@@ -7,8 +7,8 @@ date: 2026-11-25
 supersedes:
 superseded_by:
 affects: [assets, project, anim, player, editor]
-source: [assets/characters/humanoid/mocap.py, assets/characters/humanoid/animations.py, assets/characters/humanoid/build.py, crates/project/src/default_humanoid.rs, crates/anim/src/retarget.rs]
-docs: [assets/characters/humanoid/README.md, docs/research/default-humanoid.md]
+source: [assets/characters/human/mocap.py, assets/characters/human/animations.py, crates/project/src/default_humanoid.rs, crates/anim/src/retarget.rs]
+docs: [assets/characters/human/README.md, docs/research/default-humanoid.md]
 tags: [adr, animation, characters, assets]
 ---
 
@@ -58,8 +58,18 @@ The engine can already play such a file as it is: a take for another humanoid sk
 - The mannequin's proportions are near ours (hips at 0.917 m against 0.910 m), which is why turns alone carry over; a skeleton far from it would want the feet placed, not the hips corrected.
 - Revisit if the retarget in `anim` gains what this bake does (limb alignment from rest, a neutral pose for the collarbones): the bake could then be the engine's own, and a creator's library files could get the same treatment in the editor.
 
+## Notes
+
+- **2026-11-25, the same day ([ADR-0050](ADR-0050-The-Engine-Ships-One-Character-Family-MakeHumans-Body-With-Quaterniuss-Animations.md), Paul's consolidation onto one family): the bake's target is the human base's skeleton, and the keyed takes are retired.** What changed in the decisions above:
+  - *Decision 1.* The stylized humanoid and its rig are gone. `assets/characters/human/animations.py` rebuilds the skeleton out of `HumanParts.glb` (every joint a bone with the axes the file gives it) and `mocap.py` bakes onto that, so the takes are keys on the bones of the body people edit: the baked file's skeleton is the model's to 0.6 micrometres and 0.05 degrees a bone, and a clip binds by name with nothing retargeted (`anim` `the_starter_animations_play_on_the_human_bases_own_skeleton`).
+  - *Decision 2.* `Idle` is the library's idle (Paul: "swap the default Idle state to the Quaternius library's idle stance"); there is no `IdleReady`. All fifteen keyed takes are retired with the rig they were keyed on, so the motions the library lacks are gone: walking and running backward and sideways, Wave, Point, Use, Pull, Climb, Cheer, Clap, Shrug.
+  - *Decision 3.* 84 states, one for each library take; the file holds 86 takes (the walk and the jog again with root motion) and is 5.3 MB.
+  - *Decision 4.* The command is `animations.py --out <folder> --mocap <UAL1_Standard.glb> <UAL2_Standard.glb>`.
+  - *Measured on the human skeleton:* before the hips' correction the lower foot is 18 to 42 mm from the library's in the standing and running takes (the human base's legs are proportioned less like the mannequin's than the stylized rig's were) and up to 91 mm in the swim; eleven takes are lifted to keep the joints that lie on the ground out of it, by 11 to 96 mm. The human base's fit records in the walk were measured again (the men's shirt and jeans 1.77 to 4.25 mm).
+  - The status stays Proposed: Paul has not watched the takes in motion.
+
 ## Implementation references
 
-- `assets/characters/humanoid/mocap.py` (`TAKES`, `BONES`, `ALIGNED`, `SWUNG`, `Target.pose`, `GROUND`, `bake`), `build.py` (`export_animations`, `--mocap`, `--animations-only`)
+- `assets/characters/human/mocap.py` (`TAKES`, `BONES`, `ALIGNED`, `SWUNG`, `Target.pose`, `GROUND`, `bake`), `animations.py` (`skeleton`, `export`, `--mocap`)
 - `crates/project/src/default_humanoid.rs` (`STATES`, the speeds)
 - Tests: `project` `every_state_plays_a_take_the_animation_file_has_and_the_files_read`

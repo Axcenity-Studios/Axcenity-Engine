@@ -104,7 +104,7 @@ pub struct PackItem {
 /// The part of an item's catalogue entry a download needs.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct PackEntry {
-    /// The manifest's path in a library (`realistic/imports/x/X.item.json`).
+    /// The manifest's path in a library (`human/imports/x/X.item.json`).
     pub manifest: String,
     /// The item's tags (who a garment is cut for: `masculine`,
     /// `feminine`, `unisex`).
@@ -115,7 +115,7 @@ pub struct PackEntry {
 /// One file of an item.
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct PackFile {
-    /// Its path in the pack (`library/realistic/imports/x/X.glb`).
+    /// Its path in the pack (`library/human/imports/x/X.glb`).
     pub path: String,
     pub bytes: u64,
     /// Lowercase hex.
@@ -130,7 +130,7 @@ impl PackFile {
 }
 
 impl PackItem {
-    /// Its folder in a library (`realistic/imports/biker-jacket`): where
+    /// Its folder in a library (`human/imports/biker-jacket`): where
     /// every one of its files goes, by name.
     pub fn folder(&self) -> &str {
         self.catalogue
@@ -499,7 +499,7 @@ mod tests {
             .collect();
         format!(
             r#"{{ "id": "{id}", "label": "Jacket", "slot": "outerwear", "quality": "draft",
-                 "bases": ["axcenity/realistic"], "preview": "previews/jacket.png",
+                 "bases": ["axcenity/human"], "preview": "previews/jacket.png",
                  "catalogue": {{ "manifest": "{manifest}" }}, "files": [{}] }}"#,
             files.join(", ")
         )
@@ -515,15 +515,12 @@ mod tests {
         )
     }
 
-    const MANIFEST: &str = "realistic/imports/jacket/Jacket.item.json";
+    const MANIFEST: &str = "human/imports/jacket/Jacket.item.json";
 
     fn jacket_files() -> Vec<(&'static str, &'static [u8])> {
         vec![
-            ("library/realistic/imports/jacket/Jacket.glb", b"model"),
-            (
-                "library/realistic/imports/jacket/Jacket.item.json",
-                b"manifest",
-            ),
+            ("library/human/imports/jacket/Jacket.glb", b"model"),
+            ("library/human/imports/jacket/Jacket.item.json", b"manifest"),
         ]
     }
 
@@ -546,13 +543,13 @@ mod tests {
         assert_eq!(pack.name, "Test Wardrobe");
         assert_eq!(pack.refused, 0);
         let item = pack.item("test/jacket").unwrap();
-        assert_eq!(item.folder(), "realistic/imports/jacket");
+        assert_eq!(item.folder(), "human/imports/jacket");
         assert_eq!(item.manifest_name(), "Jacket.item.json");
         assert_eq!(item.bytes(), 13);
         assert!(item.is_draft());
         assert_eq!(
             pack.url(&item.files[0].path),
-            "https://example.org/wardrobe/library/realistic/imports/jacket/Jacket.glb"
+            "https://example.org/wardrobe/library/human/imports/jacket/Jacket.glb"
         );
     }
 
@@ -603,79 +600,79 @@ mod tests {
             // A file that climbs out of the pack.
             item_json(
                 "test/a",
-                "realistic/imports/a/A.item.json",
+                "human/imports/a/A.item.json",
                 &[
-                    ("library/realistic/imports/a/A.item.json", b"m"),
-                    ("library/realistic/imports/a/../../Realistic.glb", b"x"),
+                    ("library/human/imports/a/A.item.json", b"m"),
+                    ("library/human/imports/a/../../Human.glb", b"x"),
                 ],
             ),
             // A file in another item's folder.
             item_json(
                 "test/b",
-                "realistic/imports/b/B.item.json",
+                "human/imports/b/B.item.json",
                 &[
-                    ("library/realistic/imports/b/B.item.json", b"m"),
-                    ("library/realistic/imports/jacket/Jacket.glb", b"x"),
+                    ("library/human/imports/b/B.item.json", b"m"),
+                    ("library/human/imports/jacket/Jacket.glb", b"x"),
                 ],
             ),
             // A file in a folder below its own.
             item_json(
                 "test/c",
-                "realistic/imports/c/C.item.json",
+                "human/imports/c/C.item.json",
                 &[
-                    ("library/realistic/imports/c/C.item.json", b"m"),
-                    ("library/realistic/imports/c/deep/C.glb", b"x"),
+                    ("library/human/imports/c/C.item.json", b"m"),
+                    ("library/human/imports/c/deep/C.glb", b"x"),
                 ],
             ),
             // A kind of file an item isn't made of.
             item_json(
                 "test/d",
-                "realistic/imports/d/D.item.json",
+                "human/imports/d/D.item.json",
                 &[
-                    ("library/realistic/imports/d/D.item.json", b"m"),
-                    ("library/realistic/imports/d/run.sh", b"x"),
+                    ("library/human/imports/d/D.item.json", b"m"),
+                    ("library/human/imports/d/run.sh", b"x"),
                 ],
             ),
             // No manifest among its files.
             item_json(
                 "test/e",
-                "realistic/imports/e/E.item.json",
-                &[("library/realistic/imports/e/E.glb", b"x")],
+                "human/imports/e/E.item.json",
+                &[("library/human/imports/e/E.glb", b"x")],
             ),
             // At the top of a package, where the body's own files are.
             item_json(
                 "test/f",
-                "Realistic.item.json",
-                &[("library/Realistic.item.json", b"m")],
+                "Human.item.json",
+                &[("library/Human.item.json", b"m")],
             ),
             // An ID that would be a path out of the library.
             item_json(
                 "../f",
-                "realistic/imports/g/G.item.json",
-                &[("library/realistic/imports/g/G.item.json", b"m")],
+                "human/imports/g/G.item.json",
+                &[("library/human/imports/g/G.item.json", b"m")],
             ),
             // The same ID as the good one.
             item_json(
                 "test/jacket",
-                "realistic/imports/h/H.item.json",
-                &[("library/realistic/imports/h/H.item.json", b"m")],
+                "human/imports/h/H.item.json",
+                &[("library/human/imports/h/H.item.json", b"m")],
             ),
             // The same folder as the good one.
             item_json(
                 "test/i",
-                "realistic/imports/jacket/I.item.json",
-                &[("library/realistic/imports/jacket/I.item.json", b"m")],
+                "human/imports/jacket/I.item.json",
+                &[("library/human/imports/jacket/I.item.json", b"m")],
             ),
             // An empty file, and a checksum that isn't one.
             item_json(
                 "test/j",
-                "realistic/imports/j/J.item.json",
-                &[("library/realistic/imports/j/J.item.json", b"")],
+                "human/imports/j/J.item.json",
+                &[("library/human/imports/j/J.item.json", b"")],
             ),
             item_json(
                 "test/k",
-                "realistic/imports/k/K.item.json",
-                &[("library/realistic/imports/k/K.item.json", b"m")],
+                "human/imports/k/K.item.json",
+                &[("library/human/imports/k/K.item.json", b"m")],
             )
             .replace(&sum(b"m"), "nothex"),
         ];
@@ -686,7 +683,7 @@ mod tests {
         assert_eq!(ids, ["test/jacket"]);
         assert_eq!(pack.refused, bad.len());
         // The one kept is the first with its ID.
-        assert_eq!(pack.items[0].folder(), "realistic/imports/jacket");
+        assert_eq!(pack.items[0].folder(), "human/imports/jacket");
     }
 
     #[test]
@@ -724,7 +721,7 @@ mod tests {
         let temp = Temp::new("wrong");
         // The model served isn't the one the index lists (same size).
         let http = served().with(
-            &format!("{AT}library/realistic/imports/jacket/Jacket.glb"),
+            &format!("{AT}library/human/imports/jacket/Jacket.glb"),
             "MODEL",
         );
         let (pack, _) = fetch_index(&http, AT, AT).unwrap();
@@ -737,7 +734,7 @@ mod tests {
         assert_eq!(progress.done.load(Ordering::Relaxed), 0);
         // A longer answer than listed is cut off, not kept.
         let http = served().with(
-            &format!("{AT}library/realistic/imports/jacket/Jacket.glb"),
+            &format!("{AT}library/human/imports/jacket/Jacket.glb"),
             "model and more",
         );
         let error = fetch_item(&http, &pack, item, &temp.0, &Progress::default()).unwrap_err();
@@ -759,7 +756,7 @@ mod tests {
         // With the model in hand, only the manifest is asked for.
         fs::write(temp.0.join("Jacket.glb"), b"model").unwrap();
         let rest = Fixture::default().with(
-            &format!("{AT}library/realistic/imports/jacket/Jacket.item.json"),
+            &format!("{AT}library/human/imports/jacket/Jacket.item.json"),
             "manifest",
         );
         fetch_item(&rest, &pack, item, &temp.0, &Progress::default()).unwrap();

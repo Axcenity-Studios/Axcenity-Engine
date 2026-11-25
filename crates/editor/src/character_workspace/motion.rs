@@ -32,8 +32,10 @@ use axcenity_render::glam::Vec3;
 
 use super::CharacterWorkspace;
 
-/// The default character's gestures, as named by its takes.
-pub const GESTURES: [&str; 5] = ["Wave", "Point", "Cheer", "Clap", "Shrug"];
+/// The gestures the preview offers, as named by the starter animations'
+/// takes (Quaternius's library): talking, a nod, a shake of the head, a
+/// dance and reaching out to something.
+pub const GESTURES: [&str; 5] = ["IdleTalking", "Yes", "No", "Dance", "Interact"];
 
 /// Where the preview's clips are written, in the workspace's folder.
 pub const PREVIEW_CLIPS_FOLDER: &str = "assets/animations/Humanoid/Preview";

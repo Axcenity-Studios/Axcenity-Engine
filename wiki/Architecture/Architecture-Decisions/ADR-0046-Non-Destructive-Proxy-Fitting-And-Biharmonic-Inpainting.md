@@ -7,7 +7,7 @@ date: 2026-11-24
 supersedes: ADR-0044
 superseded_by:
 affects: [avatar, assets]
-source: [crates/avatar/src/fit/proxy.rs, crates/avatar/src/fit/inpaint.rs, crates/avatar/src/fit/bind.rs, crates/avatar/src/fit/transfer.rs, crates/avatar/src/fit/validate.rs, crates/avatar/src/fit/import.rs, crates/avatar/src/resolve.rs, assets/characters/realistic/clothing/generated/prep_meshy_garments.py]
+source: [crates/avatar/src/fit/proxy.rs, crates/avatar/src/fit/inpaint.rs, crates/avatar/src/fit/bind.rs, crates/avatar/src/fit/transfer.rs, crates/avatar/src/fit/validate.rs, crates/avatar/src/fit/import.rs, crates/avatar/src/resolve.rs]
 docs: [docs/development/character-studio/architecture.md, docs/research/character-clothing-workflow.md, crates/avatar/CLAUDE.md]
 tags: [adr, characters, clothing, assets]
 ---
@@ -44,3 +44,7 @@ The 2026-11-24 Character Studio audit found that while Axcenity's **runtime** ch
 - Single-morph lever-arm blowups are eliminated; sub-0.5 mm morph targets are pruned to reduce fitted `.glb` sizes.
 - `faer` (MIT) is pinned in workspace `Cargo.toml`, and both `faer` and `RobustSkinWeightsTransferCode` (MIT) are attributed in `NOTICE`.
 - Runtime crates (`anim`, `assets`, `gameplay`, `render`) require zero changes because `gameplay::description` already applies `ResolvedPart::shapes` live through CO8 compute posing.
+
+## Notes
+
+- **2026-11-25 ([ADR-0050](ADR-0050-The-Engine-Ships-One-Character-Family-MakeHumans-Body-With-Quaterniuss-Animations.md)).** The realistic package was removed, and with it the garments made with Meshy, `prep_meshy_garments.py` and the test tee's record tests. The engine code stays (`avatar::fit`: `proxy.rs`, `bind.rs`, `inpaint.rs`, `transfer.rs`, `validate.rs`, the import flow) with its unit tests, but no shipped asset exercises it: the human base's garments are MakeHuman's clothes converted as `fit: shapes` items, not fitted this way. `Shrink_Under` (decision 6) is still worn: the human base's cut underwear has the shape and `avatar::resolve` turns it on under anything worn over it.

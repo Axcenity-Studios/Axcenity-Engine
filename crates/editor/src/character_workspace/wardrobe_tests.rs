@@ -51,17 +51,17 @@ const GARMENTS: [Garment; 2] = [
         id: TEE,
         label: "Wardrobe tee",
         slot: "top",
-        folder: "realistic/imports/wardrobe-tee",
-        from: "realistic/clothing/crew-tee",
-        name: "Shirt_CrewTee",
+        folder: "human/imports/wardrobe-tee",
+        from: "human/wardrobe/crude_male_shirt",
+        name: "CrudeMaleShirt",
     },
     Garment {
         id: JOGGERS,
         label: "Wardrobe joggers",
         slot: "bottom",
-        folder: "realistic/imports/wardrobe-joggers",
-        from: "realistic/clothing/joggers",
-        name: "Pants_Joggers",
+        folder: "human/imports/wardrobe-joggers",
+        from: "human/wardrobe/cargo_pants",
+        name: "CargoPants",
     },
 ];
 
@@ -80,6 +80,10 @@ impl Garment {
         manifest["id"] = self.id.into();
         manifest["label"] = self.label.into();
         manifest["quality"] = "draft".into();
+        // (Its cover map isn't one of the pack's files.)
+        if let Some(fields) = manifest.as_object_mut() {
+            fields.remove("cover_map");
+        }
         let path = |ending: &str| format!("library/{}/{}.{ending}", self.folder, self.name);
         vec![
             (
@@ -139,7 +143,7 @@ fn served_with(item: impl Fn(&Garment) -> (String, String)) -> Served {
         files.push((format!("{AT}{}", garment.picture()), picture));
         items.push(serde_json::json!({
             "id": id, "label": garment.label, "kind": "garment", "slot": garment.slot,
-            "quality": "draft", "bases": ["axcenity/realistic"],
+            "quality": "draft", "bases": ["axcenity/human"],
             "preview": garment.picture(),
             "catalogue": { "manifest": manifest },
             "files": listed,
@@ -175,7 +179,7 @@ impl Served {
     }
 }
 
-/// A workspace on the realistic default character, on the Clothing page,
+/// A workspace on the default character, on the Clothing page,
 /// whose wardrobe is answered by `http`.
 fn workspace(name: &str, http: impl Http + 'static) -> (PathBuf, CharacterWorkspace) {
     let folder = test_folder(name);
@@ -254,7 +258,7 @@ fn the_wardrobe_is_listed_only_when_asked_and_kept_for_next_time() {
     assert!(workspace.wardrobe.fresh);
     assert_eq!(workspace.wardrobe.state(TEE), State::Available);
     assert_eq!(workspace.wardrobe.state(JOGGERS), State::Available);
-    assert_eq!(workspace.wardrobe.missing("axcenity/realistic").0, 2);
+    assert_eq!(workspace.wardrobe.missing("axcenity/human").0, 2);
     // Its pictures came with it, into the wardrobe's own folder.
     let pictures = folder.join(wardrobe::FOLDER).join("previews").join("0.1.0");
     assert!(pictures.join("wardrobe-test-tee.png").is_file());
@@ -317,7 +321,7 @@ fn a_downloaded_garment_is_in_the_library_worn_and_removed_again() {
     assert_eq!(item.label, "Wardrobe tee");
     assert_eq!(
         library.manifest_path(TEE),
-        Some("realistic/imports/wardrobe-tee/Shirt_CrewTee.item.json")
+        Some("human/imports/wardrobe-tee/CrudeMaleShirt.item.json")
     );
     let root = folder.join(LIBRARY_FOLDER);
     for (path, bytes) in GARMENTS[0].files() {
@@ -363,7 +367,7 @@ fn a_downloaded_garment_is_in_the_library_worn_and_removed_again() {
     assert_eq!(workspace.notice, None, "the garment couldn't be worn");
     let worn = workspace.worn();
     assert!(
-        worn.iter().any(|part| part.contains("Shirt_CrewTee")),
+        worn.iter().any(|part| part.contains("CrudeMaleShirt")),
         "{worn:?}"
     );
 
@@ -379,12 +383,12 @@ fn a_downloaded_garment_is_in_the_library_worn_and_removed_again() {
     });
     ask(&mut workspace, Ask::Remove(TEE.to_owned()));
     assert!(workspace.library().item(TEE).is_none());
-    assert!(!root.join("realistic/imports/wardrobe-tee").exists());
+    assert!(!root.join("human/imports/wardrobe-tee").exists());
     assert_eq!(workspace.wardrobe.state(TEE), State::Available);
     let (read, catalogue, problems) = Library::read(&root);
     assert!(problems.is_empty(), "{problems:?}");
     assert_eq!(catalogue, Some(Catalogue::of(&read)));
-    assert!(read.item("axcenity/realistic-crew-tee").is_some());
+    assert!(read.item("makehuman/crude-male-shirt").is_some());
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -395,7 +399,7 @@ fn download_all_gets_every_garment_one_after_another() {
     ask(&mut workspace, Ask::GetAll);
     let library = workspace.library();
     assert!(library.item(TEE).is_some() && library.item(JOGGERS).is_some());
-    assert_eq!(workspace.wardrobe.missing("axcenity/realistic"), (0, 0));
+    assert_eq!(workspace.wardrobe.missing("axcenity/human"), (0, 0));
     assert!(workspace.wardrobe.queue.is_empty());
     // Asked for again, there is nothing to get.
     workspace.apply(Intent::Wardrobe(Ask::GetAll));
@@ -408,7 +412,7 @@ fn download_all_gets_every_garment_one_after_another() {
 fn a_file_that_isnt_the_one_listed_never_reaches_the_library() {
     let served = served();
     // The tee's model answers with other bytes of the same length.
-    let model = format!("{AT}library/realistic/imports/wardrobe-tee/Shirt_CrewTee.glb");
+    let model = format!("{AT}library/human/imports/wardrobe-tee/CrudeMaleShirt.glb");
     let length = served
         .files
         .iter()
@@ -432,12 +436,7 @@ fn a_file_that_isnt_the_one_listed_never_reaches_the_library() {
     assert!(workspace.library().item(TEE).is_none());
     assert!(workspace.library().item(JOGGERS).is_none());
     assert_eq!(catalogue_text(&folder), before);
-    assert!(
-        !folder
-            .join(LIBRARY_FOLDER)
-            .join("realistic/imports")
-            .exists()
-    );
+    assert!(!folder.join(LIBRARY_FOLDER).join("human/imports").exists());
     assert_eq!(workspace.wardrobe.state(TEE), State::Available);
     assert!(!workspace.browser.show_drafts);
     let _ = std::fs::remove_dir_all(&folder);
@@ -458,7 +457,7 @@ fn a_character_that_names_a_garment_wears_it_once_it_is_downloaded() {
         workspace
             .worn()
             .iter()
-            .any(|part| part.contains("Shirt_CrewTee"))
+            .any(|part| part.contains("CrudeMaleShirt"))
     };
     assert!(!shown(&workspace));
     ask(&mut workspace, Ask::List);
@@ -539,10 +538,10 @@ fn the_librarys_own_items_are_never_written_over() {
     // A pack whose tee has the shipped crew tee's ID, and whose joggers
     // go into the shipped joggers' folder under an ID of their own.
     let odd = served_with(|garment| match garment.id {
-        TEE => ("axcenity/realistic-crew-tee".to_owned(), garment.manifest()),
+        TEE => ("makehuman/crude-male-shirt".to_owned(), garment.manifest()),
         _ => (
             garment.id.to_owned(),
-            "realistic/clothing/joggers/Pants_Joggers.item.json".to_owned(),
+            "human/wardrobe/cargo_pants/CargoPants.item.json".to_owned(),
         ),
     });
     // The joggers' files are listed in their own folder, so the pack's
@@ -554,13 +553,13 @@ fn the_librarys_own_items_are_never_written_over() {
     ask(&mut workspace, Ask::List);
     let before = catalogue_text(&folder);
     assert_eq!(
-        workspace.wardrobe.state("axcenity/realistic-crew-tee"),
+        workspace.wardrobe.state("makehuman/crude-male-shirt"),
         State::Taken
     );
     // Asked for anyway, it isn't downloaded.
     ask(
         &mut workspace,
-        Ask::Get("axcenity/realistic-crew-tee".to_owned()),
+        Ask::Get("makehuman/crude-male-shirt".to_owned()),
     );
     assert_eq!(catalogue_text(&folder), before);
     assert!(has(&draw(&mut workspace), "Yours"));
@@ -584,14 +583,14 @@ fn the_librarys_own_items_are_never_written_over() {
         staging
     };
     let tee = &pack.items[0];
-    let staging = stage("staged-tee", &GARMENTS[0], "axcenity/realistic-crew-tee");
+    let staging = stage("staged-tee", &GARMENTS[0], "makehuman/crude-male-shirt");
     let refused = wardrobe::install(&root, tee, &staging).unwrap_err();
     assert!(refused.contains("of its own with that ID"), "{refused}");
 
     let mut joggers = served().pack().items[1].clone();
-    joggers.catalogue.manifest = "realistic/clothing/joggers/Pants_Joggers.item.json".to_owned();
+    joggers.catalogue.manifest = "human/wardrobe/cargo_pants/CargoPants.item.json".to_owned();
     let staging = stage("staged-joggers", &GARMENTS[1], JOGGERS);
-    let shipped = root.join("realistic/clothing/joggers/Pants_Joggers.item.json");
+    let shipped = root.join("human/wardrobe/cargo_pants/CargoPants.item.json");
     let shipped_before = std::fs::read(&shipped).unwrap();
     let refused = wardrobe::install(&root, &joggers, &staging).unwrap_err();
     assert!(refused.contains("holds something else"), "{refused}");
@@ -618,7 +617,7 @@ fn a_newer_version_in_the_wardrobe_is_offered_as_an_update() {
     // The library's copy is no longer the file the index lists.
     let thumbnail = folder
         .join(LIBRARY_FOLDER)
-        .join("realistic/imports/wardrobe-tee/Shirt_CrewTee.png");
+        .join("human/imports/wardrobe-tee/CrudeMaleShirt.png");
     std::fs::write(&thumbnail, b"an older picture").unwrap();
     ask(&mut workspace, Ask::List);
     assert_eq!(workspace.wardrobe.state(TEE), State::Outdated);

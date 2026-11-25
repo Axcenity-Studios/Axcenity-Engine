@@ -62,7 +62,7 @@ pub use material::{
     Colour, MaterialRole, MaterialSlot, MaterialValue, MaterialValues, ShadingModel, ValueKind,
     ValueSpec,
 };
-pub use migrate::{V1_BASE, V1_ITEMS};
+pub use migrate::{DEFAULT_BASE, V1_BASE, V1_ITEMS};
 pub use model_check::{ModelContents, ModelRef};
 pub use preset::{
     PRESET_SUFFIX, PresetInfo, PresetKind, apply_preset, check_preset, matches_preset,

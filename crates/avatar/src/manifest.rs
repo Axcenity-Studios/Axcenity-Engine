@@ -18,10 +18,10 @@ pub const BASE_VERSION: u32 = 1;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BaseManifest {
     pub format_version: u32,
-    /// Its ID in the library, such as `axcenity/stylized`.
+    /// Its ID in the library, such as `axcenity/human`.
     pub id: String,
     pub label: String,
-    /// The body family (`stylized`, `realistic`): items name the base
+    /// The body family (`human`): items name the base
     /// models they fit, families only group them.
     pub family: String,
     pub model: BaseModel,
@@ -173,7 +173,8 @@ pub struct Drive {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensitivity: Option<f32>,
     /// The drive on a frame whose own shapes move the anchor otherwise
-    /// (the realistic waist's `<Frame>_Waist_*`); `axis` and `travel` are
+    /// (a waist with a shape for each frame, as the retired realistic
+    /// base's `<Frame>_Waist_*`); `axis` and `travel` are
     /// the default frame's, and hold on every frame not listed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub frames: Vec<FrameDrive>,
@@ -295,7 +296,7 @@ pub struct Parameter {
     pub material_values: Vec<MaterialDriver>,
     /// Named values to pick from instead of a slider (Character Studio
     /// shows a button each, and keeps the parameter at one of them): the
-    /// realistic body's `frame` is Male (0) or Female (1).
+    /// human body's `frame` is Male (0) or Female (1).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub choices: Vec<Choice>,
     /// One sentence: the friendly description and the tooltip.
@@ -322,8 +323,8 @@ pub struct Choice {
     pub value: f32,
     pub label: String,
     /// Items picking it puts on (in their slots), taking off the items the
-    /// parameter's other choices name: the realistic body's Female wears a
-    /// bra and briefs, its Male boxer briefs.
+    /// parameter's other choices name: the human body's Female wears a
+    /// bandeau with the boxer briefs its Male wears.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub items: Vec<String>,
 }
@@ -472,6 +473,14 @@ pub struct Slot {
     /// character isn't always bald.
     #[serde(default, skip_serializing_if = "is_false")]
     pub random_drafts: bool,
+    /// Slots whose item takes this slot's item off the character: while
+    /// one of them is filled, what is worn here stays worn but isn't
+    /// drawn and hides nothing. The human base's cut underwear says so
+    /// (`underwear_bottom` under `bottom`, `underwear_top` under `top`:
+    /// Paul, 2026-11-25), so no trousers, shorts or top shows it round
+    /// its edges.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_by: Vec<String>,
     /// What wearing nothing here is called ("Bald"); "None" when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub empty_label: Option<String>,
@@ -711,6 +720,14 @@ impl BaseManifest {
         unique(p, "slots", self.slots.iter().map(|slot| &slot.id));
         for (index, slot) in self.slots.iter().enumerate() {
             check_about(p, &format!("slots[{index}]"), &slot.about);
+            for over in &slot.hidden_by {
+                if *over == slot.id || self.slot(over).is_none() {
+                    p.push(Problem::new(
+                        format!("slots[{index}].hidden_by"),
+                        format!("`{over}` is not another slot of this base model"),
+                    ));
+                }
+            }
         }
         unique(p, "sockets", self.sockets.iter().map(|socket| &socket.name));
         unique(p, "materials", self.materials.iter().map(|m| &m.name));

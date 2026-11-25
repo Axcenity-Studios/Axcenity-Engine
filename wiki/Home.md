@@ -88,10 +88,10 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-25 | ADR-0050, Characters, Character Data, Animation, System inventory | The engine ships one character family, the human base on MakeHuman's body: the realistic and stylized packages are removed, the default humanoid's model is the base's default body, a project's library holds what its characters name, and the starter animations are Quaternius's 84 takes alone (the keyed ones retired) |
 | 2026-11-25 | ADR-0049, Animation, Known limitations | The starter animations are Quaternius's Universal Animation Library (CC0), baked onto the Humanoid skeleton: 84 captured takes beside 15 keyed ones |
 | 2026-11-25 | ADR-0047, Characters, Known limitations | The human base's underwear and the shoes' socks no longer come through outfits (whole cover maps on MakeHuman's clothes), and the feminine frame's elbows are no longer notched (body shapes posed about their own joints) |
 | 2026-11-25 | Known limitations | The human base's face handles are drawn (their drives had no screen directions), slider names fit the panel, the Skin page lists only what a slot offers; two more failing record tests of the realistic tee logged |
 | 2026-11-24 | ADR-0048, ADR-0047, Characters, Known limitations | The human base's polish pass: skin shading with tone controls and a fade between ages, brows and lashes as hair, hair highlights and colours, named face sliders with handles and presets, clean underwear hems, the base in the fit gate |
-| 2026-11-24 | ADR-0047, Characters, Known limitations | The human base has hair: MakeHuman's hairstyles as groom items on the Hair shading model, with colour variants (`hair.py`) |
 
 Keep the five newest rows here; the full list is [Documentation history](Changelog/Documentation-History.md).

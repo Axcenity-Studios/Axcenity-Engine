@@ -1,5 +1,5 @@
 //! The Skin and Makeup page's material values: every value the base's skin
-//! materials take (`avatar::ShadingModel::Skin`; the realistic body's slot
+//! materials take (`avatar::ShadingModel::Skin`; the human body's slot
 //! is "Skin"), a slider for a number and a colour button for a colour. A
 //! value left at its neutral setting is not written, so the material looks
 //! as made.

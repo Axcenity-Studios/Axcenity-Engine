@@ -1,22 +1,18 @@
-//! CO9's fit gate (`docs/development/character-studio/asset-quality.md`
-//! §3): garments worn by the realistic cast, applied and posed by the
+//! The fit gate (`docs/development/character-studio/asset-quality.md`
+//! §3): garments worn by the human base's cast, applied and posed by the
 //! player as a game poses them (`character_capture`'s stage), with no
 //! body vertex more than 1 mm outside a garment where the garment covers
-//! it, and no lower layer through an upper one. The garments: every
-//! shipped realistic item (the underwear, each on the frame that wears
-//! it) and the imported test tee (`avatar`'s `tests/fixtures/test-tee`,
-//! not made from the body) on both frames, over the underwear. The
-//! bodies: the cast of both frames and the body benchmarks' composition
-//! and proportion extremes. The poses: rest, the body suite's four held
-//! poses and a walk frame. Wearing the tee hides the body regions it
-//! covers whole, live.
+//! it, no lower layer through an upper one, and no skin a garment hides
+//! out from under its cloth. The garments: the underwear cut from the
+//! body, MakeHuman's two system outfits on the whole cast, and every
+//! garment of the repository's wardrobe on its own. The poses: rest, the
+//! T-pose and a frame of the walk.
 
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::path::PathBuf;
 
 use axcenity_assets::{Assets, Model};
-use axcenity_avatar::fit::{ImportRequest, Surface, import_garment, uncovered};
-use axcenity_avatar::{Catalogue, CatalogueBase, CatalogueItem, Description, Library, WornItem};
+use axcenity_avatar::fit::{Surface, uncovered};
+use axcenity_avatar::{Description, WornItem};
 use axcenity_core::{ClassName, InstanceId, Value, World};
 use axcenity_render::glam::{Mat3, Vec3};
 
@@ -28,193 +24,6 @@ const FACE_PARTS: [&str; 7] = [
 ];
 /// The worst a body vertex may be outside a garment that covers it.
 pub(super) const POKE: f32 = 0.001;
-pub(super) const TEE: &str = "imported/test-tee";
-
-/// A library of the realistic base, its underwear and the test tee
-/// imported over the sports bra. It is made once per build of the tests
-/// and shared by every test process: kept under the target folder
-/// (`target/<profile>/fit-gate/<key>`), keyed by this test binary, the
-/// tee's file and the shipped files it is made from, and made by one
-/// process while the others wait. Older ones are removed.
-pub(super) fn gate_library() -> &'static Path {
-    static LIBRARY: OnceLock<PathBuf> = OnceLock::new();
-    LIBRARY.get_or_init(|| {
-        let shipped = repository_library();
-        let (library, _, problems) = Library::read(&shipped);
-        assert!(problems.is_empty(), "{problems:?}");
-        let base = library.base("axcenity/realistic").unwrap();
-        let base_path = library.manifest_path(&base.id).unwrap();
-        let mut files = vec![
-            base_path.to_owned(),
-            library.path_of(&base.id, &base.model.file).unwrap(),
-            library
-                .path_of(&base.id, base.model.regions_map.as_deref().unwrap())
-                .unwrap(),
-        ];
-        let mut catalogue = Catalogue {
-            format_version: 1,
-            bases: vec![CatalogueBase::of(base_path, base)],
-            items: Vec::new(),
-            presets: Vec::new(),
-        };
-        for (id, item) in &library.items {
-            if item.bases.contains(&base.id) {
-                let path = library.manifest_path(id).unwrap();
-                files.push(path.to_owned());
-                catalogue.items.push(CatalogueItem::of(path, item));
-            }
-        }
-        files.sort();
-        let tee = tee_source();
-        let key = {
-            use std::hash::{Hash, Hasher};
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
-            let exe = std::env::current_exe().unwrap();
-            let made = std::fs::metadata(&exe).unwrap();
-            (made.len(), made.modified().ok()).hash(&mut hasher);
-            std::fs::read(&tee).unwrap().hash(&mut hasher);
-            for file in &files {
-                file.hash(&mut hasher);
-                std::fs::read(shipped.join(file)).unwrap().hash(&mut hasher);
-            }
-            format!("{:016x}", hasher.finish())
-        };
-        let cache = gate_cache();
-        shared_once(&cache, &key, |made| {
-            for file in &files {
-                let target = made.join(file);
-                std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-                std::fs::copy(shipped.join(file), &target).unwrap();
-            }
-            std::fs::write(made.join("catalogue.json"), catalogue.to_json()).unwrap();
-            let imported = import_garment(&ImportRequest {
-                source: tee.clone(),
-                library: made.to_owned(),
-                base: "axcenity/realistic".to_owned(),
-                id: TEE.to_owned(),
-                label: "Test tee".to_owned(),
-                folder: "imported/test-tee".to_owned(),
-                source_info: axcenity_avatar::Source {
-                    author: "Axcenity Engine contributors".to_owned(),
-                    licence: "CC0-1.0".to_owned(),
-                    url: None,
-                },
-                slot: None,
-                layer: None,
-                margin: 0.002,
-                under: vec!["axcenity/realistic-sports-bra".to_owned()],
-                about: None,
-                finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
-                also_fills: Vec::new(),
-                tags: Vec::new(),
-                limitations: Vec::new(),
-                home_frame: axcenity_avatar::fit::HomeFrame::Masculine,
-                proxy_kind: axcenity_avatar::fit::ProxyKind::Body,
-                sleeveless: false,
-                skip_align: false,
-                generate_shrink_under: true,
-                strict_validate: false,
-                texture_size: None,
-            })
-            .expect("the test tee imports");
-            // What it hides, and what it covers at rest but leaves drawn
-            // because the skin comes out from under it in a fit pose.
-            println!(
-                "the test tee hides {:?}; not {:?}",
-                imported.manifest.hides,
-                imported
-                    .unhidden
-                    .iter()
-                    .map(|(id, out)| format!("{id} ({:.1} mm out)", out * 1000.0))
-                    .collect::<Vec<_>>()
-            );
-        });
-        cache.join(&key)
-    })
-}
-
-fn tee_source() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../avatar/tests/fixtures/test-tee/TestTee.obj")
-}
-
-/// Where the gate's libraries are kept: beside this test binary's
-/// profile folder (`target/debug/fit-gate`), not the system's temporary
-/// folder, which nothing cleans.
-fn gate_cache() -> PathBuf {
-    let exe = std::env::current_exe().unwrap();
-    // target/<profile>/deps/<binary>
-    let profile = exe.parent().and_then(Path::parent).unwrap();
-    profile.join("fit-gate")
-}
-
-/// Makes `cache/key` once with `make` (given an empty folder to fill),
-/// shared by every process that asks: the first takes a lock file and
-/// makes it in a folder of its own, then renames that into place; the
-/// others wait for it. A lock older than ten minutes is a crashed
-/// process's and is taken over. Folders of other keys more than an hour
-/// old (earlier builds) are removed.
-fn shared_once(cache: &Path, key: &str, make: impl FnOnce(&Path)) {
-    use std::time::{Duration, SystemTime};
-    let age = |path: &Path| {
-        std::fs::metadata(path)
-            .and_then(|m| m.modified())
-            .ok()
-            .and_then(|m| SystemTime::now().duration_since(m).ok())
-            .unwrap_or_default()
-    };
-    std::fs::create_dir_all(cache).unwrap();
-    let done = cache.join(key);
-    let lock = cache.join(format!("{key}.lock"));
-    let started = std::time::Instant::now();
-    let mut make = Some(make);
-    while !done.is_dir() {
-        let taken = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&lock)
-            .is_ok();
-        if taken {
-            let making = cache.join(format!("{key}.{}", std::process::id()));
-            let _ = std::fs::remove_dir_all(&making);
-            std::fs::create_dir_all(&making).unwrap();
-            (make.take().expect("made once"))(&making);
-            if std::fs::rename(&making, &done).is_err() {
-                // Another process (past a stale lock) finished first.
-                let _ = std::fs::remove_dir_all(&making);
-            }
-            let _ = std::fs::remove_file(&lock);
-            break;
-        }
-        if age(&lock) > Duration::from_secs(600) {
-            let _ = std::fs::remove_file(&lock);
-            continue;
-        }
-        assert!(
-            started.elapsed() < Duration::from_secs(600),
-            "waited ten minutes for {}",
-            done.display()
-        );
-        std::thread::sleep(Duration::from_millis(250));
-    }
-    for entry in std::fs::read_dir(cache).into_iter().flatten().flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with(key) || age(&path) < Duration::from_secs(3600) {
-            continue;
-        }
-        if path.is_dir() {
-            let _ = std::fs::remove_dir_all(path);
-        } else {
-            let _ = std::fs::remove_file(path);
-        }
-    }
-}
-
-/// The benchmark descriptions of the gate: the cast of both frames and
-/// the body extremes (`assets/characters/benchmarks`).
-pub(super) fn bodies() -> Vec<Description> {
-    benchmarks("realistic-")
-}
 
 /// The cast and body benchmarks whose names start with `family`.
 pub(super) fn benchmarks(family: &str) -> Vec<Description> {
@@ -582,34 +391,17 @@ pub(super) fn holes(
 /// The name holes are recorded under in the gate.
 pub(super) const HOLES: &str = "hidden skin showing";
 
-/// Layered pairs the gate checks: (the lower layer, the upper one). A
-/// lower layer never comes through the upper one where the upper one
-/// covers it at rest.
-const LAYERS: [(&str, &str); 10] = [
-    // The realistic sports bra under the test tee.
-    ("Underwear_Bra", "TestTee"),
-    // The stylized cargo pants' waistband under the tee's hem, and the
-    // sports top under the tee.
-    ("Pants_Cargo", "Shirt_Tee"),
-    ("Underwear_Top", "Shirt_Tee"),
-    // The first realistic wardrobe (`wardrobe_tests`): the joggers'
-    // waistband under the tee's hem, the underwear under each.
-    ("Pants_Joggers", "Shirt_CrewTee"),
-    ("Underwear_Bra", "Shirt_CrewTee"),
-    ("Underwear_BoxerBriefs", "Pants_Joggers"),
-    ("Underwear_Briefs", "Pants_Joggers"),
-    // The human base's cut underwear under MakeHuman's outfits.
-    ("BoxerBriefs", "MaleCasualsuit01"),
-    ("BoxerBriefs", "FemaleCasualsuit01"),
-    ("Bandeau", "FemaleCasualsuit01"),
-];
+/// The lower layers the gate checks under whatever else is worn: the
+/// human base's cut underwear. A lower layer never comes through an upper
+/// one where the upper one covers it at rest.
+const UNDER: [&str; 2] = ["BoxerBriefs", "Bandeau"];
 
 /// The cover each garment of `garments` gives at rest: (garment name,
-/// covered body corners), and for each layered pair worn
-/// ([`LAYERS`]), the lower layer's corners the upper one covers.
+/// covered body corners), and for each lower layer worn ([`UNDER`]) and
+/// each garment over it, the lower layer's corners the upper one covers.
 pub(super) struct Cover {
     pub body: Vec<(String, Vec<bool>)>,
-    layers: Vec<(&'static str, &'static str, Vec<bool>)>,
+    layers: Vec<(String, String, Vec<bool>)>,
     /// The body triangles the worn items hide ([`hidden_triangles`]),
     /// checked for holes in every pose.
     hidden: Vec<[u32; 3]>,
@@ -618,7 +410,18 @@ pub(super) struct Cover {
 /// `bare` is the same body at rest with nothing worn, to find the skin
 /// the worn items hide.
 pub(super) fn cover_at_rest(body: &Posed, garments: &[Posed], bare: &Posed) -> Cover {
-    let find = |name: &str| garments.iter().find(|g| g.name == name);
+    let mut layers = Vec::new();
+    for lower in garments.iter().filter(|g| UNDER.contains(&g.name.as_str())) {
+        for upper in garments {
+            if UNDER.contains(&upper.name.as_str()) || is_footwear(upper) {
+                continue;
+            }
+            let covered = covered(lower, upper, 0.02);
+            if covered.contains(&true) {
+                layers.push((lower.name.clone(), upper.name.clone(), covered));
+            }
+        }
+    }
     Cover {
         hidden: hidden_triangles(bare, body),
         body: garments
@@ -626,13 +429,7 @@ pub(super) fn cover_at_rest(body: &Posed, garments: &[Posed], bare: &Posed) -> C
             .filter(|g| !is_footwear(g))
             .map(|g| (g.name.clone(), covered(body, g, 0.04)))
             .collect(),
-        layers: LAYERS
-            .iter()
-            .filter_map(|&(lower, upper)| match (find(lower), find(upper)) {
-                (Some(l), Some(u)) => Some((lower, upper, covered(l, u, 0.02))),
-                _ => None,
-            })
-            .collect(),
+        layers,
     }
 }
 
@@ -643,9 +440,11 @@ pub(super) fn undressed(description: &Description) -> Description {
     bare
 }
 
-/// Shoes are measured by the footwear check (`garment_checks`), which
-/// knows a closed shoe's inside (the foot over the shoe's inner floor is
-/// inside it, not through it): not by the cover rule here.
+/// Shoes made for the footwear check (`garment_checks`, which knows a
+/// closed shoe's inside: the foot over the shoe's inner floor is inside
+/// it, not through it) are named `Shoes_…` and left out of the cover rule
+/// here. MakeHuman's shoes (`Shoes01`…) aren't: they are measured as any
+/// garment is.
 pub(super) fn is_footwear(garment: &Posed) -> bool {
     garment.name.starts_with("Shoes_")
 }
@@ -839,158 +638,6 @@ pub(super) fn check(label: &str, failures: &[Failure], known: &[Known]) {
     assert!(problems.is_empty(), "{label}: {problems:#?}");
 }
 
-/// Runs the gate for `stance` on every body and reports every case.
-fn gate(stance: Stance, known: &[Known]) {
-    let label = pose_name(stance);
-    let stage = Stage::new(&format!("fit-gate-{label}"), gate_library()).expect("the stage");
-    let mut failures = Vec::new();
-    let mut checked = 0;
-    let started = std::time::Instant::now();
-    for description in bodies() {
-        let mut dressed = description.clone();
-        dressed.items.push(WornItem::new(TEE));
-        let (body, garments) = worn(&stage.assets, &dressed, Stance::Rest);
-        let names: Vec<&str> = garments.iter().map(|g| g.name.as_str()).collect();
-        assert!(
-            names.contains(&"TestTee"),
-            "{}: {names:?}",
-            description.name
-        );
-        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
-        let cover = cover_at_rest(&body, &garments, &bare);
-        let (body, garments) = if stance == Stance::Rest {
-            (body, garments)
-        } else {
-            worn(&stage.assets, &dressed, stance)
-        };
-        checked += measure(
-            &description.name,
-            stance,
-            &body,
-            &garments,
-            &cover,
-            &mut failures,
-        );
-    }
-    println!(
-        "fit gate {label}: {checked} garment checks in {:.1} s, {} failing",
-        started.elapsed().as_secs_f32(),
-        failures.len()
-    );
-    check(&label, &failures, known);
-}
-
-// What the realistic gate still finds (wave 4, CO9 part 2), per garment
-// and pose: open defects of drafts (`refinement/wave4/co9-fit-2.md`), not
-// accepted behaviour. Lower these as items improve; never raise one to
-// pass an item.
-//
-// - The test tee in the walk: every body (54), up to 30.2 mm (31.4 at the
-//   wave-3 merge), at the front of the armpit and the side under it as
-//   the arm swings back, where the cloth bridging the arm and the side
-//   follows the arm. Review fixes 1 brought this to 50 bodies at 23.7 mm
-//   by hiding the torso and the upper arm under the sleeve; review fixes
-//   2 found that hiding left holes (hidden skin out from under the cloth:
-//   up to 38 mm in the walk on 38 bodies, 45 mm at rest on 25 heavy
-//   ones), so the tee now hides only what stays covered in every fit
-//   pose, the waist, and this record is back at its first wave-4 value.
-//   The bra through it: 21 bodies, 17.4 mm, at the front of the armpit
-//   and the side band under it.
-// - The test tee with the arms raised: 2 bodies, 5.1 mm (every body, 16
-//   mm, at wave 3), at the base of the neck; back at its first wave-4
-//   value for the same reason. The bra through it: none since it is
-//   hidden under the tee (2 bodies, 3.6 mm before).
-// - Holes (`HOLES`): none. Every pose of the gate checks them.
-// - The boxer briefs: none. The masculine heavy-soft body's one corner
-//   (13.3 mm at rest, 17.9 mm in the walk) was skin beside the leg
-//   opening at the gusset's edge, nearest the rim folded under the hem
-//   (15 mm away) and counted covered by cloth 34 mm off: `covered` now
-//   leaves skin nearer a hem than the cloth over it (`BESIDE_HEM`) out.
-
-/// The name a lower layer coming through the tee is recorded under.
-const BRA_THROUGH_TEE: &str = "Underwear_Bra through TestTee";
-
-#[test]
-fn garments_cover_the_cast_at_rest() {
-    gate(Stance::Rest, &[]);
-}
-
-/// The walk at its widest swing (the right arm back 43 degrees, the left
-/// forward 25).
-#[test]
-fn garments_cover_the_cast_walking() {
-    gate(
-        Stance::Clip {
-            name: "Walk",
-            frames: 18,
-        },
-        &[
-            Known {
-                garment: "TestTee",
-                pose: "Walk@18",
-                cases: 54,
-                worst: 0.0302,
-            },
-            Known {
-                garment: BRA_THROUGH_TEE,
-                pose: "Walk@18",
-                cases: 21,
-                // 17.4 mm before the forearms were turned at ease
-                // (2026-11-24): the walk's arms hang a little otherwise.
-                // 17.6 mm before the bra was hidden where it is well
-                // under the tee (the same evening: it borrows the body's
-                // texture coordinates).
-                worst: 0.0153,
-            },
-            // Since the tee has a cover map (ADR-0045): at the widest
-            // swing a few hidden corners of the side and the arm have no
-            // cloth over them (the cloth bridging the arm and the side
-            // follows the arm back), on six bodies.
-            Known {
-                garment: HOLES,
-                pose: "Walk@18",
-                cases: 6,
-                // 10.3 mm before hidden skin was tried in the fit's
-                // poses (`cover::Proof`).
-                worst: 0.0088,
-            },
-        ],
-    );
-}
-
-#[test]
-fn garments_cover_the_cast_with_the_arms_out() {
-    gate(Stance::Held(HeldPose::TPose), &[]);
-}
-
-#[test]
-fn garments_cover_the_cast_with_the_arms_raised() {
-    gate(
-        Stance::Held(HeldPose::ArmsRaised),
-        &[
-            Known {
-                garment: "TestTee",
-                pose: "ArmsRaised",
-                cases: 2,
-                // 5.2 mm before its cover map hid the skin under it.
-                worst: 0.0038,
-            },
-            // The bra through it (2 bodies, 3.6 mm) went when the bra
-            // was hidden where it is well under the tee.
-        ],
-    );
-}
-
-#[test]
-fn garments_cover_the_cast_with_the_elbows_bent() {
-    gate(Stance::Held(HeldPose::ElbowsBent), &[]);
-}
-
-#[test]
-fn garments_cover_the_cast_with_the_knees_bent() {
-    gate(Stance::Held(HeldPose::KneesBent), &[]);
-}
-
 /// The ratchet: a garment and pose recorded in `known` passes at its
 /// record and fails past it, or when its defect is gone or well under the
 /// record (the record must come down); one not recorded fails on any case.
@@ -1089,153 +736,11 @@ fn skin_nearer_a_hem_than_the_cloth_over_it_is_not_covered() {
     assert_eq!(covered(&skin, &far_rim, 0.04), [true]);
 }
 
-/// Wearing the tee leaves the regions it covers whole, in every fit pose,
-/// out of the body drawn (a model with hidden regions, made live), and
-/// taking it off puts them back.
-#[test]
-fn wearing_the_tee_hides_the_regions_it_covers_and_taking_it_off_shows_them() {
-    let stage = Stage::new("fit-gate-hiding", gate_library()).expect("the stage");
-    let library = Library::read(gate_library()).0;
-    let tee = library.item(TEE).unwrap();
-    // The tee covers the torso, the waist and the upper arm under its
-    // sleeve (`upper_arms_top`, `upper_arms_mid`) whole at rest, but hides
-    // only the waist (review fixes 2): in the fit's poses the torso's skin
-    // comes out at the front of the armpit and the side under the arm, and
-    // the upper arm's past the sleeve's end as it rides up, so hiding them
-    // left holes (`avatar::fit::pose_safe_hides`). Never the rest of the
-    // upper arm, nor the neck.
-    assert!(tee.hides.contains(&"waist".to_owned()), "{:?}", tee.hides);
-    for region in [
-        "torso",
-        "upper_arms_top",
-        "upper_arms_mid",
-        "neck",
-        "upper_arms_low",
-        "forearms",
-    ] {
-        assert!(!tee.hides.contains(&region.to_owned()), "{:?}", tee.hides);
-    }
-    let mut description = bodies()
-        .into_iter()
-        .find(|d| d.name == "realistic-masculine-cast-average")
-        .unwrap();
-    let (bare, _) = worn(&stage.assets, &description, Stance::Rest);
-    description.items.push(WornItem::new(TEE));
-    let (dressed, _) = worn(&stage.assets, &description, Stance::Rest);
-    let hidden = bare.triangles.len() - dressed.triangles.len();
-    println!(
-        "the body draws {} triangles bare, {} in the tee ({hidden} hidden)",
-        bare.triangles.len(),
-        dressed.triangles.len()
-    );
-    assert!(hidden >= 200, "{hidden} triangles hidden");
-    // The corners stay the same: only what is drawn changes.
-    assert_eq!(bare.positions.len(), dressed.positions.len());
-    description.items.retain(|worn| worn.id != TEE);
-    let (again, _) = worn(&stage.assets, &description, Stance::Rest);
-    assert_eq!(again.triangles.len(), bare.triangles.len());
-}
-
 /// The walk at its widest stride.
-const STYLIZED_WALK: Stance = Stance::Clip {
+const WALK: Stance = Stance::Clip {
     name: "Walk",
     frames: 18,
 };
-
-/// The stylized family's own clothes (fitted by their copies of the body's
-/// shapes, ADR-0030's way): the underwear alone and an outfit over it on
-/// the stylized cast, measured with the same rule as the realistic items,
-/// at rest, in the walk and in the T-pose.
-#[test]
-fn stylized_clothes_cover_the_stylized_cast() {
-    let stage = Stage::new("fit-gate-stylized", &repository_library()).expect("the stage");
-    let mut failures = Vec::new();
-    let mut checked = 0;
-    // The cast only: the body extremes take this past the test time limit.
-    let cast = benchmarks("stylized-")
-        .into_iter()
-        .filter(|d| d.name.contains("-cast-"));
-    for description in cast {
-        let mut dressed = description.clone();
-        for id in ["axcenity/tee", "axcenity/cargo-pants", "axcenity/sneakers"] {
-            if !dressed.items.iter().any(|worn| worn.id == id) {
-                dressed.items.push(WornItem::new(id));
-            }
-        }
-        let (bare, _) = worn(&stage.assets, &undressed(&description), Stance::Rest);
-        // The underwear alone as well as under the outfit (review fixes
-        // 2): the cargo pants hide the hips and thighs, and their mask
-        // shape sinks the skin there, under the briefs too, so dressed the
-        // briefs can't show what they do worn alone.
-        let underwear = description.clone();
-        let outfits = [
-            (format!("{} underwear", description.name), underwear),
-            (description.name.clone(), dressed),
-        ];
-        for (name, outfit) in &outfits {
-            let (body, garments) = worn(&stage.assets, outfit, Stance::Rest);
-            let cover = cover_at_rest(&body, &garments, &bare);
-            checked += measure(name, Stance::Rest, &body, &garments, &cover, &mut failures);
-            // The T-pose, and the walk at its widest stride, where the
-            // tee's hem lies over the cargo pants' waistband (`LAYERS`).
-            for stance in [STYLIZED_WALK, Stance::Held(HeldPose::TPose)] {
-                let (body, garments) = worn(&stage.assets, outfit, stance);
-                checked += measure(name, stance, &body, &garments, &cover, &mut failures);
-            }
-        }
-    }
-    println!(
-        "stylized: {checked} garment checks, {} failing",
-        failures.len()
-    );
-    // The stylized clothes are fitted by ADR-0030's shape copies, and not
-    // refitted in wave 4 (`co9-fit-2.md`, open issues). Recorded per
-    // garment and pose, as open defects of drafts, each at or under its
-    // wave-3 record: the tee's case is the neck's side under the collar's
-    // rolled-in band (the rule takes the band's inner face as covering
-    // it), and on the muscular feminine body the top of the shoulder 9 mm
-    // through; the cargo pants at the crotch, 2.4 mm (34 mm at wave 3,
-    // when the shoes' insides counted). The sports top through the tee
-    // (new in wave 4: layered pairs are checked) at the sides of the
-    // chest. The shoes are the footwear check's (`garment_checks`).
-    let known = [
-        ("Shirt_Tee", "rest", 6, 0.0247),
-        ("Shirt_Tee", "TPose", 6, 0.0249),
-        ("Pants_Cargo", "rest", 7, 0.0024),
-        ("Pants_Cargo", "TPose", 7, 0.0024),
-        ("Underwear_Top through Shirt_Tee", "rest", 7, 0.0047),
-        ("Underwear_Top through Shirt_Tee", "TPose", 8, 0.0082),
-        // The walk (new in review fixes 1): the cargo pants at the crotch
-        // and the inner thighs in the stride, the tee as at rest plus the
-        // armpit, the sports top at the side of the chest.
-        // The four walk records below were measured again on 2026-11-25
-        // in the library's jog, which `Walk` plays since ADR-0049 (a
-        // longer stride and a higher knee than the keyed run). Before:
-        // the pants 15 bodies, 27.2 mm; the sports top alone 1 body,
-        // 5.3 mm (none now); the top through the tee 12 bodies, 2.5 mm;
-        // the briefs 8 bodies, 1.9 mm.
-        ("Pants_Cargo", "Walk@18", 16, 0.03502),
-        ("Shirt_Tee", "Walk@18", 16, 0.0247),
-        ("Underwear_Top through Shirt_Tee", "Walk@18", 7, 0.00515),
-        // The underwear alone (new in review fixes 2; dressed, the cargo
-        // pants' mask sank the skin under the briefs): the feminine briefs
-        // in the walk, the right buttock's skin 1.2 to 1.9 mm through on
-        // every feminine body (the patch the full-detail capture shows);
-        // the masculine briefs at rest and in the T-pose, one corner by
-        // the front of the crotch 28 mm out, where small notches of skin
-        // show under the hem.
-        ("Underwear_Briefs", "Walk@18", 24, 0.00587),
-        ("Underwear_Briefs", "rest", 4, 0.0280),
-        ("Underwear_Briefs", "TPose", 4, 0.0280),
-    ]
-    .map(|(garment, pose, cases, worst)| Known {
-        garment,
-        pose,
-        cases,
-        worst,
-    });
-    check("stylized", &failures, &known);
-}
 
 /// The human base (ADR-0047: MakeHuman's body and clothes) in the gate:
 /// the underwear cut from the body, alone, and a MakeHuman outfit with
@@ -1276,7 +781,7 @@ fn human_clothes_cover_the_human_cast() {
             let (body, garments) = worn(&stage.assets, outfit, Stance::Rest);
             let cover = cover_at_rest(&body, &garments, &bare);
             checked += measure(name, Stance::Rest, &body, &garments, &cover, &mut failures);
-            for stance in [STYLIZED_WALK, Stance::Held(HeldPose::TPose)] {
+            for stance in [WALK, Stance::Held(HeldPose::TPose)] {
                 let (body, garments) = worn(&stage.assets, outfit, stance);
                 checked += measure(name, stance, &body, &garments, &cover, &mut failures);
             }
@@ -1299,18 +804,20 @@ fn human_clothes_cover_the_human_cast() {
     // 2026-11-25: the two walk records fell (8.87 to 7.03 mm, 55.13 to
     // 48.57 mm) when each body shape was brought into the pose about its
     // own joints (`build.py` `shape_moves`), and the underwear under each
-    // outfit joined the gate ([`LAYERS`]): no corner of it through either
+    // outfit joined the gate ([`UNDER`]): no corner of it through either
     // outfit in any of the three poses. The walk records were measured
     // again the same day in the library's jog (ADR-0049): the women's
     // 7.03 to 5.29 mm, the men's 1 body and 1.06 mm to 4 bodies and
-    // 1.77 mm.
+    // 1.77 mm; and once more when the takes were baked on the human
+    // base's own skeleton (ADR-0050; the arms and legs now point as the
+    // library's do): the men's 1.77 to 4.25 mm.
     let known = [
         ("FemaleCasualsuit01", "rest", 3, 0.00208),
         ("FemaleCasualsuit01", "TPose", 5, 0.00229),
         ("FemaleCasualsuit01", "Walk@18", 12, 0.00529),
         ("MaleCasualsuit01", "rest", 1, 0.00100),
         ("MaleCasualsuit01", "TPose", 1, 0.00100),
-        ("MaleCasualsuit01", "Walk@18", 4, 0.00177),
+        ("MaleCasualsuit01", "Walk@18", 4, 0.00425),
         ("hidden skin showing", "rest", 8, 0.03450),
         ("hidden skin showing", "Walk@18", 24, 0.04857),
     ]
@@ -1323,12 +830,264 @@ fn human_clothes_cover_the_human_cast() {
     check("human", &failures, &known);
 }
 
+/// The bodies each garment of the wardrobe is measured on, of each body
+/// type it is cut for.
+const WARDROBE_BODIES: [&str; 3] = ["default", "heavy", "muscular"];
+
+/// The whole wardrobe in the gate (ADR-0050: every CC0 garment of the
+/// converted MakeHuman library): each garment worn on its own over the
+/// cut underwear, on the default, heavy and muscular bodies of each body
+/// type it is cut for (one tagged `male` or `female` on that type alone),
+/// at rest, in the walk and in the T-pose. A garment's records are under
+/// its part's name: `Part` for skin through its cloth, `Part: hidden skin
+/// showing` for skin its file hides that its cloth doesn't cover, `Part:
+/// Other` for skin through another worn part while it is on, and `Lower
+/// through Part` for the underwear through it.
+#[test]
+fn every_garment_of_the_human_wardrobe_is_in_the_gate() {
+    let stage = Stage::new("fit-gate-wardrobe", &repository_library()).expect("the stage");
+    let (library, catalogue, problems) = axcenity_avatar::Library::read(&repository_library());
+    assert!(problems.is_empty(), "{problems:?}");
+    let bodies = benchmarks("human-");
+    let mut failures: Vec<Failure> = Vec::new();
+    let (mut garments_measured, mut checked) = (0, 0);
+    for entry in &catalogue.expect("the catalogue").items {
+        let item = library.item(&entry.id).expect("a listed item");
+        let Some(part) = item
+            .model
+            .as_ref()
+            .and_then(|model| model.object.as_deref())
+            .and_then(|object| object.rsplit('/').next())
+        else {
+            continue;
+        };
+        if item.kind == axcenity_avatar::ItemKind::Groom || UNDER.contains(&part) {
+            continue;
+        }
+        garments_measured += 1;
+        let tagged = |tag: &str| item.tags.iter().any(|t| t == tag);
+        for frame in ["masculine", "feminine"] {
+            if (frame == "masculine" && tagged("female")) || (frame == "feminine" && tagged("male"))
+            {
+                continue;
+            }
+            for body in WARDROBE_BODIES {
+                let name = format!("human-{frame}-body-{body}");
+                let description = bodies
+                    .iter()
+                    .find(|d| d.name == name)
+                    .unwrap_or_else(|| panic!("no benchmark {name}"));
+                let mut dressed = description.clone();
+                dressed.items.push(WornItem::new(&item.id));
+                let label = format!("{name} in {part}");
+                let (bare, _) = worn(&stage.assets, &undressed(description), Stance::Rest);
+                let from = failures.len();
+                let (body_at_rest, garments) = worn(&stage.assets, &dressed, Stance::Rest);
+                assert!(
+                    garments.iter().any(|g| g.name == part),
+                    "{label}: the garment isn't worn"
+                );
+                let cover = cover_at_rest(&body_at_rest, &garments, &bare);
+                checked += measure(
+                    &label,
+                    Stance::Rest,
+                    &body_at_rest,
+                    &garments,
+                    &cover,
+                    &mut failures,
+                );
+                for stance in [WALK, Stance::Held(HeldPose::TPose)] {
+                    let (body, garments) = worn(&stage.assets, &dressed, stance);
+                    checked += measure(&label, stance, &body, &garments, &cover, &mut failures);
+                }
+                for failure in &mut failures[from..] {
+                    if !failure.garment.contains(part) {
+                        failure.garment = format!("{part}: {}", failure.garment);
+                    }
+                }
+            }
+        }
+    }
+    println!(
+        "wardrobe: {garments_measured} garments, {checked} garment checks, {} failing",
+        failures.len()
+    );
+    assert!(garments_measured >= 51, "{garments_measured} garments");
+    if std::env::var_os("AXCENITY_FIT_GATE_RECORDS").is_some() {
+        records(&failures);
+    }
+    check("the human wardrobe", &failures, &WARDROBE_KNOWN);
+}
+
+/// Prints `failures` as records, a line a garment and pose, to write a
+/// first record list from (`AXCENITY_FIT_GATE_RECORDS`).
+fn records(failures: &[Failure]) {
+    use std::collections::BTreeMap;
+    let mut groups: BTreeMap<(&str, &str), (usize, f32)> = BTreeMap::new();
+    for failure in failures {
+        let group = groups
+            .entry((failure.garment.as_str(), failure.pose.as_str()))
+            .or_default();
+        group.0 += 1;
+        group.1 = group.1.max(failure.worst);
+    }
+    for ((garment, pose), (cases, worst)) in groups {
+        println!("    known({garment:?}, {pose:?}, {cases}, {worst:.5}),");
+    }
+}
+
+/// A record of [`WARDROBE_KNOWN`].
+const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f32) -> Known {
+    Known {
+        garment,
+        pose,
+        cases,
+        worst,
+    }
+}
+
+/// What the gate finds in the wardrobe, first measured on 2026-11-25:
+/// open defects of drafts, as MakeHuman's authors fitted them and as the
+/// converter binds them to the body's shapes (nothing here is fitted by
+/// `avatar::fit`). 6 of the 51 garments have none. The largest: the
+/// elegant dress hides skin its skirt stands clear of (10 cm, the most
+/// the measure looks), the men's third casual suit and elegant suit let
+/// the heavy body through (34 and 29 mm), the women's second casual suit
+/// all three bodies (24 to 29 mm) and the panties 23 mm. The arm sleeves
+/// and stockings are one mesh in three textures each, so their records
+/// are the same. Measured with the underwear not drawn under a top or a
+/// bottom (`Slot::hidden_by`): before that rule the same day, 145
+/// records, 25 of them the underwear through what was worn over it.
+/// Lower these as items improve; never raise one to pass an item.
+#[rustfmt::skip]
+const WARDROBE_KNOWN: [Known; 120] = [
+    known("ArmsleeveFishnetLarge", "Walk@18", 5, 0.00284),
+    known("ArmsleeveFishnetMedium", "Walk@18", 5, 0.00284),
+    known("ArmsleeveFishnetSmall", "Walk@18", 5, 0.00284),
+    known("ArmsleeveWhiteL", "Walk@18", 5, 0.00284),
+    known("ArmsleeveWhiteM", "Walk@18", 5, 0.00284),
+    known("ArmsleeveWhiteS", "Walk@18", 5, 0.00284),
+    known("BodiceStyleTop: hidden skin showing", "rest", 1, 0.00145),
+    known("BoxerBriefs through SweaterFisherman", "TPose", 3, 0.00769),
+    known("BoxerBriefs through SweaterFisherman", "Walk@18", 5, 0.00790),
+    known("BoxerBriefs through SweaterFisherman", "rest", 3, 0.00769),
+    known("CamisoleTop", "TPose", 4, 0.00754),
+    known("CamisoleTop", "Walk@18", 6, 0.00492),
+    known("CamisoleTop", "rest", 2, 0.00345),
+    known("CamisoleTop: hidden skin showing", "TPose", 1, 0.02869),
+    known("CamisoleTop: hidden skin showing", "Walk@18", 1, 0.02452),
+    known("CamisoleTop: hidden skin showing", "rest", 1, 0.02869),
+    known("CargoPants", "TPose", 1, 0.00140),
+    known("CargoPants", "Walk@18", 6, 0.00991),
+    known("CargoPants", "rest", 1, 0.00140),
+    known("CrudeMaleShirt", "TPose", 1, 0.00104),
+    known("CrudeMaleShirt", "Walk@18", 5, 0.00245),
+    known("CrudeMaleShirt: hidden skin showing", "Walk@18", 6, 0.02042),
+    known("Crudefemaletshirt: hidden skin showing", "Walk@18", 4, 0.01383),
+    known("FemaleCasualsuit01", "TPose", 2, 0.00206),
+    known("FemaleCasualsuit01", "Walk@18", 2, 0.00176),
+    known("FemaleCasualsuit01", "rest", 2, 0.00181),
+    known("FemaleCasualsuit01: hidden skin showing", "Walk@18", 3, 0.02122),
+    known("FemaleCasualsuit02", "TPose", 3, 0.02364),
+    known("FemaleCasualsuit02", "Walk@18", 3, 0.02882),
+    known("FemaleCasualsuit02", "rest", 3, 0.02364),
+    known("FemaleCasualsuit02: hidden skin showing", "Walk@18", 3, 0.02463),
+    known("FemaleElegantsuit01", "TPose", 3, 0.00330),
+    known("FemaleElegantsuit01", "Walk@18", 3, 0.00281),
+    known("FemaleElegantsuit01", "rest", 3, 0.00337),
+    known("FemaleElegantsuit01: hidden skin showing", "TPose", 3, 0.10000),
+    known("FemaleElegantsuit01: hidden skin showing", "Walk@18", 3, 0.04490),
+    known("FemaleElegantsuit01: hidden skin showing", "rest", 3, 0.10000),
+    known("FemalePanties01", "TPose", 3, 0.02260),
+    known("FemalePanties01", "Walk@18", 3, 0.01808),
+    known("FemalePanties01", "rest", 3, 0.02260),
+    known("FemaleSportsuit01", "TPose", 2, 0.00206),
+    known("FemaleSportsuit01", "Walk@18", 2, 0.00176),
+    known("FemaleSportsuit01", "rest", 2, 0.00181),
+    known("FemaleSportsuit01: hidden skin showing", "Walk@18", 3, 0.03107),
+    known("FemaleTop01", "TPose", 3, 0.01935),
+    known("FemaleTop01", "Walk@18", 3, 0.01460),
+    known("FemaleTop01", "rest", 3, 0.01612),
+    known("JeanShorts", "Walk@18", 2, 0.00136),
+    known("LegWarmerSocks", "TPose", 3, 0.00183),
+    known("LegWarmerSocks", "Walk@18", 3, 0.00183),
+    known("LegWarmerSocks", "rest", 3, 0.00183),
+    known("MaleCasualsuit01", "TPose", 1, 0.00179),
+    known("MaleCasualsuit01", "Walk@18", 1, 0.00175),
+    known("MaleCasualsuit01", "rest", 1, 0.00179),
+    known("MaleCasualsuit01: hidden skin showing", "Walk@18", 3, 0.04631),
+    known("MaleCasualsuit01: hidden skin showing", "rest", 2, 0.03440),
+    known("MaleCasualsuit02: hidden skin showing", "Walk@18", 3, 0.01871),
+    known("MaleCasualsuit03", "TPose", 2, 0.03431),
+    known("MaleCasualsuit03", "Walk@18", 1, 0.03200),
+    known("MaleCasualsuit03", "rest", 1, 0.03431),
+    known("MaleCasualsuit03: hidden skin showing", "Walk@18", 3, 0.02276),
+    known("MaleCasualsuit04: hidden skin showing", "Walk@18", 3, 0.01875),
+    known("MaleCasualsuit05", "TPose", 2, 0.00480),
+    known("MaleCasualsuit05", "Walk@18", 1, 0.00256),
+    known("MaleCasualsuit05", "rest", 2, 0.00364),
+    known("MaleCasualsuit05: hidden skin showing", "TPose", 3, 0.03880),
+    known("MaleCasualsuit05: hidden skin showing", "Walk@18", 3, 0.04637),
+    known("MaleCasualsuit05: hidden skin showing", "rest", 3, 0.04003),
+    known("MaleCasualsuit06", "Walk@18", 2, 0.01128),
+    known("MaleCasualsuit06: hidden skin showing", "TPose", 1, 0.00754),
+    known("MaleCasualsuit06: hidden skin showing", "Walk@18", 2, 0.01912),
+    known("MaleElegantsuit01", "TPose", 1, 0.02895),
+    known("MaleElegantsuit01", "Walk@18", 1, 0.02836),
+    known("MaleElegantsuit01", "rest", 1, 0.02895),
+    known("MaleElegantsuit01: hidden skin showing", "Walk@18", 3, 0.03599),
+    known("MaleWorksuit01", "Walk@18", 2, 0.00375),
+    known("MaleWorksuit01: hidden skin showing", "Walk@18", 6, 0.02469),
+    known("MaleWorksuit01: hidden skin showing", "rest", 3, 0.01791),
+    known("PantsHarem", "TPose", 5, 0.00507),
+    known("PantsHarem", "Walk@18", 5, 0.00759),
+    known("PantsHarem", "rest", 5, 0.00507),
+    known("PantsWool", "TPose", 1, 0.00135),
+    known("PantsWool", "Walk@18", 3, 0.01324),
+    known("PantsWool", "rest", 1, 0.00135),
+    known("PoloTShirt", "TPose", 1, 0.00619),
+    known("PoloTShirt", "Walk@18", 3, 0.01337),
+    known("Shoes02: hidden skin showing", "TPose", 2, 0.00468),
+    known("Shoes02: hidden skin showing", "Walk@18", 2, 0.00498),
+    known("Shoes02: hidden skin showing", "rest", 2, 0.00468),
+    known("Shoes03", "TPose", 3, 0.00794),
+    known("Shoes03", "Walk@18", 3, 0.00794),
+    known("Shoes03", "rest", 3, 0.00794),
+    known("Shoes05: hidden skin showing", "TPose", 2, 0.00468),
+    known("Shoes05: hidden skin showing", "Walk@18", 2, 0.00498),
+    known("Shoes05: hidden skin showing", "rest", 2, 0.00468),
+    known("Shoes06: hidden skin showing", "TPose", 2, 0.00468),
+    known("Shoes06: hidden skin showing", "Walk@18", 2, 0.00498),
+    known("Shoes06: hidden skin showing", "rest", 2, 0.00468),
+    known("Sockslacefrill", "TPose", 3, 0.00226),
+    known("Sockslacefrill", "Walk@18", 3, 0.00226),
+    known("Sockslacefrill", "rest", 3, 0.00226),
+    known("StockingsFishnetLarge", "Walk@18", 4, 0.00260),
+    known("StockingsFishnetMedium", "Walk@18", 4, 0.00260),
+    known("StockingsFishnetSmall", "Walk@18", 4, 0.00260),
+    known("StockingsWhiteL", "Walk@18", 4, 0.00260),
+    known("StockingsWhiteM", "Walk@18", 4, 0.00260),
+    known("StockingsWhiteS", "Walk@18", 4, 0.00260),
+    known("SweaterFisherman", "TPose", 6, 0.00443),
+    known("SweaterFisherman", "Walk@18", 6, 0.01608),
+    known("SweaterFisherman", "rest", 5, 0.00376),
+    known("TShirtBasicTucked", "TPose", 3, 0.00286),
+    known("TShirtBasicTucked", "Walk@18", 6, 0.00538),
+    known("TShirtBasicTucked", "rest", 2, 0.00290),
+    known("TankKeyholeNeck: hidden skin showing", "Walk@18", 1, 0.00496),
+    known("TurtleneckHalter", "TPose", 6, 0.00997),
+    known("TurtleneckHalter", "Walk@18", 6, 0.00897),
+    known("TurtleneckHalter", "rest", 1, 0.00245),
+    known("TurtleneckHalter: hidden skin showing", "TPose", 2, 0.02221),
+    known("TurtleneckHalter: hidden skin showing", "Walk@18", 2, 0.02698),
+    known("TurtleneckHalter: hidden skin showing", "rest", 2, 0.02221),
+];
+
 /// Paul's test of 2026-11-25: the human base's underwear came through its
 /// outfits. Worn alone the briefs and the bandeau are drawn whole; under
-/// an outfit that covers them nothing of either is drawn, on every body
-/// of the human cast (their cloth is left out under the outfit's cover
-/// map, ADR-0045), and the socks of the shoes are cut where the jeans
-/// cover them.
+/// an outfit neither is drawn at all, on every body of the human cast (a
+/// top takes the bandeau's place and a bottom the briefs': `Slot::hidden_by`),
+/// and the socks of the shoes are cut where the jeans cover them.
 #[test]
 fn the_human_bases_underwear_is_not_drawn_under_an_outfit() {
     let stage = Stage::new("fit-gate-human-layers", &repository_library()).expect("the stage");
@@ -1367,7 +1126,7 @@ fn the_human_bases_underwear_is_not_drawn_under_an_outfit() {
             assert!(whole > 1000, "{}: {name} alone", description.name);
             assert_eq!(
                 dressed(name),
-                Some(0),
+                None,
                 "{}: {name} under {suit}",
                 description.name
             );

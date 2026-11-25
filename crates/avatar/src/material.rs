@@ -251,14 +251,14 @@ const SKIN: &[ValueSpec] = &[
         0.0,
         1.0,
         0.0,
-        "How much of the defined (lean, muscular) normal map shows over the smooth one: abdominal lines and muscle separation. The realistic body drives it from muscle.",
+        "How much of the defined (lean, muscular) normal map shows over the smooth one: abdominal lines and muscle separation. A body with such a map drives it from muscle (none shipped has one).",
     ),
     number(
         "softness",
         0.0,
         1.0,
         0.0,
-        "How much of that definition fat covers (a share taken off it). The realistic body drives it from fat.",
+        "How much of that definition fat covers (a share taken off it). A body with such a map drives it from fat.",
     ),
 ];
 

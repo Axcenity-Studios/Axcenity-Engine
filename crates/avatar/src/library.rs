@@ -62,6 +62,18 @@ impl Library {
         self.bases.get(id)
     }
 
+    /// The base model a character with none named is on: the engine's
+    /// ([`crate::DEFAULT_BASE`]) when this library has it, else the one
+    /// format 1 characters were on (an older project's library), else the
+    /// library's first, and the engine's ID for an empty library.
+    pub fn default_base(&self) -> &str {
+        [crate::DEFAULT_BASE, crate::V1_BASE]
+            .into_iter()
+            .find(|id| self.bases.contains_key(*id))
+            .or_else(|| self.bases.keys().next().map(String::as_str))
+            .unwrap_or(crate::DEFAULT_BASE)
+    }
+
     pub fn item(&self, id: &str) -> Option<&ItemManifest> {
         self.items.get(id)
     }

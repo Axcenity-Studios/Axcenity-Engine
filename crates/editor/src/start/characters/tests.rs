@@ -18,7 +18,8 @@ fn save(folder: &Path, description: &Description) -> PathBuf {
     path
 }
 
-fn realistic(name: &str, parameters: &[(&str, f32)]) -> Description {
+/// A character on the human base with `parameters` set.
+fn human(name: &str, parameters: &[(&str, f32)]) -> Description {
     let mut description = Description::new(name, DEFAULT_BASE);
     for (id, value) in parameters {
         description.parameters.insert((*id).to_owned(), *value);
@@ -30,12 +31,12 @@ fn realistic(name: &str, parameters: &[(&str, f32)]) -> Description {
 /// newest is first in Recent.
 fn six_characters(folder: &Path) -> Vec<PathBuf> {
     let cast = [
-        realistic("Ada", &[("frame", 1.0)]),
-        realistic("Bo", &[]),
-        realistic("Cy", &[("muscle", 0.7), ("fat", -0.4)]),
-        realistic("Dee", &[("frame", 1.0), ("fat", 0.8), ("muscle", 0.2)]),
-        realistic("Eli", &[("fat", 0.8)]),
-        realistic("Fay", &[("frame", 1.0), ("muscle", 0.6), ("fat", -0.4)]),
+        human("Ada", &[("frame", 1.0)]),
+        human("Bo", &[]),
+        human("Cy", &[("muscle", 0.7), ("fat", -0.4)]),
+        human("Dee", &[("frame", 1.0), ("fat", 0.8), ("muscle", 0.2)]),
+        human("Eli", &[("fat", 0.8)]),
+        human("Fay", &[("frame", 1.0), ("muscle", 0.6), ("fat", -0.4)]),
     ];
     cast.iter()
         .map(|description| {
@@ -117,29 +118,30 @@ fn recent_shows_four_then_show_more_lists_the_rest() {
     assert!(drawn.iter().any(|t| t == "Show 2 more"), "{drawn:?}");
     // Each card has its overview, Edit and Delete; presets start a new one.
     assert!(
-        drawn.iter().any(|t| t == "label: Female · Realistic"),
+        drawn
+            .iter()
+            .any(|t| t == "label: Female · Caucasian · Human"),
         "{drawn:?}"
     );
     assert!(
         drawn
             .iter()
-            .any(|t| t == "label: Male · Realistic · 2 values set")
+            .any(|t| t == "label: Male · Caucasian · Human · 2 values set")
     );
     assert_eq!(count(&drawn, "Edit"), 10);
     assert_eq!(count(&drawn, "Delete…"), 10);
-    // The realistic family's six whole-character presets, the stylized
-    // family's three (plan section 0, decision 7; the stylized ones are
-    // data since wave 3) and the human base's two (ADR-0047).
-    assert_eq!(count(&drawn, "Start from this"), 11);
-    for name in ["Masculine", "Feminine"] {
-        assert!(
-            drawn
-                .iter()
-                .any(|t| t.starts_with(&format!("label: {name}"))),
+    // The human base's two whole-character presets (ADR-0047): the one
+    // family the engine ships. (Eleven while the realistic family's six
+    // and the stylized family's three were shipped too.)
+    assert_eq!(count(&drawn, "Start from this"), 2);
+    // (Their names alone: a card's overview starts with the body type too.)
+    for name in ["Male", "Female"] {
+        assert_eq!(
+            count(&drawn, &format!("label: {name}")),
+            1,
             "{name} in {drawn:?}"
         );
     }
-    assert_eq!(count(&drawn, "label: Stylized character"), 0, "{drawn:?}");
 
     start.shelf.more_recent = true;
     let drawn = texts(&mut start, vec2(1400.0, 3000.0));
@@ -195,10 +197,10 @@ fn edit_opens_a_character_and_a_preset_starts_one() {
         start.follow_pick(Pick::Edit(paths[2].clone())),
         Some(StartAction::OpenCharacter(path)) if path == paths[2]
     ));
-    let athletic = Start::Preset("axcenity/realistic-athletic-female".into());
+    let female = Start::shipped("female");
     assert!(matches!(
-        start.follow_pick(Pick::Preset(athletic.clone())),
-        Some(StartAction::NewCharacter(picked)) if picked == athletic
+        start.follow_pick(Pick::Preset(female.clone())),
+        Some(StartAction::NewCharacter(picked)) if picked == female
     ));
     let _ = std::fs::remove_dir_all(&folder);
 }

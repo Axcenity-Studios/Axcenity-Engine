@@ -1,12 +1,12 @@
 {
   "format_version": 2,
-  "duration": 3.0,
+  "duration": 2.5,
   "loop": true,
   "link": {
     "source": "assets/models/Humanoid/HumanoidAnimations.glb",
     "take": "Idle",
     "start": 0.0,
-    "end": 3.0
+    "end": 2.5
   },
   "tracks": [],
   "events": []

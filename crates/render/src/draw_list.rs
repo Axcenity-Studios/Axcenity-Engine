@@ -2489,8 +2489,9 @@ pub struct SkinShading {
     /// far.
     pub scatter: f32,
     /// A second normal map placed like the material's own, blended with it
-    /// by `normal_blend` before anything is lit: the realistic body's
-    /// defined one (lean and muscular), the material's own being the
+    /// by `normal_blend` before anything is lit: a body's defined one
+    /// (lean and muscular, as the retired realistic base had), the
+    /// material's own being the
     /// smooth one. It takes the specular map's place, and is read at the
     /// own map's scale and green convention.
     pub defined_normal: Option<Arc<dyn TextureSource>>,

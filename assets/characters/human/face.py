@@ -488,7 +488,9 @@ def features_and_handles(parameters, moves, points, heads):
     Blender's axes, `heads` {bone: its joint}. A feature's anchor is the
     middle of what its page's sliders move; a handle sits on the corner
     its own shape moves most, and each slider it drives moves that corner
-    along `axis` by `travel` at the top of its range."""
+    along `axis` by `travel` over its whole range (the manifest's
+    contract: a slider with a shape at each end travels twice what one
+    shape moves)."""
     by_id = {p["id"]: p for p in parameters}
 
     def reach(p):
@@ -552,7 +554,10 @@ def features_and_handles(parameters, moves, points, heads):
                 axis = move / np.linalg.norm(move)
                 if any(abs(float(axis @ other)) > ALIKE for _, other, _ in out):
                     continue
-                out.append((p["id"], axis, float(np.linalg.norm(move))))
+                # `reach` is a step of 1; the range of a slider with a
+                # shape at each end is 2.
+                span = 2.0 if p.get("low") in moves and p.get("high") in moves else 1.0
+                out.append((p["id"], axis, float(np.linalg.norm(move)) * span))
             if not out:
                 continue
             bone = FEATURES[feature][2]

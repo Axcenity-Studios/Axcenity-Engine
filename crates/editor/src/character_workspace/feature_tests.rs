@@ -1,4 +1,4 @@
-//! R1 step 2 part 2 (RA1): both families, presets as data (by ID, "Start
+//! R1 step 2 part 2 (RA1): presets as data (by ID, "Start
 //! from" chips, "Custom", the Presets page, Save as preset, favourites),
 //! Randomize with scopes and locks, comparison (held versions, before and
 //! after, side by side, keep and discard) and autosave with recovery. Each
@@ -11,14 +11,13 @@ use axcenity_avatar::{PresetKind, matches_preset};
 use super::autosave::{self, AUTOSAVE_EVERY, RECOVERY_FILE};
 use super::intent::{Gesture, Intent};
 use super::random::RandomScope;
-use super::selection::Level;
 use super::shell_tests::{drawn_texts, input};
 use super::*;
 use crate::character_studio::test_folder;
 use crate::theme;
 
-const BODY_ATHLETIC: &str = "axcenity/realistic-body-athletic-male";
-const FACE_ROUND: &str = "axcenity/realistic-face-round";
+const BODY_ATHLETIC: &str = "axcenity/human-body-athletic";
+const FACE_SOFT: &str = "axcenity/human-face-soft";
 
 fn set(id: &str, value: f32) -> Intent {
     Intent::SetParameter {
@@ -74,78 +73,6 @@ fn undo_depth(workspace: &CharacterWorkspace) -> usize {
     depth
 }
 
-// ---- Both families (plan section 0, decision 7) ----
-
-/// A stylized character is made from New, edited from its own manifest's
-/// controls (its groups stand in for features), saved and reopened the
-/// same, as a realistic one is.
-#[test]
-fn a_stylized_character_opens_edits_saves_and_reopens() {
-    let folder = test_folder("feature-stylized");
-    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
-    assert_eq!(
-        workspace.description().base,
-        DEFAULT_BASE,
-        "realistic first"
-    );
-    workspace.apply(Intent::New(Start::Family(axcenity_avatar::V1_BASE.into())));
-    // A new character isn't saved: New asks first (Don't Save).
-    workspace.answer(Some(false));
-    assert_eq!(workspace.description().base, axcenity_avatar::V1_BASE);
-    assert!(!workspace.can_undo());
-    assert!(workspace.worn().len() > 1, "it wears its default clothes");
-
-    // Its controls: the manifest's groups, no features, listed in the
-    // navigation and edited as sliders.
-    let library = workspace.library();
-    let base = library.base(axcenity_avatar::V1_BASE).unwrap();
-    let face: Vec<String> = nav::features(
-        base,
-        workspace.description(),
-        Category::Face,
-        Level::Detailed,
-    )
-    .into_iter()
-    .map(|feature| feature.id)
-    .collect();
-    assert!(face.contains(&"nose".to_owned()), "{face:?}");
-    workspace.apply(Intent::PickCategory(Category::Face));
-    workspace.apply(Intent::PickFeature(Some("nose".into())));
-    let drawn = draw(&mut workspace);
-    assert!(has(&drawn, "Nose width"), "{drawn:?}");
-    workspace.apply(set("nose_width", 0.6));
-    workspace.apply(Intent::Randomize(RandomScope::Feature));
-    let nose = workspace.parameter("nose_length");
-    assert_ne!(nose, 0.0, "the stylized nose randomizes by its group");
-    assert_eq!(workspace.parameter("eyes_size"), 0.0, "only the nose");
-
-    // The Body page shows the family.
-    workspace.apply(Intent::PickCategory(Category::Body));
-    let drawn = draw(&mut workspace);
-    for text in ["Family", "Realistic", "Stylized", "Height"] {
-        assert!(has(&drawn, text), "{text} in {drawn:?}");
-    }
-
-    workspace.apply(Intent::Rename("Toon".into()));
-    workspace.apply(Intent::Save);
-    assert!(!workspace.dirty(), "{:?}", workspace.notice);
-    let path = workspace.file().unwrap().to_owned();
-    let reopened = CharacterWorkspace::open_file(&folder, &path).unwrap();
-    assert_eq!(reopened.description(), workspace.description());
-    assert_eq!(reopened.description().base, axcenity_avatar::V1_BASE);
-    assert_eq!(reopened.notice, None, "no fallback to another body");
-    assert!(!reopened.dirty());
-    drop(reopened);
-
-    // The Body page's family chips move a character across, one step.
-    workspace.apply(Intent::SetBase(DEFAULT_BASE.into()));
-    assert_eq!(workspace.description().base, DEFAULT_BASE);
-    assert_eq!(workspace.description().name, "Toon");
-    workspace.apply(Intent::Undo);
-    assert_eq!(workspace.description().base, axcenity_avatar::V1_BASE);
-    let _ = std::fs::remove_dir_all(&folder);
-}
-
 // ---- Presets from data ----
 
 /// A body preset and a face preset each apply what their kind owns as one
@@ -156,52 +83,72 @@ fn body_and_face_presets_apply_as_one_step_each_and_custom_shows_otherwise() {
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let library = workspace.library();
     let athletic = library.preset(BODY_ATHLETIC).unwrap().clone();
-    let round = library.preset(FACE_ROUND).unwrap().clone();
+    let soft = library.preset(FACE_SOFT).unwrap().clone();
 
-    workspace.apply(set("nose_length", 0.3));
+    workspace.apply(set("nose_scale_vert", 0.3));
     workspace.apply(Intent::ApplyPreset(BODY_ATHLETIC.into()));
     for (id, value) in &athletic.parameters {
         assert_eq!(workspace.parameter(id), *value, "{id}");
     }
-    assert_eq!(workspace.parameter("nose_length"), 0.3, "the face is left");
+    assert_eq!(
+        workspace.parameter("nose_scale_vert"),
+        0.3,
+        "the face is left"
+    );
     assert_eq!(workspace.description().name, "New Character");
     assert!(matches_preset(workspace.description(), &athletic, &library));
 
-    workspace.apply(Intent::ApplyPreset(FACE_ROUND.into()));
-    for (id, value) in &round.parameters {
+    workspace.apply(Intent::ApplyPreset(FACE_SOFT.into()));
+    assert!(!soft.parameters.is_empty());
+    for (id, value) in &soft.parameters {
         assert_eq!(workspace.parameter(id), *value, "{id}");
     }
     assert_eq!(
-        workspace.parameter("nose_length"),
-        round.parameters.get("nose_length").copied().unwrap_or(0.0),
+        workspace.parameter("nose_scale_vert"),
+        soft.parameters
+            .get("nose_scale_vert")
+            .copied()
+            .unwrap_or(0.0),
         "a face preset is a whole face"
     );
     assert!(matches_preset(workspace.description(), &athletic, &library));
     workspace.apply(Intent::Undo);
-    assert_eq!(workspace.parameter("nose_length"), 0.3, "one step back");
+    assert_eq!(workspace.parameter("nose_scale_vert"), 0.3, "one step back");
     assert!(matches_preset(workspace.description(), &athletic, &library));
     workspace.apply(Intent::Undo);
     assert_eq!(workspace.parameter("muscle"), 0.0);
     workspace.apply(Intent::Redo);
 
-    // The Body page's chips: this frame's presets only, Athletic lit.
+    // The Body page's chips: the body presets, Athletic lit. The human
+    // base's builds are tagged with no body type, so each suits both.
     workspace.apply(Intent::PickCategory(Category::Body));
     let drawn = draw(&mut workspace);
-    for text in ["Start from", "Athletic", "Heavyset", "Custom"] {
+    for text in [
+        "Start from",
+        "Average",
+        "Slim",
+        "Athletic",
+        "Muscular",
+        "Heavyset",
+        "Elderly",
+        "Custom",
+    ] {
         assert!(has(&drawn, text), "{text} in {drawn:?}");
     }
     let base = library.base(DEFAULT_BASE).unwrap();
     let body = workspace.presets_of(&library, PresetKind::Body);
-    let suits: Vec<bool> = body
-        .iter()
-        .map(|listed| presets::suits(listed, workspace.description(), base))
-        .collect();
-    assert_eq!(suits.iter().filter(|s| **s).count(), body.len() / 2);
-    assert!(
-        body.iter()
-            .filter(|listed| presets::suits(listed, workspace.description(), base))
-            .all(|listed| listed.info.tags.contains(&"male".to_owned()))
-    );
+    assert_eq!(body.len(), 6);
+    let mut female = workspace.description().clone();
+    female.parameters.insert("frame".to_owned(), 1.0);
+    for listed in &body {
+        assert!(listed.info.tags.is_empty(), "{}", listed.id);
+        assert!(
+            presets::suits(listed, workspace.description(), base),
+            "{}",
+            listed.id
+        );
+        assert!(presets::suits(listed, &female, base), "{}", listed.id);
+    }
     // A slider moved: no body preset is what the character is.
     let body: Vec<Description> = body.iter().map(|listed| listed.preset.clone()).collect();
     workspace.apply(set("muscle", 0.55));
@@ -214,19 +161,23 @@ fn body_and_face_presets_apply_as_one_step_each_and_custom_shows_otherwise() {
     // The Face page has its chips; the Presets page groups by kind.
     workspace.apply(Intent::PickCategory(Category::Face));
     let drawn = draw(&mut workspace);
-    assert!(has(&drawn, "Heart-shaped"), "{drawn:?}");
+    for text in ["Start from", "Soft features", "Angular features"] {
+        assert!(has(&drawn, text), "{text} in {drawn:?}");
+    }
     workspace.apply(Intent::PickCategory(Category::Presets));
     let drawn = draw_tall(&mut workspace);
     for text in [
         "Characters",
+        "Female",
         "Bodies",
+        "Heavyset",
         "Faces",
+        "Gaunt face",
         "Save as preset",
-        "Heavyset female",
     ] {
         assert!(has(&drawn, text), "{text} in {drawn:?}");
     }
-    // A preset of another family isn't listed for this one.
+    // Only this family's presets are listed for it.
     assert!(
         workspace
             .presets_of(&library, PresetKind::Character)
@@ -247,36 +198,32 @@ fn body_and_face_presets_apply_as_one_step_each_and_custom_shows_otherwise() {
 /// feature moves.
 #[test]
 fn a_feature_s_shapes_are_chips_that_set_that_feature_alone() {
-    const AQUILINE: &str = "axcenity/realistic-nose-aquiline";
+    const AQUILINE: &str = "axcenity/human-nose-aquiline";
     let folder = test_folder("feature-shapes");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let library = workspace.library();
     let aquiline = library.preset(AQUILINE).unwrap().clone();
     assert!(!aquiline.parameters.is_empty());
 
-    workspace.apply(set("jaw_definition", 0.5));
-    workspace.apply(set("nose_length", 0.3));
+    workspace.apply(set("chin_bones", 0.5));
+    workspace.apply(set("nose_scale_vert", 0.3));
     workspace.apply(Intent::ApplyPreset(AQUILINE.into()));
     for (id, value) in &aquiline.parameters {
         assert_eq!(workspace.parameter(id), *value, "{id}");
     }
     assert_eq!(
-        workspace.parameter("nose_length"),
+        workspace.parameter("nose_scale_vert"),
         aquiline
             .parameters
-            .get("nose_length")
+            .get("nose_scale_vert")
             .copied()
             .unwrap_or(0.0),
         "a nose preset is a whole nose"
     );
-    assert_eq!(
-        workspace.parameter("jaw_definition"),
-        0.5,
-        "the jaw is left"
-    );
+    assert_eq!(workspace.parameter("chin_bones"), 0.5, "the jaw is left");
     assert!(matches_preset(workspace.description(), &aquiline, &library));
     workspace.apply(Intent::Undo);
-    assert_eq!(workspace.parameter("nose_length"), 0.3, "one step back");
+    assert_eq!(workspace.parameter("nose_scale_vert"), 0.3, "one step back");
     workspace.apply(Intent::Redo);
 
     // The Nose page offers the nose's shapes, the applied one among them;
@@ -291,17 +238,26 @@ fn a_feature_s_shapes_are_chips_that_set_that_feature_alone() {
         "Straight",
         "Aquiline",
         "Snub",
-        "Low bridge",
+        "Button",
+        "Bulbous",
+        "Wide",
+        "Long and thin",
         "Custom",
     ] {
         assert!(has(&drawn, text), "{text} in {drawn:?}");
     }
-    assert!(!has(&drawn, "Heart-shaped"), "{drawn:?}");
+    // (The face's shapes are chips named "Heart", "Pear"…; the Face shape
+    // page's sliders are named "Heart-shaped face"….)
+    let chip = |drawn: &[String], label: &str| drawn.iter().any(|text| text == label);
+    assert!(!chip(&drawn, "Heart"), "{drawn:?}");
     workspace.apply(Intent::PickFeature(Some("face_shape".into())));
     let drawn = draw(&mut workspace);
-    for text in ["Shape", "Oval", "Round", "Square", "Heart-shaped"] {
-        assert!(has(&drawn, text), "{text} in {drawn:?}");
+    for label in [
+        "Oval", "Round", "Square", "Long", "Heart", "Pear", "Diamond", "Custom",
+    ] {
+        assert!(chip(&drawn, label), "{label} in {drawn:?}");
     }
+    assert!(has(&drawn, "Shape"), "{drawn:?}");
     assert!(!has(&drawn, "Aquiline"), "{drawn:?}");
     let _ = std::fs::remove_dir_all(&folder);
 }
@@ -313,7 +269,7 @@ fn a_feature_s_shapes_are_chips_that_set_that_feature_alone() {
 fn save_as_preset_writes_a_preset_of_its_kind_into_the_workspace() {
     let folder = test_folder("feature-own-presets");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::shipped("female")).unwrap();
-    workspace.apply(set("nose_length", 0.4));
+    workspace.apply(set("nose_scale_vert", 0.4));
     workspace.apply(set("fat", 0.3));
     workspace.apply(Intent::SaveAsPreset {
         kind: PresetKind::Face,
@@ -329,7 +285,7 @@ fn save_as_preset_writes_a_preset_of_its_kind_into_the_workspace() {
     let info = saved.preset().unwrap();
     assert_eq!(info.id, "my/long-nose");
     assert_eq!(info.kind, PresetKind::Face);
-    assert_eq!(saved.parameters.get("nose_length"), Some(&0.4));
+    assert_eq!(saved.parameters.get("nose_scale_vert"), Some(&0.4));
     assert!(!saved.parameters.contains_key("fat"), "not a face value");
     let faces = workspace.presets_of(&library, PresetKind::Face);
     assert!(
@@ -357,7 +313,7 @@ fn save_as_preset_writes_a_preset_of_its_kind_into_the_workspace() {
     // Another workspace on the folder lists them and applies one.
     let mut other = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     other.apply(Intent::ApplyPreset("my/long-nose".into()));
-    assert_eq!(other.parameter("nose_length"), 0.4);
+    assert_eq!(other.parameter("nose_scale_vert"), 0.4);
     assert_eq!(
         other.parameter("frame"),
         0.0,
@@ -365,7 +321,7 @@ fn save_as_preset_writes_a_preset_of_its_kind_into_the_workspace() {
     );
     other.apply(Intent::New(Start::Preset("my/long-nose".into())));
     other.answer(Some(false));
-    assert_eq!(other.parameter("nose_length"), 0.4);
+    assert_eq!(other.parameter("nose_scale_vert"), 0.4);
     // Nothing of the preset rides along into a character.
     assert!(other.description().extra.is_empty());
     let _ = std::fs::remove_dir_all(&folder);
@@ -378,17 +334,17 @@ fn favourites_are_kept_beside_recent_and_never_in_the_character() {
     let folder = test_folder("feature-favourites");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let before = workspace.description().clone();
-    workspace.apply(Intent::ToggleFavourite(FACE_ROUND.into()));
-    assert!(workspace.favourites.contains(FACE_ROUND));
+    workspace.apply(Intent::ToggleFavourite(FACE_SOFT.into()));
+    assert!(workspace.favourites.contains(FACE_SOFT));
     assert!(folder.join(presets::FAVOURITES_FILE).is_file());
     assert_eq!(workspace.description(), &before);
     assert!(!workspace.can_undo());
     let again = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
-    assert!(again.favourites.contains(FACE_ROUND));
-    workspace.apply(Intent::ToggleFavourite(FACE_ROUND.into()));
+    assert!(again.favourites.contains(FACE_SOFT));
+    workspace.apply(Intent::ToggleFavourite(FACE_SOFT.into()));
     assert!(presets::read_favourites(&folder).is_empty());
     // The Presets page draws a favourite's star.
-    workspace.apply(Intent::ToggleFavourite(FACE_ROUND.into()));
+    workspace.apply(Intent::ToggleFavourite(FACE_SOFT.into()));
     workspace.apply(Intent::PickCategory(Category::Presets));
     let drawn = draw(&mut workspace);
     assert!(
@@ -442,11 +398,11 @@ fn randomize_draws_its_scope_again_as_one_step_and_keeps_locks() {
         .unwrap()
         .parameters
         .iter()
-        .filter(|p| p.feature.as_deref() == Some("nose"))
+        .filter(|p| selection::parameter_feature(p) == "nose")
         .map(|p| p.id.clone())
         .collect();
     assert!(!nose.is_empty());
-    workspace.apply(set("nose_length", 0.25));
+    workspace.apply(set("nose_scale_vert", 0.25));
     workspace.apply(Intent::SetLock {
         ids: nose.clone(),
         locked: true,
@@ -495,7 +451,7 @@ fn randomize_draws_its_scope_again_as_one_step_and_keeps_locks() {
     assert_eq!(undo_depth(&workspace), depth);
     workspace.apply(Intent::PickFeature(Some("nose".into())));
     workspace.apply(Intent::Randomize(RandomScope::Feature));
-    assert_ne!(workspace.parameter("nose_length"), 0.25);
+    assert_ne!(workspace.parameter("nose_scale_vert"), 0.25);
 
     // The toolbar offers the three scopes and says what's locked.
     let choices = toolbar::random_choices(&workspace.selection, &workspace, &library);

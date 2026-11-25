@@ -65,7 +65,7 @@ Per lobe: the brief asks for a roughness or shift per lobe. The model has one ro
 
 **The colour.** `hair_colour` turns the material's colour into absorption with Chiang, Bitterli, Tappan and Burley's mapping (2016, azimuthal roughness 0.3: the same one Blender's Principled Hair BSDF uses for "direct colouring"), splits it into eumelanin and pheomelanin by least squares on their absorption spectra (Donner and Jensen's, as pbrt v4 gives them: `(0.419, 0.697, 1.37)` and `(0.187, 0.4, 1.05)`; what neither explains is kept), moves them by the values and turns it back into a colour. With every value neutral the colour isn't touched. So one pair of numbers runs from blonde through red and brown to black, and skin and hair share one idea of pigment (references/materials).
 
-The realistic body's `Brows` and `Lashes` are Hair slots in its manifest but their file doesn't mark them hair (they are blended cards, CO6): on them, `melanin` and `redness` still take the skin's curve on the base colour, as before.
+A material that is a Hair slot in its manifest but whose file doesn't mark it hair still takes the skin's curve on the base colour for `melanin` and `redness` (the realistic body's brows and lashes, blended cards, were such; that body was removed on 2026-11-25). The human base's `Brows` and `Lashes` are marked hair in `HumanParts.glb` and drawn by this model.
 
 ## What it draws
 
@@ -108,7 +108,7 @@ A hair card is a cut-out (`alpha_cutoff` > 0). Its depth is drawn before the sce
 
 ## The first hairstyle
 
-`axcenity/realistic-hair-short-crop` (Character Studio R6, `assets/characters/realistic/hair/`, a **draft**) is the first content built to this contract: one `Hair` material (MASK, cut-off 0.5, two-sided, roughness 0.3), a 2048² atlas with the colour, data, flow and normal maps, every card's texture coordinates running root to tip down its tile. Its cards and cap are 27,600 triangles at hero, 16,000 at the gameplay copy and under 500 at the crowd copy. What it showed about this model is in its hand-back (`docs/development/character-studio/refinement/wave4/r6-hair-first.md`): the R lobe reads as a broad pale grey sheen over the top of dark hair under the studio light, and the tangent gap above.
+History: this hairstyle was removed with the realistic package on 2026-11-25 (the wiki's ADR-0050). The hairstyles the engine ships now are MakeHuman's ten, converted by `assets/characters/human/hair.py`: each one `Hair` material marked for this model (`axcenity_hair_shell`, a flow map, cut out by the painted texture's alpha) on the groom's mesh tier. `axcenity/realistic-hair-short-crop` (Character Studio R6, a **draft**) was the first content built to this contract: one `Hair` material (MASK, cut-off 0.5, two-sided, roughness 0.3), a 2048² atlas with the colour, data, flow and normal maps, every card's texture coordinates running root to tip down its tile. Its cards and cap are 27,600 triangles at hero, 16,000 at the gameplay copy and under 500 at the crowd copy. What it showed about this model is in its hand-back (`docs/development/character-studio/refinement/wave4/r6-hair-first.md`): the R lobe reads as a broad pale grey sheen over the top of dark hair under the studio light, and the tangent gap above.
 
 ## Not yet
 

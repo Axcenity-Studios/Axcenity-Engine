@@ -201,8 +201,8 @@ pub fn suits(listed: &Listed, description: &Description, base: &BaseManifest) ->
             })
 }
 
-/// The bases in the order New and the Body page offer them: the realistic
-/// family first (the default, plan section 0 decision 7), then by label.
+/// The bases in the order New and the Body page offer them: the engine's
+/// own first (the default), then any others the library has, by label.
 pub fn families(library: &Library) -> Vec<&BaseManifest> {
     let mut bases: Vec<&BaseManifest> = library
         .bases

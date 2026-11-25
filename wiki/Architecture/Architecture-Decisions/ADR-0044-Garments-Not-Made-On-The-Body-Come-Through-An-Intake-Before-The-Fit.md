@@ -8,7 +8,7 @@ supersedes:
 superseded_by: ADR-0046
 affects: [avatar, assets]
 source: [crates/avatar/src/fit/import.rs, crates/avatar/src/fit/transfer.rs, crates/avatar/src/fit/glb.rs]
-docs: [docs/development/character-studio/architecture.md, assets/characters/realistic/clothing/README.md, docs/development/character-studio/progress.md]
+docs: [docs/development/character-studio/architecture.md, docs/development/character-studio/progress.md]
 tags: [adr, characters, assets]
 ---
 

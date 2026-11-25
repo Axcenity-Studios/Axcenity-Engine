@@ -210,7 +210,7 @@ pub enum PartFit {
 /// such base model). Items that can't be worn are left out and listed in
 /// [`Resolved::problems`]; values outside their ranges are clamped. What a
 /// parameter's choices wear is always worn ([`crate::wear_choices`]: the
-/// realistic body's underwear), so the item indexes in problems are of the
+/// human body's underwear), so the item indexes in problems are of the
 /// description with it on.
 pub fn resolve(library: &Library, description: &Description) -> Result<Resolved, Problem> {
     let base = library.base(&description.base).ok_or_else(|| {
@@ -329,6 +329,22 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             ),
         ));
     }
+    // What a slot says another slot's item takes off the character
+    // (`Slot::hidden_by`: the cut underwear under a bottom or a top) is
+    // worn but not drawn: no part, no cover of its own, no problem.
+    let filled: Vec<&String> = worn
+        .iter()
+        .flat_map(|(_, _, manifest)| manifest.slots())
+        .collect();
+    let off: Vec<&str> = worn
+        .iter()
+        .filter(|(_, _, manifest)| {
+            base.slot(&manifest.slot)
+                .is_some_and(|slot| slot.hidden_by.iter().any(|over| filled.contains(&over)))
+        })
+        .map(|(_, _, manifest)| manifest.id.as_str())
+        .collect();
+    worn.retain(|(_, _, manifest)| !off.contains(&manifest.id.as_str()));
     let mut hidden: Vec<&str> = Vec::new();
     // Each worn garment's cover map and where it is worn, inside out.
     let covering: Vec<(&str, (u8, u8), String, bool)> = worn

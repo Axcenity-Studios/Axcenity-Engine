@@ -7,7 +7,9 @@
 use std::path::{Path, PathBuf};
 
 use axcenity_assets::Assets;
-use axcenity_avatar::{Colour, Description, Library, MaterialValue, V1_BASE, Variant};
+use axcenity_avatar::{
+    Colour, DEFAULT_BASE, Description, Library, MaterialValue, Variant, WornItem,
+};
 use axcenity_core::{ClassName, World};
 use axcenity_script::{OutputKind, ScriptRuntime};
 
@@ -31,10 +33,26 @@ fn shipped() -> Library {
     library
 }
 
-/// The default character: swept hair, a T-shirt, a jacket, cargo trousers
-/// and sneakers.
+const BRIEFS: &str = "axcenity/human-boxer-briefs";
+const HAIR: &str = "makehuman/hair-short02";
+const SHIRT: &str = "makehuman/crude-male-shirt";
+const TROUSERS: &str = "makehuman/cargo-pants";
+const SHOES: &str = "makehuman/shoes01";
+const HAT: &str = "makehuman/fedora";
+const BOB: &str = "makehuman/hair-bob02";
+const LONG: &str = "makehuman/hair-long01";
+const SLEEVES: &str = "makehuman/armsleeve-white-m";
+
+/// A dressed character on the human base: what its body type wears (the
+/// boxer briefs), then short hair, a shirt, cargo trousers, shoes and a
+/// hat.
 fn default_character(library: &Library) -> Description {
-    default_description(library, V1_BASE)
+    let mut description = default_description(library, DEFAULT_BASE);
+    assert_eq!(worn(&description), [BRIEFS]);
+    description
+        .items
+        .extend([HAIR, SHIRT, TROUSERS, SHOES, HAT].map(WornItem::new));
+    description
 }
 
 /// What `description` wears, in order.
@@ -100,18 +118,17 @@ fn a_parameter_reads_its_default_and_is_clamped_to_its_range_when_set() {
     let mut character = default_character(&library);
     // Left out, a parameter is at the manifest's default.
     assert_eq!(parameter(&library, &character, "height"), Ok(1.0));
-    assert_eq!(parameter(&library, &character, "build"), Ok(0.0));
-    // (1.1: inside the stylized body's `height` range, 0.85 to 1.15 since
-    // R3's wave 3.)
+    assert_eq!(parameter(&library, &character, "muscle"), Ok(0.0));
+    // (1.1: inside the human body's `height` range, 0.82 to 1.13.)
     set_parameter(&library, &mut character, "height", 1.1).unwrap();
     // As the file says it (1.1), not the nearest 32-bit number.
     assert_eq!(parameter(&library, &character, "height"), Ok(1.1));
     assert_eq!(character.parameters["height"], 1.1);
     // Outside its range, the nearest end.
-    set_parameter(&library, &mut character, "build", 5.0).unwrap();
-    assert_eq!(parameter(&library, &character, "build"), Ok(1.0));
+    set_parameter(&library, &mut character, "muscle", 5.0).unwrap();
+    assert_eq!(parameter(&library, &character, "muscle"), Ok(1.0));
     set_parameter(&library, &mut character, "height", -3.0).unwrap();
-    assert_eq!(parameter(&library, &character, "height"), Ok(0.85));
+    assert_eq!(parameter(&library, &character, "height"), Ok(0.82));
 
     let unknown = parameter(&library, &character, "nose_wide").unwrap_err();
     assert!(unknown.contains("no parameter `nose_wide`"), "{unknown}");
@@ -129,7 +146,7 @@ fn a_parameter_reads_its_default_and_is_clamped_to_its_range_when_set() {
     let mut stranger = Description::new("Stranger", "other/base");
     stranger.parameters.insert("height".to_owned(), 1.5);
     assert_eq!(parameter(&library, &stranger, "height"), Ok(1.5));
-    let why = parameter(&library, &stranger, "build").unwrap_err();
+    let why = parameter(&library, &stranger, "muscle").unwrap_err();
     assert!(why.contains("no base model `other/base`"), "{why}");
     let why = set_parameter(&library, &mut stranger, "height", 1.0).unwrap_err();
     assert!(why.contains("no base model `other/base`"), "{why}");
@@ -141,37 +158,15 @@ fn an_item_goes_in_its_slot_in_place_of_what_the_slot_held() {
     let mut character = default_character(&library);
     assert_eq!(
         worn(&character),
-        [
-            "axcenity/hair-swept",
-            "axcenity/tee",
-            "axcenity/cropped-jacket",
-            "axcenity/cargo-pants",
-            "axcenity/sneakers"
-        ]
+        [BRIEFS, HAIR, SHIRT, TROUSERS, SHOES, HAT]
     );
     // In the slot's place in the list; nothing else moves.
-    set_item(&library, &mut character, "hair", "axcenity/hair-bob", None).unwrap();
-    assert_eq!(
-        worn(&character),
-        [
-            "axcenity/hair-bob",
-            "axcenity/tee",
-            "axcenity/cropped-jacket",
-            "axcenity/cargo-pants",
-            "axcenity/sneakers"
-        ]
-    );
+    set_item(&library, &mut character, "hair", BOB, None).unwrap();
+    assert_eq!(worn(&character), [BRIEFS, BOB, SHIRT, TROUSERS, SHOES, HAT]);
     // An empty slot's item goes last.
-    set_item(
-        &library,
-        &mut character,
-        "underwear_top",
-        "axcenity/sports-top",
-        None,
-    )
-    .unwrap();
-    assert_eq!(worn(&character).last().unwrap(), "axcenity/sports-top");
-    assert_eq!(character.items.len(), 6);
+    set_item(&library, &mut character, "gloves", SLEEVES, None).unwrap();
+    assert_eq!(worn(&character).last().unwrap(), SLEEVES);
+    assert_eq!(character.items.len(), 7);
 
     // What can't be worn is an error, and changes nothing.
     let before = character.clone();
@@ -180,30 +175,26 @@ fn an_item_goes_in_its_slot_in_place_of_what_the_slot_held() {
         assert_eq!(character, before, "nothing changed: {why}");
         why
     };
-    let why = refused(&library, "hair", "axcenity/hair-mohawk", None);
-    assert!(why.contains("no item `axcenity/hair-mohawk`"), "{why}");
-    let why = refused(&library, "top", "axcenity/hair-long", None);
+    let why = refused(&library, "hair", "makehuman/hair-mohawk", None);
+    assert!(why.contains("no item `makehuman/hair-mohawk`"), "{why}");
+    let why = refused(&library, "top", LONG, None);
     assert!(
         why.contains("`hair` slot") && why.contains("`top`"),
         "{why}"
     );
-    let why = refused(&library, "hair", "axcenity/hair-long", Some("blonde"));
-    assert!(why.contains("no variant `blonde`"), "{why}");
+    let why = refused(&library, "hair", LONG, Some("neon"));
+    assert!(why.contains("no variant `neon`"), "{why}");
     // An item made for another base model doesn't fit this one.
     let mut other_base = library.clone();
-    other_base
-        .items
-        .get_mut("axcenity/hair-long")
-        .unwrap()
-        .bases = vec!["other/base".to_owned()];
-    let why = refused(&other_base, "hair", "axcenity/hair-long", None);
+    other_base.items.get_mut(LONG).unwrap().bases = vec!["other/base".to_owned()];
+    let why = refused(&other_base, "hair", LONG, None);
     assert!(why.contains("doesn't fit"), "{why}");
 
     // A variant is kept with the item, and setting the item again changes
     // its variant where it is, keeping the item's own material values.
     library
         .items
-        .get_mut("axcenity/tee")
+        .get_mut(SHIRT)
         .unwrap()
         .variants
         .push(Variant {
@@ -214,63 +205,47 @@ fn an_item_goes_in_its_slot_in_place_of_what_the_slot_held() {
             parameters: Default::default(),
         });
     let mut character = default_character(&library);
-    character.items[1].materials.insert(
+    character.items[2].materials.insert(
         "Shirt".to_owned(),
         [("roughness_scale".to_owned(), MaterialValue::Number(0.5))].into(),
     );
-    set_item(
-        &library,
-        &mut character,
-        "top",
-        "axcenity/tee",
-        Some("navy"),
-    )
-    .unwrap();
-    assert_eq!(worn(&character)[1], "axcenity/tee#navy");
-    assert_eq!(character.items.len(), 5);
-    assert_eq!(character.items[1].materials.len(), 1);
-    set_item(&library, &mut character, "top", "axcenity/tee", None).unwrap();
-    assert_eq!(worn(&character)[1], "axcenity/tee");
+    set_item(&library, &mut character, "top", SHIRT, Some("navy")).unwrap();
+    assert_eq!(worn(&character)[2], format!("{SHIRT}#navy"));
+    assert_eq!(character.items.len(), 6);
+    assert_eq!(character.items[2].materials.len(), 1);
+    set_item(&library, &mut character, "top", SHIRT, None).unwrap();
+    assert_eq!(worn(&character)[2], SHIRT);
 
     // A slot that holds several keeps what it has.
-    let base = library.bases.get_mut(V1_BASE).unwrap();
+    let base = library.bases.get_mut(DEFAULT_BASE).unwrap();
     base.slots
         .iter_mut()
         .find(|slot| slot.id == "hair")
         .unwrap()
         .multiple = true;
     let mut character = default_character(&library);
-    set_item(&library, &mut character, "hair", "axcenity/hair-bob", None).unwrap();
-    set_item(&library, &mut character, "hair", "axcenity/hair-bob", None).unwrap();
+    set_item(&library, &mut character, "hair", BOB, None).unwrap();
+    set_item(&library, &mut character, "hair", BOB, None).unwrap();
     assert_eq!(
         worn(&character),
-        [
-            "axcenity/hair-swept",
-            "axcenity/tee",
-            "axcenity/cropped-jacket",
-            "axcenity/cargo-pants",
-            "axcenity/sneakers",
-            "axcenity/hair-bob"
-        ]
+        [BRIEFS, HAIR, SHIRT, TROUSERS, SHOES, HAT, BOB]
     );
     // And taking the slot's items off takes them all.
     remove_item(&library, &mut character, "hair").unwrap();
-    assert_eq!(character.items.len(), 4);
+    assert_eq!(character.items.len(), 5);
 }
 
 #[test]
 fn removing_a_slots_item_leaves_the_others_and_an_unknown_slot_is_an_error() {
     let library = shipped();
     let mut character = default_character(&library);
-    remove_item(&library, &mut character, "outerwear").unwrap();
+    remove_item(&library, &mut character, "headwear").unwrap();
     remove_item(&library, &mut character, "hair").unwrap();
-    assert_eq!(
-        worn(&character),
-        ["axcenity/tee", "axcenity/cargo-pants", "axcenity/sneakers"]
-    );
+    assert_eq!(worn(&character), [BRIEFS, SHIRT, TROUSERS, SHOES]);
     // An empty slot is fine.
     remove_item(&library, &mut character, "hair").unwrap();
-    assert_eq!(character.items.len(), 3);
+    remove_item(&library, &mut character, "outerwear").unwrap();
+    assert_eq!(character.items.len(), 4);
     let why = remove_item(&library, &mut character, "hat").unwrap_err();
     assert!(why.contains("no slot `hat`"), "{why}");
     assert!(why.contains("hair"), "it names the slots there are: {why}");
@@ -279,30 +254,27 @@ fn removing_a_slots_item_leaves_the_others_and_an_unknown_slot_is_an_error() {
 /// The realistic body's underwear comes with Male or Female: a script
 /// can't take it off or swap it, and setting the frame dresses for it.
 #[test]
-fn a_script_cant_take_off_the_realistic_underwear() {
+fn a_script_cant_take_off_the_underwear_a_body_type_wears() {
     let library = shipped();
-    let mut character = default_description(&library, "axcenity/realistic");
-    assert_eq!(worn(&character), ["axcenity/realistic-boxer-briefs"]);
+    let mut character = default_description(&library, DEFAULT_BASE);
+    assert_eq!(worn(&character), [BRIEFS]);
     let why = remove_item(&library, &mut character, "underwear_bottom").unwrap_err();
     assert!(why.contains("comes with `frame`"), "{why}");
     let why = set_item(
         &library,
         &mut character,
         "underwear_bottom",
-        "axcenity/realistic-briefs",
+        "makehuman/female-panties-01",
         None,
     )
     .unwrap_err();
     assert!(why.contains("can't be changed"), "{why}");
-    assert_eq!(worn(&character), ["axcenity/realistic-boxer-briefs"]);
+    assert_eq!(worn(&character), [BRIEFS]);
 
     set_parameter(&library, &mut character, "frame", 1.0).unwrap();
     let mut items = worn(&character);
     items.sort();
-    assert_eq!(
-        items,
-        ["axcenity/realistic-briefs", "axcenity/realistic-sports-bra"]
-    );
+    assert_eq!(items, ["axcenity/human-bandeau", BRIEFS]);
 }
 
 #[test]
@@ -322,9 +294,9 @@ fn a_material_value_is_checked_against_its_slots_shading_model() {
     set_material_value(
         &library,
         &mut character,
-        "Iris",
-        "pupil_size",
-        MaterialValue::Number(2.0),
+        "Brows",
+        "redness",
+        MaterialValue::Number(0.5),
     )
     .unwrap();
     assert_eq!(
@@ -333,8 +305,8 @@ fn a_material_value_is_checked_against_its_slots_shading_model() {
     );
     assert_eq!(character.materials["Skin"]["tint"], tint);
     assert_eq!(
-        character.materials["Iris"]["pupil_size"],
-        MaterialValue::Number(2.0)
+        character.materials["Brows"]["redness"],
+        MaterialValue::Number(0.5)
     );
     // Set again, a value is replaced.
     set_material_value(
@@ -395,24 +367,25 @@ end
 -- nothing until it's changed.
 print(description.Base == "", description.Data == "")
 print(worn())
-print(description:GetParameter("height"), description:GetParameter("build"))
+print(description:GetParameter("height"), description:GetParameter("muscle"))
 description:SetParameter("height", 1.1)
-description:SetParameter("build", 5)
-print(description:GetParameter("height"), description:GetParameter("build"))
+description:SetParameter("muscle", 5)
+print(description:GetParameter("height"), description:GetParameter("muscle"))
 print(description.Base, description.Data ~= "")
-description:SetItem("hair", "axcenity/hair-bob")
-description:RemoveItem("outerwear")
-description:SetItem("underwear_top", "axcenity/sports-top")
+description:SetItem("hair", "makehuman/hair-bob02")
+description:SetItem("headwear", "makehuman/fedora")
+description:RemoveItem("headwear")
+description:SetItem("gloves", "makehuman/armsleeve-white-m")
 print(worn())
 description:SetMaterialValue("Skin", "melanin", 0.4)
-description:SetMaterialValue("Iris", "iris_tint", Color3.fromRGB(90, 122, 154))
+description:SetMaterialValue("Brows", "tint", Color3.fromRGB(90, 122, 154))
 -- Its Data is the character file's text, so another one given it is the
 -- same character.
 local copy = Instance.new("HumanoidDescription")
 copy.Data = description.Data
 print(#copy:GetItems(), copy:GetParameter("height"))
 print(string.find(description.Data, '"melanin": 0.4', 1, true) ~= nil)
-print(string.find(description.Data, '"iris_tint": "#5a7a9a"', 1, true) ~= nil)
+print(string.find(description.Data, '"tint": "#5a7a9a"', 1, true) ~= nil)
 "##,
         Assets::new(repository()),
     );
@@ -420,14 +393,13 @@ print(string.find(description.Data, '"iris_tint": "#5a7a9a"', 1, true) ~= nil)
         one_side(lines),
         [
             "true true",
-            "hair=axcenity/hair-swept top=axcenity/tee outerwear=axcenity/cropped-jacket \
-             bottom=axcenity/cargo-pants shoes=axcenity/sneakers",
+            "underwear_bottom=axcenity/human-boxer-briefs",
             "1 0",
             "1.1 1",
-            "axcenity/stylized true",
-            "hair=axcenity/hair-bob top=axcenity/tee bottom=axcenity/cargo-pants \
-             shoes=axcenity/sneakers underwear_top=axcenity/sports-top",
-            "5 1.1",
+            "axcenity/human true",
+            "underwear_bottom=axcenity/human-boxer-briefs hair=makehuman/hair-bob02 \
+             gloves=makehuman/armsleeve-white-m",
+            "3 1.1",
             "true",
             "true",
         ]
@@ -448,9 +420,9 @@ try("GetParameter", 5)
 try("SetParameter", "nose_wide", 1)
 try("SetParameter", "height", 0 / 0)
 try("SetParameter", "height", "tall")
-try("SetItem", "hair", "axcenity/hair-mohawk")
-try("SetItem", "top", "axcenity/hair-bob")
-try("SetItem", "hair", "axcenity/hair-bob", "blonde")
+try("SetItem", "hair", "makehuman/hair-mohawk")
+try("SetItem", "top", "makehuman/hair-bob02")
+try("SetItem", "hair", "makehuman/hair-bob02", "neon")
 try("SetItem", "hair")
 try("RemoveItem", "hat")
 try("SetMaterialValue", "Skin", "shine", 1)
@@ -478,9 +450,9 @@ print(pcall(description.GetItems, workspace))
         ("SetParameter false", "no parameter `nose_wide`"),
         ("SetParameter false", "finite number"),
         ("SetParameter false", "finite number, not string"),
-        ("SetItem false", "no item `axcenity/hair-mohawk`"),
+        ("SetItem false", "no item `makehuman/hair-mohawk`"),
         ("SetItem false", "`hair` slot"),
-        ("SetItem false", "no variant `blonde`"),
+        ("SetItem false", "no variant `neon`"),
         ("SetItem false", "must be a string, not nil"),
         ("RemoveItem false", "no slot `hat`"),
         ("SetMaterialValue false", "`shine`"),

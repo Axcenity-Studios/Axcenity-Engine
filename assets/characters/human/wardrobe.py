@@ -18,7 +18,9 @@ its own cloth out, are where its cloth lies over the skin
 (`build.skin_uvs_of`), so worn under another garment it is cut and its
 edge sunk as a garment the engine fitted.
 
-**Licence gate.** A garment is taken only when its own file's header and
+**Licence gate.** (This converter's, for a library outside the
+repository; the repository itself takes only the CC0 ones of what is
+converted: `take_library.py`.) A garment is taken only when its own file's header and
 its pack's metadata both say CC0 or CC BY, and agree (`vet`). Anything
 else is left out with the reason (some packs listed as CC0 hold files
 whose headers still say AGPL3, and outfits of characters that aren't
@@ -60,9 +62,13 @@ KINDS = (
     (("stocking", "pantyhose", "sock", "tights", "legwarmer", "leg_warmer"), "legwear", 0, ()),
     (("glove", "mitten", "armsleeve", "arm_sleeve"), "gloves", 1, ()),
     (("hat", "fedora", "cap", "helmet", "hood", "beanie", "crown", "headband"), "headwear", None, ()),
-    (("bra", "bikini_top", "bikinitop", "camisole", "bandeau"), "underwear_top", 0, ()),
+    # Underwear and swimwear are a top or a bottom of layer 0, worn over
+    # the underwear cut from the body, which they hide where they cover
+    # it: the base's own underwear slots are the body type's
+    # (`avatar::chosen_slots`), and nothing else can be worn in them.
+    (("bra", "bikini_top", "bikinitop", "camisole", "bandeau"), "top", 0, ()),
     (("underwear", "brief", "boxer", "panties", "panty", "thong", "lingerie", "bikini", "swim", "slip"),
-     "underwear_bottom", 0, ()),
+     "bottom", 0, ()),
     (("dress", "gown", "robe", "tunic", "jumpsuit", "overall", "suit", "uniform", "costume", "outfit",
       "romper", "babydoll", "teddy"), "top", 1, ("bottom",)),
     (("skirt", "kilt"), "bottom", 1, ()),
@@ -80,15 +86,15 @@ def kind_of(name, tags, entry):
     words_in = "_" + re.sub(r"[^a-z0-9]+", "_", " ".join([name] + tags).lower()) + "_"
     for words, slot, layer, fills in KINDS:
         if any(w in words_in for w in words):
-            # In an underwear pack a top is an underwear top.
+            # In an underwear pack a top is worn as underwear: layer 0.
             if category == "underwear" and slot == "top" and not fills:
-                return "underwear_top", 0, []
+                return "top", 0, []
             # A top made tucked in is worn under the bottoms (layer 0:
             # `ItemManifest::wearing_order`), so their waistband hides it.
             if slot == "top" and not fills and "_tucked_" in words_in:
                 return slot, 0, []
             return slot, layer, list(fills)
-    by_category = {"underwear": ("underwear_bottom", 0, []), "shirts": ("top", 1, []), "pants": ("bottom", 1, []),
+    by_category = {"underwear": ("bottom", 0, []), "shirts": ("top", 1, []), "pants": ("bottom", 1, []),
                    "shoes": ("shoes", 1, []), "gloves": ("gloves", 1, []), "hats": ("headwear", None, []),
                    "skirts": ("bottom", 1, []), "dress": ("top", 1, ["bottom"]), "suits": ("top", 1, ["bottom"])}
     return by_category.get(category)

@@ -15,8 +15,8 @@
 //! - **Add to Project** writes the pack's characters into a game project's
 //!   [`PROJECT_FOLDER`] (`assets/characters/descriptions/`) beside the
 //!   project's character library (section 15), and makes sure the library
-//!   has the bodies and items they wear (`project::add_character_library`
-//!   and the engine's packages).
+//!   has the bodies and items they wear
+//!   (`project::add_character_packages_for`, from the studio's library).
 
 use std::path::{Path, PathBuf};
 
@@ -316,12 +316,12 @@ pub fn add_to_project(folder: &Path, pack: &Pack, project: &Path) -> Result<Vec<
     if descriptions.is_empty() {
         return Err(format!("\"{}\" has no characters to add.", pack.name));
     }
-    axcenity_project::add_character_library(project)
-        .map_err(|err| format!("Could not write the project's character library: {err}"))?;
-    if let Some(shipped) = super::find_character_library() {
-        axcenity_project::add_character_packages(project, &shipped)
-            .map_err(|err| format!("Could not copy the character library: {err}"))?;
-    }
+    // What the pack's characters name, from the studio's own library
+    // (which has the engine's and a person's own items).
+    let named: Vec<&Description> = descriptions.iter().collect();
+    let library = folder.join(axcenity_avatar::LIBRARY_FOLDER);
+    axcenity_project::add_character_packages_for(project, &library, &named)
+        .map_err(|err| format!("Could not copy the character library: {err}"))?;
     let target = project.join(PROJECT_FOLDER);
     std::fs::create_dir_all(&target)
         .map_err(|err| format!("Could not make {}: {err}", target.display()))?;

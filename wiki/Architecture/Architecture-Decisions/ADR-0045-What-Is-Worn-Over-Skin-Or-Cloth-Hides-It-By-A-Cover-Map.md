@@ -7,8 +7,8 @@ date: 2026-11-24
 supersedes:
 superseded_by:
 affects: [avatar, assets, gameplay, editor]
-source: [crates/avatar/src/fit/cover.rs, crates/avatar/src/fit/transfer.rs, crates/avatar/src/fit/import.rs, crates/avatar/src/fit/glb.rs, crates/avatar/src/item.rs, crates/avatar/src/resolve.rs, crates/assets/src/hidden.rs, crates/assets/src/model/hide.rs, crates/gameplay/src/description.rs, crates/editor/src/character_workspace/direct.rs, crates/editor/src/character_workspace/browser.rs, assets/characters/realistic/clothing/generated/garments.json]
-docs: [docs/development/character-studio/architecture.md, docs/research/character-clothing-workflow.md, assets/characters/realistic/clothing/README.md, docs/editor/character-studio.md, docs/development/character-studio/progress.md]
+source: [crates/avatar/src/fit/cover.rs, crates/avatar/src/fit/transfer.rs, crates/avatar/src/fit/import.rs, crates/avatar/src/fit/glb.rs, crates/avatar/src/item.rs, crates/avatar/src/resolve.rs, crates/assets/src/hidden.rs, crates/assets/src/model/hide.rs, crates/gameplay/src/description.rs, crates/editor/src/character_workspace/direct.rs, crates/editor/src/character_workspace/browser.rs]
+docs: [docs/development/character-studio/architecture.md, docs/research/character-clothing-workflow.md, docs/editor/character-studio.md, docs/development/character-studio/progress.md]
 tags: [adr, characters, assets]
 ---
 
@@ -91,6 +91,19 @@ Paul chose a fit step over a shape weighted when worn, with guards against tight
 Rejected: fitting a top over the bottoms as lower layers (`--under`), which fixed the puffer and the V-neck over one pair of trousers and doubled the size of the tank top and the polo over all eleven (the push takes a layer for a closed body, isn't kept to the hips and has no cap); a low cap against slim bottoms only, which left the bites over cargo pants; hiding by a wider cover (a hole under a hem is worse than cloth through it).
 
 Consequences: adding or changing a bottom means importing the tops again (three and a half minutes for the fourteen, seven at a time). The hem of a top opens by up to 3 cm at the seat to clear the bulkiest bottom, whichever is worn. The order is made at rest on the default body.
+
+## Amended on 2026-11-25: the cut underwear is not drawn under what takes its place
+
+Paul, looking at the wardrobe's contact sheets (the panties on the boxer briefs, whose legs showed whole round them): "If there is an overlapping piece of clothing then simply do not render the undergarments."
+
+A cover map leaves an inner garment out only where the outer one's cloth is over it, so a smaller garment shows the larger one beneath it round its edges. That is right for a T-shirt under a jacket and wrong for underwear a body type always wears: nobody chose it, and it can't be taken off.
+
+- A base model's slot can name the slots whose item takes its own off the character (`Slot::hidden_by`, an optional field: no format change). While one of them is filled, the item worn in the slot stays worn (no problem, still in the description) but `resolve` makes no part of it, and it hides no region and has no cover.
+- The human base sets it on its two underwear slots: `underwear_bottom` under `bottom`, `underwear_top` under `top`. An outfit fills both. Shoes, socks, stockings, gloves and hats take nothing off.
+- It goes by slot, not by what the cloth covers, so it is exact and costs nothing at runtime: a long top still leaves the briefs drawn below its hem, and an open back shows skin where the bandeau was.
+- MakeHuman's own underwear and swimwear are filed as a top or a bottom of layer 0 (`wardrobe.py`), so they take the cut underwear's place instead of sitting on it.
+
+Tests: `avatar` `an_item_in_a_slot_hidden_by_another_is_worn_but_not_drawn`, `the_human_bases_underwear_goes_under_its_clothes`; `player` `the_human_bases_underwear_is_not_drawn_under_an_outfit`.
 
 ## Open (for Paul)
 

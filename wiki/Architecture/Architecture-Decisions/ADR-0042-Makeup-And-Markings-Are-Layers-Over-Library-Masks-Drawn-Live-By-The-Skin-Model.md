@@ -7,7 +7,7 @@ date: 2026-11-17
 supersedes:
 superseded_by:
 affects: [avatar, assets, scene, render, gameplay, editor]
-source: [crates/avatar/src/skin.rs, crates/assets/src/model.rs, crates/scene/src/material.rs, crates/scene/src/draw_list/materials.rs, crates/render/src/skin.wgsl, crates/render/src/renderer/lighting.rs, assets/characters/realistic/makeup.py]
+source: [crates/avatar/src/skin.rs, crates/assets/src/model.rs, crates/scene/src/material.rs, crates/scene/src/draw_list/materials.rs, crates/render/src/skin.wgsl, crates/render/src/renderer/lighting.rs]
 docs: [docs/development/character-studio/architecture.md, docs/rendering/skin.md, docs/development/character-studio/references/skin/README.md]
 tags: [adr, characters, rendering, assets]
 ---
@@ -70,6 +70,10 @@ The constraints:
 - Revisit when decals are built (point 6), or if CO8's posed buffer gives the shader a rest position (then freckles could be procedural at any density).
 - **The spare channel is stubble's** (R6, 2026-11-18): mask 2's alpha holds the beard region's stubble density with a follicle stipple (`makeup.py`, `stubble_mask`), for a marking-kind layer `stubble` whose colour comes from the hair's melanin. Drawing it needs uniform room in `skin_layer_uniform` (every slot is taken), so the base doesn't offer the layer until the Skin model draws it (`docs/rendering/skin.md`). With it, the three masks are full: a tenth layer needs the fourth mask or the decal path, as above.
 
+## Notes
+
+- **2026-11-25 ([ADR-0050](ADR-0050-The-Engine-Ships-One-Character-Family-MakeHumans-Body-With-Quaterniuss-Animations.md)).** The realistic package was removed, and with it the only content for this decision: the masks (`makeup.py`), the base manifest's `skin_layers` and `player`'s `makeup_tests.rs`. The engine code stays (`avatar`'s `skin.rs`, the Skin model's layers in `scene` and `render`, Character Studio's Makeup and markings controls) with its synthetic tests, but no shipped asset exercises it: the human base's manifest offers no `skin_layers`, so a character on it has no makeup or markings.
+
 ## Implementation references
 
 - `crates/avatar/src/skin.rs` (`Skin`, `SkinLayer`, `SkinLayerSpec`, `skin_layer_value`, the checks and `draw_values`), `description.rs`, `manifest.rs`, `resolve.rs`, `preset.rs`; tests `crates/avatar/src/tests/skin_layers.rs`
@@ -78,4 +82,4 @@ The constraints:
 - `crates/render/src/draw_list.rs` (`SkinLayers`, `Makeup`, `Spots`), `renderer/lighting.rs` (`skin_layer_uniform`, the slots), `renderer/gpu.rs` (the masks read as values), `skin.wgsl` (`skin_layered`), `shader.wgsl` (the call in `standard_surface`); tests `renderer/tests/skin_layers.rs`
 - `assets/characters/realistic/makeup.py` (the masks), `manifests.py` (`SKIN_LAYERS`), `build.py`
 - `crates/editor/src/character_workspace/panel/materials.rs` (Makeup and markings), `intent.rs` (`SetSkinLayer`)
-- `crates/player/src/makeup_tests.rs` (every layer in a capture, off draws bare skin, a colour change live, softness alone)
+- `player`'s `makeup_tests.rs`, removed with the realistic package on 2026-11-25 (every layer in a capture, off draws bare skin, a colour change live, softness alone)

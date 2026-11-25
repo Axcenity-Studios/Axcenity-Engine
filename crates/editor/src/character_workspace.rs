@@ -129,9 +129,9 @@ pub use stage::{Backdrop, Lighting, Orbit, ViewPreset};
 /// The command-line flag that opens the editor straight into the workspace.
 pub const FLAG: &str = "--character-studio";
 
-/// The base model a new character starts on: the semi-realistic family is
-/// the default (ADR-0032).
-pub const DEFAULT_BASE: &str = "axcenity/realistic";
+/// The base model a new character starts on: the human base, the one
+/// family the engine ships.
+pub const DEFAULT_BASE: &str = axcenity_avatar::DEFAULT_BASE;
 
 /// Where a workspace's files live, in the editor's data folder.
 pub fn default_folder() -> Option<PathBuf> {
@@ -163,25 +163,25 @@ pub enum Start {
 }
 
 impl Start {
-    /// A shipped realistic preset by its short name (`female`,
-    /// `athletic-male`…), for tests.
+    /// A shipped preset of the human base by its short name (`female`,
+    /// `body-athletic`…), for tests.
     #[cfg(test)]
     pub fn shipped(name: &str) -> Self {
-        Start::Preset(format!("axcenity/realistic-{name}"))
+        Start::Preset(format!("axcenity/human-{name}"))
     }
 }
 
 impl Default for Start {
-    /// The realistic family's default character.
+    /// The human base's default character.
     fn default() -> Self {
         Start::Family(DEFAULT_BASE.to_owned())
     }
 }
 
 /// Whether Character Studio offers base model `id` for new characters:
-/// every family the library has (plan section 0, decision 7: both the
-/// realistic and the stylized family are selectable; realistic is the
-/// default and listed first, [`presets::families`]).
+/// every family the library has (the engine ships one; a library of a
+/// person's own may hold others, the default listed first,
+/// [`presets::families`]).
 pub fn offers_base(library: &Library, id: &str) -> bool {
     library.base(id).is_some()
 }
@@ -413,7 +413,7 @@ impl CharacterWorkspace {
             }
             None => {
                 notice = Some(
-                    "Only the stylized characters are here: the engine's character library \
+                    "There are no characters to edit: the engine's character library \
                      (assets/characters) wasn't found."
                         .to_owned(),
                 )
@@ -531,14 +531,8 @@ impl CharacterWorkspace {
                 })
             }
         };
-        let made = made.unwrap_or_else(|| {
-            let base = if library.base(DEFAULT_BASE).is_some() {
-                DEFAULT_BASE
-            } else {
-                axcenity_avatar::V1_BASE
-            };
-            applier::default_description(&library, base)
-        });
+        let made =
+            made.unwrap_or_else(|| applier::default_description(&library, library.default_base()));
         let mut made = tidy(made, &library);
         made.name = "New Character".to_owned();
         made
@@ -1125,7 +1119,7 @@ impl CharacterWorkspace {
             && let Some(head) = self.head()
         {
             // The fixed view looked at the default character's head bone
-            // (0.905 of its height) from 0.05 in front of it.
+            // (0.89 of its height) from 0.05 in front of it.
             self.orbit.target = head + Vec3::new(0.0, 0.0, -0.05);
         }
         self.view = Some(view);
@@ -1234,11 +1228,7 @@ fn adopt(description: Description, library: &Library) -> (Description, Option<St
     if library.base(&description.base).is_some() {
         return (tidy(description, library), None);
     }
-    let base = if library.base(DEFAULT_BASE).is_some() {
-        DEFAULT_BASE
-    } else {
-        axcenity_avatar::V1_BASE
-    };
+    let base = library.default_base();
     let notice = format!(
         "\"{}\" is on a body this library hasn't ({}); showing the default character.",
         description.name, description.base

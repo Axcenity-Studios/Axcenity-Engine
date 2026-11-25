@@ -361,7 +361,7 @@ fn face_controls_turn_a_skinned_characters_eyes() {
 #[test]
 fn the_eye_and_jaw_turns_of_a_face_reach_the_bodys_parts() {
     let assets = Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters"));
-    let mesh = |object: &str| format!("realistic/RealisticParts.glb#AxcenityRealistic/{object}");
+    let mesh = |object: &str| format!("human/HumanParts.glb#AxcenityHuman/{object}");
     let mut world = World::new();
     let body = mesh_part(&mut world, &mesh("Body"));
     let mut parts = Vec::new();
@@ -399,111 +399,6 @@ fn the_eye_and_jaw_turns_of_a_face_reach_the_bodys_parts() {
             "{object}'s {bone} turned {turned} degrees, not {degrees}"
         );
     }
-}
-
-/// `Blink` and `Eye_Closed` both close a lid, and a head has a shape for
-/// each: a blink over an eye that is already closed (a sleepy face that
-/// blinks) closes only what is still open, or the lid would go on through
-/// the lower one.
-#[test]
-fn a_blink_closes_only_what_a_closed_eye_leaves_open() {
-    let assets = Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters"));
-    let mesh = "realistic/RealisticParts.glb#AxcenityRealistic/Body";
-    let model = assets.model_blocking(mesh).unwrap();
-    let mut world = World::new();
-    let body = mesh_part(&mut world, mesh);
-    let face = face_controls(
-        &mut world,
-        body,
-        &[
-            ("Eye_Closed_Left", 1.0),
-            ("Blink_Left", 1.0),
-            ("Eye_Closed_Right", 0.8),
-            ("Blink_Right", 0.5),
-        ],
-    );
-    world
-        .set_property(face, "ProceduralEnabled", Value::Bool(false))
-        .unwrap();
-    let mut animators = Animators::new();
-    animators.update(&mut world, &assets, FRAME);
-    let errors = animators.take_errors();
-    assert!(errors.is_empty(), "{errors:?}");
-    let posed = animators.poses().get(&body).unwrap();
-    let weight = |name: &str| {
-        let index = model
-            .morph_targets
-            .iter()
-            .position(|target| target.name == name)
-            .unwrap_or_else(|| panic!("the body has no shape `{name}`"));
-        posed.morph_weights()[index]
-    };
-    assert!((weight("Eye_Closed_Left") - 1.0).abs() < 1e-4);
-    assert!(
-        weight("Blink_Left").abs() < 1e-4,
-        "{}",
-        weight("Blink_Left")
-    );
-    assert!((weight("Eye_Closed_Right") - 0.8).abs() < 1e-4);
-    assert!(
-        (weight("Blink_Right") - 0.2).abs() < 1e-4,
-        "{}",
-        weight("Blink_Right")
-    );
-}
-
-/// A squint, a raised cheek and a lowered brow each close part of the
-/// eye, and blend shapes add: a full blink over a laughing or a frowning
-/// face (the automatic blink, most of the time) would carry the upper lid
-/// on past the lower one. A blink closes only what they leave open.
-#[test]
-fn a_blink_closes_only_what_a_narrowed_eye_leaves_open() {
-    let assets = Assets::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters"));
-    let mesh = "realistic/RealisticParts.glb#AxcenityRealistic/Body";
-    let model = assets.model_blocking(mesh).unwrap();
-    let mut world = World::new();
-    let body = mesh_part(&mut world, mesh);
-    let face = face_controls(
-        &mut world,
-        body,
-        &[
-            ("Eye_Squint_Left", 0.5),
-            ("Cheek_Raise_Left", 1.0),
-            ("Blink_Left", 1.0),
-            ("Brow_Lower_Right", 0.5),
-            ("Eye_Closed_Right", 0.25),
-            ("Blink_Right", 1.0),
-        ],
-    );
-    world
-        .set_property(face, "ProceduralEnabled", Value::Bool(false))
-        .unwrap();
-    let mut animators = Animators::new();
-    animators.update(&mut world, &assets, FRAME);
-    let errors = animators.take_errors();
-    assert!(errors.is_empty(), "{errors:?}");
-    let posed = animators.poses().get(&body).unwrap();
-    let weight = |name: &str| {
-        let index = model
-            .morph_targets
-            .iter()
-            .position(|target| target.name == name)
-            .unwrap_or_else(|| panic!("the body has no shape `{name}`"));
-        posed.morph_weights()[index]
-    };
-    // What narrows the eye is left as it was.
-    assert!((weight("Eye_Squint_Left") - 0.5).abs() < 1e-4);
-    assert!((weight("Cheek_Raise_Left") - 1.0).abs() < 1e-4);
-    assert!(
-        (weight("Blink_Left") - (1.0 - 0.5 * 0.71 - 0.31)).abs() < 1e-4,
-        "{}",
-        weight("Blink_Left")
-    );
-    assert!(
-        (weight("Blink_Right") - (1.0 - 0.25 - 0.5 * 0.26)).abs() < 1e-4,
-        "{}",
-        weight("Blink_Right")
-    );
 }
 
 #[test]

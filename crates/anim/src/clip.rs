@@ -399,8 +399,9 @@ impl BoundTake {
         // Such a body rests in the take's pose already, but in its own
         // shape: its bones keep their own rest directions and take only
         // the take's turns from rest. Matching the rest pose would bend
-        // them to the take's skeleton (the realistic body's flatter feet
-        // tipped into the floor, its collarbones turned forward).
+        // them to the take's skeleton (the retired realistic body's
+        // flatter feet tipped into the floor, its collarbones turned
+        // forward).
         let own_shape = RetargetProfile {
             match_rest_pose: false,
             ..RetargetProfile::default()

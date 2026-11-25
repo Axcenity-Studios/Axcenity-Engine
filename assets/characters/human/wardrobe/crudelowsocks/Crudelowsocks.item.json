@@ -1,0 +1,98 @@
+{
+  "format_version": 1,
+  "id": "makehuman/crudelowsocks",
+  "label": "Crudelowsocks",
+  "kind": "garment",
+  "slot": "legwear",
+  "layer": 0,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/human"
+  ],
+  "model": {
+    "file": "Crudelowsocks.glb",
+    "object": "AxcenityHuman/Crudelowsocks"
+  },
+  "cover_map": "Crudelowsocks.cover.png",
+  "materials": [
+    {
+      "name": "Crudelowsocks",
+      "shading": "standard"
+    }
+  ],
+  "fit": {
+    "method": "shapes",
+    "follows": [
+      "Face_Chin_Height_Decr",
+      "Face_Chin_Height_Incr",
+      "Face_Ear_Scale_Decr_Left",
+      "Face_Ear_Scale_Decr_Right",
+      "Face_Eyebrows_Trans_Backward",
+      "Face_Eyebrows_Trans_Forward",
+      "Face_Forehead_Nubian_Decr",
+      "Face_Forehead_Nubian_Incr",
+      "Face_Forehead_Scale_Vert_Decr",
+      "Face_Forehead_Scale_Vert_Incr",
+      "Face_Forehead_Temple_Incr",
+      "Face_Forehead_Trans_Backward",
+      "Face_Forehead_Trans_Forward",
+      "Face_Head_Age_Decr",
+      "Face_Head_Age_Incr",
+      "Face_Head_Angle_In",
+      "Face_Head_Angle_Out",
+      "Face_Head_Back_Scale_Depth_Decr",
+      "Face_Head_Back_Scale_Depth_Incr",
+      "Face_Head_Diamond",
+      "Face_Head_Fat_Decr",
+      "Face_Head_Fat_Incr",
+      "Face_Head_Invertedtriangular",
+      "Face_Head_Oval",
+      "Face_Head_Rectangular",
+      "Face_Head_Round",
+      "Face_Head_Scale_Depth_Decr",
+      "Face_Head_Scale_Depth_Incr",
+      "Face_Head_Scale_Horiz_Decr",
+      "Face_Head_Scale_Horiz_Incr",
+      "Face_Head_Scale_Vert_Decr",
+      "Face_Head_Scale_Vert_Incr",
+      "Face_Head_Square",
+      "Face_Head_Trans_Down",
+      "Face_Head_Trans_Up",
+      "Face_Head_Triangular",
+      "Face_Measure_Neck_Height_Decr",
+      "Face_Measure_Neck_Height_Incr",
+      "Face_Neck_Double_Decr",
+      "Face_Neck_Double_Incr",
+      "Face_Neck_Scale_Vert_Decr",
+      "Face_Neck_Trans_Down",
+      "Face_Neck_Trans_Up",
+      "Feminine_Age_Old",
+      "Feminine_Fat_Down",
+      "Feminine_Fat_Up",
+      "Feminine_Muscle_Down_Fat_Down",
+      "Feminine_Muscle_Down_Fat_Up",
+      "Feminine_Muscle_Up",
+      "Feminine_Muscle_Up_Fat_Down",
+      "Feminine_Muscle_Up_Fat_Up",
+      "Frame_Feminine",
+      "Masculine_Age_Old",
+      "Masculine_Fat_Down",
+      "Masculine_Muscle_Down",
+      "Masculine_Muscle_Down_Fat_Down",
+      "Masculine_Muscle_Down_Fat_Up",
+      "Masculine_Muscle_Up",
+      "Masculine_Muscle_Up_Fat_Down",
+      "Masculine_Muscle_Up_Fat_Up"
+    ]
+  },
+  "tags": [
+    "makehuman"
+  ],
+  "thumbnail": "Crudelowsocks.png",
+  "source": {
+    "author": "Joel Palmius",
+    "licence": "CC0-1.0",
+    "url": "http://www.makehumancommunity.org/node/32"
+  },
+  "quality": "draft"
+}

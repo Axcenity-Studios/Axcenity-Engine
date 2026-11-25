@@ -131,7 +131,8 @@ fn body_contents(
 #[test]
 fn the_shipped_library_reads_and_is_sound() {
     let library = read();
-    assert!(library.base("axcenity/stylized").is_some());
+    // One family: the human base.
+    assert_eq!(library.bases.keys().collect::<Vec<_>>(), ["axcenity/human"]);
     assert_eq!(lines(&library.validate()), "");
     // The catalogue is current: what `catalogue.py` writes is what the
     // manifests say, and it lists every manifest in the folder.
@@ -196,27 +197,6 @@ fn every_base_models_default_character_is_sound() {
         let mut description = Description::new("New Character", &base.id);
         description.items = base.defaults.items.iter().map(WornItem::new).collect();
         assert_eq!(lines(&description.validate(&library)), "", "{}", base.id);
-    }
-}
-
-#[test]
-fn every_format_1_character_migrates_to_a_sound_description() {
-    let library = read();
-    let looks = [
-        r#"{"format_version": 1}"#,
-        r#"{"format_version": 1, "name": "Casual", "build": -0.4, "hair": "Hair_Bob", "outerwear": null}"#,
-        r#"{"format_version": 1, "name": "Athlete", "muscle": 0.9, "hair": "Hair_Buzz", "outerwear": null}"#,
-        r#"{"format_version": 1, "name": "Long hair", "build": 0.5, "hair": "Hair_Long"}"#,
-        r#"{"format_version": 1, "name": "Base body", "hair": "Hair_Crop", "top": null, "outerwear": null, "bottom": "Underwear_Briefs", "shoes": null}"#,
-        r#"{"format_version": 1, "hair": "Hair_Ponytail", "top": "Underwear_Top"}"#,
-    ];
-    for text in looks {
-        let description = Description::from_json(text).unwrap();
-        assert_eq!(lines(&description.validate(&library)), "", "{text}");
-    }
-    // Every format 1 part became an item the library has.
-    for (part, id) in axcenity_avatar::V1_ITEMS {
-        assert!(library.item(id).is_some(), "{part} → {id}");
     }
 }
 
@@ -358,14 +338,6 @@ fn every_shipped_preset_is_sound_listed_and_resolves() {
         let kind = preset.preset().unwrap().kind;
         *kinds.entry((preset.base.clone(), kind)).or_default() += 1;
     }
-    let count = |kind| kinds.get(&("axcenity/realistic".to_owned(), kind)).copied();
-    // Seven builds for each frame (Custom is "none matches"), nine faces,
-    // the six characters the editor had in code, and the feature presets:
-    // ten noses and six face shapes.
-    assert_eq!(count(PresetKind::Body), Some(14));
-    assert_eq!(count(PresetKind::Face), Some(9));
-    assert_eq!(count(PresetKind::Character), Some(6));
-    assert_eq!(count(PresetKind::Feature), Some(16));
     let of_feature = |base: &str, feature: &str| {
         library
             .presets
@@ -375,13 +347,6 @@ fn every_shipped_preset_is_sound_listed_and_resolves() {
             .filter(|block| block.feature.as_deref() == Some(feature))
             .count()
     };
-    for (feature, presets) in [("nose", 10), ("face_shape", 6)] {
-        assert_eq!(
-            of_feature("axcenity/realistic", feature),
-            presets,
-            "{feature}"
-        );
-    }
     // The human base (`assets/characters/human/presets.py`): its two
     // characters, six builds, eight faces, seven face shapes and noses.
     let human = |kind| kinds.get(&("axcenity/human".to_owned(), kind)).copied();
@@ -391,73 +356,6 @@ fn every_shipped_preset_is_sound_listed_and_resolves() {
     for (feature, presets) in [("nose", 7), ("face_shape", 7)] {
         assert_eq!(of_feature("axcenity/human", feature), presets, "{feature}");
     }
-}
-
-/// The realistic base model's parameters say what they are (R1): a
-/// sentence, a level in step with `advanced`, and a feature it has.
-#[test]
-fn the_realistic_parameters_say_what_they_are() {
-    use axcenity_avatar::Level;
-    let library = read();
-    let base = library.base("axcenity/realistic").unwrap();
-    // (75 at R1; R4 added the face's 14; the finer face controls of
-    // 2026-11-24 another 33: the outline's five, and more of the nose,
-    // eyes, cheeks, jaw, chin and lips.)
-    assert_eq!(base.parameters.len(), 122);
-    for parameter in &base.parameters {
-        let id = &parameter.id;
-        let about = parameter.about.as_deref().unwrap_or_default();
-        assert!(about.len() > 10 && about.ends_with('.'), "{id}: `{about}`");
-        let level = parameter
-            .level
-            .unwrap_or_else(|| panic!("{id} has no level"));
-        assert_eq!(level == Level::Advanced, parameter.advanced, "{id}");
-        let feature = parameter
-            .feature
-            .as_deref()
-            .unwrap_or_else(|| panic!("{id}"));
-        assert!(base.feature(feature).is_some(), "{id}: {feature}");
-    }
-    for id in ["frame", "muscle", "fat", "height"] {
-        assert_eq!(base.parameter(id).unwrap().level(), Level::Quick, "{id}");
-    }
-    let features: Vec<&str> = base.features.iter().map(|f| f.id.as_str()).collect();
-    for id in [
-        "head",
-        "neck",
-        "shoulders",
-        "chest",
-        "arms",
-        "hands",
-        "abdomen",
-        "waist",
-        "back",
-        "hips",
-        "thighs",
-        "calves",
-        "feet",
-        "face_shape",
-        "eyes",
-        "brows",
-        "nose",
-        "cheeks",
-        "jaw",
-        "chin",
-        "lips",
-        "forehead",
-        "ears",
-    ] {
-        assert!(features.contains(&id), "no feature `{id}`: {features:?}");
-    }
-    for feature in &base.features {
-        assert!(
-            !feature.anchors.is_empty() && feature.radius > 0.0,
-            "{}",
-            feature.id
-        );
-    }
-    // R2 wrote the handles (`handles.py`); `realistic_handles.rs` checks them.
-    assert!(!base.handles.is_empty(), "the realistic body's handles");
 }
 
 /// Randomize on the shipped base models (R1; R10's 1,000 seeds): every
@@ -496,20 +394,20 @@ fn a_thousand_random_characters_on_each_shipped_base_are_sound() {
 }
 
 /// An outfit preset never takes off what a parameter's choices wear (the
-/// realistic body's underwear), even one that wears nothing.
+/// human body's underwear), even one that wears nothing.
 #[test]
 fn an_outfit_preset_leaves_the_chosen_underwear() {
     let library = read();
     let empty = Description::from_json(
-        r#"{ "format_version": 2, "name": "Nothing", "base": "axcenity/realistic",
+        r#"{ "format_version": 2, "name": "Nothing", "base": "axcenity/human",
              "preset": { "id": "test/nothing", "kind": "outfit", "about": "Nothing on." } }"#,
     )
     .unwrap();
-    let mut character = Description::new("Ada", "axcenity/realistic");
+    let mut character = Description::new("Ada", "axcenity/human");
     character.parameters.insert("frame".to_owned(), 1.0);
     axcenity_avatar::wear_choices(&mut character, &library);
     let before = character.items.clone();
-    assert_eq!(before.len(), 2, "briefs and a sports bra");
+    assert_eq!(before.len(), 2, "boxer briefs and a bandeau");
     axcenity_avatar::apply_preset(&mut character, &empty, &library).unwrap();
     assert_eq!(character.items, before);
 }
@@ -541,9 +439,9 @@ fn every_scope_on_each_shipped_family_draws_sound_characters_and_keeps_its_locks
     use axcenity_avatar::{Category, Scope, parameter_values, randomize};
     use std::collections::BTreeSet;
     let library = read();
-    let families = [axcenity_avatar::V1_BASE, "axcenity/realistic"];
+    let families = [axcenity_avatar::DEFAULT_BASE];
     for family in families {
-        let base = library.base(family).expect("both families ship");
+        let base = library.base(family).expect("the human base ships");
         let mut scopes = vec![Scope::All];
         scopes.extend(
             [
@@ -648,112 +546,6 @@ fn every_scope_on_each_shipped_family_draws_sound_characters_and_keeps_its_locks
             );
         }
     }
-}
-
-/// Every `*.build.json` under `folder`.
-fn build_data_files(folder: &Path, out: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(folder).unwrap() {
-        let path = entry.unwrap().path();
-        if path.is_dir() {
-            build_data_files(&path, out);
-        } else if path.to_string_lossy().ends_with(".build.json") {
-            out.push(path);
-        }
-    }
-}
-
-/// CRC-32 (the zip and PNG one), as `graft_shapes.py` records it.
-fn crc32(bytes: &[u8]) -> u32 {
-    let table: Vec<u32> = (0..256u32)
-        .map(|n| {
-            (0..8).fold(n, |c, _| {
-                (c >> 1) ^ (0xEDB8_8320 & 0u32.wrapping_sub(c & 1))
-            })
-        })
-        .collect();
-    !bytes.iter().fold(!0u32, |c, b| {
-        table[((c ^ u32::from(*b)) & 0xFF) as usize] ^ (c >> 8)
-    })
-}
-
-/// A model with shapes grafted on (`graft_shapes.py`: the realistic body
-/// and its hairstyle since 2026-11-24) is still the model that shipped
-/// with the new shapes after the others: garments are bound to the shipped
-/// body's triangles and texture coordinates, and a build over it would
-/// move them. The build data's `grafted_shapes` record says what shipped
-/// (how much binary data, and its checksum) and which shapes each mesh
-/// gained, in order.
-#[test]
-fn a_grafted_model_is_the_shipped_one_with_its_new_shapes_last() {
-    let mut files = Vec::new();
-    build_data_files(&root(), &mut files);
-    let mut body_checked = false;
-    for file in files {
-        let data: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
-        let Some(record) = data.get("grafted_shapes") else {
-            continue;
-        };
-        let name = file.file_name().unwrap().to_string_lossy().into_owned();
-        body_checked |= name == "Realistic.build.json";
-        // The body's parts are in `<Base>Parts.glb`; a part built apart
-        // from it has its own name.
-        let model = if file
-            .with_file_name(name.replace(".build.json", ".glb"))
-            .exists()
-        {
-            file.with_file_name(name.replace(".build.json", ".glb"))
-        } else {
-            file.with_file_name(name.replace(".build.json", "Parts.glb"))
-        };
-        let label = model.display().to_string();
-        let bytes = std::fs::read(&model).unwrap();
-        // A binary glTF: a 12-byte header, then the JSON chunk and the
-        // binary one, each after its length and kind.
-        let word = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
-        let json_length = word(12);
-        let gltf: serde_json::Value = serde_json::from_slice(&bytes[20..20 + json_length]).unwrap();
-        let binary = &bytes[20 + json_length + 8..][..word(20 + json_length)];
-
-        let shipped = &record["shipped"];
-        let length = shipped["binary_bytes"].as_u64().expect("what shipped") as usize;
-        assert!(length <= binary.len(), "{label} is shorter than it shipped");
-        assert_eq!(
-            u64::from(crc32(&binary[..length])),
-            shipped["binary_crc32"].as_u64().unwrap(),
-            "{label}: the data it shipped with has changed (see the package's README, \"Rebuilding\")"
-        );
-        for (mesh, entry) in record["meshes"].as_object().unwrap() {
-            let found = gltf["meshes"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|m| m["name"] == mesh.as_str())
-                .unwrap_or_else(|| panic!("{label} has no mesh `{mesh}`"));
-            let names = found["extras"]["targetNames"].as_array().unwrap();
-            let shapes = entry["shapes"].as_array().unwrap();
-            assert!(!shapes.is_empty() && shapes.len() <= names.len());
-            assert_eq!(
-                &names[names.len() - shapes.len()..],
-                &shapes[..],
-                "{label}: `{mesh}`'s grafted shapes are not its last"
-            );
-            for primitive in found["primitives"].as_array().unwrap() {
-                assert_eq!(
-                    primitive["targets"].as_array().map_or(0, Vec::len),
-                    names.len(),
-                    "{label}: a primitive of `{mesh}` hasn't every shape"
-                );
-            }
-        }
-    }
-    // The realistic body is grafted. (Built over on purpose, with every
-    // garment refitted, this is the line to change; a part nothing is
-    // bound to, the hairstyle, may be rebuilt, and then has no record.)
-    assert!(
-        body_checked,
-        "the realistic body has no `grafted_shapes` record: was it built over?"
-    );
 }
 
 /// ADR-0048: every colour map a shipped base offers is an image the
@@ -1038,7 +830,7 @@ fn randomize_draws_the_human_bases_hairstyles_and_no_other_draft() {
             bald += usize::from(!has_hair);
         }
         if base.id == "axcenity/human" {
-            assert_eq!(hair.len(), 5, "every shipped hairstyle is drawn: {hair:?}");
+            assert_eq!(hair.len(), 10, "every shipped hairstyle is drawn: {hair:?}");
             // One choice in six is no hair at all.
             assert!((30..110).contains(&bald), "{bald} of 400 are bald");
         }
@@ -1109,8 +901,8 @@ fn the_human_bases_face_has_readable_names_features_and_handles() {
 /// has the shape that presses it onto the skin under other clothes, and
 /// wears it only then; a converted garment carries its corners' places on
 /// the skin, so the engine tucks its edge under what is worn over it (the
-/// socks of the shoes under the jeans). That nothing of the underwear is
-/// then drawn is the player's `the_human_bases_underwear_is_not_drawn_under_an_outfit`.
+/// socks of the shoes under the jeans). Under a garment that takes its
+/// place the underwear isn't drawn at all (`Slot::hidden_by`).
 /// And the frame moves the twist bones with the limbs they are inside.
 #[test]
 fn the_human_bases_underwear_goes_under_its_clothes() {
@@ -1138,14 +930,12 @@ fn the_human_bases_underwear_goes_under_its_clothes() {
             bare += usize::from(lit(0) && !lit(1));
             untucked += usize::from(lit(1) && !lit(2));
         }
-        assert!(red > 0 && green >= red, "{id}: red {red}, green {green}");
+        // (A garment of net hides no skin: its red is empty.)
+        assert!(green > 0 && green >= red, "{id}: red {red}, green {green}");
         assert_eq!(bare, 0, "{id}: skin hidden where cloth beneath isn't");
         assert_eq!(untucked, 0, "{id}: blue is at least green");
     }
-    assert_eq!(
-        garments, 6,
-        "the underwear, two outfits and two pairs of shoes"
-    );
+    assert!(garments >= 50, "the underwear and the wardrobe: {garments}");
 
     let model = |id: &str| {
         let item = &library.items[id];
@@ -1201,13 +991,14 @@ fn the_human_bases_underwear_goes_under_its_clothes() {
                 .contains_key(axcenity_avatar::fit::SHRINK_UNDER_SHAPE)
         );
     }
-    character
-        .items
-        .push(WornItem::new("makehuman/female-casualsuit01"));
-    let dressed = resolve(&library, &character).unwrap();
-    assert_eq!(dressed.problems, Vec::new());
+    // Under shoes, which take neither's place: both drawn, pressed onto
+    // the skin and left out where the shoes' cover map says.
+    let mut shod = character.clone();
+    shod.items.push(WornItem::new("makehuman/shoes04"));
+    let shod = resolve(&library, &shod).unwrap();
+    assert_eq!(shod.problems, Vec::new());
     for id in [BRIEFS, BANDEAU] {
-        let part = dressed
+        let part = shod
             .parts
             .iter()
             .find(|part| part.item.as_deref() == Some(id))
@@ -1221,12 +1012,48 @@ fn the_human_bases_underwear_goes_under_its_clothes() {
         );
         assert_eq!(
             part.under,
-            ["human/wardrobe/female_casualsuit01/FemaleCasualsuit01.cover.png"],
+            ["human/wardrobe/shoes04/Shoes04.cover.png"],
             "{id}"
         );
     }
 
+    // Paul, 2026-11-25: where a garment is worn over the underwear, the
+    // underwear isn't drawn at all (`Slot::hidden_by`): a bottom takes
+    // the briefs off, a top the bandeau, an outfit both. It is still worn
+    // (no problem says otherwise) and comes back when the garment goes.
     let human = library.base("axcenity/human").unwrap();
+    assert_eq!(
+        human.slot("underwear_bottom").unwrap().hidden_by,
+        ["bottom"]
+    );
+    assert_eq!(human.slot("underwear_top").unwrap().hidden_by, ["top"]);
+    let drawn = |garment: &str| {
+        let mut worn = character.clone();
+        worn.items.push(WornItem::new(garment));
+        let resolved = resolve(&library, &worn).unwrap();
+        assert_eq!(resolved.problems, Vec::new(), "{garment}");
+        let has = |id: &str| {
+            resolved
+                .parts
+                .iter()
+                .any(|part| part.item.as_deref() == Some(id))
+        };
+        assert!(has(garment), "{garment} is drawn");
+        (has(BRIEFS), has(BANDEAU))
+    };
+    for (garment, briefs, bandeau) in [
+        // An outfit fills the top and the bottom.
+        ("makehuman/female-casualsuit01", false, false),
+        ("makehuman/jean-shorts", false, true),
+        ("makehuman/female-panties-01", false, true),
+        ("makehuman/camisole-top", true, false),
+        ("makehuman/crudefemaletshirt", true, false),
+        ("makehuman/stockings-white-l", true, true),
+        ("makehuman/fedora", true, true),
+    ] {
+        assert_eq!(drawn(garment), (briefs, bandeau), "{garment}");
+    }
+
     let frame = human.parameter("frame").unwrap();
     for side in ["Left", "Right"] {
         for bone in [

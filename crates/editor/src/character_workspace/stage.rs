@@ -75,7 +75,8 @@ impl ViewPreset {
                 yaw: 12.0,
                 pitch: 2.0,
                 distance: 3.2,
-                target: Vec3::new(0.0, HEIGHT * 0.905, -0.05),
+                // The default character's head bone as the idle holds it.
+                target: Vec3::new(0.0, HEIGHT * 0.89, -0.05),
             },
             ViewPreset::Front => full(0.0),
             ViewPreset::ThreeQuarter => full(45.0),

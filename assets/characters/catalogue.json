@@ -6,157 +6,9 @@
       "manifest": "human/Human.base.json",
       "label": "Human",
       "family": "human"
-    },
-    {
-      "id": "axcenity/realistic",
-      "manifest": "realistic/Realistic.base.json",
-      "label": "Realistic",
-      "family": "realistic"
-    },
-    {
-      "id": "axcenity/stylized",
-      "manifest": "humanoid/Humanoid.base.json",
-      "label": "Stylized",
-      "family": "stylized"
     }
   ],
   "items": [
-    {
-      "id": "axcenity/briefs",
-      "manifest": "humanoid/items/briefs.item.json",
-      "label": "Briefs",
-      "kind": "garment",
-      "slot": "underwear_bottom",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "underwear"
-      ]
-    },
-    {
-      "id": "axcenity/cargo-pants",
-      "manifest": "humanoid/items/cargo-pants.item.json",
-      "label": "Cargo pants",
-      "kind": "garment",
-      "slot": "bottom",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "casual",
-        "joggers",
-        "pockets"
-      ]
-    },
-    {
-      "id": "axcenity/cropped-jacket",
-      "manifest": "humanoid/items/cropped-jacket.item.json",
-      "label": "Cropped jacket",
-      "kind": "garment",
-      "slot": "outerwear",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "casual",
-        "cropped",
-        "zip",
-        "ribbed"
-      ]
-    },
-    {
-      "id": "axcenity/hair-bob",
-      "manifest": "humanoid/items/hair-bob.item.json",
-      "label": "Bob",
-      "kind": "groom",
-      "slot": "hair",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "medium",
-        "straight"
-      ]
-    },
-    {
-      "id": "axcenity/hair-buzz",
-      "manifest": "humanoid/items/hair-buzz.item.json",
-      "label": "Buzz",
-      "kind": "groom",
-      "slot": "hair",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "very-short"
-      ]
-    },
-    {
-      "id": "axcenity/hair-crop",
-      "manifest": "humanoid/items/hair-crop.item.json",
-      "label": "Crop",
-      "kind": "groom",
-      "slot": "hair",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "short"
-      ]
-    },
-    {
-      "id": "axcenity/hair-long",
-      "manifest": "humanoid/items/hair-long.item.json",
-      "label": "Long",
-      "kind": "groom",
-      "slot": "hair",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "long",
-        "straight"
-      ]
-    },
-    {
-      "id": "axcenity/hair-ponytail",
-      "manifest": "humanoid/items/hair-ponytail.item.json",
-      "label": "Ponytail",
-      "kind": "groom",
-      "slot": "hair",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "long",
-        "tied"
-      ]
-    },
-    {
-      "id": "axcenity/hair-swept",
-      "manifest": "humanoid/items/hair-swept.item.json",
-      "label": "Swept",
-      "kind": "groom",
-      "slot": "hair",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "short",
-        "straight",
-        "side-part"
-      ]
-    },
     {
       "id": "axcenity/human-bandeau",
       "manifest": "human/items/bandeau/Bandeau.item.json",
@@ -186,163 +38,231 @@
       ]
     },
     {
-      "id": "axcenity/realistic-boxer-briefs",
-      "manifest": "realistic/items/realistic-boxer-briefs.item.json",
-      "label": "Boxer briefs",
+      "id": "makehuman/armsleeve-fishnet-large",
+      "manifest": "human/wardrobe/armsleeve_fishnet_large/ArmsleeveFishnetLarge.item.json",
+      "label": "Armsleeve fishnet large",
       "kind": "garment",
-      "slot": "underwear_bottom",
+      "slot": "gloves",
       "tier": "built_in",
       "bases": [
-        "axcenity/realistic"
+        "axcenity/human"
       ],
       "tags": [
-        "underwear"
-      ]
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/armsleeve_fishnet_large/ArmsleeveFishnetLarge.png"
     },
     {
-      "id": "axcenity/realistic-briefs",
-      "manifest": "realistic/items/realistic-briefs.item.json",
-      "label": "Briefs",
+      "id": "makehuman/armsleeve-fishnet-medium",
+      "manifest": "human/wardrobe/armsleeve_fishnet_medium/ArmsleeveFishnetMedium.item.json",
+      "label": "Armsleeve fishnet medium",
       "kind": "garment",
-      "slot": "underwear_bottom",
+      "slot": "gloves",
       "tier": "built_in",
       "bases": [
-        "axcenity/realistic"
+        "axcenity/human"
       ],
       "tags": [
-        "underwear"
-      ]
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/armsleeve_fishnet_medium/ArmsleeveFishnetMedium.png"
     },
     {
-      "id": "axcenity/realistic-crew-tee",
-      "manifest": "realistic/clothing/crew-tee/Shirt_CrewTee.item.json",
-      "label": "Crew-neck T-shirt",
+      "id": "makehuman/armsleeve-fishnet-small",
+      "manifest": "human/wardrobe/armsleeve_fishnet_small/ArmsleeveFishnetSmall.item.json",
+      "label": "Armsleeve fishnet small",
+      "kind": "garment",
+      "slot": "gloves",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/armsleeve_fishnet_small/ArmsleeveFishnetSmall.png"
+    },
+    {
+      "id": "makehuman/armsleeve-white-l",
+      "manifest": "human/wardrobe/armsleeve_white_l/ArmsleeveWhiteL.item.json",
+      "label": "Armsleeve white l",
+      "kind": "garment",
+      "slot": "gloves",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/armsleeve_white_l/ArmsleeveWhiteL.png"
+    },
+    {
+      "id": "makehuman/armsleeve-white-m",
+      "manifest": "human/wardrobe/armsleeve_white_m/ArmsleeveWhiteM.item.json",
+      "label": "Armsleeve white m",
+      "kind": "garment",
+      "slot": "gloves",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/armsleeve_white_m/ArmsleeveWhiteM.png"
+    },
+    {
+      "id": "makehuman/armsleeve-white-s",
+      "manifest": "human/wardrobe/armsleeve_white_s/ArmsleeveWhiteS.item.json",
+      "label": "Armsleeve white s",
+      "kind": "garment",
+      "slot": "gloves",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/armsleeve_white_s/ArmsleeveWhiteS.png"
+    },
+    {
+      "id": "makehuman/bodice-style-top",
+      "manifest": "human/wardrobe/bodice_style_top/BodiceStyleTop.item.json",
+      "label": "Bodice style top",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
       "bases": [
-        "axcenity/realistic"
+        "axcenity/human"
       ],
       "tags": [
-        "tee",
-        "t-shirt",
-        "jersey",
-        "casual"
+        "makehuman"
       ],
-      "thumbnail": "realistic/clothing/crew-tee/Shirt_CrewTee.png"
+      "thumbnail": "human/wardrobe/bodice_style_top/BodiceStyleTop.png"
     },
     {
-      "id": "axcenity/realistic-hair-short-crop",
-      "manifest": "realistic/items/realistic-hair-short-crop.item.json",
-      "label": "Short textured crop",
-      "kind": "groom",
-      "slot": "hair",
+      "id": "makehuman/camisole-top",
+      "manifest": "human/wardrobe/camisole_top/CamisoleTop.item.json",
+      "label": "Camisole top",
+      "kind": "garment",
+      "slot": "top",
       "tier": "built_in",
       "bases": [
-        "axcenity/realistic"
+        "axcenity/human"
       ],
       "tags": [
-        "short",
-        "wavy",
-        "crop",
-        "textured"
-      ]
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/camisole_top/CamisoleTop.png"
     },
     {
-      "id": "axcenity/realistic-joggers",
-      "manifest": "realistic/clothing/joggers/Pants_Joggers.item.json",
-      "label": "Joggers",
+      "id": "makehuman/cargo-pants",
+      "manifest": "human/wardrobe/cargo_pants/CargoPants.item.json",
+      "label": "Cargo pants",
       "kind": "garment",
       "slot": "bottom",
       "tier": "built_in",
       "bases": [
-        "axcenity/realistic"
+        "axcenity/human"
       ],
       "tags": [
-        "joggers",
-        "sweatpants",
-        "fleece",
-        "casual"
+        "makehuman"
       ],
-      "thumbnail": "realistic/clothing/joggers/Pants_Joggers.png"
+      "thumbnail": "human/wardrobe/cargo_pants/CargoPants.png"
     },
     {
-      "id": "axcenity/realistic-sneakers",
-      "manifest": "realistic/clothing/sneakers/Shoes_CourtSneakers.item.json",
-      "label": "Court sneakers",
-      "kind": "garment",
-      "slot": "shoes",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/realistic"
-      ],
-      "tags": [
-        "sneakers",
-        "trainers",
-        "leather",
-        "casual"
-      ],
-      "thumbnail": "realistic/clothing/sneakers/Shoes_CourtSneakers.png"
-    },
-    {
-      "id": "axcenity/realistic-sports-bra",
-      "manifest": "realistic/items/realistic-sports-bra.item.json",
-      "label": "Sports bra",
-      "kind": "garment",
-      "slot": "underwear_top",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/realistic"
-      ],
-      "tags": [
-        "underwear"
-      ]
-    },
-    {
-      "id": "axcenity/sneakers",
-      "manifest": "humanoid/items/sneakers.item.json",
-      "label": "Sneakers",
-      "kind": "garment",
-      "slot": "shoes",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "casual",
-        "trainers"
-      ]
-    },
-    {
-      "id": "axcenity/sports-top",
-      "manifest": "humanoid/items/sports-top.item.json",
-      "label": "Sports top",
-      "kind": "garment",
-      "slot": "underwear_top",
-      "tier": "built_in",
-      "bases": [
-        "axcenity/stylized"
-      ],
-      "tags": [
-        "underwear",
-        "athletic"
-      ]
-    },
-    {
-      "id": "axcenity/tee",
-      "manifest": "humanoid/items/tee.item.json",
-      "label": "T-shirt",
+      "id": "makehuman/crude-male-shirt",
+      "manifest": "human/wardrobe/crude_male_shirt/CrudeMaleShirt.item.json",
+      "label": "Crude male shirt",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
       "bases": [
-        "axcenity/stylized"
+        "axcenity/human"
       ],
       "tags": [
-        "casual",
-        "cotton",
-        "short-sleeve"
-      ]
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/crude_male_shirt/CrudeMaleShirt.png"
+    },
+    {
+      "id": "makehuman/crudefemaletshirt",
+      "manifest": "human/wardrobe/crudefemaletshirt/Crudefemaletshirt.item.json",
+      "label": "Crudefemaletshirt",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/crudefemaletshirt/Crudefemaletshirt.png"
+    },
+    {
+      "id": "makehuman/crudehighsocks",
+      "manifest": "human/wardrobe/crudehighsocks/Crudehighsocks.item.json",
+      "label": "Crudehighsocks",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/crudehighsocks/Crudehighsocks.png"
+    },
+    {
+      "id": "makehuman/crudelowsocks",
+      "manifest": "human/wardrobe/crudelowsocks/Crudelowsocks.item.json",
+      "label": "Crudelowsocks",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/crudelowsocks/Crudelowsocks.png"
+    },
+    {
+      "id": "makehuman/fedora",
+      "manifest": "human/wardrobe/fedora/Fedora.item.json",
+      "label": "Fedora",
+      "kind": "accessory",
+      "slot": "headwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "hats",
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/fedora/Fedora.png"
+    },
+    {
+      "id": "makehuman/fedora-cocked",
+      "manifest": "human/wardrobe/fedora_cocked/FedoraCocked.item.json",
+      "label": "Fedora cocked",
+      "kind": "accessory",
+      "slot": "headwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "hats",
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/fedora_cocked/FedoraCocked.png"
     },
     {
       "id": "makehuman/female-casualsuit01",
@@ -362,6 +282,91 @@
       "thumbnail": "human/wardrobe/female_casualsuit01/FemaleCasualsuit01.png"
     },
     {
+      "id": "makehuman/female-casualsuit02",
+      "manifest": "human/wardrobe/female_casualsuit02/FemaleCasualsuit02.item.json",
+      "label": "Female casualsuit02",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "female",
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/female_casualsuit02/FemaleCasualsuit02.png"
+    },
+    {
+      "id": "makehuman/female-elegantsuit01",
+      "manifest": "human/wardrobe/female_elegantsuit01/FemaleElegantsuit01.item.json",
+      "label": "Female elegantsuit01",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "elegant",
+        "female",
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/female_elegantsuit01/FemaleElegantsuit01.png"
+    },
+    {
+      "id": "makehuman/female-panties-01",
+      "manifest": "human/wardrobe/female_panties_01/FemalePanties01.item.json",
+      "label": "Female panties 01",
+      "kind": "garment",
+      "slot": "bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "female",
+        "makehuman",
+        "panties",
+        "underwear"
+      ],
+      "thumbnail": "human/wardrobe/female_panties_01/FemalePanties01.png"
+    },
+    {
+      "id": "makehuman/female-sportsuit01",
+      "manifest": "human/wardrobe/female_sportsuit01/FemaleSportsuit01.item.json",
+      "label": "Female sportsuit01",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "female",
+        "makehuman",
+        "sport"
+      ],
+      "thumbnail": "human/wardrobe/female_sportsuit01/FemaleSportsuit01.png"
+    },
+    {
+      "id": "makehuman/female-top-01",
+      "manifest": "human/wardrobe/female_top_01/FemaleTop01.item.json",
+      "label": "Female top 01",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "female",
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/female_top_01/FemaleTop01.png"
+    },
+    {
       "id": "makehuman/hair-afro01",
       "manifest": "human/hair/afro01/HairAfro01.item.json",
       "label": "Afro",
@@ -377,6 +382,23 @@
         "short"
       ],
       "thumbnail": "human/hair/afro01/HairAfro01.png"
+    },
+    {
+      "id": "makehuman/hair-bob01",
+      "manifest": "human/hair/bob01/HairBob01.item.json",
+      "label": "Bob",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "medium",
+        "straight"
+      ],
+      "thumbnail": "human/hair/bob01/HairBob01.png"
     },
     {
       "id": "makehuman/hair-bob02",
@@ -397,6 +419,21 @@
       "thumbnail": "human/hair/bob02/HairBob02.png"
     },
     {
+      "id": "makehuman/hair-braid01",
+      "manifest": "human/hair/braid01/HairBraid01.item.json",
+      "label": "Braid01",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/hair/braid01/HairBraid01.png"
+    },
+    {
       "id": "makehuman/hair-long01",
       "manifest": "human/hair/long01/HairLong01.item.json",
       "label": "Long and straight",
@@ -412,6 +449,39 @@
         "straight"
       ],
       "thumbnail": "human/hair/long01/HairLong01.png"
+    },
+    {
+      "id": "makehuman/hair-ponytail01",
+      "manifest": "human/hair/ponytail01/HairPonytail01.item.json",
+      "label": "Ponytail",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "long",
+        "makehuman",
+        "tied"
+      ],
+      "thumbnail": "human/hair/ponytail01/HairPonytail01.png"
+    },
+    {
+      "id": "makehuman/hair-short01",
+      "manifest": "human/hair/short01/HairShort01.item.json",
+      "label": "Short crop",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "short"
+      ],
+      "thumbnail": "human/hair/short01/HairShort01.png"
     },
     {
       "id": "makehuman/hair-short02",
@@ -430,6 +500,22 @@
       "thumbnail": "human/hair/short02/HairShort02.png"
     },
     {
+      "id": "makehuman/hair-short03",
+      "manifest": "human/hair/short03/HairShort03.item.json",
+      "label": "Short, swept to the side",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "short"
+      ],
+      "thumbnail": "human/hair/short03/HairShort03.png"
+    },
+    {
       "id": "makehuman/hair-short04",
       "manifest": "human/hair/short04/HairShort04.item.json",
       "label": "Short, brushed forward",
@@ -444,6 +530,37 @@
         "short"
       ],
       "thumbnail": "human/hair/short04/HairShort04.png"
+    },
+    {
+      "id": "makehuman/jean-shorts",
+      "manifest": "human/wardrobe/jean_shorts/JeanShorts.item.json",
+      "label": "Jean shorts",
+      "kind": "garment",
+      "slot": "bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/jean_shorts/JeanShorts.png"
+    },
+    {
+      "id": "makehuman/leg-warmer-socks",
+      "manifest": "human/wardrobe/leg_warmer_socks/LegWarmerSocks.item.json",
+      "label": "Leg warmer socks",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "socks"
+      ],
+      "thumbnail": "human/wardrobe/leg_warmer_socks/LegWarmerSocks.png"
     },
     {
       "id": "makehuman/male-casualsuit01",
@@ -463,6 +580,174 @@
       "thumbnail": "human/wardrobe/male_casualsuit01/MaleCasualsuit01.png"
     },
     {
+      "id": "makehuman/male-casualsuit02",
+      "manifest": "human/wardrobe/male_casualsuit02/MaleCasualsuit02.item.json",
+      "label": "Male casualsuit02",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "makehuman",
+        "male"
+      ],
+      "thumbnail": "human/wardrobe/male_casualsuit02/MaleCasualsuit02.png"
+    },
+    {
+      "id": "makehuman/male-casualsuit03",
+      "manifest": "human/wardrobe/male_casualsuit03/MaleCasualsuit03.item.json",
+      "label": "Male casualsuit03",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "makehuman",
+        "male"
+      ],
+      "thumbnail": "human/wardrobe/male_casualsuit03/MaleCasualsuit03.png"
+    },
+    {
+      "id": "makehuman/male-casualsuit04",
+      "manifest": "human/wardrobe/male_casualsuit04/MaleCasualsuit04.item.json",
+      "label": "Male casualsuit04",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "makehuman",
+        "male"
+      ],
+      "thumbnail": "human/wardrobe/male_casualsuit04/MaleCasualsuit04.png"
+    },
+    {
+      "id": "makehuman/male-casualsuit05",
+      "manifest": "human/wardrobe/male_casualsuit05/MaleCasualsuit05.item.json",
+      "label": "Male casualsuit05",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "makehuman",
+        "male"
+      ],
+      "thumbnail": "human/wardrobe/male_casualsuit05/MaleCasualsuit05.png"
+    },
+    {
+      "id": "makehuman/male-casualsuit06",
+      "manifest": "human/wardrobe/male_casualsuit06/MaleCasualsuit06.item.json",
+      "label": "Male casualsuit06",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "makehuman",
+        "male"
+      ],
+      "thumbnail": "human/wardrobe/male_casualsuit06/MaleCasualsuit06.png"
+    },
+    {
+      "id": "makehuman/male-elegantsuit01",
+      "manifest": "human/wardrobe/male_elegantsuit01/MaleElegantsuit01.item.json",
+      "label": "Male elegantsuit01",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "elegant",
+        "makehuman",
+        "male"
+      ],
+      "thumbnail": "human/wardrobe/male_elegantsuit01/MaleElegantsuit01.png"
+    },
+    {
+      "id": "makehuman/male-worksuit01",
+      "manifest": "human/wardrobe/male_worksuit01/MaleWorksuit01.item.json",
+      "label": "Male worksuit01",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/male_worksuit01/MaleWorksuit01.png"
+    },
+    {
+      "id": "makehuman/pants-harem",
+      "manifest": "human/wardrobe/pants_harem/PantsHarem.item.json",
+      "label": "Pants harem",
+      "kind": "garment",
+      "slot": "bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/pants_harem/PantsHarem.png"
+    },
+    {
+      "id": "makehuman/pants-wool",
+      "manifest": "human/wardrobe/pants_wool/PantsWool.item.json",
+      "label": "Pants wool",
+      "kind": "garment",
+      "slot": "bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "male",
+        "pants"
+      ],
+      "thumbnail": "human/wardrobe/pants_wool/PantsWool.png"
+    },
+    {
+      "id": "makehuman/polo-t-shirt",
+      "manifest": "human/wardrobe/polo-t-shirt/PoloTShirt.item.json",
+      "label": "Polo t shirt",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "contemporary",
+        "makehuman",
+        "male",
+        "profession"
+      ],
+      "thumbnail": "human/wardrobe/polo-t-shirt/PoloTShirt.png"
+    },
+    {
       "id": "makehuman/shoes01",
       "manifest": "human/wardrobe/shoes01/Shoes01.item.json",
       "label": "Brown leather shoes",
@@ -479,6 +764,38 @@
       "thumbnail": "human/wardrobe/shoes01/Shoes01.png"
     },
     {
+      "id": "makehuman/shoes02",
+      "manifest": "human/wardrobe/shoes02/Shoes02.item.json",
+      "label": "Shoes02",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "shoes"
+      ],
+      "thumbnail": "human/wardrobe/shoes02/Shoes02.png"
+    },
+    {
+      "id": "makehuman/shoes03",
+      "manifest": "human/wardrobe/shoes03/Shoes03.item.json",
+      "label": "Shoes03",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "shoes"
+      ],
+      "thumbnail": "human/wardrobe/shoes03/Shoes03.png"
+    },
+    {
       "id": "makehuman/shoes04",
       "manifest": "human/wardrobe/shoes04/Shoes04.item.json",
       "label": "Black shoes",
@@ -493,6 +810,213 @@
         "shoes"
       ],
       "thumbnail": "human/wardrobe/shoes04/Shoes04.png"
+    },
+    {
+      "id": "makehuman/shoes05",
+      "manifest": "human/wardrobe/shoes05/Shoes05.item.json",
+      "label": "Shoes05",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "shoes"
+      ],
+      "thumbnail": "human/wardrobe/shoes05/Shoes05.png"
+    },
+    {
+      "id": "makehuman/shoes06",
+      "manifest": "human/wardrobe/shoes06/Shoes06.item.json",
+      "label": "Shoes06",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "shoes"
+      ],
+      "thumbnail": "human/wardrobe/shoes06/Shoes06.png"
+    },
+    {
+      "id": "makehuman/sockslacefrill",
+      "manifest": "human/wardrobe/sockslacefrill/Sockslacefrill.item.json",
+      "label": "Sockslacefrill",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "socks"
+      ],
+      "thumbnail": "human/wardrobe/sockslacefrill/Sockslacefrill.png"
+    },
+    {
+      "id": "makehuman/stockings-fishnet-large",
+      "manifest": "human/wardrobe/stockings_fishnet_large/StockingsFishnetLarge.item.json",
+      "label": "Stockings fishnet large",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/stockings_fishnet_large/StockingsFishnetLarge.png"
+    },
+    {
+      "id": "makehuman/stockings-fishnet-medium",
+      "manifest": "human/wardrobe/stockings_fishnet_medium/StockingsFishnetMedium.item.json",
+      "label": "Stockings fishnet medium",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/stockings_fishnet_medium/StockingsFishnetMedium.png"
+    },
+    {
+      "id": "makehuman/stockings-fishnet-small",
+      "manifest": "human/wardrobe/stockings_fishnet_small/StockingsFishnetSmall.item.json",
+      "label": "Stockings fishnet small",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/stockings_fishnet_small/StockingsFishnetSmall.png"
+    },
+    {
+      "id": "makehuman/stockings-white-l",
+      "manifest": "human/wardrobe/stockings_white_l/StockingsWhiteL.item.json",
+      "label": "Stockings white l",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/stockings_white_l/StockingsWhiteL.png"
+    },
+    {
+      "id": "makehuman/stockings-white-m",
+      "manifest": "human/wardrobe/stockings_white_m/StockingsWhiteM.item.json",
+      "label": "Stockings white m",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/stockings_white_m/StockingsWhiteM.png"
+    },
+    {
+      "id": "makehuman/stockings-white-s",
+      "manifest": "human/wardrobe/stockings_white_s/StockingsWhiteS.item.json",
+      "label": "Stockings white s",
+      "kind": "garment",
+      "slot": "legwear",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/stockings_white_s/StockingsWhiteS.png"
+    },
+    {
+      "id": "makehuman/sweater-fisherman",
+      "manifest": "human/wardrobe/sweater_fisherman/SweaterFisherman.item.json",
+      "label": "Sweater fisherman",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "knit",
+        "makehuman",
+        "shirt",
+        "sweater",
+        "top"
+      ],
+      "thumbnail": "human/wardrobe/sweater_fisherman/SweaterFisherman.png"
+    },
+    {
+      "id": "makehuman/t-shirt-basic-tucked",
+      "manifest": "human/wardrobe/t-shirt_basic_tucked/TShirtBasicTucked.item.json",
+      "label": "T shirt basic tucked",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "knit",
+        "makehuman",
+        "shirt",
+        "t-shirt",
+        "top"
+      ],
+      "thumbnail": "human/wardrobe/t-shirt_basic_tucked/TShirtBasicTucked.png"
+    },
+    {
+      "id": "makehuman/tank-keyhole-neck",
+      "manifest": "human/wardrobe/tank_keyhole_neck/TankKeyholeNeck.item.json",
+      "label": "Tank keyhole neck",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/tank_keyhole_neck/TankKeyholeNeck.png"
+    },
+    {
+      "id": "makehuman/turtleneck-halter",
+      "manifest": "human/wardrobe/turtleneck_halter/TurtleneckHalter.item.json",
+      "label": "Turtleneck halter",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/turtleneck_halter/TurtleneckHalter.png"
     }
   ],
   "presets": [
@@ -705,601 +1229,6 @@
       "label": "Wide",
       "kind": "feature",
       "base": "axcenity/human"
-    },
-    {
-      "id": "axcenity/realistic-athletic-female",
-      "file": "realistic/presets/athletic-female.preset.json",
-      "label": "Athletic female",
-      "kind": "character",
-      "base": "axcenity/realistic"
-    },
-    {
-      "id": "axcenity/realistic-athletic-male",
-      "file": "realistic/presets/athletic-male.preset.json",
-      "label": "Athletic male",
-      "kind": "character",
-      "base": "axcenity/realistic"
-    },
-    {
-      "id": "axcenity/realistic-body-athletic-female",
-      "file": "realistic/presets/body-athletic-female.preset.json",
-      "label": "Athletic",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "female"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-athletic-male",
-      "file": "realistic/presets/body-athletic-male.preset.json",
-      "label": "Athletic",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "male"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-average-female",
-      "file": "realistic/presets/body-average-female.preset.json",
-      "label": "Average",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "female"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-average-male",
-      "file": "realistic/presets/body-average-male.preset.json",
-      "label": "Average",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "male"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-broad-female",
-      "file": "realistic/presets/body-broad-female.preset.json",
-      "label": "Broad",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "female"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-broad-male",
-      "file": "realistic/presets/body-broad-male.preset.json",
-      "label": "Broad",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "male"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-heavyset-female",
-      "file": "realistic/presets/body-heavyset-female.preset.json",
-      "label": "Heavyset",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "female"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-heavyset-male",
-      "file": "realistic/presets/body-heavyset-male.preset.json",
-      "label": "Heavyset",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "male"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-lean-female",
-      "file": "realistic/presets/body-lean-female.preset.json",
-      "label": "Lean",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "female"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-lean-male",
-      "file": "realistic/presets/body-lean-male.preset.json",
-      "label": "Lean",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "male"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-muscular-female",
-      "file": "realistic/presets/body-muscular-female.preset.json",
-      "label": "Muscular",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "female"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-muscular-male",
-      "file": "realistic/presets/body-muscular-male.preset.json",
-      "label": "Muscular",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "male"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-slim-female",
-      "file": "realistic/presets/body-slim-female.preset.json",
-      "label": "Slim",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "female"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-body-slim-male",
-      "file": "realistic/presets/body-slim-male.preset.json",
-      "label": "Slim",
-      "kind": "body",
-      "base": "axcenity/realistic",
-      "tags": [
-        "build",
-        "male"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-angular",
-      "file": "realistic/presets/face-angular.preset.json",
-      "label": "Angular features",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-broad",
-      "file": "realistic/presets/face-broad.preset.json",
-      "label": "Broad",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-heart",
-      "file": "realistic/presets/face-heart.preset.json",
-      "label": "Heart-shaped",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-long",
-      "file": "realistic/presets/face-long.preset.json",
-      "label": "Long",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-narrow",
-      "file": "realistic/presets/face-narrow.preset.json",
-      "label": "Narrow",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-oval",
-      "file": "realistic/presets/face-oval.preset.json",
-      "label": "Oval",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-round",
-      "file": "realistic/presets/face-round.preset.json",
-      "label": "Round",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-shape-heart",
-      "file": "realistic/presets/face-shape-heart.preset.json",
-      "label": "Heart-shaped",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-shape-long",
-      "file": "realistic/presets/face-shape-long.preset.json",
-      "label": "Long",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-shape-narrow",
-      "file": "realistic/presets/face-shape-narrow.preset.json",
-      "label": "Narrow",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-shape-oval",
-      "file": "realistic/presets/face-shape-oval.preset.json",
-      "label": "Oval",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-shape-round",
-      "file": "realistic/presets/face-shape-round.preset.json",
-      "label": "Round",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-shape-square",
-      "file": "realistic/presets/face-shape-square.preset.json",
-      "label": "Square",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-soft",
-      "file": "realistic/presets/face-soft.preset.json",
-      "label": "Soft features",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-face-square",
-      "file": "realistic/presets/face-square.preset.json",
-      "label": "Square",
-      "kind": "face",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-female",
-      "file": "realistic/presets/female.preset.json",
-      "label": "Female",
-      "kind": "character",
-      "base": "axcenity/realistic"
-    },
-    {
-      "id": "axcenity/realistic-heavyset-female",
-      "file": "realistic/presets/heavyset-female.preset.json",
-      "label": "Heavyset female",
-      "kind": "character",
-      "base": "axcenity/realistic"
-    },
-    {
-      "id": "axcenity/realistic-heavyset-male",
-      "file": "realistic/presets/heavyset-male.preset.json",
-      "label": "Heavyset male",
-      "kind": "character",
-      "base": "axcenity/realistic"
-    },
-    {
-      "id": "axcenity/realistic-male",
-      "file": "realistic/presets/male.preset.json",
-      "label": "Male",
-      "kind": "character",
-      "base": "axcenity/realistic"
-    },
-    {
-      "id": "axcenity/realistic-nose-aquiline",
-      "file": "realistic/presets/nose-aquiline.preset.json",
-      "label": "Aquiline",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-bulbous",
-      "file": "realistic/presets/nose-bulbous.preset.json",
-      "label": "Bulbous",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-button",
-      "file": "realistic/presets/nose-button.preset.json",
-      "label": "Button",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-hooked",
-      "file": "realistic/presets/nose-hooked.preset.json",
-      "label": "Hooked",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-long-thin",
-      "file": "realistic/presets/nose-long-thin.preset.json",
-      "label": "Long and thin",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-low-bridge",
-      "file": "realistic/presets/nose-low-bridge.preset.json",
-      "label": "Low bridge",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-snub",
-      "file": "realistic/presets/nose-snub.preset.json",
-      "label": "Snub",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-straight",
-      "file": "realistic/presets/nose-straight.preset.json",
-      "label": "Straight",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-upturned",
-      "file": "realistic/presets/nose-upturned.preset.json",
-      "label": "Upturned",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/realistic-nose-wide",
-      "file": "realistic/presets/nose-wide.preset.json",
-      "label": "Wide",
-      "kind": "feature",
-      "base": "axcenity/realistic",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-athletic",
-      "file": "humanoid/presets/athletic.preset.json",
-      "label": "Athletic",
-      "kind": "character",
-      "base": "axcenity/stylized"
-    },
-    {
-      "id": "axcenity/stylized-body-athletic-feminine",
-      "file": "humanoid/presets/body-athletic-feminine.preset.json",
-      "label": "Athletic",
-      "kind": "body",
-      "base": "axcenity/stylized",
-      "tags": [
-        "build",
-        "feminine"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-body-athletic-masculine",
-      "file": "humanoid/presets/body-athletic-masculine.preset.json",
-      "label": "Athletic",
-      "kind": "body",
-      "base": "axcenity/stylized",
-      "tags": [
-        "build",
-        "masculine"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-body-broad-feminine",
-      "file": "humanoid/presets/body-broad-feminine.preset.json",
-      "label": "Broad",
-      "kind": "body",
-      "base": "axcenity/stylized",
-      "tags": [
-        "build",
-        "feminine"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-body-broad-masculine",
-      "file": "humanoid/presets/body-broad-masculine.preset.json",
-      "label": "Broad",
-      "kind": "body",
-      "base": "axcenity/stylized",
-      "tags": [
-        "build",
-        "masculine"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-body-heavy-feminine",
-      "file": "humanoid/presets/body-heavy-feminine.preset.json",
-      "label": "Heavy",
-      "kind": "body",
-      "base": "axcenity/stylized",
-      "tags": [
-        "build",
-        "feminine"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-body-heavy-masculine",
-      "file": "humanoid/presets/body-heavy-masculine.preset.json",
-      "label": "Heavy",
-      "kind": "body",
-      "base": "axcenity/stylized",
-      "tags": [
-        "build",
-        "masculine"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-body-slim-feminine",
-      "file": "humanoid/presets/body-slim-feminine.preset.json",
-      "label": "Slim",
-      "kind": "body",
-      "base": "axcenity/stylized",
-      "tags": [
-        "build",
-        "feminine"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-body-slim-masculine",
-      "file": "humanoid/presets/body-slim-masculine.preset.json",
-      "label": "Slim",
-      "kind": "body",
-      "base": "axcenity/stylized",
-      "tags": [
-        "build",
-        "masculine"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-face-angular",
-      "file": "humanoid/presets/face-angular.preset.json",
-      "label": "Angular",
-      "kind": "face",
-      "base": "axcenity/stylized",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-face-long",
-      "file": "humanoid/presets/face-long.preset.json",
-      "label": "Long",
-      "kind": "face",
-      "base": "axcenity/stylized",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-face-round",
-      "file": "humanoid/presets/face-round.preset.json",
-      "label": "Round",
-      "kind": "face",
-      "base": "axcenity/stylized",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-face-soft",
-      "file": "humanoid/presets/face-soft.preset.json",
-      "label": "Soft",
-      "kind": "face",
-      "base": "axcenity/stylized",
-      "tags": [
-        "shape"
-      ]
-    },
-    {
-      "id": "axcenity/stylized-feminine",
-      "file": "humanoid/presets/feminine.preset.json",
-      "label": "Feminine",
-      "kind": "character",
-      "base": "axcenity/stylized"
-    },
-    {
-      "id": "axcenity/stylized-masculine",
-      "file": "humanoid/presets/masculine.preset.json",
-      "label": "Masculine",
-      "kind": "character",
-      "base": "axcenity/stylized"
     }
   ]
 }

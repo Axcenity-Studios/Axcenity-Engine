@@ -20,7 +20,7 @@ pub const DESCRIPTION_VERSION: u32 = 2;
 pub struct Description {
     pub format_version: u32,
     pub name: String,
-    /// The base model's ID, such as `axcenity/stylized`.
+    /// The base model's ID, such as `axcenity/human`.
     pub base: String,
     /// Parameter values by the base manifest's parameter IDs. A parameter
     /// left out takes its default.

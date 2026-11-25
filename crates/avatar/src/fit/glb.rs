@@ -21,8 +21,8 @@ const ARRAY_BUFFER: u32 = 34962;
 const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 
 /// What to write: the fitted garment, the body's skeleton, the name of the
-/// object holding the skeleton (`AxcenityRealistic`, so the garment's
-/// object path is `AxcenityRealistic/<object>` like the body's) and the
+/// object holding the skeleton (`AxcenityHuman`, so the garment's
+/// object path is `AxcenityHuman/<object>` like the body's) and the
 /// garment object's name.
 pub struct FittedModel<'a> {
     pub fitted: &'a Fitted,

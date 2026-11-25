@@ -5491,7 +5491,7 @@ end
 
 --- A character's look as data: its base model, body and face values, what it wears and its material values. Data is the text of a character file (`*.character.json`, as Character Studio saves it) and Base its base model's ID. Humanoid:ApplyDescription makes a character look like it. The one inside a Humanoid is what that character has applied; it's applied again when the world is loaded or replicated, so every device builds the character's meshes itself.
 declare extern type HumanoidDescription extends Instance with
-	--- The ID of its base model in the project's character library, such as `axcenity/stylized`. The methods keep it the same as the `base` in Data; with Data empty, the description is this base model's default character (of `axcenity/stylized` when this is empty too).
+	--- The ID of its base model in the project's character library, such as `axcenity/human`. The methods keep it the same as the `base` in Data; with Data empty, the description is this base model's default character (of the library's default base, `axcenity/human`, when this is empty too).
 	Base: string
 	--- The description: the text of a character file (`*.character.json`), with the base model, parameter values, items worn and material values. Empty is the base model's default character. The methods read and write it, and setting it to a saved character's text loads that character. Changing the Data of the one inside a Humanoid changes that character by the next frame.
 	Data: string

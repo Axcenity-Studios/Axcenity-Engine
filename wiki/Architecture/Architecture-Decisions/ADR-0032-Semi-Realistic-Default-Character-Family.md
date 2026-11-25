@@ -2,19 +2,19 @@
 title: "ADR-0032: Semi-realistic is the default character family, on Blender Studio's realistic CC0 bodies; stylized stays as a second family"
 type: adr
 adr: 32
-adr_status: Accepted
+adr_status: Superseded
 date: 2026-11-14
 supersedes: ADR-0030
-superseded_by:
+superseded_by: ADR-0050
 affects: [assets, project, anim, avatar, editor]
-source: [crates/avatar/src/manifest.rs, assets/characters/humanoid/manifests.py, assets/characters/humanoid/Humanoid.base.json]
+source: [crates/avatar/src/manifest.rs, assets/characters/human/manifests.py, assets/characters/human/Human.base.json]
 docs: [plans/axcenity-engine-character-studio.md, docs/development/character-studio/architecture.md, docs/development/character-studio/research.md]
 tags: [adr, characters, assets]
 ---
 
 # ADR-0032: Semi-realistic is the default character family, on Blender Studio's realistic CC0 bodies; stylized stays as a second family
 
-- **Status:** Accepted (Paul, 2026-11-14: plan section 0, decision 1)
+- **Status:** **Superseded by [ADR-0050](ADR-0050-The-Engine-Ships-One-Character-Family-MakeHumans-Body-With-Quaterniuss-Animations.md)** (2026-11-25: the engine ships one family, the human base on MakeHuman's body; the realistic and stylized packages described here were removed). Accepted by Paul on 2026-11-14 (plan section 0, decision 1).
 - **Date:** 2026-11-14
 - **Affected systems:** the default humanoid asset, Character Data (`avatar`), Character Studio, `anim` (skeleton additions)
 - **Supersedes:** [ADR-0030](ADR-0030-Smooth-Stylized-Humanoid-On-CC0-Base-Meshes-With-Mask-Shapes.md) (its art direction; its mask shapes are superseded by [ADR-0035](ADR-0035-Clothing-Fits-By-Surface-Binding-With-Region-Hiding.md))

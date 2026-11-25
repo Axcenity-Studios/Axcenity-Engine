@@ -137,6 +137,66 @@ pub(crate) const VIEWS: [View; 6] = [
     },
 ];
 
+/// Where the head's joint is on the body the head's views were set for
+/// (the default body standing at rest), in studs above the floor.
+const HEAD_HEIGHT: f32 = 4.567;
+/// A view aimed above this (studs) is a view of the head.
+const HEAD_VIEWS_ABOVE: f32 = 4.0;
+
+/// How far the character's head is above [`HEAD_HEIGHT`] as it is posed
+/// (studs; negative below it). The views of the head (the face's, the
+/// skin's close-up, the hair's) move up and down by it, so the face of a
+/// shorter body, or of one that crouches, is in the picture: the human
+/// base's feminine frame stands 0.6 studs shorter, and those views
+/// showed its forehead. 0 where there is no head to find.
+fn head_lift(world: &World, assets: &Assets, animators: &Animators) -> f32 {
+    let body = world
+        .all_below(world.workspace(), |class| class == ClassName::MeshPart)
+        .into_iter()
+        .find(|part| world.get(*part).is_some_and(|p| p.name() == "Body"));
+    let Some(body) = body else {
+        return 0.0;
+    };
+    let mesh = world
+        .get(body)
+        .and_then(|part| part.property("MeshId"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let Some(model) = assets.model_blocking(&mesh) else {
+        return 0.0;
+    };
+    let Some((rig, head)) = model
+        .rig
+        .as_deref()
+        .and_then(|rig| Some((rig, rig.bone("Head")?)))
+    else {
+        return 0.0;
+    };
+    // In the part's own box, as the pose is kept: with the body's
+    // identity settled into it (a frame's bones are shorter or longer).
+    let at = match animators.poses().get(&body) {
+        Some(posed) => posed.bones().get(head).map(|bone| bone.position),
+        None => {
+            let mut pose = rig.rest_pose();
+            model.settle(&mut pose);
+            rig.skeleton(&pose).get(head).map(|bone| bone.position)
+        }
+    };
+    let vector = |name: &str| {
+        world
+            .get(body)
+            .and_then(|part| part.property(name))
+            .and_then(Value::as_vector3)
+    };
+    match (at, vector("Position"), vector("Size")) {
+        // The body stands upright (turned about Y only), so its height
+        // in the world is its place and its size alone.
+        (Some(at), Some(position), Some(size)) => position.y + at.y * size.y - HEAD_HEIGHT,
+        _ => 0.0,
+    }
+}
+
 /// Cameras beside [`VIEWS`] (refinement R1, brief §17.2's face and skin
 /// tests), drawn only when named (`AXCENITY_CAPTURE_VIEWS`) or by a suite,
 /// so the default run and its sheet stay as they were.
@@ -1033,6 +1093,7 @@ pub(crate) fn draw_staged(
     graphics.anti_aliasing = Some(anti_aliasing());
     ray_traced(&mut graphics);
     let mut shots = Vec::with_capacity(lights.len() * views.len());
+    let lift = head_lift(world, assets, animators);
     for lit in lights {
         let light = lit.light;
         let lighting = world.lighting();
@@ -1067,9 +1128,15 @@ pub(crate) fn draw_staged(
                 renderer.preview_lod(Some((axcenity_scene::item_id(part), 0)));
             }
             let mut cache = TerrainCache::new();
+            // The views of the head ride with it (`head_lift`).
+            let lift = if view.target[1] > HEAD_VIEWS_ABOVE {
+                Vec3::Y * lift
+            } else {
+                Vec3::ZERO
+            };
             let camera = Camera {
-                position: Vec3::from(view.eye),
-                look_at: Vec3::from(view.target),
+                position: Vec3::from(view.eye) + lift,
+                look_at: Vec3::from(view.target) + lift,
                 fov_y_degrees: view.fov,
             };
             for _ in 0..settings.frames.max(1) {
@@ -1486,7 +1553,7 @@ fn the_same_description_captures_identical_pictures_and_every_view_is_drawn() {
     };
     let default = axcenity_gameplay::description::default_description(
         &axcenity_gameplay::description::library(&stage.assets),
-        axcenity_avatar::V1_BASE,
+        axcenity_avatar::DEFAULT_BASE,
     );
     let first = capture(&device, &queue, &stage.assets, &default, settings).unwrap();
     let again = capture(&device, &queue, &stage.assets, &default, settings).unwrap();
@@ -1529,10 +1596,9 @@ fn the_same_description_captures_identical_pictures_and_every_view_is_drawn() {
         first[0].pixels != first[VIEWS.len()].pixels,
         "studio and hard"
     );
-    let mut bald = default.clone();
-    bald.items.clear();
-    bald.parameters.insert("build".to_owned(), 1.0);
-    let other = capture(&device, &queue, &stage.assets, &bald, settings).unwrap();
+    let mut heavy = default.clone();
+    heavy.parameters.insert("fat".to_owned(), 1.0);
+    let other = capture(&device, &queue, &stage.assets, &heavy, settings).unwrap();
     assert!(first[0].pixels != other[0].pixels, "another character");
     // Each picture says which level of detail the parts were drawn at.
     assert!(
@@ -1676,10 +1742,12 @@ fn the_suites_hold_the_brief_s_facial_and_body_tests() {
 }
 
 /// The realistic base's skeleton, at rest.
-fn realistic_rig(stage: &Stage) -> std::sync::Arc<Rig> {
+fn base_rig(stage: &Stage) -> std::sync::Arc<Rig> {
     let library = axcenity_gameplay::description::library(&stage.assets);
-    let description =
-        axcenity_gameplay::description::default_description(&library, "axcenity/realistic");
+    let description = axcenity_gameplay::description::default_description(
+        &library,
+        axcenity_avatar::DEFAULT_BASE,
+    );
     let resolved = axcenity_avatar::resolve(&library, &description).unwrap();
     let mesh_id = format!(
         "{}/{}",
@@ -1694,9 +1762,9 @@ fn realistic_rig(stage: &Stage) -> std::sync::Arc<Rig> {
 /// harness's angles, measured on the realistic skeleton in its file's
 /// space (Y up, the character facing +Z: its eyes are ahead of its head).
 #[test]
-fn held_poses_turn_each_joint_to_its_angle_on_the_realistic_body() {
+fn held_poses_turn_each_joint_to_its_angle_on_the_shipped_body() {
     let stage = Stage::new("held", &repository_library()).expect("the stage");
-    let rig = realistic_rig(&stage);
+    let rig = base_rig(&stage);
     let rest = rig.world(&rig.rest_pose());
     let at = |world: &[Mat4], name: &str| world[rig.bone(name).unwrap()].w_axis.truncate();
     assert!(at(&rest, "LeftEye").z > at(&rest, "Head").z, "facing +Z");
@@ -1748,8 +1816,10 @@ fn added_lights_views_and_poses_repeat_and_differ() {
     };
     let stage = Stage::new("more", &repository_library()).expect("the stage");
     let library = axcenity_gameplay::description::library(&stage.assets);
-    let realistic =
-        axcenity_gameplay::description::default_description(&library, "axcenity/realistic");
+    let realistic = axcenity_gameplay::description::default_description(
+        &library,
+        axcenity_avatar::DEFAULT_BASE,
+    );
     let settings = Settings {
         size: (320, 180),
         frames: 12,
@@ -1811,8 +1881,10 @@ fn the_face_suite_draws_each_face_on_one_sheet() {
     };
     let stage = Stage::new("suite", &repository_library()).expect("the stage");
     let library = axcenity_gameplay::description::library(&stage.assets);
-    let realistic =
-        axcenity_gameplay::description::default_description(&library, "axcenity/realistic");
+    let realistic = axcenity_gameplay::description::default_description(
+        &library,
+        axcenity_avatar::DEFAULT_BASE,
+    );
     let settings = Settings {
         size: (160, 90),
         frames: 6,
@@ -1856,8 +1928,10 @@ fn an_explicit_bake_draws_the_same_pixels_as_the_live_character() {
     };
     let stage = Stage::new("bake", &repository_library()).expect("the stage");
     let library = axcenity_gameplay::description::library(&stage.assets);
-    let mut description =
-        axcenity_gameplay::description::default_description(&library, "axcenity/realistic");
+    let mut description = axcenity_gameplay::description::default_description(
+        &library,
+        axcenity_avatar::DEFAULT_BASE,
+    );
     for (id, value) in [
         ("frame", 1.0),
         ("fat", 0.7),

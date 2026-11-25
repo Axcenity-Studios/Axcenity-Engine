@@ -272,8 +272,8 @@ impl EditorApp {
             let parent = tree::insert_parent(&self.world, near, what);
             let position = self.insert_position();
             let name = tree::unique_name(&self.world, parent, "Character");
-            // The realistic character when the project's library has it
-            // (refinement R10, OPEN-22).
+            // The described human character when the project's library
+            // has the base (refinement R10, OPEN-22).
             let character = if self.add_default_humanoid() {
                 self.default_game_character(position, &name)
             } else {
@@ -607,9 +607,9 @@ impl EditorApp {
     }
 
     /// Writes the default humanoid's files (model, animations, clips, state
-    /// machine and `Character` prefab) and both character families
-    /// (`axcenity_project::add_default_game_character`: the realistic one
-    /// from the engine's library, refinement R10, OPEN-22) into the project
+    /// machine and `Character` prefab) and the human base
+    /// (`axcenity_project::add_default_game_character`: from the engine's
+    /// library, with what the default character wears) into the project
     /// for Insert > Character, keeping any already there (an older
     /// project's prefab stays). False when there's no project folder to
     /// write to or writing failed (with an error): Insert > Character then
@@ -621,13 +621,13 @@ impl EditorApp {
         let new = !project
             .join(axcenity_project::DEFAULT_HUMANOID_MODEL_PATH)
             .is_file();
-        let realistic = |project: &Path| {
+        let has_base = |project: &Path| {
             axcenity_avatar::Library::read(&project.join(axcenity_avatar::LIBRARY_FOLDER))
                 .0
                 .base(axcenity_project::DEFAULT_GAME_BASE)
                 .is_some()
         };
-        let had_realistic = realistic(&project);
+        let had_base = has_base(&project);
         let shipped = crate::character_workspace::find_character_library();
         match axcenity_project::add_default_game_character(&project, shipped.as_deref()) {
             Ok(_) => {
@@ -639,9 +639,9 @@ impl EditorApp {
                         axcenity_project::DEFAULT_HUMANOID_STATE_MACHINE_PATH
                     ));
                 }
-                if !had_realistic && realistic(&project) {
+                if !had_base && has_base(&project) {
                     self.output.info(format!(
-                        "Added the realistic character family to the project's character \
+                        "Added the human character base to the project's character \
                          library (`{}`). Right-click a character in the Explorer and pick \
                          Edit in Character Studio to change how it looks.",
                         axcenity_avatar::LIBRARY_FOLDER

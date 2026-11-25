@@ -310,7 +310,7 @@ fn the_camera_keeps_framing_a_moving_character() {
     run_for(&mut workspace, 0.5);
     let resting = in_picture(&workspace);
     let framed = workspace.orbit;
-    for motion in [Motion::Run, Motion::Gesture("Cheer".into())] {
+    for motion in [Motion::Run, Motion::Gesture("Dance".into())] {
         workspace.apply(Intent::PreviewMotion(motion.clone()));
         run_for(&mut workspace, 1.0);
         // Over two seconds: where the head sits on average (the camera
@@ -327,15 +327,18 @@ fn the_camera_keeps_framing_a_moving_character() {
             resting.length(),
             mean.length()
         );
+        // (Where the view framed it at rest: the Face view aims at the
+        // face, above the head's joint.)
         assert!(
-            mean.length() < 0.1,
-            "{motion:?}: on average the head is near the middle ({:.3})",
-            mean.length()
+            (mean - resting).length() < 0.1,
+            "{motion:?}: on average the head is where it was framed ({:.3} from it)",
+            (mean - resting).length()
         );
-        // The library's jog leans and bobs more than the keyed run did:
-        // the head comes 0.37 of the way to the edge at worst (ADR-0049).
+        // The library's sprint leans and bobs more than the keyed run
+        // did: the head comes half of the way to the edge at worst
+        // (0.49, measured 2026-11-25 on the human base; ADR-0049).
         assert!(
-            worst < 0.45,
+            worst < 0.6,
             "{motion:?}: and never near the edge ({worst:.3})"
         );
 
@@ -385,8 +388,8 @@ fn pose_and_motion_are_on_the_expressions_page_and_the_bottom_bar() {
         "Still",
         "Walk",
         "Run",
-        "Wave",
-        "Shrug",
+        "Yes",
+        "Interact",
         "Happy",
     ] {
         assert!(

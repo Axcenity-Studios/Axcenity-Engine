@@ -1,4 +1,4 @@
-//! The default humanoid (`assets/characters/humanoid`, shown by
+//! The default humanoid (`assets/characters/human/Humanoid.glb`, shown by
 //! `crates/samples/projects/humanoid`): its glTF animations play on its model, its
 //! skeleton maps to every humanoid role with nothing to fix, and its head
 //! carries the facial profile's shapes.
@@ -28,7 +28,7 @@ fn hello_humanoid_plays_its_glb_animations_on_each_humanoid() {
         }
         assert_eq!(animators.take_errors(), Vec::<String>::new());
         let walker = world.find_first_child(world.workspace(), "Walk").unwrap();
-        assert_eq!(animators.poses().len(), 3, "Idle, Walk and Wave are posed");
+        assert_eq!(animators.poses().len(), 3, "Idle, Walk and Dance are posed");
         animators.poses()[&walker].joints().to_vec()
     };
     let first = joints_at(&mut world, 1);
@@ -66,7 +66,9 @@ fn the_default_humanoid_skeleton_maps_every_role_with_no_problems() {
     assert!((angle - 45.0).abs() < 1.0, "{angle}");
     // Every starter animation is a take for the same skeleton.
     let takes = assets.takes(ANIMATIONS).unwrap();
-    assert_eq!(takes.len(), 101);
+    // The library's 84 takes, and the walk's and the jog's root-motion
+    // versions.
+    assert_eq!(takes.len(), 86);
     for take in takes.iter() {
         let problems = check_pair(&take.skeleton, bones, &assets.rig_definitions());
         assert!(problems.is_empty(), "{}: {problems:?}", take.name);
@@ -93,24 +95,17 @@ fn the_default_humanoid_head_has_the_facial_profile_shapes_at_rest() {
         "Mouth_Smile_Left",
         "Mouth_Frown_Right",
         "Mouth_Open",
-        "Jaw_Open",
         "Mouth_Pucker",
-        "Mouth_Left",
-        "Mouth_Right",
-        "Cheek_Raise_Left",
+        "Nose_Sneer_Left",
     ] {
         assert!(names.contains(&name), "{name} in {names:?}");
     }
-    // The 41 expression shapes, and the clothing masks the default outfit
-    // needs, resting at 1 (they pull the covered skin inside the clothes).
-    let (masks, face): (Vec<_>, Vec<_>) = model
-        .morph_targets
-        .iter()
-        .partition(|target| target.name.starts_with("Mask_"));
-    assert_eq!(face.len(), 41, "{names:?}");
-    assert!(face.iter().all(|t| t.default_weight == 0.0));
-    assert!(!masks.is_empty());
-    assert!(masks.iter().all(|t| t.default_weight == 1.0), "{masks:?}");
+    // The 30 face control shapes MakeHuman's expression units give (the
+    // jaw opens by its bone), all at rest; the body's identity shapes are
+    // left out of the built-in model, and it hides nothing by mask shapes.
+    assert_eq!(model.morph_targets.len(), 30, "{names:?}");
+    assert!(model.morph_targets.iter().all(|t| t.default_weight == 0.0));
+    assert!(!names.iter().any(|name| name.starts_with("Mask_")));
 }
 
 /// A new Baseplate project in a temporary folder, its player spawned as
@@ -144,10 +139,10 @@ impl Game {
         let starter = axcenity_project::load_starter_character(&folder, &mut world)
             .unwrap()
             .expect("the template names the Character prefab");
-        // These tests are about the stylized default humanoid (its parts,
-        // sockets and sliders). Since R10 a new project's players wear the
-        // realistic description (decision 7, OPEN-22): taking it out gives
-        // the stylized default character underneath, as before.
+        // These tests are about the default humanoid as it is (its model,
+        // sockets and sliders). A new project's players wear the human
+        // base's description: taking it out gives the default humanoid
+        // underneath.
         let humanoid = world.find_first_child(starter, "Humanoid").unwrap();
         let kept: Vec<InstanceId> = world.get(humanoid).unwrap().children().to_vec();
         for id in kept {
@@ -285,18 +280,42 @@ fn a_new_baseplate_projects_player_is_the_default_humanoid_and_walks_animated() 
     game.no_errors();
 }
 
-/// HD4: a part from `HumanoidParts.glb` put inside the default character's
+/// The hairstyle and the outfit a new project's library has (the default
+/// game character's), as `MeshId`s: parts on the default humanoid's
+/// skeleton.
+const HAIR: &str = "assets/characters/human/hair/short02/HairShort02.glb#AxcenityHuman/HairShort02";
+const SUIT: &str = "assets/characters/human/wardrobe/male_casualsuit01/MaleCasualsuit01.glb#AxcenityHuman/MaleCasualsuit01";
+
+/// A MeshPart named `name` drawing `mesh` inside the skinned MeshPart
+/// `body`: it takes its pose and its place from `body` (`anim`'s
+/// followers), and doesn't collide.
+fn part_inside(world: &mut World, body: InstanceId, name: &str, mesh: &str) -> InstanceId {
+    let part = world.create(axcenity_core::ClassName::MeshPart).unwrap();
+    world.set_name(part, name).unwrap();
+    for (property, value) in [
+        ("MeshId", Value::String(mesh.to_owned())),
+        ("CanCollide", Value::Bool(false)),
+        ("CanQuery", Value::Bool(false)),
+        ("CanTouch", Value::Bool(false)),
+        ("Massless", Value::Bool(true)),
+    ] {
+        world.set_property(part, property, value).unwrap();
+    }
+    world.set_parent(part, Some(body)).unwrap();
+    part
+}
+
+/// HD4: a part on the same skeleton put inside the default character's
 /// Body follows its pose (each bone where the Body's is) and is placed
 /// where the Body's skeleton puts it, moving and turning with it.
 #[test]
 fn a_part_inside_the_body_follows_its_pose_and_place() {
     let mut game = Game::new("parts");
-    axcenity_project::add_humanoid_parts(&game.folder).unwrap();
     game.frames(10, MoveInput::default());
     let character = game.character();
     let body = game.world.find_first_child(character, "Body").unwrap();
-    let hair = axcenity_project::humanoid_part(&mut game.world, body, "Hair_Long");
-    let hair_mesh = axcenity_project::humanoid_part_mesh_id("Hair_Long");
+    let hair = part_inside(&mut game.world, body, "Hair", HAIR);
+    let hair_mesh = HAIR.to_owned();
     let _ = game.assets.model_blocking(&hair_mesh);
     game.frames(40, walk());
     // Turn it too, so the place is checked off the axes.
@@ -317,7 +336,7 @@ fn a_part_inside_the_body_follows_its_pose_and_place() {
     );
     let hair_size = game.vector(hair, "Size");
     assert!(
-        hair_size.y > 0.5 && hair_size.y < 2.5,
+        hair_size.y > 0.2 && hair_size.y < 2.5,
         "hair is a small part of a 5-stud body: {hair_size:?}"
     );
     // The head bone is in the same place in the world in both, posed.
@@ -350,8 +369,8 @@ fn a_part_inside_the_body_follows_its_pose_and_place() {
         top(&game, hair),
         top(&game, body)
     );
-    // Swapping is setting the MeshId: the short hair is placed anew.
-    let short = axcenity_project::humanoid_part_mesh_id("Hair_Swept");
+    // Swapping is setting the MeshId: the outfit is placed anew.
+    let short = SUIT.to_owned();
     game.world
         .set_property(hair, "MeshId", Value::String(short.clone()))
         .unwrap();
@@ -361,7 +380,7 @@ fn a_part_inside_the_body_follows_its_pose_and_place() {
     assert!(game.animators.poses().contains_key(&hair));
     assert!(
         (bone_at(&game, hair, &short) - bone_at(&game, body, MODEL)).length() < 1e-3,
-        "the short hair's head is the body's"
+        "the outfit's head is the body's"
     );
     game.no_errors();
 }
@@ -484,7 +503,6 @@ fn body_sliders_reshape_the_default_character_and_its_parts() {
     let mut plain = Game::new("plain");
     let mut shaped = Game::new("shaped");
     let setup = |game: &mut Game, sliders: &[(&str, f64)]| {
-        axcenity_project::add_humanoid_parts(&game.folder).unwrap();
         game.frames(5, MoveInput::default());
         let body = game
             .world
@@ -495,10 +513,8 @@ fn body_sliders_reshape_the_default_character_and_its_parts() {
                 .set_attribute(body, name, Some(Value::Number(*value)))
                 .unwrap();
         }
-        let hair = axcenity_project::humanoid_part(&mut game.world, body, "Hair_Swept");
-        let _ = game
-            .assets
-            .model_blocking(&axcenity_project::humanoid_part_mesh_id("Hair_Swept"));
+        let hair = part_inside(&mut game.world, body, "Hair", HAIR);
+        let _ = game.assets.model_blocking(HAIR);
         game.frames(20, MoveInput::default());
         (body, hair)
     };
@@ -525,7 +541,7 @@ fn body_sliders_reshape_the_default_character_and_its_parts() {
     let grew = eye_from_head(&shaped, body) / eye_from_head(&plain, plain_body);
     assert!((grew - 1.4).abs() < 0.02, "{grew}");
     // The hair takes the same head: its Head bone and its scale match.
-    let hair_mesh = axcenity_project::humanoid_part_mesh_id("Hair_Swept");
+    let hair_mesh = HAIR.to_owned();
     let head = |part, mesh: &str| {
         let rig = shaped
             .assets

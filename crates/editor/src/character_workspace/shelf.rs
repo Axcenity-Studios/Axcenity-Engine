@@ -90,7 +90,7 @@ pub fn library_for(folder: &Path) -> Arc<Library> {
 /// A character in a few words, for its card.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Overview {
-    /// Its body: "Female · Realistic · 4 values set".
+    /// Its body: "Female · Caucasian · Human".
     pub body: String,
     /// Its hair and what it wears: "Bald · Boxer briefs".
     pub look: String,

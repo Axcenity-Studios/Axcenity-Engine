@@ -157,7 +157,7 @@ pub(crate) fn set_parameter(
     Ok(())
 }
 
-/// An error when `slot` is one a parameter's choices fill (the realistic
+/// An error when `slot` is one a parameter's choices fill (the human
 /// body's underwear, which follows Male or Female): it can't be changed.
 fn not_chosen(library: &Library, base: &BaseManifest, slot: &str) -> Result<(), String> {
     if !axcenity_avatar::chosen_slots(library, &base.id)
@@ -199,7 +199,7 @@ fn known_slot<'a>(base: &'a BaseManifest, slot: &str) -> Result<&'a axcenity_ava
 /// already stays where it is with its own material values. An error,
 /// changing nothing, when the library hasn't the item, it doesn't fit the
 /// base model, `slot` isn't its slot, it hasn't the variant, or the slot
-/// comes with a parameter's choice (the realistic body's underwear).
+/// comes with a parameter's choice (the human body's underwear).
 pub(crate) fn set_item(
     library: &Library,
     description: &mut Description,
@@ -266,7 +266,7 @@ pub(crate) fn set_item(
 
 /// Takes off every item in `slot`. A slot the base model hasn't is an
 /// error (a mistyped name would otherwise do nothing, silently), and so is
-/// one that comes with a parameter's choice (the realistic body's
+/// one that comes with a parameter's choice (the human body's
 /// underwear can't be taken off).
 pub(crate) fn remove_item(
     library: &Library,

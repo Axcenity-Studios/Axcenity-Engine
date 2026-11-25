@@ -3108,7 +3108,7 @@ impl ClassName {
             ],
             ClassName::HumanoidDescription => vec![
                 // The base model's ID in the character library, such as
-                // `axcenity/stylized`. Kept in step with `Data`.
+                // `axcenity/human`. Kept in step with `Data`.
                 ("Base", Value::String(String::new())),
                 // The description: the text of a `*.character.json` file.
                 // Empty is the base model's default character.

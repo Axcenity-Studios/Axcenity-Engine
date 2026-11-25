@@ -50,6 +50,7 @@ fn a_base_manifest_with_mistakes_reports_each() {
         map_index: None,
     });
     base.slots[1].id = "hair".to_owned();
+    base.slots[2].hidden_by = vec!["wrist".to_owned(), "hat".to_owned()];
     base.defaults.items.push("not an id".to_owned());
     let problems = base.validate();
     assert_problem(&problems, &["id", "Test Body"]);
@@ -68,6 +69,8 @@ fn a_base_manifest_with_mistakes_reports_each() {
     assert_problem(&problems, &["constraints[2]", "build"]);
     assert_problem(&problems, &["regions[2]", "hands"]);
     assert_problem(&problems, &["slots[1]", "hair", "twice"]);
+    assert_problem(&problems, &["slots[2].hidden_by", "wrist"]);
+    assert_problem(&problems, &["slots[2].hidden_by", "hat"]);
     assert_problem(&problems, &["defaults.items[1]"]);
 }
 

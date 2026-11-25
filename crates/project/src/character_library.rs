@@ -4,82 +4,59 @@
 //! and their items, which a character description names by ID and
 //! `Humanoid:ApplyDescription` resolves against.
 //!
-//! The default character's package (the stylized humanoid) is built into
-//! the engine, like the default humanoid's model: [`add_character_library`]
-//! writes it into a project, files already there kept. Other packages are
-//! copied in beside it (the repository's are in `assets/characters/`).
+//! The engine ships one family, the human base (MakeHuman's body,
+//! `assets/characters/human`), in a folder beside the program
+//! ([`shipped_character_library`]): its model and wardrobe are too big to
+//! build into the program, and a project gets only what its characters
+//! name ([`add_character_packages_for`]). Character Studio's own folder
+//! takes all of it ([`add_character_packages`]).
 
 use std::path::Path;
 
-use axcenity_avatar::{BaseManifest, Catalogue, ItemManifest, Library};
+use axcenity_avatar::{Catalogue, Description, Library};
 
-use super::default_humanoid::write_missing;
 use super::*;
 
 /// The character library's folder in a project.
 pub const CHARACTER_LIBRARY_PATH: &str = axcenity_avatar::LIBRARY_FOLDER;
 
-/// The built-in package's manifests, by their path in the library.
-const MANIFESTS: [(&str, &str); 13] = {
-    macro_rules! file {
-        ($path:literal) => {
-            (
-                $path,
-                include_str!(concat!("../../../assets/characters/", $path)),
-            )
-        };
-    }
-    [
-        file!("humanoid/Humanoid.base.json"),
-        file!("humanoid/items/briefs.item.json"),
-        file!("humanoid/items/cargo-pants.item.json"),
-        file!("humanoid/items/cropped-jacket.item.json"),
-        file!("humanoid/items/hair-bob.item.json"),
-        file!("humanoid/items/hair-buzz.item.json"),
-        file!("humanoid/items/hair-crop.item.json"),
-        file!("humanoid/items/hair-long.item.json"),
-        file!("humanoid/items/hair-ponytail.item.json"),
-        file!("humanoid/items/hair-swept.item.json"),
-        file!("humanoid/items/sneakers.item.json"),
-        file!("humanoid/items/sports-top.item.json"),
-        file!("humanoid/items/tee.item.json"),
-    ]
-};
-
-/// The built-in package's model, by its path in the library.
-const MODEL: &str = "humanoid/HumanoidParts.glb";
-
-/// The character library built into the engine: the default character's
-/// base model and its items.
-pub fn built_in_character_library() -> Library {
-    let mut library = Library::new();
-    for (path, text) in MANIFESTS {
-        if path.ends_with(".base.json") {
-            if let Ok(base) = BaseManifest::from_json(text) {
-                library.add_base(path, base);
-            }
-        } else if let Ok(item) = ItemManifest::from_json(text) {
-            library.add_item(path, item);
-        }
-    }
-    library
+/// Gives `project` the default game character's family from the engine's
+/// shipped library ([`add_game_character_library`]), when that is found;
+/// without it the project's library stays as it is.
+pub fn add_character_library(project: &Path) -> Result<(), SaveError> {
+    add_game_character_library(project, shipped_character_library().as_deref()).map(|_| ())
 }
 
-/// Writes the built-in character library into `project`
-/// ([`CHARACTER_LIBRARY_PATH`]): its catalogue, manifests and model. Files
-/// already there are kept, so a project's own library is never written
-/// over; a project that has a catalogue keeps it (add packages to it with
-/// Character Studio).
-pub fn add_character_library(project: &Path) -> Result<(), SaveError> {
-    let write = |path: &str, bytes: &[u8]| {
-        write_missing(project, &format!("{CHARACTER_LIBRARY_PATH}/{path}"), bytes)
-    };
-    for (path, text) in MANIFESTS {
-        write(path, text.as_bytes())?;
+/// Copies what `descriptions` name from the library in `from` into
+/// `project`'s library: each one's base model (with its region map and
+/// the colour maps its materials can draw) and the items it wears, and
+/// the base's default items. Nothing else of `from` is copied (no other
+/// item, no preset), so a project holds what its characters need and not
+/// the whole wardrobe. Files are compared and kept as
+/// [`add_character_packages`] does. Returns the IDs copied in or brought
+/// up to date.
+pub fn add_character_packages_for(
+    project: &Path,
+    from: &Path,
+    descriptions: &[&Description],
+) -> Result<Vec<String>, SaveError> {
+    let (shipped, _, _) = Library::read(from);
+    let mut wanted = std::collections::BTreeSet::new();
+    for description in descriptions {
+        wanted.insert(description.base.clone());
+        wanted.extend(description.items.iter().map(|worn| worn.id.clone()));
+        if let Some(base) = shipped.base(&description.base) {
+            wanted.extend(base.defaults.items.iter().cloned());
+            // What a parameter's choices put on (the underwear that
+            // follows the body type).
+            for parameter in &base.parameters {
+                for choice in &parameter.choices {
+                    wanted.extend(choice.items.iter().cloned());
+                }
+            }
+        }
     }
-    write(MODEL, DEFAULT_HUMANOID_PARTS)?;
-    let catalogue = Catalogue::of(&built_in_character_library());
-    write("catalogue.json", catalogue.to_json().as_bytes())
+    copy_packages(project, from, &shipped, |id| wanted.contains(id), false)
 }
 
 /// Copies the character packages of the library in `from` (a folder with
@@ -91,7 +68,7 @@ pub fn add_character_library(project: &Path) -> Result<(), SaveError> {
 /// one (in size or in its bytes), so a newer engine's package replaces an
 /// older copy, file by file, and an unchanged one isn't copied again
 /// (audit D2: a package the folder already had used to be skipped, so an
-/// old `Realistic.base.json` stayed for good). The project's own files,
+/// old base manifest stayed for good). The project's own files,
 /// which the shipped packages haven't, are never touched, and neither is
 /// an ID the project has at a path of its own (its entry wins). The
 /// catalogue is written again with what the project's library had and
@@ -99,10 +76,21 @@ pub fn add_character_library(project: &Path) -> Result<(), SaveError> {
 /// copied in or brought up to date; what `from` can't read is skipped.
 ///
 /// Character Studio's workspace calls it for its own folder, so it offers
-/// every family the engine ships, not only the one built in (the realistic
-/// body's model is 32 MB, too big to build into the program).
+/// everything the engine ships.
 pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>, SaveError> {
     let (shipped, _, _) = Library::read(from);
+    copy_packages(project, from, &shipped, |_| true, true)
+}
+
+/// [`add_character_packages`] for the bases and items `wanted` names, with
+/// the presets or without.
+fn copy_packages(
+    project: &Path,
+    from: &Path,
+    shipped: &Library,
+    wanted: impl Fn(&str) -> bool,
+    presets: bool,
+) -> Result<Vec<String>, SaveError> {
     let root = project.join(CHARACTER_LIBRARY_PATH);
     let (mut library, _, _) = Library::read(&root);
     // Copies `path` when the project's copy is missing or differs; says
@@ -124,6 +112,9 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
     let own = |listed: Option<&str>, shipped: &str| listed.is_some_and(|path| path != shipped);
     let mut added = Vec::new();
     for (id, base) in &shipped.bases {
+        if !wanted(id) {
+            continue;
+        }
         let Some(manifest) = shipped.manifest_path(id) else {
             continue;
         };
@@ -158,6 +149,9 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
         }
     }
     for (id, item) in &shipped.items {
+        if !wanted(id) {
+            continue;
+        }
         let Some(manifest) = shipped.manifest_path(id) else {
             continue;
         };
@@ -187,7 +181,7 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
             added.push(id.clone());
         }
     }
-    for (id, preset) in &shipped.presets {
+    for (id, preset) in shipped.presets.iter().filter(|_| presets) {
         let Some(file) = shipped.preset_path(id) else {
             continue;
         };
@@ -244,234 +238,108 @@ fn same_contents(a: &Path, b: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
-    /// The repository's stylized package, file for file: a manifest added
-    /// there must be added to `MANIFESTS` too.
-    #[test]
-    fn the_built_in_library_is_the_repositorys_stylized_package() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
-        let (repository, _, problems) = Library::read(&root);
-        assert!(problems.is_empty(), "{problems:?}");
-        let built_in = built_in_character_library();
-        assert_eq!(built_in.bases.len(), 1);
-        let base = built_in.base(axcenity_avatar::V1_BASE).expect("stylized");
-        assert_eq!(repository.base(&base.id), Some(base));
-        let fitting: Vec<&String> = repository
-            .items
-            .values()
-            .filter(|item| item.bases.contains(&base.id))
-            .map(|item| &item.id)
-            .collect();
-        let listed: Vec<&String> = built_in.items.keys().collect();
-        assert_eq!(listed, fitting, "every item of the package is built in");
-        for (id, item) in &built_in.items {
-            assert_eq!(repository.item(id), Some(item));
-            assert_eq!(built_in.manifest_path(id), repository.manifest_path(id));
-        }
-        assert!(built_in.validate().is_empty(), "{:?}", built_in.validate());
-        assert_eq!(
-            built_in.path_of(&base.id, &base.model.file).as_deref(),
-            Some(MODEL)
-        );
+    const HUMAN: &str = "axcenity/human";
+
+    fn shipped() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters")
     }
 
-    #[test]
-    fn the_library_written_into_a_project_reads_back_sound() {
+    fn temp(name: &str) -> PathBuf {
         let folder = std::env::temp_dir().join(format!(
-            "axcenity-character-library-test-{}",
+            "axcenity-character-library-{name}-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&folder);
-        add_character_library(&folder).unwrap();
-        let root = folder.join(CHARACTER_LIBRARY_PATH);
+        fs::create_dir_all(&folder).unwrap();
+        folder
+    }
+
+    /// A character's packages: its base with the files it draws, what it
+    /// wears, and nothing else of the library.
+    #[test]
+    fn a_project_gets_what_its_characters_name_and_no_more() {
+        let project = temp("for");
+        let (whole, _, problems) = Library::read(&shipped());
+        assert!(problems.is_empty(), "{problems:?}");
+        let mut description = Description::new("Ada", HUMAN);
+        description
+            .items
+            .push(axcenity_avatar::WornItem::new("makehuman/shoes01"));
+        let added = add_character_packages_for(&project, &shipped(), &[&description]).unwrap();
+        assert!(added.iter().any(|id| id == HUMAN), "{added:?}");
+        assert!(added.iter().any(|id| id == "makehuman/shoes01"));
+
+        let root = project.join(CHARACTER_LIBRARY_PATH);
         let (library, catalogue, problems) = Library::read(&root);
         assert!(problems.is_empty(), "{problems:?}");
-        assert_eq!(library, built_in_character_library());
-        assert_eq!(catalogue, Some(Catalogue::of(&library)));
-        assert_eq!(fs::read(root.join(MODEL)).unwrap(), DEFAULT_HUMANOID_PARTS);
-        // A file already there is kept.
-        fs::write(root.join("catalogue.json"), "mine").unwrap();
-        add_character_library(&folder).unwrap();
-        assert_eq!(
-            fs::read_to_string(root.join("catalogue.json")).unwrap(),
-            "mine"
-        );
-        let _ = fs::remove_dir_all(&folder);
-    }
-
-    #[test]
-    fn the_shipped_packages_are_copied_beside_the_built_in_one() {
-        let folder = std::env::temp_dir().join(format!(
-            "axcenity-character-packages-test-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&folder);
-        add_character_library(&folder).unwrap();
-        let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
-        let added = add_character_packages(&folder, &shipped).unwrap();
-        assert!(
-            added.iter().any(|id| id == "axcenity/realistic"),
-            "{added:?}"
-        );
-        assert!(
-            !added.iter().any(|id| id == axcenity_avatar::V1_BASE),
-            "the built-in package was already there: {added:?}"
-        );
-
-        let root = folder.join(CHARACTER_LIBRARY_PATH);
-        let (library, _, problems) = Library::read(&root);
-        assert!(problems.is_empty(), "{problems:?}");
-        let realistic = library.base("axcenity/realistic").expect("copied");
-        let model = library
-            .path_of("axcenity/realistic", &realistic.model.file)
-            .unwrap();
-        assert_eq!(
-            fs::metadata(root.join(&model)).unwrap().len(),
-            fs::metadata(shipped.join(&model)).unwrap().len()
-        );
-        assert!(library.base(axcenity_avatar::V1_BASE).is_some());
-        let (repository, _, _) = Library::read(&shipped);
-        assert_eq!(library.bases.len(), repository.bases.len());
-        assert_eq!(library.items.len(), repository.items.len());
-        // The presets come too, file for file, and the library is sound.
-        assert!(!repository.presets.is_empty());
-        assert_eq!(library.presets, repository.presets);
-        for id in repository.presets.keys() {
-            let file = repository.preset_path(id).unwrap();
-            assert_eq!(library.preset_path(id), Some(file));
-            assert_eq!(
-                fs::read(root.join(file)).unwrap(),
-                fs::read(shipped.join(file)).unwrap()
-            );
-        }
+        assert!(catalogue.is_some());
         assert!(library.validate().is_empty(), "{:?}", library.validate());
-        // A base's colour maps (the human base's skins, ADR-0048) come
-        // with it: a character whose skin isn't there draws the wrong one.
-        let mut skins = 0;
-        for (id, base) in &repository.bases {
-            for map in &base.material_maps {
-                let file = repository.path_of(id, &map.colour_map).unwrap();
-                assert_eq!(
-                    fs::metadata(root.join(&file)).map(|m| m.len()).ok(),
-                    fs::metadata(shipped.join(&file)).map(|m| m.len()).ok(),
-                    "{file}"
-                );
-                skins += 1;
+        let base = library.base(HUMAN).expect("copied");
+        let model = library.path_of(HUMAN, &base.model.file).unwrap();
+        assert!(root.join(&model).is_file(), "{model}");
+        // Its skins come with it (ADR-0048), and the underwear its body
+        // types put on.
+        for map in &base.material_maps {
+            let path = library.path_of(HUMAN, &map.colour_map).unwrap();
+            assert!(root.join(&path).is_file(), "{path}");
+        }
+        for choice in base.parameters.iter().flat_map(|p| &p.choices) {
+            for item in &choice.items {
+                assert!(library.item(item).is_some(), "{item}");
             }
         }
-        assert!(skins > 0, "the human base offers its skins");
+        assert!(library.item("makehuman/male-casualsuit01").is_none());
+        assert!(library.items.len() < whole.items.len() / 4);
+        assert!(library.presets.is_empty());
 
-        // Again: nothing new to copy, and the catalogue is left alone.
-        fs::write(
-            root.join("catalogue.json"),
-            Catalogue::of(&library).to_json(),
-        )
-        .unwrap();
-        assert!(
-            add_character_packages(&folder, &shipped)
-                .unwrap()
-                .is_empty()
-        );
-        let _ = fs::remove_dir_all(&folder);
+        // A second time changes nothing.
+        let again = add_character_packages_for(&project, &shipped(), &[&description]).unwrap();
+        assert!(again.is_empty(), "{again:?}");
+        let _ = fs::remove_dir_all(&project);
     }
 
-    /// Audit D2: a folder that already has a shipped package (an older
-    /// copy) gets the shipped files again where they differ, even at the
-    /// same size; a project's own files, which the shipped package hasn't,
-    /// are left alone, and so are its own catalogue entries.
+    /// The whole library, as Character Studio's own folder takes it; an
+    /// older copy of a file is brought up to date and the folder's own
+    /// files are left alone.
     #[test]
-    fn an_older_copy_of_a_shipped_package_is_brought_up_to_date() {
-        let folder = std::env::temp_dir().join(format!(
-            "axcenity-character-packages-update-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&folder);
-        add_character_library(&folder).unwrap();
-        let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
-        add_character_packages(&folder, &shipped).unwrap();
-        let root = folder.join(CHARACTER_LIBRARY_PATH);
-        let (repository, _, _) = Library::read(&shipped);
-        let manifest = repository.manifest_path("axcenity/realistic").unwrap();
-        let preset_id = repository.presets.keys().next().unwrap().clone();
-        let preset_file = repository.preset_path(&preset_id).unwrap();
-
-        // An older engine's copies: the base manifest with its label
-        // changed at the same size (one letter), and a preset's about.
-        let shipped_text = fs::read_to_string(shipped.join(manifest)).unwrap();
-        let older = shipped_text.replacen("\"Realistic\"", "\"Realistix\"", 1);
-        assert_ne!(older, shipped_text, "the label is in the manifest");
-        assert_eq!(older.len(), shipped_text.len());
-        fs::write(root.join(manifest), &older).unwrap();
-        let preset_text = fs::read_to_string(shipped.join(preset_file)).unwrap();
-        fs::write(
-            root.join(preset_file),
-            preset_text.replacen("\"about\": \"", "\"about\": \"Older. ", 1),
-        )
-        .unwrap();
-        // The project's own files: an item of its own, listed in its
-        // catalogue, and a note beside the package.
-        let briefs = repository
-            .manifest_path("axcenity/realistic-briefs")
-            .unwrap();
-        let mut item: serde_json::Value =
-            serde_json::from_str(&fs::read_to_string(shipped.join(briefs)).unwrap()).unwrap();
-        item["id"] = "studio-x/briefs".into();
-        item["label"] = "Our briefs".into();
-        // Beside the shipped item, so its paths still resolve.
-        let own_path = briefs.replace(".item.json", "-ours.item.json");
-        let own_text = serde_json::to_string_pretty(&item).unwrap();
-        fs::write(root.join(&own_path), &own_text).unwrap();
-        let (mut library, _, _) = Library::read(&root);
-        library.add_item(&own_path, ItemManifest::from_json(&own_text).unwrap());
-        fs::write(
-            root.join("catalogue.json"),
-            Catalogue::of(&library).to_json(),
-        )
-        .unwrap();
-        fs::write(root.join("realistic/NOTES.txt"), "ours").unwrap();
-
-        let updated = add_character_packages(&folder, &shipped).unwrap();
-        assert!(
-            updated.iter().any(|id| id == "axcenity/realistic"),
-            "{updated:?}"
-        );
-        assert!(updated.contains(&preset_id), "{updated:?}");
+    fn the_whole_library_is_copied_and_an_older_copy_brought_up_to_date() {
+        let project = temp("whole");
+        let (whole, _, _) = Library::read(&shipped());
+        let added = add_character_packages(&project, &shipped()).unwrap();
         assert_eq!(
-            fs::read_to_string(root.join(manifest)).unwrap(),
-            shipped_text,
-            "the shipped manifest replaced the older one"
+            added.len(),
+            whole.bases.len() + whole.items.len() + whole.presets.len()
         );
-        assert_eq!(
-            fs::read(root.join(preset_file)).unwrap(),
-            fs::read(shipped.join(preset_file)).unwrap()
-        );
+        let root = project.join(CHARACTER_LIBRARY_PATH);
         let (library, _, problems) = Library::read(&root);
         assert!(problems.is_empty(), "{problems:?}");
-        assert_eq!(
-            library.base("axcenity/realistic").unwrap().label,
-            "Realistic",
-            "the library reads the new manifest"
-        );
-        assert_eq!(
-            library.preset(&preset_id),
-            repository.preset(&preset_id),
-            "and the new preset"
-        );
+        assert_eq!(library, whole);
         assert!(
-            library.item("studio-x/briefs").is_some(),
-            "the project's own item stays in the catalogue"
-        );
-        assert_eq!(fs::read_to_string(root.join(&own_path)).unwrap(), own_text);
-        assert_eq!(
-            fs::read_to_string(root.join("realistic/NOTES.txt")).unwrap(),
-            "ours"
-        );
-        // Up to date now: nothing to copy.
-        assert!(
-            add_character_packages(&folder, &shipped)
+            add_character_packages(&project, &shipped())
                 .unwrap()
                 .is_empty()
         );
-        let _ = fs::remove_dir_all(&folder);
+
+        // An older manifest of the base, and a file of the project's own.
+        let manifest = root.join(whole.manifest_path(HUMAN).unwrap());
+        let text = fs::read_to_string(&manifest).unwrap();
+        let label = &whole.base(HUMAN).unwrap().label;
+        let older = text.replacen(
+            &format!("\"label\": \"{label}\""),
+            "\"label\": \"Older\"",
+            1,
+        );
+        assert_ne!(older, text);
+        fs::write(&manifest, older).unwrap();
+        let notes = root.join("human/NOTES.txt");
+        fs::write(&notes, "ours").unwrap();
+        let updated = add_character_packages(&project, &shipped()).unwrap();
+        assert_eq!(updated, [HUMAN]);
+        let (library, _, _) = Library::read(&root);
+        assert_eq!(&library.base(HUMAN).unwrap().label, label);
+        assert_eq!(fs::read_to_string(&notes).unwrap(), "ours");
+        let _ = fs::remove_dir_all(&project);
     }
 }

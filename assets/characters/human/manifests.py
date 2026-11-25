@@ -56,8 +56,10 @@ SLOTS = [
     # Every hairstyle is still a draft (`hair.py`), and Randomize draws no
     # draft unless the slot says so: without this a random character is bald.
     {"id": "hair", "label": "Hairstyle", "category": "hair", "empty_label": "Bald", "random_drafts": True},
-    {"id": "underwear_top", "label": "Underwear top", "category": "clothing"},
-    {"id": "underwear_bottom", "label": "Underwear", "category": "clothing"},
+    # The cut underwear isn't drawn while a top or a bottom is worn over it
+    # (`Slot::hidden_by`): it would show round a smaller garment's edges.
+    {"id": "underwear_top", "label": "Underwear top", "category": "clothing", "hidden_by": ["top"]},
+    {"id": "underwear_bottom", "label": "Underwear", "category": "clothing", "hidden_by": ["bottom"]},
     {"id": "top", "label": "Top", "category": "clothing"},
     {"id": "outerwear", "label": "Outerwear", "category": "clothing"},
     {"id": "bottom", "label": "Bottoms", "category": "clothing"},
@@ -195,8 +197,8 @@ def base_manifest(data):
         "format_version": 1,
         "id": BASE_ID,
         "label": "Human",
-        # Its own family while the realistic base it replaces still ships
-        # (ADR-0047): benchmarks and presets are named by family.
+        # The engine's one family (ADR-0050): benchmarks and presets are
+        # named by family.
         "family": "human",
         "model": {"file": PARTS_FILE, "body": f"{ARMATURE}/Body", "parts": parts, "regions_map": REGIONS_MAP},
         "skeleton": {"convention": "humanoid", "height": 1.75, "pose": "a-pose-45",

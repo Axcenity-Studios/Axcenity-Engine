@@ -1,6 +1,6 @@
 //! Wave 2's open list (refinement R10 polish): the status line while a
 //! held version is shown, the Presets page's body tiles framed so the
-//! builds read apart, and the stylized family's presets as data.
+//! builds read apart, and the family's presets as data.
 
 use axcenity_avatar::PresetKind;
 
@@ -85,102 +85,94 @@ fn the_status_line_says_a_held_version_is_shown() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// The stylized family has presets as data beside its manifest (body,
-/// face and whole characters, made with its own parameters): each is
-/// sound, applies and resolves, New offers its characters, and a body
-/// preset is offered for the frame it was made for.
+/// The human family has presets as data beside its manifest (body, face
+/// and whole characters, made with its own parameters): each is sound,
+/// applies and resolves, New offers its characters, and a body preset is
+/// offered for either body type and keeps it.
 #[test]
-fn the_stylized_family_has_sound_presets_and_new_offers_them() {
-    let folder = test_folder("polish-stylized-presets");
+fn the_human_family_has_sound_presets_and_new_offers_them() {
+    let folder = test_folder("polish-family-presets");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let library = workspace.library();
-    let base = library.base(axcenity_avatar::V1_BASE).unwrap();
-    for (kind, at_least) in [
-        (PresetKind::Body, 4),
-        (PresetKind::Face, 3),
+    let base = library.base(DEFAULT_BASE).unwrap();
+    let default = applier::default_description(&library, &base.id);
+    for (kind, count) in [
+        (PresetKind::Body, 6),
+        (PresetKind::Face, 8),
         (PresetKind::Character, 2),
     ] {
         let listed = presets::of_kind(&library, workspace.own_presets(), &base.id, kind);
-        assert!(listed.len() >= at_least, "{kind:?}: {}", listed.len());
+        assert_eq!(listed.len(), count, "{kind:?}");
         for listed in listed {
-            assert!(listed.id.starts_with("axcenity/stylized-"), "{}", listed.id);
+            assert!(listed.id.starts_with("axcenity/human-"), "{}", listed.id);
             let problems = axcenity_avatar::check_preset(listed.preset, &library);
             assert!(problems.is_empty(), "{}: {problems:?}", listed.id);
-            // Only stylized parameters, inside their ranges.
+            // Only the base's parameters, inside their ranges.
             for (id, value) in &listed.preset.parameters {
                 let parameter = base.parameter(id).unwrap_or_else(|| panic!("{id}"));
                 let [low, high] = parameter.range;
                 assert!((low..=high).contains(value), "{}: {id} {value}", listed.id);
             }
-            let mut made = applier::default_description(&library, &base.id);
+            let mut made = default.clone();
             axcenity_avatar::apply_preset(&mut made, listed.preset, &library).unwrap();
             assert!(made.validate(&library).is_empty(), "{}", listed.id);
             axcenity_avatar::resolve(&library, &made).unwrap();
-            if kind != PresetKind::Character {
-                assert_ne!(
-                    made,
-                    applier::default_description(&library, &base.id),
-                    "{} changes the character",
-                    listed.id
-                );
+            // Every body and face preset changes the character, but the
+            // Average build, which is the default one by its name.
+            if listed.id == "axcenity/human-body-average" {
+                assert_eq!(made, default, "{} is the default build", listed.id);
+            } else if kind != PresetKind::Character {
+                assert_ne!(made, default, "{} changes the character", listed.id);
             }
         }
     }
-    // New lists the stylized characters (no longer only its default).
+    // New lists the family's characters.
     let choices = toolbar::new_choices(&library, &workspace);
-    let stylized: Vec<&Start> = choices
+    let human: Vec<&Start> = choices
         .iter()
-        .skip_while(|(label, _, start)| !(start.is_none() && label == "Stylized"))
+        .skip_while(|(label, _, start)| !(start.is_none() && label == "Human"))
         .filter_map(|(_, _, start)| start.as_ref())
         .collect();
-    assert!(stylized.len() >= 2, "{choices:?}");
+    assert_eq!(human.len(), 2, "{choices:?}");
     assert!(
-        stylized.iter().all(
-            |start| matches!(start, Start::Preset(id) if id.starts_with("axcenity/stylized-"))
-        ),
-        "{stylized:?}"
+        human
+            .iter()
+            .all(|start| matches!(start, Start::Preset(id) if id.starts_with("axcenity/human-"))),
+        "{human:?}"
     );
-    // Its first is its default character, as the realistic one's is.
+    // Its first is its default character.
     assert_eq!(
-        workspace.starting(stylized[0]),
-        tidy(applier::default_description(&library, &base.id), &library)
+        workspace.starting(human[0]),
+        tidy(default.clone(), &library)
     );
 
-    // On a feminine stylized frame only its feminine body presets are
-    // offered, and applying one keeps the frame.
-    workspace.apply(Intent::New(Start::Family(base.id.clone())));
+    // The builds are tagged with no body type: on a female character every
+    // one is offered, and applying one keeps the body type and what it
+    // wears.
+    workspace.apply(Intent::New(Start::shipped("female")));
     workspace.answer(Some(false));
-    workspace.apply(Intent::SetParameter {
-        id: "frame".into(),
-        value: 1.0,
-        gesture: Gesture::Commit,
-    });
-    let offered: Vec<String> = presets::of_kind(
-        &library,
-        workspace.own_presets(),
-        &base.id,
-        PresetKind::Body,
-    )
-    .into_iter()
-    .filter(|listed| presets::suits(listed, workspace.description(), base))
-    .map(|listed| listed.id.to_owned())
-    .collect();
-    assert!(!offered.is_empty());
-    for id in &offered {
-        workspace.apply(Intent::ApplyPreset(id.clone()));
-        assert_eq!(workspace.parameter("frame"), 1.0, "{id} keeps the frame");
-    }
+    assert_eq!(workspace.parameter("frame"), 1.0);
     let all = presets::of_kind(
         &library,
         workspace.own_presets(),
         &base.id,
         PresetKind::Body,
-    )
-    .len();
-    assert!(
-        offered.len() < all,
-        "the masculine ones aren't offered here"
     );
+    let offered: Vec<String> = all
+        .iter()
+        .filter(|listed| presets::suits(listed, workspace.description(), base))
+        .map(|listed| listed.id.to_owned())
+        .collect();
+    assert_eq!(offered.len(), all.len(), "{offered:?}");
+    for id in &offered {
+        workspace.apply(Intent::ApplyPreset(id.clone()));
+        assert_eq!(workspace.parameter("frame"), 1.0, "{id} keeps the frame");
+        assert_eq!(
+            workspace.worn_in("underwear_top").as_deref(),
+            Some("axcenity/human-bandeau"),
+            "{id}"
+        );
+    }
     // The Body page's Start from chips show them.
     workspace.apply(Intent::PickCategory(Category::Body));
     let drawn = status_texts(&mut workspace);
@@ -190,6 +182,11 @@ fn the_stylized_family_has_sound_presets_and_new_offers_them() {
             .any(|t| t.to_lowercase().contains("start from")),
         "{drawn:?}"
     );
+    for label in [
+        "Average", "Slim", "Athletic", "Muscular", "Heavyset", "Elderly",
+    ] {
+        assert!(drawn.iter().any(|t| t == label), "{label} in {drawn:?}");
+    }
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -213,7 +210,7 @@ fn body_preset_tiles_are_framed_so_the_builds_read_apart() {
             )
         })
         .collect();
-    assert!(bodies.len() >= 7);
+    assert_eq!(bodies.len(), 6);
     for listed in &bodies {
         assert!(
             matches!(
@@ -271,8 +268,8 @@ fn body_preset_tiles_are_framed_so_the_builds_read_apart() {
 /// the Face page's Eyes with uneven sides (the Left and right menu and the
 /// pair buttons), the Expressions page mid-walk with a smile, the Body
 /// page mid-walk (the bottom bar's motion menu), the Presets page's body
-/// tiles, a held version shown (the status line) and the stylized Body
-/// page's Start from chips.
+/// tiles, a held version shown (the status line) and a female character's
+/// Body page with its Start from chips.
 #[test]
 fn wave3_pages_are_drawn() {
     use super::shell_tests::{paint_preset_pictures, snap};
@@ -298,7 +295,10 @@ fn wave3_pages_are_drawn() {
         workspace.apply(Intent::PickCategory(Category::Face));
         workspace.apply(Intent::PickFeature(Some("eyes".into())));
         workspace.apply(Intent::SetSymmetry(false));
-        for (id, value) in [("eye_size_left", 0.6), ("eye_tilt_right", -0.5)] {
+        for (id, value) in [
+            ("eyes_scale_left", 0.6),
+            ("eyes_corner1_down_up_right", -0.5),
+        ] {
             workspace.apply(Intent::SetParameter {
                 id: id.into(),
                 value,
@@ -347,14 +347,14 @@ fn wave3_pages_are_drawn() {
             3,
         );
         workspace.apply(Intent::FocusView(ViewPreset::FullBody));
-        workspace.apply(Intent::PreviewMotion(Motion::Gesture("Wave".into())));
+        workspace.apply(Intent::PreviewMotion(Motion::Gesture("Yes".into())));
         for _ in 0..25 {
             workspace.advance(1.0 / 30.0);
         }
         snap(
             &mut workspace,
             &snapshots,
-            &format!("w3-body-wave{suffix}"),
+            &format!("w3-body-gesture{suffix}"),
             3,
         );
         workspace.apply(Intent::PreviewMotion(Motion::Idle));
@@ -386,18 +386,12 @@ fn wave3_pages_are_drawn() {
         );
         workspace.apply(Intent::DiscardHeld(0));
     }
-    // The stylized family's Body page with its Start from chips, on a
-    // feminine frame.
+    // A female character's Body page with its Start from chips.
     workspace.apply(Intent::SetBackdrop(super::stage::Backdrop::Grey));
-    workspace.apply(Intent::New(Start::Preset(
-        "axcenity/stylized-feminine".into(),
-    )));
+    workspace.apply(Intent::New(Start::shipped("female")));
     workspace.answer(Some(false));
     workspace.apply(Intent::PickCategory(Category::Body));
-    snap(&mut workspace, &snapshots, "w3-body-stylized", 3);
-    workspace.apply(Intent::PickCategory(Category::Presets));
-    paint_preset_pictures(&folder, &workspace);
-    snap(&mut workspace, &snapshots, "w3-presets-stylized", 10);
+    snap(&mut workspace, &snapshots, "w3-body-female", 3);
     drop(workspace);
     let _ = std::fs::remove_dir_all(&folder);
 }

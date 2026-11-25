@@ -19,7 +19,7 @@ const COVER_REACH: f32 = 0.08;
 pub(super) const CREASE_REACH: f32 = 0.15;
 
 /// A body's region map: a region index per texel over its first texture
-/// coordinates (0 where no skin is), as `RealisticRegions.png` holds it.
+/// coordinates (0 where no skin is), as `HumanRegions.png` holds it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RegionMap {
     pub width: u32,

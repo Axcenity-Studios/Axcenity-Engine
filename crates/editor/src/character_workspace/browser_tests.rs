@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use axcenity_avatar::{
     Catalogue, Description, ItemManifest, LIBRARY_FOLDER, Library, MaterialRole, MaterialValue,
-    V1_BASE,
 };
 use eframe::egui;
 
@@ -45,7 +44,8 @@ fn item(id: &str, label: &str, kind: &str, slot: &str, bases: &[&str], more: &st
     ItemManifest::from_json(&text).unwrap_or_else(|err| panic!("{id}: {err}\n{text}"))
 }
 
-/// The items the listing tests use, on the realistic body.
+/// The items the listing tests use, on the human base (and one for a base
+/// the library doesn't have).
 fn fixtures() -> Vec<ItemManifest> {
     let r = &[DEFAULT_BASE];
     vec![
@@ -82,11 +82,11 @@ fn fixtures() -> Vec<ItemManifest> {
             r#", "quality": "draft", "tags": ["denim"]"#,
         ),
         item(
-            "test/stylized-top",
-            "Stylized top",
+            "test/other-base-top",
+            "Top for another base",
             "garment",
             "top",
-            &[V1_BASE],
+            &["test/another-base"],
             r#", "quality": "production""#,
         ),
         item(
@@ -147,12 +147,13 @@ fn library() -> Arc<Library> {
     Arc::new(library)
 }
 
-fn realistic(library: &Library) -> Description {
+/// The human base's default character.
+fn human(library: &Library) -> Description {
     axcenity_gameplay::description::default_description(library, DEFAULT_BASE)
 }
 
 /// The fixtures' IDs in a listing, in order: the shipped library's own
-/// items (the realistic wardrobe since wave 4) come and go with the
+/// items (the human base's wardrobe and hairstyles) come and go with the
 /// content, so the listing tests look at the fixtures only.
 fn ids(listing: &browser::Listing) -> Vec<String> {
     listing
@@ -184,7 +185,7 @@ fn listed(
 #[test]
 fn only_items_for_this_base_in_a_slot_the_page_takes_are_offered() {
     let library = library();
-    let description = realistic(&library);
+    let description = human(&library);
     let listing = browser::list(
         &library,
         &description,
@@ -195,9 +196,9 @@ fn only_items_for_this_base_in_a_slot_the_page_takes_are_offered() {
         &[],
     );
     let offered = ids(&listing);
-    // The stylized top is for another base; the slip dress also fills the
+    // One top is for another base; the slip dress also fills the
     // underwear the body type wears, a slot nobody picks in.
-    assert!(!offered.contains(&"test/stylized-top".to_owned()));
+    assert!(!offered.contains(&"test/other-base-top".to_owned()));
     assert!(!offered.contains(&"test/slip-dress".to_owned()));
     // No underwear tile: it comes with the body type and is said so.
     assert!(offered.iter().all(|id| !id.contains("briefs")));
@@ -206,9 +207,15 @@ fn only_items_for_this_base_in_a_slot_the_page_takes_are_offered() {
         wears.iter().any(|(slot, _)| slot == "Underwear"),
         "{wears:?}"
     );
-    // The categories are the page's slots a person picks in, in order.
+    // The categories are the page's slots a person picks in, in order:
+    // the human base's clothing slots but its two underwear ones (its
+    // headwear is an accessory). It has legwear and gloves, which the
+    // realistic body's four (top, outerwear, bottom, shoes) didn't.
     let slots: Vec<&str> = listing.slots.iter().map(|s| s.id.as_str()).collect();
-    assert_eq!(slots, ["top", "outerwear", "bottom", "shoes"]);
+    assert_eq!(
+        slots,
+        ["top", "outerwear", "bottom", "shoes", "legwear", "gloves"]
+    );
     // Grouped by slot in that order.
     assert_eq!(
         offered,
@@ -230,7 +237,7 @@ fn only_items_for_this_base_in_a_slot_the_page_takes_are_offered() {
 #[test]
 fn drafts_are_hidden_until_show_drafts_and_marked_when_shown() {
     let library = library();
-    let mut description = realistic(&library);
+    let mut description = human(&library);
     let off = browser::list(
         &library,
         &description,
@@ -241,7 +248,7 @@ fn drafts_are_hidden_until_show_drafts_and_marked_when_shown() {
         &[],
     );
     assert!(!ids(&off).contains(&"test/jeans".to_owned()));
-    // The jeans and the shipped realistic drafts (the first garments).
+    // The jeans and the shipped drafts (the human base's garments).
     let shipped_drafts = browser::list(
         &library,
         &description,
@@ -316,7 +323,7 @@ fn a_page_of_drafts_alone_lists_them_without_asking() {
             r#", "quality": "draft", "groom": { "mesh": { "file": "x.glb" } }"#,
         ),
     );
-    let description = realistic(&library);
+    let description = human(&library);
     let list = |shelf, filters: &Filters, drafts| {
         browser::list(
             &library,
@@ -359,7 +366,7 @@ fn a_page_of_drafts_alone_lists_them_without_asking() {
 #[test]
 fn search_matches_every_word_against_name_tags_and_about() {
     let library = library();
-    let description = realistic(&library);
+    let description = human(&library);
     let search = |text: &str| {
         let filters = Filters {
             search: text.to_owned(),
@@ -377,7 +384,7 @@ fn search_matches_every_word_against_name_tags_and_about() {
 #[test]
 fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
     let library = library();
-    let mut description = realistic(&library);
+    let mut description = human(&library);
     let with = |filters: Filters, description: &Description| {
         listed(&library, description, Shelf::Clothing, &filters, true)
     };
@@ -406,7 +413,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
         &BTreeSet::new(),
         &[],
     );
-    // (The shipped realistic garments add their own tags.)
+    // (The shipped garments add their own tags.)
     for tag in ["casual", "cotton", "denim", "hood"] {
         assert!(
             listing.kinds.iter().any(|k| k == tag),
@@ -451,7 +458,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
     let favourites = BTreeSet::from(["test/jeans".to_owned()]);
     let only = browser::list(
         &library,
-        &realistic(&library),
+        &human(&library),
         Shelf::Clothing,
         &Filters {
             favourites: true,
@@ -464,7 +471,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
     assert_eq!(ids(&only), ["test/jeans"]);
     let first = browser::list(
         &library,
-        &realistic(&library),
+        &human(&library),
         Shelf::Clothing,
         &Filters::default(),
         true,
@@ -477,7 +484,7 @@ fn filters_narrow_by_slot_kind_colour_fit_and_favourites() {
 #[test]
 fn recently_used_lists_the_items_last_worn_newest_first() {
     let library = library();
-    let description = realistic(&library);
+    let description = human(&library);
     let mut recent = Vec::new();
     for id in ["test/tee", "test/jeans", "test/hoodie", "test/tee"] {
         browser::remember(&mut recent, id);
@@ -522,7 +529,7 @@ fn recently_used_lists_the_items_last_worn_newest_first() {
 #[test]
 fn wearing_takes_off_what_conflicts_and_what_its_slots_held() {
     let library = library();
-    let mut description = realistic(&library);
+    let mut description = human(&library);
     let worn = |d: &Description| d.items.iter().map(|w| w.id.clone()).collect::<Vec<_>>();
     description = browser::dressed(&description, &library, "outerwear", Some("test/hoodie"));
     description = browser::dressed(&description, &library, "top", Some("test/tee"));
@@ -564,7 +571,7 @@ fn wearing_takes_off_what_conflicts_and_what_its_slots_held() {
 #[test]
 fn a_clothing_tile_shows_its_item_over_what_is_under_it_only() {
     let library = library();
-    let mut description = realistic(&library);
+    let mut description = human(&library);
     description = browser::dressed(&description, &library, "outerwear", Some("test/hoodie"));
     let worn = |d: &Description| d.items.iter().map(|w| w.id.clone()).collect::<Vec<_>>();
     // The tee's picture leaves the hoodie (layer 3 over its 1) off, and
@@ -647,20 +654,24 @@ fn add_items(folder: &Path, items: &[ItemManifest]) {
     .unwrap();
 }
 
-/// Items for the stylized body that use its shipped models: a bob with
-/// highlights, variants and a length, and one with a single colour.
-fn stylized_items() -> Vec<ItemManifest> {
-    let s = &[V1_BASE];
+/// Items for the human base that use its shipped hair models: a bob with
+/// highlights, a variant and a length, and crops with a single colour (one
+/// a draft). The shipped hair models have one material, `Hair`, so the
+/// bob's `HairSecondary` slot is declared only: what the controls and the
+/// description are tested with, with nothing in the model that reads it
+/// (the applier sets a value on whichever part has the material).
+fn hair_items() -> Vec<ItemManifest> {
+    let h = &[DEFAULT_BASE];
     vec![
         item(
             "test/streaked-bob",
             "Streaked bob",
             "groom",
             "hair",
-            s,
+            h,
             r#", "quality": "production", "tags": ["medium"],
-               "groom": { "mesh": { "file": "../humanoid/HumanoidParts.glb",
-                                    "object": "AxcenityHumanoid/Hair_Bob" } },
+               "groom": { "mesh": { "file": "../human/hair/bob01/HairBob01.glb",
+                                    "object": "AxcenityHuman/HairBob01" } },
                "fit": { "method": "shapes", "follows": ["Frame_Feminine"] },
                "materials": [{ "name": "Hair", "shading": "hair", "role": "primary" },
                              { "name": "HairSecondary", "shading": "hair", "role": "secondary",
@@ -675,10 +686,10 @@ fn stylized_items() -> Vec<ItemManifest> {
             "Draft crop",
             "groom",
             "hair",
-            s,
+            h,
             r#", "quality": "draft", "tags": ["short"],
-               "groom": { "mesh": { "file": "../humanoid/HumanoidParts.glb",
-                                    "object": "AxcenityHumanoid/Hair_Crop" } },
+               "groom": { "mesh": { "file": "../human/hair/short01/HairShort01.glb",
+                                    "object": "AxcenityHuman/HairShort01" } },
                "materials": [{ "name": "Hair", "shading": "hair", "role": "primary" }]"#,
         ),
         item(
@@ -686,21 +697,21 @@ fn stylized_items() -> Vec<ItemManifest> {
             "Plain crop",
             "groom",
             "hair",
-            s,
+            h,
             r#", "quality": "production", "tags": ["short"],
-               "groom": { "mesh": { "file": "../humanoid/HumanoidParts.glb",
-                                    "object": "AxcenityHumanoid/Hair_Crop" } },
+               "groom": { "mesh": { "file": "../human/hair/short01/HairShort01.glb",
+                                    "object": "AxcenityHuman/HairShort01" } },
                "materials": [{ "name": "Hair", "shading": "hair", "role": "primary" }]"#,
         ),
     ]
 }
 
-/// A workspace on the stylized body with [`stylized_items`] in its library.
-fn stylized_workspace(name: &str) -> (PathBuf, CharacterWorkspace) {
+/// A workspace on the human base's default character (no hair), with
+/// [`hair_items`] in its library, on the Hair page.
+fn hair_workspace(name: &str) -> (PathBuf, CharacterWorkspace) {
     let folder = test_folder(name);
-    let mut workspace =
-        CharacterWorkspace::open_new(&folder, &Start::Family(V1_BASE.to_owned())).unwrap();
-    add_items(&folder, &stylized_items());
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    add_items(&folder, &hair_items());
     assert!(workspace.library().item("test/streaked-bob").is_some());
     workspace.apply(Intent::PickCategory(Category::Hair));
     (folder, workspace)
@@ -731,7 +742,7 @@ fn pick(id: &str) -> Pick {
 
 #[test]
 fn a_hovered_tile_is_previewed_without_committing_and_a_click_wears_it() {
-    let (folder, mut workspace) = stylized_workspace("browser-preview");
+    let (folder, mut workspace) = hair_workspace("browser-preview");
     let before = workspace.description().clone();
     let dirty = workspace.dirty();
     assert!(!wears(&before, "test/streaked-bob"));
@@ -831,15 +842,19 @@ fn a_hovered_tile_is_previewed_without_committing_and_a_click_wears_it() {
 
 #[test]
 fn drafts_show_only_with_show_drafts_and_say_draft() {
-    let (folder, mut workspace) = stylized_workspace("browser-drafts");
-    // Only an item that says `draft` is one; the shipped stylized
-    // hairstyles (no `quality`, made before the standard) are listed.
+    let (folder, mut workspace) = hair_workspace("browser-drafts");
+    // Only an item that says `draft` is one. The human base's shipped
+    // hairstyles all say so (MakeHuman's, not reviewed yet), so they wait
+    // for "Show drafts" beside the test's own draft; the finished test
+    // items are listed.
     let library = workspace.library();
     assert!(library.item("test/draft-crop").unwrap().is_draft());
-    assert!(!library.item("axcenity/hair-long").unwrap().is_draft());
+    assert!(!library.item("test/plain-crop").unwrap().is_draft());
+    assert!(library.item("makehuman/hair-long01").unwrap().is_draft());
     let texts = draw(&mut workspace, Vec::new());
     assert!(!texts.iter().any(|t| t == "Draft crop"), "{texts:?}");
-    assert!(texts.iter().any(|t| t == "Long"), "{texts:?}");
+    assert!(!texts.iter().any(|t| t == "Long and straight"), "{texts:?}");
+    assert!(texts.iter().any(|t| t == "Plain crop"), "{texts:?}");
     assert!(texts.iter().any(|t| t == "Streaked bob"), "{texts:?}");
     assert!(
         texts
@@ -850,6 +865,7 @@ fn drafts_show_only_with_show_drafts_and_say_draft() {
     workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
     let texts = draw(&mut workspace, Vec::new());
     assert!(texts.iter().any(|t| t == "Draft crop"), "{texts:?}");
+    assert!(texts.iter().any(|t| t == "Long and straight"), "{texts:?}");
     assert!(texts.iter().any(|t| t == "Draft"), "{texts:?}");
     // Turning them off again drops a draft being previewed.
     workspace.apply(Intent::Browse(Browse::Hover(Some(pick("test/draft-crop")))));
@@ -862,7 +878,7 @@ fn drafts_show_only_with_show_drafts_and_say_draft() {
 
 #[test]
 fn the_worn_style_shows_only_the_controls_it_declares() {
-    let (folder, mut workspace) = stylized_workspace("browser-controls");
+    let (folder, mut workspace) = hair_workspace("browser-controls");
     workspace.apply(Intent::Wear {
         slot: "hair".to_owned(),
         item: Some("test/plain-crop".to_owned()),
@@ -909,7 +925,7 @@ fn the_worn_style_shows_only_the_controls_it_declares() {
 
 #[test]
 fn the_worn_items_controls_are_one_undo_step_each() {
-    let (folder, mut workspace) = stylized_workspace("browser-worn");
+    let (folder, mut workspace) = hair_workspace("browser-worn");
     let id = "test/streaked-bob".to_owned();
     workspace.apply(Intent::Wear {
         slot: "hair".to_owned(),
@@ -1004,7 +1020,7 @@ fn the_worn_items_controls_are_one_undo_step_each() {
 
 #[test]
 fn favourites_and_recently_used_are_kept_beside_the_preset_favourites() {
-    let (folder, mut workspace) = stylized_workspace("browser-favourites");
+    let (folder, mut workspace) = hair_workspace("browser-favourites");
     let before = workspace.description().clone();
     let library = workspace.library();
     let preset = workspace
@@ -1049,8 +1065,8 @@ fn favourites_and_recently_used_are_kept_beside_the_preset_favourites() {
 }
 
 #[test]
-fn the_realistic_pages_say_what_they_have() {
-    let folder = test_folder("browser-realistic");
+fn the_pages_say_what_they_have() {
+    let folder = test_folder("browser-pages");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     for (category, shelf) in [
         (Category::Hair, Shelf::Hair),
@@ -1069,7 +1085,7 @@ fn the_realistic_pages_say_what_they_have() {
         );
         let texts = draw(&mut workspace, Vec::new());
         // A page never opens on "Nothing to show" while it has anything:
-        // with only drafts to list (the realistic hairstyles and garments
+        // with only drafts to list (the human base's hairstyles and garments
         // so far), they are listed, marked "Draft", and there is no "Show
         // drafts" to turn on first.
         if listing.finished == 0 && listing.drafts > 0 {
@@ -1107,15 +1123,14 @@ fn the_realistic_pages_say_what_they_have() {
 }
 
 /// With `AXCENITY_SNAPSHOTS` naming a folder: both pages drawn for real at
-/// 1440 by 900, the tiles' pictures drawn first. The realistic Clothing
-/// page has the CO9 test tee imported into the workspace's library (a
-/// draft). Saved as `character-browser-*.png`.
+/// 1440 by 900, the tiles' pictures drawn first. Saved as
+/// `character-browser-*.png`.
 #[test]
 fn the_browsers_are_drawn() {
     let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) else {
         return;
     };
-    let (folder, mut workspace) = stylized_workspace("browser-snapshots");
+    let (folder, mut workspace) = hair_workspace("browser-snapshots");
     workspace.selection.level = super::selection::Level::Detailed;
     let shots: Vec<(&str, Category, Vec<Intent>)> = vec![
         ("hair-drafts-off", Category::Hair, vec![]),
@@ -1133,7 +1148,7 @@ fn the_browsers_are_drawn() {
                     item: Some("test/streaked-bob".to_owned()),
                 },
                 Intent::Browse(Browse::Unfold("test/streaked-bob".to_owned(), true)),
-                Intent::Browse(Browse::Hover(Some(pick("axcenity/hair-long")))),
+                Intent::Browse(Browse::Hover(Some(pick("makehuman/hair-long01")))),
             ],
         ),
         (
@@ -1155,7 +1170,7 @@ fn the_browsers_are_drawn() {
             Category::Clothing,
             vec![Intent::Wear {
                 slot: "top".to_owned(),
-                item: Some("axcenity/tee".to_owned()),
+                item: Some("makehuman/male-casualsuit01".to_owned()),
             }],
         ),
         (
@@ -1177,70 +1192,6 @@ fn the_browsers_are_drawn() {
         }
         snapshot(&snapshots, name, &folder, &mut workspace);
     }
-    let _ = std::fs::remove_dir_all(&folder);
-}
-
-/// With `AXCENITY_SNAPSHOTS`: the realistic Clothing page with the CO9
-/// test tee imported into the workspace's library (a draft), drafts off
-/// and the tee tried on. Ignored: the import takes minutes in a debug
-/// build, past nextest's two; run it with `cargo test -- --ignored`.
-#[test]
-#[ignore = "imports the CO9 test tee: minutes in a debug build"]
-fn the_realistic_clothing_page_is_drawn_with_the_test_tee() {
-    let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) else {
-        return;
-    };
-    let folder = test_folder("browser-snapshots-realistic");
-    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
-    let tee =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../avatar/tests/fixtures/test-tee/TestTee.obj");
-    let imported = axcenity_avatar::fit::import_garment(&axcenity_avatar::fit::ImportRequest {
-        source: tee,
-        library: folder.join(LIBRARY_FOLDER),
-        base: DEFAULT_BASE.to_owned(),
-        id: "imported/test-tee".to_owned(),
-        label: "Test tee".to_owned(),
-        folder: "imported/test-tee".to_owned(),
-        source_info: axcenity_avatar::Source {
-            author: "Axcenity Engine contributors".to_owned(),
-            licence: "CC0-1.0".to_owned(),
-            url: None,
-        },
-        slot: None,
-        layer: None,
-        margin: 0.002,
-        under: vec!["axcenity/realistic-sports-bra".to_owned()],
-        about: Some("The fitting test garment (CO9): a draft.".to_owned()),
-        finish_pose: None,
-        also_fills: Vec::new(),
-        tags: Vec::new(),
-        limitations: Vec::new(),
-        home_frame: axcenity_avatar::fit::HomeFrame::Masculine,
-        proxy_kind: axcenity_avatar::fit::ProxyKind::Body,
-        sleeveless: false,
-        skip_align: false,
-        generate_shrink_under: true,
-        strict_validate: false,
-        texture_size: None,
-    });
-    assert!(imported.is_ok(), "{:?}", imported.err());
-    workspace.apply(Intent::PickCategory(Category::Clothing));
-    snapshot(
-        &snapshots,
-        "realistic-clothing-drafts-off",
-        &folder,
-        &mut workspace,
-    );
-    workspace.apply(Intent::Browse(Browse::Hover(Some(Pick {
-        slot: "top".to_owned(),
-        item: Some("imported/test-tee".to_owned()),
-    }))));
-    snapshot(
-        &snapshots,
-        "realistic-clothing-preview",
-        &folder,
-        &mut workspace,
-    );
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -1286,7 +1237,7 @@ fn snapshot(snapshots: &Path, name: &str, folder: &Path, workspace: &mut Charact
 fn keeping_a_held_version_ends_a_tile_preview() {
     // Review fix 1: Keep A replaces the description, so a tile tried on
     // the character before it must not stay in the viewport.
-    let (folder, mut workspace) = stylized_workspace("browser-keep-held");
+    let (folder, mut workspace) = hair_workspace("browser-keep-held");
     workspace.apply(Intent::Capture);
     workspace.apply(Intent::SetParameter {
         id: "height".to_owned(),
@@ -1335,7 +1286,7 @@ fn esc_ends_a_hover_preview_while_the_pointer_stays_on_its_tile() {
     // Review fix 1: the pointer is still on the tile after Esc; the
     // preview must not come back with the panel hovering that tile again
     // next frame.
-    let (folder, mut workspace) = stylized_workspace("browser-esc-hover");
+    let (folder, mut workspace) = hair_workspace("browser-esc-hover");
     let before = workspace.description().clone();
     let ctx = theme::test_context();
     frame_in(&ctx, &mut workspace, Vec::new());
@@ -1454,13 +1405,14 @@ fn clicking_a_tile_wears_it_and_the_still_pointer_previews_nothing_else() {
     // still holds: the worn item's line pushes the tiles down under the
     // still pointer, and the tile that comes under it must not be
     // previewed in the clicked one's place.
-    let (folder, mut workspace) = stylized_workspace("browser-click-top");
+    let (folder, mut workspace) = hair_workspace("browser-click-top");
     workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
     let before = workspace.description().clone();
     let ctx = theme::test_context();
     frame_in(&ctx, &mut workspace, Vec::new());
     let output = frame_in(&ctx, &mut workspace, Vec::new());
-    let long = text_at(&output, "Long").expect("the Long tile is drawn");
+    // (The shipped styles: "Long and straight" is the tile under "Bob".)
+    let long = text_at(&output, "Long and straight").expect("the Long tile is drawn");
     let bob = text_at(&output, "Bob").expect("the Bob tile is drawn");
     assert!(long.y > bob.y + 50.0, "Long is in a lower row than Bob");
     // A point near the top of Long's tile: a row's pitch above its label
@@ -1470,14 +1422,14 @@ fn clicking_a_tile_wears_it_and_the_still_pointer_previews_nothing_else() {
     frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(at)]);
     assert_eq!(
         hair_of(&workspace, workspace.shown()).as_deref(),
-        Some("axcenity/hair-long"),
+        Some("makehuman/hair-long01"),
         "the point is on the Long tile: hovered, it is previewed"
     );
     assert_eq!(*workspace.description(), before, "and not worn yet");
     click_and_hold_still(&ctx, &mut workspace, at);
     assert_eq!(
         hair_of(&workspace, workspace.description()).as_deref(),
-        Some("axcenity/hair-long"),
+        Some("makehuman/hair-long01"),
         "the click wore Long"
     );
     assert_eq!(undo_depth(&workspace), 1, "as one undo step");
@@ -1496,7 +1448,7 @@ fn clicking_a_tile_wears_it_and_the_still_pointer_previews_nothing_else() {
     });
     assert_eq!(
         hair_of(&workspace, workspace.shown()).as_deref(),
-        Some("axcenity/hair-long")
+        Some("makehuman/hair-long01")
     );
     workspace.apply(Intent::Undo);
     workspace.apply(Intent::Undo);
@@ -1510,11 +1462,11 @@ fn clicking_the_worn_tile_takes_it_off_and_previews_nothing() {
     // couldn't be clicked off). The tiles move up under the still pointer
     // when its line goes: nothing may be previewed, least of all the tile
     // just taken off.
-    let (folder, mut workspace) = stylized_workspace("browser-click-worn");
+    let (folder, mut workspace) = hair_workspace("browser-click-worn");
     workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
     workspace.apply(Intent::Wear {
         slot: "hair".to_owned(),
-        item: Some("axcenity/hair-bob".to_owned()),
+        item: Some("makehuman/hair-bob01".to_owned()),
     });
     let before = workspace.description().clone();
     let ctx = theme::test_context();
@@ -1563,17 +1515,17 @@ fn clicking_the_worn_tile_takes_it_off_and_previews_nothing() {
 
 #[test]
 fn a_second_click_on_a_tile_takes_it_off_again() {
-    let (folder, mut workspace) = stylized_workspace("browser-click-again");
+    let (folder, mut workspace) = hair_workspace("browser-click-again");
     workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
     let before = workspace.description().clone();
     let ctx = theme::test_context();
     frame_in(&ctx, &mut workspace, Vec::new());
     let output = frame_in(&ctx, &mut workspace, Vec::new());
-    let long = text_at(&output, "Long").expect("the Long tile is drawn");
+    let long = text_at(&output, "Long and straight").expect("the Long tile is drawn");
     click_and_hold_still(&ctx, &mut workspace, long);
     assert_eq!(
         hair_of(&workspace, workspace.description()).as_deref(),
-        Some("axcenity/hair-long")
+        Some("makehuman/hair-long01")
     );
     // Its line above the tiles says it is worn, with the way to take it
     // off there too.
@@ -1587,7 +1539,7 @@ fn a_second_click_on_a_tile_takes_it_off_again() {
         frame_in(&ctx, &mut workspace, Vec::new());
     }
     let output = frame_in(&ctx, &mut workspace, Vec::new());
-    let long = text_at(&output, "Long").expect("the Long tile is still drawn");
+    let long = text_at(&output, "Long and straight").expect("the Long tile is still drawn");
     click_and_hold_still(&ctx, &mut workspace, long);
     assert_eq!(hair_of(&workspace, workspace.description()), None);
     assert_eq!(workspace.shown(), workspace.description());
@@ -1621,7 +1573,7 @@ fn text_where(output: &egui::FullOutput, wanted: impl Fn(&str) -> bool) -> Optio
 /// differ from what the page opens with.
 #[test]
 fn the_filters_are_a_menu_whose_button_counts_what_is_changed() {
-    let (folder, mut workspace) = stylized_workspace("browser-filters-menu");
+    let (folder, mut workspace) = hair_workspace("browser-filters-menu");
     let before = workspace.description().clone();
     let ctx = theme::test_context();
     frame_in(&ctx, &mut workspace, Vec::new());
@@ -1759,7 +1711,7 @@ fn a_worn_garment_stays_on_while_the_body_is_dragged() {
     use super::stage::ViewPreset;
     let folder = test_folder("browser-worn-drag");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
-    // A garment of the realistic library, whichever it ships first (they
+    // A garment of the shipped library, whichever it lists first (they
     // are drafts so far, listed all the same).
     let (slot, item) = {
         let library = workspace.library();
@@ -1775,7 +1727,7 @@ fn a_worn_garment_stays_on_while_the_body_is_dragged() {
         let entry = listing
             .entries
             .first()
-            .expect("the realistic library has a garment to wear");
+            .expect("the shipped library has a garment to wear");
         (entry.item.slot.clone(), entry.item.id.clone())
     };
     // Worn as the Clothing page wears it: a click on its tile.
@@ -1804,48 +1756,77 @@ fn a_worn_garment_stays_on_while_the_body_is_dragged() {
     assert!(!mesh.is_empty());
     let mut keys = vec![garment_is_worn(&workspace, &item, part, &mesh, "worn")];
 
-    // The body's page, the waist picked: its slider, driven by the
-    // pointer as a person drags it.
+    // The body's page at Detailed: two of its sliders, each driven by the
+    // pointer as a person drags it. On the human base the body's fat is
+    // shapes, so every step of its drag is a new identity, which the
+    // garment wears as the body does. The waist's width (a proportion,
+    // what Paul dragged) is a size of the skeleton the garment is drawn
+    // on, not a shape: the garment stays on through its drag all the same.
     workspace.apply(Intent::PickCategory(Category::Body));
-    workspace.apply(Intent::PickFeature(Some("waist".to_owned())));
+    workspace.apply(Intent::PickLevel(super::selection::Level::Detailed));
     workspace.apply(Intent::FocusView(ViewPreset::Front));
     let ctx = theme::test_context();
-    for _ in 0..3 {
-        frame_in(&ctx, &mut workspace, Vec::new());
+    for (group, row, past, reshapes) in [
+        ("build", "fat", 0.3, true),
+        ("proportions", "waist_width", 1.05, false),
+    ] {
+        workspace.apply(Intent::PickFeature(Some(group.to_owned())));
+        for _ in 0..3 {
+            frame_in(&ctx, &mut workspace, Vec::new());
+        }
+        keys.push(garment_is_worn(&workspace, &item, part, &mesh, "on Body"));
+        let from = numeric::track_rect(&ctx, row)
+            .unwrap_or_else(|| panic!("{row}'s row is drawn"))
+            .center();
+        frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(from)]);
+        frame_in(&ctx, &mut workspace, vec![button_at(from, true)]);
+        for step in 1..=4 {
+            let at = from + egui::vec2(2.0 + 6.0 * step as f32, 0.0);
+            frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(at)]);
+            assert!(
+                workspace.dragging(),
+                "{row}, step {step}: the drag is going on"
+            );
+            let key = garment_is_worn(&workspace, &item, part, &mesh, "during the slider drag");
+            if reshapes {
+                assert_ne!(
+                    Some(&key),
+                    keys.last(),
+                    "{row}, step {step}: a new identity"
+                );
+            }
+            keys.push(key);
+        }
+        let end = from + egui::vec2(26.0, 0.0);
+        frame_in(&ctx, &mut workspace, vec![button_at(end, false)]);
+        for _ in 0..3 {
+            frame_in(&ctx, &mut workspace, Vec::new());
+        }
+        assert!(!workspace.dragging());
+        assert!(workspace.parameter(row) > past, "{row} moved");
+        garment_is_worn(&workspace, &item, part, &mesh, "after the slider drag");
     }
-    keys.push(garment_is_worn(&workspace, &item, part, &mesh, "on Body"));
-    let from = numeric::track_rect(&ctx, "waist_width")
-        .expect("the waist's row is drawn")
-        .center();
-    frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(from)]);
-    frame_in(&ctx, &mut workspace, vec![button_at(from, true)]);
-    // (A little: at its widest the waist's handles are behind the arms.)
-    for step in 1..=4 {
-        let at = from + egui::vec2(2.0 + 6.0 * step as f32, 0.0);
-        frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(at)]);
-        assert!(workspace.dragging(), "step {step}: the drag is going on");
-        let key = garment_is_worn(&workspace, &item, part, &mesh, "during the slider drag");
-        assert_ne!(Some(&key), keys.last(), "step {step}: a new identity");
-        keys.push(key);
-    }
-    let end = from + egui::vec2(26.0, 0.0);
-    frame_in(&ctx, &mut workspace, vec![button_at(end, false)]);
-    for _ in 0..3 {
-        frame_in(&ctx, &mut workspace, Vec::new());
-    }
-    assert!(!workspace.dragging());
-    assert!(workspace.parameter("waist_width") > 1.05, "the waist moved");
-    garment_is_worn(&workspace, &item, part, &mesh, "after the slider drag");
-    assert_eq!(undo_depth(&workspace), 2, "the garment, then the waist");
+    assert_eq!(
+        undo_depth(&workspace),
+        3,
+        "the garment, the body's fat, then the waist"
+    );
 
-    // A handle on the character, dragged the same way: 24 points against
-    // the direction that widens what it drives (well past the handle's
-    // dead zone).
+    // A handle on the character, dragged the same way (the human base's
+    // handles are on the face: the nose's tip): 24 points against the
+    // direction that raises what it drives (well past the handle's dead
+    // zone).
+    workspace.apply(Intent::PickCategory(Category::Face));
+    workspace.apply(Intent::PickFeature(Some("nose".to_owned())));
+    workspace.apply(Intent::FocusView(ViewPreset::Face));
+    for _ in 0..3 {
+        frame_in(&ctx, &mut workspace, Vec::new());
+    }
     let from = workspace
-        .handle_on_screen("waist_left")
-        .expect("the waist's handle is shown");
+        .handle_on_screen("nose_tip")
+        .expect("the nose's handle is shown");
     let (driven, screen) = workspace
-        .handle_drives_on_screen("waist_left")
+        .handle_drives_on_screen("nose_tip")
         .first()
         .cloned()
         .expect("the handle drives a parameter");
@@ -1971,7 +1952,7 @@ fn the_clothing_page_lists_the_garments_cut_for_the_characters_frame() {
         ids
     };
     // The default body is the masculine frame.
-    let mut description = realistic(&library);
+    let mut description = human(&library);
     assert_eq!(
         browser::feminine_body(&description, library.base(DEFAULT_BASE).unwrap()),
         Some(false)

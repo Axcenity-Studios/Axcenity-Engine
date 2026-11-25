@@ -460,9 +460,10 @@ fn preset_chips(
     intents
 }
 
-/// The body families (plan section 0, decision 7): realistic first, the
-/// default, and stylized. The one the character is on is lit; another
-/// starts again on that body as one undo step.
+/// The body families, when the library has more than the engine's one
+/// (packages of a person's own, or an older library's): the default
+/// first. The one the character is on is lit; another starts again on
+/// that body as one undo step. With one family nothing is drawn.
 fn base_picker(
     ui: &mut egui::Ui,
     workspace: &CharacterWorkspace,
@@ -471,6 +472,9 @@ fn base_picker(
     let mut intents = Vec::new();
     let current = &workspace.description().base;
     let families = presets::families(library);
+    if families.len() < 2 {
+        return intents;
+    }
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
         widgets::section_label(ui, "Family");

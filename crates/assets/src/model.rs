@@ -251,8 +251,9 @@ pub struct Primitive {
     /// One per position, or empty: the body region each corner belongs to,
     /// for a character's body whose build stores its region map in the
     /// second set of texture coordinates (`TEXCOORD_1`, `u = (index + 0.5)
-    /// / 16`, `v = 0.5`; `assets/characters/realistic/README.md`, "Body
-    /// regions"). Picking on the character reads it (refinement R2). A
+    /// / 16`, `v = 0.5`, as the retired realistic base's build wrote it;
+    /// the human base keeps its regions in an image beside the model
+    /// instead). Picking on the character reads it (refinement R2). A
     /// second set that isn't such a map (a lightmap's) leaves it empty.
     pub regions: Vec<u8>,
     /// One per position, or empty: for a garment fitted to a character's
