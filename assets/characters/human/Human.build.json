@@ -2652,6 +2652,298 @@
    -0.00248
   ]
  },
+ "skins": {
+  "choices": [
+   {
+    "value": 0,
+    "id": "african",
+    "label": "African"
+   },
+   {
+    "value": 1,
+    "id": "asian",
+    "label": "Asian"
+   },
+   {
+    "value": 2,
+    "id": "caucasian",
+    "label": "Caucasian"
+   },
+   {
+    "value": 3,
+    "id": "caucasian_2",
+    "label": "Caucasian 2"
+   },
+   {
+    "value": 4,
+    "id": "bodysuit",
+    "label": "Bodysuit"
+   }
+  ],
+  "default": 2,
+  "last_random": 3,
+  "maps": [
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_african_male.jpg",
+    "at": {
+     "skin": 0,
+     "frame": 0.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_african_female.jpg",
+    "at": {
+     "skin": 0,
+     "frame": 1.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/middleage_african_male.jpg",
+    "at": {
+     "skin": 0,
+     "frame": 0.0,
+     "age": 0.5
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/middleage_african_female.jpg",
+    "at": {
+     "skin": 0,
+     "frame": 1.0,
+     "age": 0.5
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/old_african_male.jpg",
+    "at": {
+     "skin": 0,
+     "frame": 0.0,
+     "age": 1.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/old_african_female.jpg",
+    "at": {
+     "skin": 0,
+     "frame": 1.0,
+     "age": 1.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_asian_male.jpg",
+    "at": {
+     "skin": 1,
+     "frame": 0.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_asian_female.jpg",
+    "at": {
+     "skin": 1,
+     "frame": 1.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/middleage_asian_male.jpg",
+    "at": {
+     "skin": 1,
+     "frame": 0.0,
+     "age": 0.5
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/middleage_asian_female.jpg",
+    "at": {
+     "skin": 1,
+     "frame": 1.0,
+     "age": 0.5
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/old_asian_male.jpg",
+    "at": {
+     "skin": 1,
+     "frame": 0.0,
+     "age": 1.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/old_asian_female.jpg",
+    "at": {
+     "skin": 1,
+     "frame": 1.0,
+     "age": 1.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_male.jpg",
+    "at": {
+     "skin": 2,
+     "frame": 0.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_female.jpg",
+    "at": {
+     "skin": 2,
+     "frame": 1.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/middleage_caucasian_male.jpg",
+    "at": {
+     "skin": 2,
+     "frame": 0.0,
+     "age": 0.5
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/middleage_caucasian_female.jpg",
+    "at": {
+     "skin": 2,
+     "frame": 1.0,
+     "age": 0.5
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/old_caucasian_male.jpg",
+    "at": {
+     "skin": 2,
+     "frame": 0.0,
+     "age": 1.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/old_caucasian_female.jpg",
+    "at": {
+     "skin": 2,
+     "frame": 1.0,
+     "age": 1.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_male2.jpg",
+    "at": {
+     "skin": 3,
+     "frame": 0.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_male_special_suit.jpg",
+    "at": {
+     "skin": 4,
+     "frame": 0.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_male_special_suit.jpg",
+    "at": {
+     "skin": 4,
+     "frame": 0.0,
+     "age": 0.5
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_male_special_suit.jpg",
+    "at": {
+     "skin": 4,
+     "frame": 0.0,
+     "age": 1.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_female2.jpg",
+    "at": {
+     "skin": 3,
+     "frame": 1.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_female_special_suit.jpg",
+    "at": {
+     "skin": 4,
+     "frame": 1.0,
+     "age": 0.0
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_female_special_suit.jpg",
+    "at": {
+     "skin": 4,
+     "frame": 1.0,
+     "age": 0.5
+    }
+   },
+   {
+    "material": "Skin",
+    "colour_map": "skins/young_caucasian_female_special_suit.jpg",
+    "at": {
+     "skin": 4,
+     "frame": 1.0,
+     "age": 1.0
+    }
+   }
+  ],
+  "files": [
+   "skins/middleage_african_female.jpg",
+   "skins/middleage_african_male.jpg",
+   "skins/middleage_asian_female.jpg",
+   "skins/middleage_asian_male.jpg",
+   "skins/middleage_caucasian_female.jpg",
+   "skins/middleage_caucasian_male.jpg",
+   "skins/old_african_female.jpg",
+   "skins/old_african_male.jpg",
+   "skins/old_asian_female.jpg",
+   "skins/old_asian_male.jpg",
+   "skins/old_caucasian_female.jpg",
+   "skins/old_caucasian_male.jpg",
+   "skins/young_african_female.jpg",
+   "skins/young_african_male.jpg",
+   "skins/young_asian_female.jpg",
+   "skins/young_asian_male.jpg",
+   "skins/young_caucasian_female.jpg",
+   "skins/young_caucasian_female2.jpg",
+   "skins/young_caucasian_female_special_suit.jpg",
+   "skins/young_caucasian_male.jpg",
+   "skins/young_caucasian_male2.jpg",
+   "skins/young_caucasian_male_special_suit.jpg"
+  ],
+  "left_out": []
+ },
  "added_bones": [
   {
    "name": "LeftUpperArmTwist",

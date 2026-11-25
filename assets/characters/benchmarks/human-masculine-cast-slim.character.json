@@ -5,7 +5,8 @@
   "parameters": {
     "fat": -0.6,
     "frame": 0,
-    "muscle": -0.2
+    "muscle": -0.2,
+    "skin": 1
   },
   "items": [
     {

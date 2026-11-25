@@ -82,7 +82,7 @@ pub fn randomize(
         let value = if parameter.choices.is_empty() {
             draw(&mut rng, parameter.range, parameter.random)
         } else {
-            parameter.choices[rng.below(parameter.choices.len())].value
+            draw_choice(&mut rng, &parameter.choices, parameter.random)
         };
         out.parameters.insert(parameter.id.clone(), value);
     }
@@ -281,6 +281,22 @@ fn draw_items(
     }
 }
 
+/// One of `choices`' values. With a `random` span, one of those inside it
+/// (a skin painted as a costume is offered, not drawn); all of them when
+/// there is none or none is inside.
+fn draw_choice(rng: &mut Rng, choices: &[crate::Choice], random: Option<[f32; 2]>) -> f32 {
+    let drawn: Vec<f32> = choices
+        .iter()
+        .map(|choice| choice.value)
+        .filter(|value| random.is_none_or(|[a, b]| (a.min(b)..=a.max(b)).contains(value)))
+        .collect();
+    if drawn.is_empty() {
+        choices[rng.below(choices.len())].value
+    } else {
+        drawn[rng.below(drawn.len())]
+    }
+}
+
 /// `item` worn with a random variant and random values for its own
 /// parameters.
 fn draw_item(rng: &mut Rng, item: &ItemManifest) -> WornItem {
@@ -293,7 +309,7 @@ fn draw_item(rng: &mut Rng, item: &ItemManifest) -> WornItem {
         let value = if parameter.choices.is_empty() {
             draw(rng, parameter.range, parameter.random)
         } else {
-            parameter.choices[rng.below(parameter.choices.len())].value
+            draw_choice(rng, &parameter.choices, parameter.random)
         };
         worn.parameters.insert(parameter.id.clone(), value);
     }

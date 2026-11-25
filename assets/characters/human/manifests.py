@@ -36,6 +36,9 @@ GROUPS = [
     {"id": "build", "label": "Build", "category": "body"},
     {"id": "proportions", "label": "Proportions", "category": "body"},
 ]
+# The Skin and Makeup page: the skin choice (`skins.py`).
+SKIN_GROUP = {"id": "skin", "label": "Skin", "category": "skin",
+              "about": "The photographed skin the body wears."}
 # The face's pages, in order (`face.SECTIONS`).
 FACE_GROUPS = [
     {"id": "face_shape", "label": "Face shape", "category": "face"},
@@ -129,8 +132,10 @@ def base_manifest(data):
          "about": "How much muscle the whole body carries, from slight to strong."},
         {"id": "fat", "label": "Body fat", "group": "build", "range": [-1, 1], "level": "quick",
          "about": "How much fat the whole body carries, from lean to heavy."},
-        {"id": "age", "label": "Age", "group": "build", "range": [0, 1], "level": "quick",
-         "about": "How old the body looks, from a young adult to an old one."},
+        # Randomize draws any age (by default it would keep to the middle half
+        # of the slider, and so to the middle-aged skins: `skins.AGES`).
+        {"id": "age", "label": "Age", "group": "build", "range": [0, 1], "level": "quick", "random": [0, 1],
+         "about": "How old the body looks, from a young adult to an old one. The skin ages with it."},
     ]
     for pid, label, attribute, span, level, about in PROPORTIONS:
         parameters.append({"id": pid, "label": label, "group": "proportions", "range": list(span),
@@ -153,6 +158,21 @@ def base_manifest(data):
         if bones:
             p["bones"] = bones
         parameters.append(p)
+    # The skin (ADR-0048): one choice a person makes. Which of its skins
+    # is drawn follows the body type and the age (`material_maps`).
+    skins = data.get("skins", {})
+    if skins.get("maps"):
+        parameters.append({
+            "id": "skin", "label": "Skin", "group": "skin", "level": "quick",
+            "range": [skins["choices"][0]["value"], skins["choices"][-1]["value"]],
+            "default": skins["default"],
+            # Randomize draws the photographed skins, not the painted bodysuit.
+            "random": [skins["choices"][0]["value"], skins["last_random"]],
+            "about": "The skin the body wears, one of MakeHuman's photographed skins. "
+                     "It is the male or the female one with the body type, and the young, "
+                     "middle-aged or old one with Age.",
+            "choices": [{"value": c["value"], "label": c["label"]} for c in skins["choices"]],
+        })
     for p in parameters:
         p["advanced"] = p["level"] == "advanced"
     parts = [f"{ARMATURE}/{name}" for name in data["objects"] if name != "Body"]
@@ -166,7 +186,7 @@ def base_manifest(data):
         "model": {"file": PARTS_FILE, "body": f"{ARMATURE}/Body", "parts": parts, "regions_map": REGIONS_MAP},
         "skeleton": {"convention": "humanoid", "height": 1.75, "pose": "a-pose-45",
                      "added_bones": data["added_bones"]},
-        "groups": GROUPS + [g for g in FACE_GROUPS
+        "groups": GROUPS + [g for g in FACE_GROUPS + [SKIN_GROUP]
                             if any(p["group"] == g["id"] for p in parameters)],
         "parameters": parameters,
         "corners": corners(shapes),
@@ -177,6 +197,7 @@ def base_manifest(data):
                       for name in sorted(data["materials"])],
         "face": {"profile": "axcenity", "eye_bones": ["LeftEye", "RightEye"], "jaw_bone": "Jaw"},
         "defaults": {"items": MALE_WEARS},
+        **({"material_maps": skins["maps"]} if skins.get("maps") else {}),
     }
 
 

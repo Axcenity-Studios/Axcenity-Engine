@@ -169,6 +169,10 @@ impl Library {
         for (id, base) in &self.bases {
             problems.extend(prefixed(id, base.validate()));
             self.check_inside(&mut problems, id, "model.file", &base.model.file);
+            for (index, map) in base.material_maps.iter().enumerate() {
+                let at = format!("material_maps[{index}].colour_map");
+                self.check_inside(&mut problems, id, &at, &map.colour_map);
+            }
         }
         for (id, item) in &self.items {
             problems.extend(prefixed(id, item.validate()));

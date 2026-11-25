@@ -739,3 +739,110 @@ fn a_grafted_model_is_the_shipped_one_with_its_new_shapes_last() {
         "the realistic body has no `grafted_shapes` record: was it built over?"
     );
 }
+
+/// ADR-0048: every colour map a shipped base offers is an image the
+/// engine reads, all of a material the same size; and the human base's
+/// skins are MakeHuman's 22, each drawn by the characters it was made for:
+/// the sex of the skin follows the body type, its age the Age slider, and
+/// Randomize never draws the painted bodysuit.
+#[test]
+fn the_human_bases_skins_follow_the_body_type_and_the_age() {
+    use axcenity_avatar::{Scope, randomize, resolve};
+    let library = read();
+    let assets = axcenity_assets::Assets::new(root());
+    for (id, base) in &library.bases {
+        let mut sizes: BTreeMap<&str, (u32, u32)> = BTreeMap::new();
+        for map in &base.material_maps {
+            let path = library.path_of(id, &map.colour_map).unwrap();
+            let image = assets
+                .texture(&path)
+                .unwrap_or_else(|| panic!("{path}: {:?}", assets.take_errors()));
+            let size = (image.width, image.height);
+            assert_eq!(*sizes.entry(&map.material).or_insert(size), size, "{path}");
+        }
+    }
+
+    let human = library.base("axcenity/human").expect("shipped");
+    let files: std::collections::BTreeSet<&str> = human
+        .material_maps
+        .iter()
+        .map(|map| map.colour_map.as_str())
+        .collect();
+    assert_eq!(files.len(), 22, "MakeHuman's textured skins");
+    let skin = |values: &[(&str, f32)]| {
+        let mut character = Description::new("Skin", "axcenity/human");
+        for (id, value) in values {
+            character.parameters.insert((*id).to_owned(), *value);
+        }
+        let resolved = resolve(&library, &character).unwrap();
+        assert_eq!(resolved.colour_maps.len(), 1);
+        resolved.colour_maps["Skin"].clone()
+    };
+    // The default character: the model file's own skin, as a map.
+    assert_eq!(skin(&[]), "human/skins/young_caucasian_male.jpg");
+    assert_eq!(
+        skin(&[("frame", 1.0)]),
+        "human/skins/young_caucasian_female.jpg"
+    );
+    for (choice, tone) in [(0.0, "african"), (1.0, "asian"), (2.0, "caucasian")] {
+        for (frame, sex) in [(0.0, "male"), (1.0, "female")] {
+            // Young up to a quarter of the Age slider, old from three
+            // quarters, middle-aged between.
+            for (age, word) in [
+                (0.0, "young"),
+                (0.2, "young"),
+                (0.3, "middleage"),
+                (0.7, "middleage"),
+                (0.8, "old"),
+                (1.0, "old"),
+            ] {
+                assert_eq!(
+                    skin(&[("skin", choice), ("frame", frame), ("age", age)]),
+                    format!("human/skins/{word}_{tone}_{sex}.jpg"),
+                );
+            }
+        }
+    }
+    // The second Caucasian pair is young only: older, the first pair's.
+    assert_eq!(
+        skin(&[("skin", 3.0), ("frame", 1.0)]),
+        "human/skins/young_caucasian_female2.jpg"
+    );
+    assert_eq!(
+        skin(&[("skin", 3.0), ("age", 0.3)]),
+        "human/skins/young_caucasian_male2.jpg"
+    );
+    assert_eq!(
+        skin(&[("skin", 3.0), ("age", 0.6)]),
+        "human/skins/middleage_caucasian_male.jpg"
+    );
+    assert_eq!(
+        skin(&[("skin", 3.0), ("age", 1.0)]),
+        "human/skins/old_caucasian_male.jpg"
+    );
+    // The bodysuit is painted on: it stays on at every age.
+    for age in [0.0, 0.5, 1.0] {
+        assert_eq!(
+            skin(&[("skin", 4.0), ("frame", 1.0), ("age", age)]),
+            "human/skins/young_caucasian_female_special_suit.jpg"
+        );
+    }
+
+    let start = Description::new("Npc", "axcenity/human");
+    let mut drawn: std::collections::BTreeSet<String> = Default::default();
+    for seed in 0..1000 {
+        let character = randomize(&start, &Scope::All, &Default::default(), seed, &library);
+        assert!(character.parameters["skin"] <= 3.0, "seed {seed}");
+        drawn.extend(
+            resolve(&library, &character)
+                .unwrap()
+                .colour_maps
+                .into_values(),
+        );
+    }
+    assert_eq!(
+        drawn.len(),
+        20,
+        "every photographed skin is drawn: {drawn:?}"
+    );
+}

@@ -6,7 +6,8 @@ use axcenity_assets::{
     ModelMaterial, Shading as FileShading, StandardMaterial,
 };
 use axcenity_core::{
-    ClassName, Instance, InstanceId, TextureChannel, Value, World, material_value_attribute,
+    ClassName, Instance, InstanceId, MATERIAL_COLOUR_MAP, TextureChannel, Value, World,
+    material_value_attribute,
 };
 use axcenity_render::glam::Mat4;
 use axcenity_render::{
@@ -253,6 +254,27 @@ pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str)
                 skin.layers = None;
             }
         }
+    }
+}
+
+/// A character's colour map for the material named `name` (the attribute
+/// `Mat_<name>_colour_map`, a texture file in the project: ADR-0048), drawn
+/// in place of the model file's own. Everything else of the material stays:
+/// its other maps, its shading and its values, so the image is laid out as
+/// the file's own colour map is. Until the image is read, and if it can't
+/// be, the file's own is drawn.
+pub(crate) fn colour_map(
+    material: &mut Material,
+    instance: &Instance,
+    name: &str,
+    assets: &Assets,
+) {
+    let path = instance
+        .attribute(&material_value_attribute(name, MATERIAL_COLOUR_MAP))
+        .and_then(Value::as_str)
+        .filter(|path| !path.is_empty());
+    if let Some(image) = path.and_then(|path| assets.texture(path)) {
+        material.base_color_texture = Some(texture(&image));
     }
 }
 

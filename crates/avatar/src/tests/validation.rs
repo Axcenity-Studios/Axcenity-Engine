@@ -237,3 +237,47 @@ fn a_description_with_mistakes_reports_each() {
     assert_problem(&lost.validate(&library), &["base", "test/nobody"]);
     assert_problem(&lost.validate(&Library::new()), &["base"]);
 }
+
+/// ADR-0048: a colour map names a material and parameters the base has,
+/// inside their ranges, an image inside the library, and values no
+/// earlier map of its material has.
+#[test]
+fn a_colour_map_with_mistakes_reports_each() {
+    let map = |material: &str, file: &str, at: &[(&str, f32)]| crate::MaterialMap {
+        material: material.to_owned(),
+        colour_map: file.to_owned(),
+        at: at
+            .iter()
+            .map(|(id, value)| ((*id).to_owned(), *value))
+            .collect(),
+    };
+    let mut base = fixtures::base();
+    base.material_maps = vec![
+        map("Skin", "skins/a.jpg", &[("frame", 0.0)]),
+        map("Skin", "skins/b.jpg", &[("frame", 0.0)]),
+        map("Scales", "skins/c.jpg", &[("frame", 1.0)]),
+        map("Skin", "skins/d.jpg", &[("frame", 3.0)]),
+        map("Skin", "skins/e.jpg", &[("moult", 0.5)]),
+        map("Skin", "..\\f.jpg", &[("frame", 0.5)]),
+    ];
+    let problems = base.validate();
+    assert_eq!(problems.len(), 5, "{:#?}", texts(&problems));
+    assert_problem(&problems, &["material_maps[1]", "same values", "Skin"]);
+    assert_problem(&problems, &["material_maps[2]", "no material", "Scales"]);
+    assert_problem(
+        &problems,
+        &["material_maps[3]", "frame", "outside its range"],
+    );
+    assert_problem(&problems, &["material_maps[4]", "no parameter", "moult"]);
+    assert_problem(&problems, &["material_maps[5].colour_map", "relative path"]);
+
+    // A map that leads out of the library is the library's to find.
+    let mut base = fixtures::base();
+    base.material_maps = vec![map("Skin", "../../elsewhere/skin.jpg", &[("frame", 0.0)])];
+    let mut library = fixtures::library();
+    library.add_base("test/Body.base.json", base);
+    assert_problem(
+        &library.validate(),
+        &["material_maps[0].colour_map", "leads out of the library"],
+    );
+}

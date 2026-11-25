@@ -6,7 +6,8 @@
     "fat": 0.1,
     "frame": 1,
     "muscle": 0.9,
-    "shoulder_width": 1.05
+    "shoulder_width": 1.05,
+    "skin": 3
   },
   "items": [
     {

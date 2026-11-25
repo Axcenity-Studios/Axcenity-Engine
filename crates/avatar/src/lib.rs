@@ -55,7 +55,8 @@ pub use library::{LIBRARY_FOLDER, Library};
 pub use manifest::{
     AddedBone, Anchor, AttributeDriver, BASE_VERSION, BaseManifest, BaseModel, BoneDriver,
     Category, Choice, Constraint, Corner, Defaults, Drive, Face, Factor, Feature, FrameDrive,
-    Group, Handle, Level, MaterialDriver, Parameter, Region, ShapeDriver, Skeleton, Slot, Socket,
+    Group, Handle, Level, MaterialDriver, MaterialMap, Parameter, Region, ShapeDriver, Skeleton,
+    Slot, Socket,
 };
 pub use material::{
     Colour, MaterialRole, MaterialSlot, MaterialValue, MaterialValues, ShadingModel, ValueKind,

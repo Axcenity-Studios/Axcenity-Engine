@@ -139,6 +139,19 @@ pub fn add_character_packages(project: &Path, from: &Path) -> Result<Vec<String>
         if let Some(map) = map.and_then(|map| shipped.path_of(id, map)) {
             copied |= copy(&map)?;
         }
+        // The colour maps its materials can draw (its skins: ADR-0048).
+        let mut maps: Vec<&str> = base
+            .material_maps
+            .iter()
+            .map(|map| map.colour_map.as_str())
+            .collect();
+        maps.sort_unstable();
+        maps.dedup();
+        for map in maps {
+            if let Some(map) = shipped.path_of(id, map) {
+                copied |= copy(&map)?;
+            }
+        }
         if copied || library.base(id) != Some(base) {
             library.add_base(manifest, base.clone());
             added.push(id.clone());
@@ -332,6 +345,21 @@ mod tests {
             );
         }
         assert!(library.validate().is_empty(), "{:?}", library.validate());
+        // A base's colour maps (the human base's skins, ADR-0048) come
+        // with it: a character whose skin isn't there draws the wrong one.
+        let mut skins = 0;
+        for (id, base) in &repository.bases {
+            for map in &base.material_maps {
+                let file = repository.path_of(id, &map.colour_map).unwrap();
+                assert_eq!(
+                    fs::metadata(root.join(&file)).map(|m| m.len()).ok(),
+                    fs::metadata(shipped.join(&file)).map(|m| m.len()).ok(),
+                    "{file}"
+                );
+                skins += 1;
+            }
+        }
+        assert!(skins > 0, "the human base offers its skins");
 
         // Again: nothing new to copy, and the catalogue is left alone.
         fs::write(

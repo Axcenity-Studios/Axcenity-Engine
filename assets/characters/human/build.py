@@ -41,6 +41,7 @@ from mathutils import Vector  # noqa: E402
 import face  # noqa: E402
 import manifests  # noqa: E402
 import mh  # noqa: E402
+import skins  # noqa: E402
 import underwear  # noqa: E402
 
 ARMATURE = "AxcenityHuman"
@@ -70,7 +71,7 @@ PARTS = (
 # How a part's texture is see-through: the brows' and lashes' hairs fade
 # out, and the eye's outer shell (the cornea) is clear over the iris.
 PART_ALPHA = {"Brows": "blend", "Lashes": "blend", "Eyes": "cut"}
-SKIN = "skins/young_caucasian_male/young_caucasian_male.mhmat"
+SKIN = f"skins/{skins.DEFAULT}/{skins.DEFAULT}.mhmat"
 
 # The body's shapes, each a sum of MakeHuman bodies: (weight, settings).
 # `M` and `F` are the two frames at the middle of muscle and weight; a
@@ -796,6 +797,10 @@ def main():
                       "unmapped": list(face.UNMAPPED), "parameters": face_parameters,
                       "bones": face_bones}
     report["frame_bones"] = frame_bones
+    # Every MakeHuman skin as an image beside the manifest (ADR-0048).
+    report["skins"] = skins.write(args.assets, args.out, args.texture_size)
+    for left in report["skins"]["left_out"]:
+        print(f"human build: skin {left['skin']} left out: {left['why']}")
     report["added_bones"] = [{"name": n, "parent": p} for n, p in added_bones()]
     report["objects"] = object_names
     report["materials"] = material_names

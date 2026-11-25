@@ -119,6 +119,12 @@
       "id": "neck",
       "label": "Neck",
       "category": "face"
+    },
+    {
+      "id": "skin",
+      "label": "Skin",
+      "category": "skin",
+      "about": "The photographed skin the body wears."
     }
   ],
   "parameters": [
@@ -631,7 +637,11 @@
         1
       ],
       "level": "quick",
-      "about": "How old the body looks, from a young adult to an old one.",
+      "random": [
+        0,
+        1
+      ],
+      "about": "How old the body looks, from a young adult to an old one. The skin ages with it.",
       "advanced": false
     },
     {
@@ -7149,6 +7159,45 @@
         }
       ],
       "advanced": false
+    },
+    {
+      "id": "skin",
+      "label": "Skin",
+      "group": "skin",
+      "level": "quick",
+      "range": [
+        0,
+        4
+      ],
+      "default": 2,
+      "random": [
+        0,
+        3
+      ],
+      "about": "The skin the body wears, one of MakeHuman's photographed skins. It is the male or the female one with the body type, and the young, middle-aged or old one with Age.",
+      "choices": [
+        {
+          "value": 0,
+          "label": "African"
+        },
+        {
+          "value": 1,
+          "label": "Asian"
+        },
+        {
+          "value": 2,
+          "label": "Caucasian"
+        },
+        {
+          "value": 3,
+          "label": "Caucasian 2"
+        },
+        {
+          "value": 4,
+          "label": "Bodysuit"
+        }
+      ],
+      "advanced": false
     }
   ],
   "corners": [
@@ -7920,5 +7969,241 @@
     "items": [
       "axcenity/human-boxer-briefs"
     ]
-  }
+  },
+  "material_maps": [
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_african_male.jpg",
+      "at": {
+        "skin": 0,
+        "frame": 0.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_african_female.jpg",
+      "at": {
+        "skin": 0,
+        "frame": 1.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/middleage_african_male.jpg",
+      "at": {
+        "skin": 0,
+        "frame": 0.0,
+        "age": 0.5
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/middleage_african_female.jpg",
+      "at": {
+        "skin": 0,
+        "frame": 1.0,
+        "age": 0.5
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/old_african_male.jpg",
+      "at": {
+        "skin": 0,
+        "frame": 0.0,
+        "age": 1.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/old_african_female.jpg",
+      "at": {
+        "skin": 0,
+        "frame": 1.0,
+        "age": 1.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_asian_male.jpg",
+      "at": {
+        "skin": 1,
+        "frame": 0.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_asian_female.jpg",
+      "at": {
+        "skin": 1,
+        "frame": 1.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/middleage_asian_male.jpg",
+      "at": {
+        "skin": 1,
+        "frame": 0.0,
+        "age": 0.5
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/middleage_asian_female.jpg",
+      "at": {
+        "skin": 1,
+        "frame": 1.0,
+        "age": 0.5
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/old_asian_male.jpg",
+      "at": {
+        "skin": 1,
+        "frame": 0.0,
+        "age": 1.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/old_asian_female.jpg",
+      "at": {
+        "skin": 1,
+        "frame": 1.0,
+        "age": 1.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_male.jpg",
+      "at": {
+        "skin": 2,
+        "frame": 0.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_female.jpg",
+      "at": {
+        "skin": 2,
+        "frame": 1.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/middleage_caucasian_male.jpg",
+      "at": {
+        "skin": 2,
+        "frame": 0.0,
+        "age": 0.5
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/middleage_caucasian_female.jpg",
+      "at": {
+        "skin": 2,
+        "frame": 1.0,
+        "age": 0.5
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/old_caucasian_male.jpg",
+      "at": {
+        "skin": 2,
+        "frame": 0.0,
+        "age": 1.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/old_caucasian_female.jpg",
+      "at": {
+        "skin": 2,
+        "frame": 1.0,
+        "age": 1.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_male2.jpg",
+      "at": {
+        "skin": 3,
+        "frame": 0.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_male_special_suit.jpg",
+      "at": {
+        "skin": 4,
+        "frame": 0.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_male_special_suit.jpg",
+      "at": {
+        "skin": 4,
+        "frame": 0.0,
+        "age": 0.5
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_male_special_suit.jpg",
+      "at": {
+        "skin": 4,
+        "frame": 0.0,
+        "age": 1.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_female2.jpg",
+      "at": {
+        "skin": 3,
+        "frame": 1.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_female_special_suit.jpg",
+      "at": {
+        "skin": 4,
+        "frame": 1.0,
+        "age": 0.0
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_female_special_suit.jpg",
+      "at": {
+        "skin": 4,
+        "frame": 1.0,
+        "age": 0.5
+      }
+    },
+    {
+      "material": "Skin",
+      "colour_map": "skins/young_caucasian_female_special_suit.jpg",
+      "at": {
+        "skin": 4,
+        "frame": 1.0,
+        "age": 1.0
+      }
+    }
+  ]
 }

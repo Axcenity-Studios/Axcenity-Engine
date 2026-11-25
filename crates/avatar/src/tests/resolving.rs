@@ -392,3 +392,56 @@ fn garments_are_worn_in_order_of_layer_then_slot() {
     overalls.layer = Some(2);
     assert!(overalls.wearing_order() > order(fixtures::TEE));
 }
+
+/// Three skins for the test body: by frame (0 or 1) and by tone (-1 to 1).
+fn skins() -> Vec<crate::MaterialMap> {
+    let map = |file: &str, frame: f32, tone: f32| crate::MaterialMap {
+        material: "Skin".to_owned(),
+        colour_map: file.to_owned(),
+        at: [("frame".to_owned(), frame), ("tone".to_owned(), tone)].into(),
+    };
+    vec![
+        map("skins/light_masculine.jpg", 0.0, -1.0),
+        map("skins/light_feminine.jpg", 1.0, -1.0),
+        map("skins/dark_masculine.jpg", 0.0, 1.0),
+    ]
+}
+
+/// ADR-0048: of the colour maps a base offers for a material, a character
+/// draws the one made nearest its values, as a library path; a base with
+/// none draws its model file's own.
+#[test]
+fn a_material_draws_the_colour_map_nearest_the_characters_values() {
+    let mut library = fixtures::library();
+    let mut description = Description::new("Ada", "test/body");
+    let resolved = resolve(&library, &description).expect("it resolves");
+    assert!(resolved.colour_maps.is_empty(), "the file's own");
+
+    let mut base = fixtures::base();
+    base.material_maps = skins();
+    assert_eq!(base.validate(), Vec::new());
+    library.add_base("test/Body.base.json", base);
+    assert_eq!(library.validate(), Vec::new());
+    let skin = |description: &Description| {
+        let resolved = resolve(&library, description).expect("it resolves");
+        assert_eq!(resolved.colour_maps.len(), 1, "only Skin has maps");
+        resolved.colour_maps["Skin"].clone()
+    };
+    // The defaults (frame 0, tone 0) are as near the light masculine skin
+    // as the dark one: the first of equals.
+    assert_eq!(skin(&description), "test/skins/light_masculine.jpg");
+    description.parameters.insert("tone".to_owned(), 0.2);
+    assert_eq!(skin(&description), "test/skins/dark_masculine.jpg");
+    description.parameters.insert("tone".to_owned(), -0.6);
+    description.parameters.insert("frame".to_owned(), 0.7);
+    assert_eq!(skin(&description), "test/skins/light_feminine.jpg");
+    // No dark feminine skin was made. A distance is a share of the
+    // parameter's range, so a character at frame 1 and tone 0.9 is 0.95
+    // of `tone` from the light feminine skin and the whole of `frame`
+    // from the dark masculine one: the light feminine skin is nearer.
+    description.parameters.insert("tone".to_owned(), 0.9);
+    description.parameters.insert("frame".to_owned(), 1.0);
+    assert_eq!(skin(&description), "test/skins/light_feminine.jpg");
+    description.parameters.insert("frame".to_owned(), 0.6);
+    assert_eq!(skin(&description), "test/skins/dark_masculine.jpg");
+}

@@ -433,7 +433,7 @@ fn the_workspace_draws_every_category_on_both_bodies_without_a_gpu() {
     let folder = test_folder("workspace-ui");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let ctx = theme::test_context();
-    for base in [DEFAULT_BASE, axcenity_avatar::V1_BASE] {
+    for base in [DEFAULT_BASE, HUMAN_BASE, axcenity_avatar::V1_BASE] {
         workspace.set_base(base);
         for level in selection::Level::ALL {
             workspace.selection.level = level;
@@ -680,5 +680,71 @@ fn the_preview_draws_the_realistic_character() {
         changed > (width * height) as usize / 50,
         "the two bodies look different"
     );
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// ADR-0048: the human base's Skin and Makeup page offers its skins as
+/// one choice, and choosing one writes that skin's file on the body, the
+/// female or the male one with the body type; undo puts the old one back.
+#[test]
+fn the_human_bases_skin_is_a_choice_on_the_skin_page() {
+    let folder = test_folder("workspace-human-skin");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    workspace.set_base(HUMAN_BASE);
+    assert_eq!(workspace.notice, None);
+    workspace.apply(Intent::PickCategory(Category::SkinAndMakeup));
+    let ctx = theme::test_context();
+    let mut drawn = Vec::new();
+    for _ in 0..3 {
+        let output = theme::run(&ctx, Default::default(), |ui| {
+            assert_eq!(workspace.ui(ui, None), None);
+        });
+        drawn = super::shell_tests::drawn_texts(&output);
+    }
+    for label in ["African", "Asian", "Caucasian", "Caucasian 2", "Bodysuit"] {
+        assert!(
+            drawn.iter().any(|text| text == label),
+            "{label} in {drawn:?}"
+        );
+    }
+
+    let attribute =
+        axcenity_core::material_value_attribute("Skin", axcenity_core::MATERIAL_COLOUR_MAP);
+    let skin = |workspace: &CharacterWorkspace| {
+        use axcenity_gameplay::description as applier;
+        let body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
+        workspace
+            .world
+            .get(body)
+            .and_then(|body| body.attribute(&attribute))
+            .and_then(axcenity_core::Value::as_str)
+            .map(str::to_owned)
+    };
+    let file = |name: &str| Some(format!("assets/characters/human/skins/{name}.jpg"));
+    assert_eq!(skin(&workspace), file("young_caucasian_male"));
+    let choice = workspace.base().unwrap().parameter("skin").unwrap().clone();
+    workspace.choose(&choice, 1.0);
+    assert_eq!(skin(&workspace), file("young_asian_male"));
+    let frame = workspace
+        .base()
+        .unwrap()
+        .parameter("frame")
+        .unwrap()
+        .clone();
+    workspace.choose(&frame, 1.0);
+    assert_eq!(skin(&workspace), file("young_asian_female"));
+    workspace.undo();
+    workspace.undo();
+    assert_eq!(skin(&workspace), file("young_caucasian_male"));
+    // The file is in the studio's own library, copied with the base.
+    let copied = folder.join("assets/characters/human/skins/young_asian_female.jpg");
+    assert!(copied.is_file(), "{}", copied.display());
+    // With `AXCENITY_SNAPSHOTS`, the page drawn for real on two skins.
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        for (value, name) in [(0.0, "human-skin-african"), (1.0, "human-skin-asian")] {
+            workspace.choose(&choice, value);
+            super::shell_tests::snap(&mut workspace, &snapshots, name, 8);
+        }
+    }
     let _ = std::fs::remove_dir_all(&folder);
 }

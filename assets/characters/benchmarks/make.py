@@ -209,26 +209,33 @@ CAST = {
 # baseline), so it isn't written; `cast-average` is the face reference.
 NEUTRAL_FACE_IN_CAST = {"axcenity/realistic", "axcenity/human"}
 
-# The human base's cast: the realistic one's bodies, and faces set with
-# MakeHuman's own sliders (ADR-0047).
+# The human base's cast: the realistic one's bodies, faces set with
+# MakeHuman's own sliders (ADR-0047), and its skins (ADR-0048): `skin` is
+# the choice (0 African, 1 Asian, 2 Caucasian, the default, 3 the second
+# Caucasian pair, 4 the painted bodysuit); which of a choice's skins is
+# drawn follows the frame and `age`, so the cast shows young, middle-aged
+# and old ones of each.
 CAST["axcenity/human"] = {
     "average": {},
-    "slim": {"fat": -0.6, "muscle": -0.2},
+    "slim": {"fat": -0.6, "muscle": -0.2, "skin": 1},
     "athletic": {
-        "masculine": {"muscle": 0.7, "fat": -0.4},
-        "feminine": {"muscle": 0.6, "fat": -0.4},
+        "masculine": {"muscle": 0.7, "fat": -0.4, "skin": 0},
+        "feminine": {"muscle": 0.6, "fat": -0.4, "skin": 0},
     },
-    "muscular": {"muscle": 0.9, "fat": 0.1, "shoulder_width": 1.05},
-    "heavyset": {"fat": 0.8, "muscle": 0.2},
+    "muscular": {"muscle": 0.9, "fat": 0.1, "shoulder_width": 1.05, "skin": 3},
+    "heavyset": {"fat": 0.8, "muscle": 0.2, "age": 0.5, "skin": 0},
     "broad-face": {"face_shape_scale_horiz": 0.6, "chin_width": 0.5, "face_shape_round": 0.4},
     "narrow-face": {"face_shape_scale_horiz": -0.6, "chin_width": -0.5, "face_shape_oval": 0.4},
     "distinctive": {"age": 0.6, "nose_hump": 0.7, "nose_scale_vert": 0.4, "chin_prominent": 0.6,
-                    "brows_trans_down_up": -0.5},
+                    "brows_trans_down_up": -0.5, "skin": 1},
     # Each pair differs between its sides, as the realistic cast's does.
     "asymmetry": sided({
         "eyes_trans_down_up": 0.35, "eyes_scale": -0.25, "eyes_corner1_down_up": 0.25,
         "cheeks_bones": -0.6, "ears_trans_down_up": 0.7, "ears_wing": -0.7, "ears_scale": -0.7,
     }),
+    "elder": {"age": 0.9, "fat": -0.3, "skin": 0},
+    "elder-light": {"age": 1.0, "skin": 1},
+    "bodysuit": {"skin": 4},
 }
 # Bases whose face parameters aren't each given a file at both ends: the
 # human base's 149 are MakeHuman's own list, held by the library's random

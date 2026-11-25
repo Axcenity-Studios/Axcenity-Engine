@@ -88,10 +88,10 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-24 | ADR-0048, Characters, Known limitations | The human base wears MakeHuman's 22 skins: library colour maps a manifest lists and the character's values choose (`material_maps`), outside the model file |
 | 2026-11-24 | ADR-0047, Characters, Known limitations | The realistic family is rebuilt on MakeHuman's body and wardrobe (`axcenity/human`), by driving MPFB as a tool; body, face (149 parameters, 30 control shapes) and underwear built, stages 1 and 2 of 7 |
 | 2026-11-24 | Characters, Known limitations | The realistic face's finer controls: 33 more parameters, a ring of outline handles on the new Face shape feature, `feature` presets (noses, face shapes); the shipped model grafted, not rebuilt |
 | 2026-11-24 | Toolbox, specialized editors, file formats | Character Studio's online wardrobe: garments listed from the Axcenity Wardrobe and downloaded into the library, each file checked by size and SHA-256 |
 | 2026-11-23 | Repository structure, System inventory | The examples became the engine's own samples in `crates/samples/projects/` (the `samples` crate) |
-| 2026-11-23 | Lighting and atmosphere | Lightning that throws the sun's shadows and glows in the clouds; grey sky light under an overcast; snow driven by the wind, uneven on things, and spindrift |
 
 Keep the five newest rows here; the full list is [Documentation history](Changelog/Documentation-History.md).

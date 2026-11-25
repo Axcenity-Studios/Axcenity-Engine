@@ -724,6 +724,10 @@ fn copy_library(from: &Path, to: &Path) -> Result<(), String> {
     for (id, base) in &library.bases {
         files.extend(library.manifest_path(id).map(str::to_owned));
         files.extend(library.path_of(id, &base.model.file));
+        // The colour maps its materials can draw (its skins: ADR-0048).
+        for map in &base.material_maps {
+            files.extend(library.path_of(id, &map.colour_map));
+        }
     }
     for (id, item) in &library.items {
         files.extend(library.manifest_path(id).map(str::to_owned));

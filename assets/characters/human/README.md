@@ -7,6 +7,7 @@ The realistic family's new body: **MakeHuman's base mesh, targets and clothes**,
 | `HumanParts.glb` | The body and its parts (`Body`, `Eyes`, `Teeth`, `Tongue`, `Brows`, `Lashes`) under the armature `AxcenityHuman`, with the body's shapes as morph targets |
 | `Human.base.json` | The base model manifest (`manifests.py`; schema in `docs/development/character-studio/architecture.md` section 6) |
 | `HumanRegions.png` | The body's region map |
+| `skins/` | MakeHuman's 22 photographed skins, one image each (`skins.py`): what the body's `Skin` material draws, chosen by the manifest's `material_maps` |
 | `Human.build.json` | What the build measured (joints, shape reaches, versions) |
 | `items/` | The underwear a new character wears, cut from the body (`underwear.py`): boxer briefs, and a bandeau top for the feminine frame |
 | `wardrobe/` | Four MakeHuman garments (two casual outfits, two pairs of shoes), with `CREDITS.md` |
@@ -25,6 +26,14 @@ The realistic family's new body: **MakeHuman's base mesh, targets and clothes**,
    - **What it does**: MakeHuman's 34 expression units become 30 blend shapes named after the engine's standard facial controls (`Blink_Left`, `Mouth_Smile_Right`, ...), which is what the built-in `axcenity` face profile looks for, so `FaceControls`, expressions, blinking and lip sync work with no profile file. A unit that moves both sides of the mouth is split into a left and a right shape. The jaw opens by its bone. Thirteen controls have no unit behind them (`face.UNMAPPED`: the brows drawn together, the mouth and jaw sideways, cheek raise and puff, the tongue).
    - **Who it is**: MakeHuman's own slider list (`target.json`) for the head, forehead, brows, eyes, nose, cheeks, mouth, chin, ears and neck becomes 149 identity parameters in ten groups, each driving its pair of opposite targets as shapes, mirrored where the feature is paired. A shape that moves an eye or the jaw moves that bone with it. Labels are made from the targets' names and read mechanically ("Nose width 2").
 8. **The underwear** (`underwear.py`): boxer briefs and a bandeau, the body's own skin between smooth hem lines, cut from the skin's triangles so each cloth face lies over the skin triangle it came from, stood 3 mm off (5 mm at the hems) and relaxed outward, with a rim turned in at each hem. A corner is a fixed mix of two body corners, so the garment takes the body's weights and shapes. The bandeau is laid out on the feminine frame.
+
+9. **The skins** (`skins.py`, [ADR-0048](../../../wiki/Architecture/Architecture-Decisions/ADR-0048-A-Base-Models-Material-Draws-A-Library-Colour-Map-Chosen-By-The-Characters-Parameters.md)): every textured skin of MakeHuman's system assets (three ages by three ethnicities by two sexes, a second young Caucasian pair, and a young pair with a bodysuit painted on: 22) is written as a 2048 by 2048 JPEG in `skins/`, 11 MB in all, and **not** into `HumanParts.glb`, which keeps only the default character's as the map drawn until a skin is read. The manifest lists each skin with the parameter values it was made for (`material_maps`), and a character draws the one nearest its own. So a person picks one thing, the `skin` choice (African, Asian, Caucasian, Caucasian 2, Bodysuit: MakeHuman's own names), and the rest follows the body:
+   - the **sex** of the skin is the body type's (`frame`);
+   - its **age** is the Age slider's: the young skin up to a quarter of the slider, the old one from three quarters, the middle-aged one between;
+   - the second Caucasian pair exists young only, so an older character with it draws the first pair's skin of its age;
+   - the bodysuit is listed at every age, so it stays on as the Age slider moves, and Randomize never draws it (the choice's `random` span stops before it).
+
+   Every MakeHuman skin is laid out on the base mesh's own texture coordinates, so the face and body sliders move the same skin under every choice: lips, lids, nipples and navel sit where the mesh has them on all 22 (looked at in engine captures of each).
 
 `wardrobe.py` does the same for garments and adds what an item needs: a licence check, a slot and layer from the garment's name and its pack's category, a cover map from the body corners its file hides (`delete_verts`), a thumbnail, a manifest with `fit: shapes`, and `CREDITS.md`. A garment follows every body slider exactly as MakeHuman fits it, with nothing solved at run time; the proxy fit of ADR-0046 isn't involved.
 
@@ -56,17 +65,17 @@ A garment is taken only when **its own file's header and its pack's metadata bot
 
 ## Sources and credit
 
-- **MakeHuman** (<http://www.makehumancommunity.org>): the base mesh, the targets, and the system assets (skins, eyes, teeth, tongue, brows, lashes, the casual outfits and shoes). Released **CC0 1.0** by their copyright holders, Data Collection AB, Joel Palmius and Jonas Hauquier (each file's header: "This asset was explicitly released as CC0 in september 2020"). CC0 asks for no credit; it is given here, in `NOTICE` and in every item's `source`.
+- **MakeHuman** (<http://www.makehumancommunity.org>): the base mesh, the targets, and the system assets (the 22 skins in `skins/`, eyes, teeth, tongue, brows, lashes, the casual outfits and shoes). Released **CC0 1.0** by their copyright holders, Data Collection AB, Joel Palmius and Jonas Hauquier (each file's header: "This asset was explicitly released as CC0 in september 2020"). CC0 asks for no credit; it is given here, in `NOTICE` and in every item's `source`.
 - **MakeHuman community asset packs**: each garment's author and licence (CC0 1.0 or CC BY 4.0) are in its item manifest and in the `CREDITS.md` written beside the items. CC BY requires that credit; keep `CREDITS.md` with the items wherever they go.
 - **MPFB** (<https://static.makehumancommunity.org/mpfb.html>), by Joel Palmius and the MakeHuman community, GPL-3.0-or-later: the tool that makes the body, loads its rig weights and fits the clothes. **None of its code is in this repository** (the scripts call the installed add-on); what it outputs is the person's who made it (MPFB's `LICENSE.md`, section D, as MakeHuman's). The `.mhclo` and `.mhmat` readers in `mh.py` and `build.py` are written from the formats' published description.
 - **Blender** (GPL) runs the scripts; nothing of it ships.
 
 ## Not yet
 
-This is the first stage of ADR-0047. Against `axcenity/realistic` the base lacks:
+Stages 1 and 2 of ADR-0047 and the skins of stage 3 are built. Against `axcenity/realistic` the base lacks:
 
 - **Face**: the sliders' labels and descriptions are made from MakeHuman's target names and need writing by hand; none is marked `quick`; there are no features, handles or face presets, so Character Studio lists the face as plain sliders. Thirteen of the 48 standard controls play nothing. MakeHuman's face rig bones are gathered onto `Head` and `Jaw`. The face capture frames the feminine frame low (she is 13 cm shorter).
-- **Skin**: one of MakeHuman's photographed skins on the `standard` model; no skin tone controls, makeup or the `skin` shading model. Brows and lashes are on `standard`, not `hair`.
+- **Skin**: MakeHuman's 22 skins as colour maps on the `standard` model. No skin tone, tint or roughness controls, no normal map, no makeup, no `skin` shading model (Character Studio's Skin and Makeup page says "No skin material" above the choice). The skin changes in a step where the Age slider crosses a quarter and three quarters. The choices have MakeHuman's names and no swatches. Brows and lashes are on `standard`, not `hair`, and the brows are a thin line.
 - **Body**: frame, muscle, fat and age only (and the proportion sliders). No regional sliders, correctives or helper bones; no simpler copies (levels of detail).
 - **Hair, presets, handles, features**: none.
 - **Layering**: garments hide skin by their cover maps, but not each other's cloth.

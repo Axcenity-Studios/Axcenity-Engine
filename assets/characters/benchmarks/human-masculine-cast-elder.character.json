@@ -1,0 +1,16 @@
+{
+  "format_version": 2,
+  "name": "human-masculine-cast-elder",
+  "base": "axcenity/human",
+  "parameters": {
+    "age": 0.9,
+    "fat": -0.3,
+    "frame": 0,
+    "skin": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    }
+  ]
+}

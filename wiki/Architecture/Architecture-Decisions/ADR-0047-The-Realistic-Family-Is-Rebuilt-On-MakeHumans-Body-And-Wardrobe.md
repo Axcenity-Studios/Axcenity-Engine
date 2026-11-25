@@ -7,14 +7,14 @@ date: 2026-11-24
 supersedes:
 superseded_by:
 affects: [avatar, assets]
-source: [assets/characters/human/build.py, assets/characters/human/face.py, assets/characters/human/underwear.py, assets/characters/human/mh.py, assets/characters/human/wardrobe.py, assets/characters/human/manifests.py, assets/characters/human/Human.base.json, assets/characters/benchmarks/make.py]
+source: [assets/characters/human/build.py, assets/characters/human/face.py, assets/characters/human/underwear.py, assets/characters/human/skins.py, assets/characters/human/mh.py, assets/characters/human/wardrobe.py, assets/characters/human/manifests.py, assets/characters/human/Human.base.json, assets/characters/benchmarks/make.py]
 docs: [assets/characters/human/README.md, docs/development/character-studio/architecture.md, docs/development/character-studio/references/README.md]
 tags: [adr, characters, clothing, assets, licensing]
 ---
 
 # ADR-0047: The realistic family is rebuilt on MakeHuman's body, and its wardrobe is MakeHuman's clothes, by driving MPFB as a tool
 
-- **Status:** Accepted (Paul, 2026-11-24). First stage built the same day; the rest is listed under "Stages".
+- **Status:** Accepted (Paul, 2026-11-24). Stages 1 and 2 and the skins of stage 3 built the same day; the rest is listed under "Stages".
 - **Date:** 2026-11-24
 - **Affected systems:** Character assets (`assets/characters/human/`), Character Data (`crates/avatar`: no code change, the base is data). Amends [ADR-0032](ADR-0032-Semi-Realistic-Default-Character-Family.md) (the realistic family's source body) and narrows [ADR-0046](ADR-0046-Non-Destructive-Proxy-Fitting-And-Biharmonic-Inpainting.md) (its upstream preparation of generated garments is no longer the wardrobe's source).
 
@@ -66,7 +66,7 @@ MPFB, the Blender add-on that builds MakeHuman bodies, is GPL-3.0-or-later. The 
 |---|---|---|
 | 1 | The body (frame, muscle, fat, age), parts, skeleton, manifest, region map, the garment converter with its licence gate and credits, underwear cut from the body, four MakeHuman garments, benchmarks | Built 2026-11-24 |
 | 2 | Face: identity parameters from MakeHuman's face targets, expression shapes for the standard controls, eyelids | Built 2026-11-24 (`face.py`): 149 identity parameters in ten groups, 30 control shapes on the built-in `axcenity` profile. Left: hand-written labels, quick-level picks, features, handles and presets; 13 controls with no MakeHuman unit |
-| 3 | Skin: MakeHuman's skins as choices or the `skin` model over them, brows and lashes on `hair`, makeup | Not started |
+| 3 | Skin: MakeHuman's skins as choices or the `skin` model over them, brows and lashes on `hair`, makeup | Skins built 2026-11-24 ([ADR-0048](ADR-0048-A-Base-Models-Material-Draws-A-Library-Colour-Map-Chosen-By-The-Characters-Parameters.md), `skins.py`): the 22 skins as library images, one `skin` choice of five, the sex and the age of the skin following the body type and the Age slider. Left, and held until hair works so skin and hair are tuned under the same lighting (Paul, 2026-11-24): the `skin` shading model with tone controls and blending between ages, brows and lashes on `hair`, makeup |
 | 4 | Body detail: regional targets, height and proportions by targets, correctives, levels of detail | Not started |
 | 5 | Hair, presets, features and handles; Character Studio's pages on the new base | Not started |
 | 6 | The whole wardrobe converted, reviewed and published; cloth-under-cloth hiding | Not started |
@@ -75,6 +75,7 @@ MPFB, the Blender add-on that builds MakeHuman bodies, is GPL-3.0-or-later. The 
 ## Implementation references
 
 - `assets/characters/human/mh.py` (driving MPFB, the clothes reader, the re-pose), `build.py` (the body, the skeleton, the export), `manifests.py`, `wardrobe.py` (the converter, `vet`, `CREDITS.md`)
+- `assets/characters/human/skins.py` (the skins, ADR-0048)
 - `assets/characters/human/README.md` (how it is made, rebuilding, sources and credit, what is missing)
 - `crates/avatar/tests/shipped_library.rs` holds the base to the library's checks (manifest against model, default character, 1,000 random characters, benchmarks)
 - `NOTICE`, "Public-domain character base data"

@@ -145,6 +145,11 @@ pub struct Resolved {
     /// The cover maps of the worn garments (ADR-0045), as library paths:
     /// the body leaves out the skin they cover.
     pub covers: Vec<String>,
+    /// The colour map each material of the base model draws in place of
+    /// its file's own (ADR-0048), by slot, as library paths: the one of
+    /// the base's `material_maps` nearest the character's values. A slot
+    /// that isn't here draws its file's own.
+    pub colour_maps: BTreeMap<String, String>,
 }
 
 /// One mesh of a resolved character.
@@ -531,6 +536,18 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
     for (slot, layers) in crate::skin::draw_values(base, &description.skin) {
         materials.entry(slot).or_default().extend(layers);
     }
+    // The colour map nearest the character's values, for each material
+    // the base offers any for (ADR-0048).
+    let colour_maps: BTreeMap<String, String> = base
+        .material_maps_for(&values)
+        .into_iter()
+        .filter_map(|(material, map)| {
+            Some((
+                material.to_owned(),
+                library.path_of(&base.id, &map.colour_map)?,
+            ))
+        })
+        .collect();
     // The body's weights are what the layers add up to, so the two can't
     // disagree about which items are worn.
     let mut shapes: BTreeMap<String, f32> = BTreeMap::new();
@@ -554,6 +571,7 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             .map(|region| region.id.clone())
             .collect(),
         covers: covering.into_iter().map(|(_, _, map, _)| map).collect(),
+        colour_maps,
     })
 }
 
