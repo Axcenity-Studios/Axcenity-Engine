@@ -798,7 +798,9 @@ fn the_human_bases_hairstyles_follow_the_head_and_not_its_expressions() {
 /// Paul, 2026-11-24: Randomize draws the human base's hairstyles though
 /// they are drafts (its hair slot says `random_drafts`), so a random
 /// character isn't always bald; it still never draws a draft garment, and
-/// the other bases' drafts are never drawn.
+/// the other bases' drafts are never drawn. Since 2026-11-25 it draws
+/// only the hairstyles made for the body type it drew, and the unisex
+/// ones (`avatar::made_for`).
 #[test]
 fn randomize_draws_the_human_bases_hairstyles_and_no_other_draft() {
     use axcenity_avatar::{Scope, randomize};
@@ -826,13 +828,22 @@ fn randomize_draws_the_human_bases_hairstyles_and_no_other_draft() {
                 if item.slot == "hair" {
                     hair.insert(worn.id.clone());
                 }
+                let feminine = axcenity_avatar::feminine_frame(base, &character);
+                assert!(
+                    axcenity_avatar::made_for_body(&item.tags, feminine),
+                    "{} seed {seed}: {} isn't made for this body type",
+                    base.id,
+                    item.id
+                );
             }
             bald += usize::from(!has_hair);
         }
         if base.id == "axcenity/human" {
             assert_eq!(hair.len(), 10, "every shipped hairstyle is drawn: {hair:?}");
-            // One choice in six is no hair at all.
-            assert!((30..110).contains(&bald), "{bald} of 400 are bald");
+            // Wearing nothing is one choice among a body type's own and
+            // the unisex styles: one in seven for a male character, one
+            // in nine for a female one, about 51 of 400.
+            assert!((30..80).contains(&bald), "{bald} of 400 are bald");
         }
     }
 }

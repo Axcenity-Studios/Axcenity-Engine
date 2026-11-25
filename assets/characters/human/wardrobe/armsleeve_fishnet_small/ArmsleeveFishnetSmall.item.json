@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/armsleeve-fishnet-small",
-  "label": "Armsleeve fishnet small",
+  "label": "Fishnet sleeves, small",
   "kind": "garment",
   "slot": "gloves",
   "layer": 1,
@@ -78,6 +78,7 @@
     ]
   },
   "tags": [
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "ArmsleeveFishnetSmall.png",

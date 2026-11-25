@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/male-elegantsuit01",
-  "label": "Male elegantsuit01",
+  "label": "Suit and tie",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -103,7 +103,8 @@
   "tags": [
     "elegant",
     "makehuman",
-    "male"
+    "male",
+    "masculine"
   ],
   "thumbnail": "MaleElegantsuit01.png",
   "source": {

@@ -13,7 +13,8 @@
 //! body the controller measures, walks and collides with: 0.60 m across and
 //! 5 studs tall, 1 stud = 0.35 m) and the visible MeshPart `Body`, welded
 //! to it and not colliding, whose Animator plays the state machine. The
-//! Humanoid plays the Idle, Walk, Run, Jump and Fall states as it moves.
+//! Humanoid plays the Idle, Walk, Run, Jump and Fall states as it moves,
+//! and Land when it comes down standing still.
 
 use super::*;
 use axcenity_core::{Value, Vector3};
@@ -84,10 +85,29 @@ struct State {
 enum End {
     /// Goes round.
     Loops,
-    /// Holds its last frame (Jump, until the Humanoid plays Fall).
+    /// Holds its last frame (a pose to stay in: an aim, lying dead).
     Holds,
     /// Goes back to Idle.
     ReturnsToIdle,
+    /// Goes on to the state named, the one the library made the take to
+    /// lead into or to be played from: the last frame of `Jump` is the
+    /// first of `Fall`, `SitDown` ends seated as `Sit` starts, and a
+    /// pistol shot starts and ends in the pistol stance, not in Idle.
+    /// Measured on 2026-11-25: every such pair is within 13 degrees a bone
+    /// and 3 mm at the hips, but the spell's cast (23 degrees from its
+    /// stance) and the sword's attack (23 mm).
+    GoesTo(&'static str),
+}
+
+impl End {
+    /// The state it goes to when its take has played, if it goes to one.
+    fn next(self) -> Option<&'static str> {
+        match self {
+            End::Loops | End::Holds => None,
+            End::ReturnsToIdle => Some("Idle"),
+            End::GoesTo(state) => Some(state),
+        }
+    }
 }
 
 /// What the library's forward takes cover on the ground, metres a second
@@ -105,7 +125,9 @@ const STUDS: f64 = 5.0 / 1.75;
 /// (32): the Run take covers 5.36 m a second (15.3 studs), Sprint 8.25 m
 /// (23.6 studs). The library's own walk (0.97 m a second) is `Stroll`.
 /// After the states the Humanoid and Insert > Character play come one for
-/// every other take of the file, so each can be played by name.
+/// every other take of the file, so each can be played by name. A state
+/// whose take doesn't loop says where it goes when the take has played
+/// ([`End`]).
 const STATES: [State; 84] = {
     use End::*;
     const fn s(name: &'static str, take: &'static str, speed: f64, end: End) -> State {
@@ -124,7 +146,7 @@ const STATES: [State; 84] = {
         s("Idle", "Idle", 1.0, Loops),
         s("Walk", "Run", 16.0 / (JOG_SPEED * STUDS), Loops),
         s("Run", "Sprint", 32.0 / (SPRINT_SPEED * STUDS), Loops),
-        s("Jump", "Jump", 1.0, Holds),
+        s("Jump", "Jump", 1.0, GoesTo("Fall")),
         s("Fall", "Fall", 1.0, Loops),
         s("Land", "Land", 1.0, ReturnsToIdle),
         s("Sit", "Sit", 1.0, Loops),
@@ -151,21 +173,21 @@ const STATES: [State; 84] = {
         t("IdleTorch", Loops),
         t("IdleLantern", Loops),
         t("IdleRail", Loops),
-        t("IdleRailCall", ReturnsToIdle),
+        t("IdleRailCall", GoesTo("IdleRail")),
         t("Yes", ReturnsToIdle),
         t("No", Loops),
         t("SwimIdle", Loops),
-        t("SitDown", Holds),
+        t("SitDown", GoesTo("Sit")),
         t("StandUp", ReturnsToIdle),
         t("SitTalking", Loops),
         t("GetUp", ReturnsToIdle),
         t("Drive", Loops),
         t("Roll", ReturnsToIdle),
-        t("SlideStart", Holds),
+        t("SlideStart", GoesTo("Slide")),
         t("Slide", Loops),
         t("SlideEnd", ReturnsToIdle),
         t("ClimbUp", ReturnsToIdle),
-        t("HighJump", Holds),
+        t("HighJump", GoesTo("HighJumpFall")),
         t("HighJumpFall", Loops),
         t("HighJumpLand", ReturnsToIdle),
         t("Death", Holds),
@@ -181,36 +203,36 @@ const STATES: [State; 84] = {
         t("Throw", ReturnsToIdle),
         t("PunchJab", ReturnsToIdle),
         t("PunchCross", ReturnsToIdle),
-        t("Hook", Holds),
+        t("Hook", GoesTo("HookRecover")),
         t("HookRecover", ReturnsToIdle),
         t("SwordIdle", Loops),
-        t("SwordAttack", ReturnsToIdle),
+        t("SwordAttack", GoesTo("SwordIdle")),
         t("SwordBlock", ReturnsToIdle),
         t("SwordDash", ReturnsToIdle),
-        t("SwordSlashA", Holds),
+        t("SwordSlashA", GoesTo("SwordSlashARecover")),
         t("SwordSlashARecover", ReturnsToIdle),
-        t("SwordSlashB", Holds),
+        t("SwordSlashB", GoesTo("SwordSlashBRecover")),
         t("SwordSlashBRecover", ReturnsToIdle),
         t("SwordSlashC", ReturnsToIdle),
         t("SwordCombo", ReturnsToIdle),
         t("SwordHeavyCombo", ReturnsToIdle),
         t("ShieldIdle", Loops),
-        t("ShieldBreak", ReturnsToIdle),
+        t("ShieldBreak", GoesTo("ShieldIdle")),
         t("ShieldDash", ReturnsToIdle),
         t("ShieldBash", ReturnsToIdle),
         t("PistolIdle", Loops),
         t("PistolAim", Holds),
         t("PistolAimUp", Holds),
         t("PistolAimDown", Holds),
-        t("PistolShoot", ReturnsToIdle),
-        t("PistolReload", ReturnsToIdle),
-        t("SpellStart", Holds),
+        t("PistolShoot", GoesTo("PistolIdle")),
+        t("PistolReload", GoesTo("PistolIdle")),
+        t("SpellStart", GoesTo("SpellIdle")),
         t("SpellIdle", Loops),
-        t("SpellCast", ReturnsToIdle),
+        t("SpellCast", GoesTo("SpellIdle")),
         t("SpellEnd", ReturnsToIdle),
         t("ZombieIdle", Loops),
         t("ZombieWalk", Loops),
-        t("ZombieScratch", ReturnsToIdle),
+        t("ZombieScratch", GoesTo("ZombieIdle")),
     ]
 };
 
@@ -222,7 +244,29 @@ const STATES: [State; 84] = {
 /// brings the human base, so the character can be given a description
 /// (`Humanoid:ApplyDescription`).
 pub fn add_default_humanoid(project: &Path) -> Result<&'static str, SaveError> {
-    let write = |path: &str, bytes: &[u8]| write_missing(project, path, bytes);
+    write_default_humanoid(project, write_missing)
+}
+
+/// [`add_default_humanoid`] for a folder the engine keeps for itself
+/// (Character Studio's own, which no creator edits): every file of the
+/// default humanoid there that isn't this engine's is written again, so
+/// the folder never plays an earlier build's animations. Without it a
+/// folder made by an earlier build kept that build's animation file and
+/// state machine beside this build's clips: takes the file didn't have
+/// played nothing, and the others played the old motion at the new
+/// lengths (seen in Character Studio on 2026-11-25, with a folder made on
+/// the 21st). Returns the prefab's path.
+pub fn refresh_default_humanoid(folder: &Path) -> Result<&'static str, SaveError> {
+    write_default_humanoid(folder, write_changed)
+}
+
+/// Writes the default humanoid's files into `project` through `write`,
+/// which decides what happens to a file already there.
+fn write_default_humanoid(
+    project: &Path,
+    write: fn(&Path, &str, &[u8]) -> Result<(), SaveError>,
+) -> Result<&'static str, SaveError> {
+    let write = |path: &str, bytes: &[u8]| write(project, path, bytes);
     write(DEFAULT_HUMANOID_MODEL_PATH, DEFAULT_HUMANOID_MODEL)?;
     write(
         DEFAULT_HUMANOID_ANIMATIONS_PATH,
@@ -244,6 +288,19 @@ pub fn add_default_humanoid(project: &Path) -> Result<&'static str, SaveError> {
 pub(crate) fn write_missing(project: &Path, path: &str, bytes: &[u8]) -> Result<(), SaveError> {
     let file = project.join(path);
     if file.is_file() {
+        return Ok(());
+    }
+    if let Some(folder) = file.parent() {
+        fs::create_dir_all(folder).map_err(SaveError::new(folder))?;
+    }
+    fs::write(&file, bytes).map_err(SaveError::new(&file))
+}
+
+/// Writes `bytes` to `path` in `project` unless the file there holds them
+/// already.
+fn write_changed(project: &Path, path: &str, bytes: &[u8]) -> Result<(), SaveError> {
+    let file = project.join(path);
+    if fs::read(&file).is_ok_and(|there| there == bytes) {
         return Ok(());
     }
     if let Some(folder) = file.parent() {
@@ -303,9 +360,8 @@ pub fn default_humanoid_animation_files() -> Vec<(String, String)> {
             "speed": state.speed,
             "position": [column as f64 * 180.0, row as f64 * 110.0],
         });
-        if state.end == End::ReturnsToIdle {
-            entry["returns"] =
-                serde_json::json!({ "to": "Idle", "when": "finished", "blend": 0.2 });
+        if let Some(next) = state.end.next() {
+            entry["returns"] = serde_json::json!({ "to": next, "when": "finished", "blend": 0.2 });
         }
         states.push(entry);
     }
@@ -507,6 +563,76 @@ mod tests {
         let names: std::collections::BTreeSet<&str> =
             STATES.iter().map(|state| state.name).collect();
         assert_eq!(names.len(), STATES.len(), "no state twice");
+        // A state that goes on to another names one the machine has, and
+        // only a state whose take doesn't loop goes anywhere.
+        for state in &STATES {
+            let made = machine.state(state.name).unwrap();
+            match state.end.next() {
+                Some(next) => {
+                    assert!(machine.state(next).is_some(), "{} to {next}", state.name);
+                    assert_eq!(made.returns.as_ref().unwrap().to, next, "{}", state.name);
+                }
+                None => assert!(made.returns.is_none(), "{}", state.name),
+            }
+        }
+    }
+
+    /// A take the library made to lead into another ends in the pose the
+    /// other starts in, and one made to be played from a stance starts and
+    /// ends in it: where a state goes when its take has played is where
+    /// the body already is, within what the blend covers. (Each of these
+    /// held its last frame or went to Idle before 2026-11-25: a pistol
+    /// shot dropped the arms, a call from the rail stood away from it.)
+    #[test]
+    fn a_state_goes_on_to_the_state_its_take_ends_in() {
+        let model = axcenity_assets::load_model(
+            DEFAULT_HUMANOID_MODEL,
+            Path::new(""),
+            axcenity_assets::ModelFormat::Gltf,
+        )
+        .unwrap();
+        let rig = model.rig.as_deref().unwrap();
+        let takes = axcenity_assets::load_takes(
+            DEFAULT_HUMANOID_ANIMATIONS,
+            axcenity_assets::ModelFormat::Gltf,
+        )
+        .unwrap();
+        let take = |state: &str| {
+            let state = STATES.iter().find(|s| s.name == state).unwrap();
+            takes.iter().find(|take| take.name == state.take).unwrap()
+        };
+        let pose = |take: &axcenity_assets::Take, time: f32| {
+            let mut pose = rig.rest_pose();
+            take.sample(time, &take.bind(rig), rig, &mut pose);
+            pose
+        };
+        let mut checked = 0;
+        for state in &STATES {
+            let End::GoesTo(next) = state.end else {
+                continue;
+            };
+            let from = take(state.name);
+            let (last, first) = (pose(from, from.duration), pose(take(next), 0.0));
+            let mut worst = (0.0_f32, "");
+            for (index, bone) in rig.bones.iter().enumerate() {
+                let turn = last[index]
+                    .rotation
+                    .angle_between(first[index].rotation)
+                    .to_degrees();
+                if turn > worst.0 {
+                    worst = (turn, bone.name.as_str());
+                }
+            }
+            assert!(
+                worst.0 < 25.0,
+                "{} ends {:.1} degrees from where {next} starts ({})",
+                state.name,
+                worst.0,
+                worst.1
+            );
+            checked += 1;
+        }
+        assert_eq!(checked, 15);
     }
 
     #[test]
@@ -556,6 +682,63 @@ mod tests {
         fs::write(&walk, "changed").unwrap();
         add_default_humanoid(&folder).unwrap();
         assert_eq!(fs::read_to_string(&walk).unwrap(), "changed");
+        let _ = fs::remove_dir_all(&folder);
+    }
+
+    #[test]
+    fn refreshing_it_replaces_an_earlier_builds_files_and_adding_it_keeps_them() {
+        let folder = std::env::temp_dir().join(format!(
+            "axcenity-default-humanoid-refresh-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&folder);
+        fs::create_dir_all(&folder).unwrap();
+        // A folder as an earlier build left it: another animation file,
+        // another state machine and a clip of another length.
+        let stale = [
+            DEFAULT_HUMANOID_ANIMATIONS_PATH,
+            DEFAULT_HUMANOID_MODEL_PATH,
+            DEFAULT_HUMANOID_STATE_MACHINE_PATH,
+            "assets/animations/Humanoid/Idle.anim.json",
+            DEFAULT_CHARACTER_PREFAB_PATH,
+        ];
+        for path in stale {
+            write_missing(&folder, path, b"an earlier build's").unwrap();
+        }
+        add_default_humanoid(&folder).unwrap();
+        for path in stale {
+            assert_eq!(
+                fs::read(folder.join(path)).unwrap(),
+                b"an earlier build's",
+                "{path}: a project's file is kept"
+            );
+        }
+        assert_eq!(
+            refresh_default_humanoid(&folder).unwrap(),
+            DEFAULT_CHARACTER_PREFAB_PATH
+        );
+        assert_eq!(
+            fs::read(folder.join(DEFAULT_HUMANOID_ANIMATIONS_PATH)).unwrap(),
+            DEFAULT_HUMANOID_ANIMATIONS
+        );
+        assert_eq!(
+            fs::read(folder.join(DEFAULT_HUMANOID_MODEL_PATH)).unwrap(),
+            DEFAULT_HUMANOID_MODEL
+        );
+        for (path, text) in default_humanoid_animation_files() {
+            assert_eq!(
+                fs::read_to_string(folder.join(&path)).unwrap(),
+                text,
+                "{path}"
+            );
+        }
+        let prefab = fs::read_to_string(folder.join(DEFAULT_CHARACTER_PREFAB_PATH)).unwrap();
+        assert!(prefab.contains("HumanoidRootPart"), "the engine's prefab");
+        // Nothing is written when nothing differs.
+        let file = folder.join(DEFAULT_HUMANOID_ANIMATIONS_PATH);
+        let written = fs::metadata(&file).unwrap().modified().unwrap();
+        refresh_default_humanoid(&folder).unwrap();
+        assert_eq!(fs::metadata(&file).unwrap().modified().unwrap(), written);
         let _ = fs::remove_dir_all(&folder);
     }
 

@@ -169,6 +169,14 @@ impl CharacterWorkspace {
         if let Some(shelf) = super::browser::Shelf::of(self.selection.category) {
             let tiles = self.browser_tiles(&library, shelf);
             self.load_item_pictures(ui.ctx(), tiles);
+            // What the tile under the pointer would show is read in the
+            // background until it is in.
+            if self.browser.over.is_some() && !self.browser.ready {
+                self.warm_tile();
+            }
+        } else {
+            self.browser.over = None;
+            self.browser.ready = false;
         }
         // While a held version is shown in the character's place, editing
         // is off: what's edited is always what's seen.

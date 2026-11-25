@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/crude-male-shirt",
-  "label": "Crude male shirt",
+  "label": "White T-shirt",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -86,7 +86,8 @@
     ]
   },
   "tags": [
-    "makehuman"
+    "makehuman",
+    "masculine"
   ],
   "thumbnail": "CrudeMaleShirt.png",
   "source": {

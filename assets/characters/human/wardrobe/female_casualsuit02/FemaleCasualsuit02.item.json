@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/female-casualsuit02",
-  "label": "Female casualsuit02",
+  "label": "T-shirt and jean shorts",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -103,6 +103,7 @@
   "tags": [
     "casual",
     "female",
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "FemaleCasualsuit02.png",

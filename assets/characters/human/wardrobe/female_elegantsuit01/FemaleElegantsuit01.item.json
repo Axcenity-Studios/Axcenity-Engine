@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/female-elegantsuit01",
-  "label": "Female elegantsuit01",
+  "label": "Blouse and skirt",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -103,6 +103,7 @@
   "tags": [
     "elegant",
     "female",
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "FemaleElegantsuit01.png",

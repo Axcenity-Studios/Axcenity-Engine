@@ -77,13 +77,15 @@ pub(in super::super) fn rows<'a>(
 }
 
 /// Whether every word of `search` is in `parameter`'s label, ID or
-/// `about` (case aside). An empty search matches everything.
+/// `about`, or in the label of its slider between choices (case aside).
+/// An empty search matches everything.
 pub(in super::super) fn matches(parameter: &Parameter, search: &str) -> bool {
     super::has_words(
         &[
             &parameter.label,
             &parameter.id,
             parameter.about.as_deref().unwrap_or(""),
+            parameter.between.as_deref().unwrap_or(""),
         ],
         search,
     )
@@ -262,6 +264,12 @@ pub(super) fn show(
                     locks,
                     paired,
                     note,
+                    // A search lists what it finds at every level.
+                    if searching {
+                        Level::Advanced
+                    } else {
+                        selection.level
+                    },
                 ));
             }
         };
@@ -350,6 +358,7 @@ fn parameter(
     locks: &BTreeSet<String>,
     paired: bool,
     note: Option<&str>,
+    level: Level,
 ) -> Option<Intent> {
     let parameter = shown.parameter;
     let value = value_of(description, Some(base), &parameter.id);
@@ -402,6 +411,55 @@ fn parameter(
                 }
             });
         });
+        // What is between the choices, where the body offers it: a slider
+        // over the same value, from the Detailed level (Quick is the
+        // choices alone). The human frame's is "Masculine to feminine".
+        if let Some(label) = &parameter.between
+            && level.shows(Level::Detailed)
+        {
+            let about = format!(
+                "{} Anywhere between {}; what the body type wears follows the nearer.",
+                parameter_about(parameter),
+                parameter
+                    .choices
+                    .iter()
+                    .map(|choice| choice.label.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" and ")
+            );
+            let sides = if paired { Sides::Column } else { Sides::None };
+            let asked = row::slider_with_sides(
+                ui,
+                &Row {
+                    id: &parameter.id,
+                    label,
+                    note: None,
+                    about: &about,
+                    value,
+                    range: parameter.range,
+                    default: parameter.default,
+                    // The same lock as the choices' above: one value.
+                    locked: Some(locked),
+                },
+                sides,
+            );
+            match asked {
+                Some(Asked::Set(value, gesture)) => {
+                    out = Some(Intent::SetParameter {
+                        id: parameter.id.clone(),
+                        value,
+                        gesture,
+                    });
+                }
+                Some(Asked::Lock(locked)) => {
+                    out = Some(Intent::SetLock {
+                        ids: ids.clone(),
+                        locked,
+                    });
+                }
+                _ => {}
+            }
+        }
         return out;
     }
     let label = if shown.mirrored {

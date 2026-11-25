@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/shoes06",
-  "label": "Shoes06",
+  "label": "Navy shoes",
   "kind": "garment",
   "slot": "shoes",
   "layer": 1,
@@ -45,7 +45,8 @@
   },
   "tags": [
     "makehuman",
-    "shoes"
+    "shoes",
+    "unisex"
   ],
   "thumbnail": "Shoes06.png",
   "source": {

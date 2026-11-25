@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use super::selection::Level;
 use super::stage::ViewPreset;
 use super::*;
 use crate::character_studio::test_folder;
@@ -53,10 +54,11 @@ fn the_workspace_offers_the_human_body_and_shows_it() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// The human body is Male or Female, a choice and not a slider: each wears
-/// its own underwear (boxer briefs; the female one a bandeau top too), the
-/// switch is one undo step, and a value in between (from an older file) is
-/// taken to the nearest.
+/// The human body is Male or Female, a choice: each wears its own
+/// underwear (boxer briefs; the female one a bandeau top too) and the
+/// switch is one undo step. A frame between the two is kept (the slider
+/// under the choice, `Parameter::between`) and wears what the nearer one
+/// does.
 #[test]
 fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     const BRIEFS: &str = "axcenity/human-boxer-briefs";
@@ -136,11 +138,90 @@ fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     );
     assert_eq!(reopened.worn_in("underwear_top").as_deref(), Some(BANDEAU));
 
-    // A value between the two is taken to the nearest choice.
-    workspace.edit(|description| {
-        description.parameters.insert("frame".to_owned(), 0.7);
+    // A frame between the two is kept (Paul, 2026-11-25: "Restore the
+    // ability to adjust character frame options"; until then it was taken
+    // to the nearest choice), and dresses as the nearer body type: its
+    // slider's drag is one undo step.
+    assert_eq!(frame.between.as_deref(), Some("Masculine to feminine"));
+    // (Undone until nothing is left, on a copy.)
+    let steps = |workspace: &CharacterWorkspace| {
+        let mut history = workspace.history.clone();
+        let mut description = workspace.description().clone();
+        let mut depth = 0;
+        while let Some(before) = history.undo(description) {
+            description = before;
+            depth += 1;
+        }
+        depth
+    };
+    let before = steps(&workspace);
+    workspace.apply(Intent::SetParameter {
+        id: "frame".to_owned(),
+        value: 0.3,
+        gesture: Gesture::Drag,
     });
-    assert_eq!(workspace.parameter("frame"), 1.0);
+    workspace.apply(Intent::SetParameter {
+        id: "frame".to_owned(),
+        value: 0.7,
+        gesture: Gesture::Commit,
+    });
+    assert_eq!(workspace.parameter("frame"), 0.7);
+    assert_eq!(steps(&workspace), before + 1, "one step for the drag");
+    assert_eq!(workspace.worn_in("underwear_top").as_deref(), Some(BANDEAU));
+    workspace.apply(Intent::SetParameter {
+        id: "frame".to_owned(),
+        value: 0.3,
+        gesture: Gesture::Commit,
+    });
+    assert_eq!(workspace.parameter("frame"), 0.3);
+    assert_eq!(workspace.worn_in("underwear_top"), None);
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some(BRIEFS)
+    );
+    // Exactly halfway dresses as the first choice, and the clothes
+    // offered go by the same rule.
+    assert_eq!(
+        frame.nearest_choice(0.5).map(|c| c.label.as_str()),
+        Some("Male")
+    );
+    let mut halfway = workspace.description().clone();
+    halfway.parameters.insert("frame".to_owned(), 0.5);
+    let base = workspace.base().unwrap().clone();
+    assert_eq!(browser::feminine_body(&halfway, &base), Some(false));
+    halfway.parameters.insert("frame".to_owned(), 0.51);
+    assert_eq!(browser::feminine_body(&halfway, &base), Some(true));
+    // It is saved and opened as it is.
+    workspace.save().unwrap();
+    let saved = workspace.description().clone();
+    let reopened = CharacterWorkspace::open(&folder, saved.clone(), true).unwrap();
+    assert_eq!(*reopened.description(), saved);
+    assert_eq!(reopened.parameter("frame"), 0.3);
+    // The row: from the Detailed level, under the choice; Quick is the
+    // choice alone. Hand and foot size are Advanced.
+    workspace.apply(Intent::PickCategory(Category::Body));
+    let drawn = |workspace: &mut CharacterWorkspace, level| {
+        workspace.apply(Intent::PickLevel(level));
+        let ctx = crate::theme::test_context();
+        let mut texts = Vec::new();
+        for _ in 0..2 {
+            let output = crate::theme::run(&ctx, Default::default(), |ui| {
+                let _ = workspace.ui(ui, None);
+            });
+            texts = super::shell_tests::drawn_texts(&output);
+        }
+        texts
+    };
+    let has = |texts: &[String], wanted: &str| texts.iter().any(|text| text == wanted);
+    let quick = drawn(&mut workspace, Level::Quick);
+    assert!(has(&quick, "Male") && has(&quick, "Female"), "{quick:?}");
+    assert!(!has(&quick, "Masculine to feminine"));
+    let detailed = drawn(&mut workspace, Level::Detailed);
+    assert!(has(&detailed, "Masculine to feminine"), "{detailed:?}");
+    assert!(has(&detailed, "0.30"), "its value: {detailed:?}");
+    assert!(!has(&detailed, "Hand size"));
+    let advanced = drawn(&mut workspace, Level::Advanced);
+    assert!(has(&advanced, "Hand size") && has(&advanced, "Foot size"));
     let _ = std::fs::remove_dir_all(&folder);
 }
 

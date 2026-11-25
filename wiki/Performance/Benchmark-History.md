@@ -109,6 +109,18 @@ Container, release, 2026-11-12 ([Optimization log](Optimization-Log.md#collabora
 
 The join over Tailscale between two machines is still to be recorded (goal: under 10 s).
 
+## Character Studio's browser pages (2026-11-25)
+
+Desktop under Fedora, a **debug** build, one run, `timing_tests.rs` `browser_costs` ([Optimization log](Optimization-Log.md#character-studios-tile-previews-2026-11-25)):
+
+| Measure (the interface's thread) | Before | After |
+|---|---|---|
+| A garment tile the pointer crosses or scrolls past | 24–147 ms, median 44 (79 with a renderer) | nothing |
+| A garment tile's first preview, pointer rested | as above | 41–104 ms, median 47 (its model read on the loader's thread) |
+| A hairstyle tile's first preview, pointer rested | 83–143 ms, median 105 (133 with a renderer) | 20–41 ms, median 22 |
+| A second preview of a tile | 7–49 ms, median 12 (hair 4) | the same |
+| A still frame of the Clothing page (Hair, Body) | 1.25 ms (0.63, 0.69) | the same |
+
 ## Against other engines (XB10k)
 
 `benchmarks/cross-engine/` defines XB10k (S10k's parts, physics and scripts rebuilt in each engine with one timing rule; PR #80). On the Desktop, 2026-11-11, median frame: **s&box 2.05 ms** (real time, not ranked), **Unity 3.11**, **Axcenity 5.14** (6.70 before #84/#86/#88/#93), **Godot 10.27**; Unreal and Roblox not timed yet. Results: `benchmarks/cross-engine/results.md`; what the numbers mean against each engine's features: `docs/research/engine-comparison.md`.

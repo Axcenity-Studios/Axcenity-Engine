@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/shoes05",
-  "label": "Shoes05",
+  "label": "Light grey shoes",
   "kind": "garment",
   "slot": "shoes",
   "layer": 1,
@@ -45,7 +45,8 @@
   },
   "tags": [
     "makehuman",
-    "shoes"
+    "shoes",
+    "unisex"
   ],
   "thumbnail": "Shoes05.png",
   "source": {

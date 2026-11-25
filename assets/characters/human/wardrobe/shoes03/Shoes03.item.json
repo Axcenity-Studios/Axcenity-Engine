@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/shoes03",
-  "label": "Shoes03",
+  "label": "Black shoes, black socks",
   "kind": "garment",
   "slot": "shoes",
   "layer": 1,
@@ -45,7 +45,8 @@
   },
   "tags": [
     "makehuman",
-    "shoes"
+    "shoes",
+    "unisex"
   ],
   "thumbnail": "Shoes03.png",
   "source": {

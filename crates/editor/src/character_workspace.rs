@@ -314,8 +314,9 @@ pub struct CharacterWorkspace {
     /// What the preview's body does (Still, Idle, Walk, Run, a gesture):
     /// preview only, never in the description (brief §10, R9).
     pub motion: Motion,
-    /// The clip the preview plays for `motion`, in the folder.
-    preview_clip: Option<String>,
+    /// The motion preview's state machine and clips are in the folder
+    /// (`motion.rs` writes them the first time a motion is picked).
+    preview_written: bool,
     /// The point the camera follows while the body moves.
     follow: Option<Vec3>,
     /// A motion just stopped: the view frames the still body again.
@@ -400,7 +401,10 @@ impl CharacterWorkspace {
         let writing = WRITING_LIBRARY
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        axcenity_project::add_default_humanoid(folder)
+        // The folder is the studio's own: the humanoid's files in it are
+        // always this engine's (an earlier build's animation file played
+        // old or missing takes under this build's clips).
+        axcenity_project::refresh_default_humanoid(folder)
             .map_err(|err| format!("Could not write the humanoid's files: {err}"))?;
         axcenity_project::add_character_library(folder)
             .map_err(|err| format!("Could not write the character library: {err}"))?;
@@ -449,7 +453,7 @@ impl CharacterWorkspace {
             face_controls: BTreeMap::new(),
             face_view: None,
             motion: Motion::default(),
-            preview_clip: None,
+            preview_written: false,
             follow: None,
             reframe: false,
             canvas: Canvas::default(),
@@ -702,12 +706,23 @@ impl CharacterWorkspace {
                     .clone()
             })
             .flatten();
+        // A value set between a parameter's choices (the frame's slider)
+        // wears what the nearest one wears, as picking it does.
+        let library = self.library();
+        let chosen = library
+            .base(&self.description.base)
+            .and_then(|base| base.parameter(id))
+            .filter(|parameter| !parameter.choices.is_empty())
+            .cloned();
         let id = id.to_owned();
         self.transact(
             |description| {
                 description.parameters.insert(id, value);
                 if let Some(mirror) = mirror {
                     description.parameters.insert(mirror, value);
+                }
+                if let Some(parameter) = &chosen {
+                    wear_choice(description, &library, parameter, value);
                 }
             },
             gesture,
@@ -1279,7 +1294,8 @@ fn same_file(a: &Path, b: &Path) -> bool {
 }
 
 /// `description` with every parameter in its base model's range (one with
-/// choices at the nearest, wearing what that choice wears), unknown
+/// choices at the nearest, unless the body offers what is between them,
+/// wearing what that choice wears), unknown
 /// parameters dropped and a name.
 fn tidy(mut description: Description, library: &Library) -> Description {
     if let Some(base) = library.base(&description.base) {
@@ -1290,7 +1306,11 @@ fn tidy(mut description: Description, library: &Library) -> Description {
             if let Some(parameter) = base.parameter(id) {
                 let [low, high] = parameter.range;
                 *value = value.clamp(low.min(high), low.max(high));
-                if let Some(choice) = parameter.nearest_choice(*value) {
+                // Kept at a choice, unless the body offers what is
+                // between them (`Parameter::between`: the human frame).
+                if parameter.between.is_none()
+                    && let Some(choice) = parameter.nearest_choice(*value)
+                {
                     *value = choice.value;
                 }
             }

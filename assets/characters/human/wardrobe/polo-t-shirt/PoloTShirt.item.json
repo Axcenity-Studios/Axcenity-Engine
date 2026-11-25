@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/polo-t-shirt",
-  "label": "Polo t shirt",
+  "label": "Polo shirt",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -85,6 +85,7 @@
     "contemporary",
     "makehuman",
     "male",
+    "masculine",
     "profession"
   ],
   "thumbnail": "PoloTShirt.png",

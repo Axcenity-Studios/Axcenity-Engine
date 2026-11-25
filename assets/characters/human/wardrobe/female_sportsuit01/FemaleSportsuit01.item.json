@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/female-sportsuit01",
-  "label": "Female sportsuit01",
+  "label": "Crop top and leggings",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -102,6 +102,7 @@
   },
   "tags": [
     "female",
+    "feminine",
     "makehuman",
     "sport"
   ],

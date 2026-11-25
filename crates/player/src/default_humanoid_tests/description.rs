@@ -251,6 +251,48 @@ fn a_description_applied_in_the_player_wears_its_parts() {
     assert_eq!(read.base, BASE);
 }
 
+/// Paul, 2026-11-25: "Some clothing items have strange visual holes or
+/// artifacts that appear at a distance but disappear when moving closer."
+/// The loader made simpler copies of the body and of every garment from
+/// their rest shapes, and a part under 30% of the picture's height was
+/// drawn from one: it cut through the skin under it, and where that skin
+/// is hidden left holes. A described character's models have no simpler
+/// copies made for them now (`assets` `model/lod.rs`), so it is the same
+/// meshes at every distance.
+#[test]
+fn a_described_character_has_no_simpler_copies_to_be_drawn_from_far_away() {
+    let mut game = game("description-full-detail");
+    let character = game.character();
+    let body = game.world.find_first_child(character, "Body").unwrap();
+    still(&mut game, body);
+    let dressed = described(&[], &[SUIT, SHOES, HAIR]);
+    apply_description(&mut game.world, &game.assets, character, &dressed).unwrap();
+    game.frames(2, MoveInput::default());
+    let worn = [PARTS, "MaleCasualsuit01", "Shoes01", "HairShort02"];
+    let mut seen = Vec::new();
+    for (name, mesh) in mesh_ids(&game) {
+        if !worn.iter().any(|part| mesh.contains(part)) {
+            continue;
+        }
+        let model = game.assets.model_blocking(&mesh).expect("a worn model");
+        for primitive in &model.primitives {
+            assert!(
+                primitive.lods.is_empty(),
+                "{name} ({mesh}) has {} simpler copies of a primitive of {} triangles",
+                primitive.lods.len(),
+                primitive.indices.len() / 3
+            );
+        }
+        seen.push(mesh);
+    }
+    for part in worn {
+        assert!(
+            seen.iter().any(|mesh| mesh.contains(part)),
+            "{part} in {seen:?}"
+        );
+    }
+}
+
 #[test]
 fn applied_parts_wear_the_bodys_identity_live_and_follow_its_live_shapes() {
     let mut game = game("description-shapes");

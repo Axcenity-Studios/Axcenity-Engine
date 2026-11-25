@@ -248,12 +248,17 @@ fn drafts_are_hidden_until_show_drafts_and_marked_when_shown() {
         &[],
     );
     assert!(!ids(&off).contains(&"test/jeans".to_owned()));
-    // The jeans and the shipped drafts (the human base's garments).
+    // The jeans and the shipped drafts (the human base's garments, made
+    // for either body type: the count is of the page, not of one cut).
+    let every = Filters {
+        cut: browser::Cut::All,
+        ..Filters::default()
+    };
     let shipped_drafts = browser::list(
         &library,
         &description,
         Shelf::Clothing,
-        &Filters::default(),
+        &every,
         true,
         &BTreeSet::new(),
         &[],
@@ -346,7 +351,16 @@ fn a_page_of_drafts_alone_lists_them_without_asking() {
         .find(|entry| entry.item.id == "test/draft-crop")
         .expect("the draft is listed");
     assert!(crop.draft, "and still marked a draft");
-    assert_eq!(hair.entries.len(), hair.drafts);
+    // (Every one of them, under "All": the page lists this body type's.)
+    let every = Filters {
+        cut: browser::Cut::All,
+        ..Filters::default()
+    };
+    assert_eq!(list(Shelf::Hair, &every, false).entries.len(), hair.drafts);
+    assert!(
+        hair.entries.len() < hair.drafts,
+        "the other body type's wait"
+    );
     // Clothing has finished items (the fixtures' tops), so its drafts
     // wait for "Show drafts", the jeans among them.
     let clothing = list(Shelf::Clothing, &Filters::default(), false);
@@ -1292,8 +1306,11 @@ fn esc_ends_a_hover_preview_while_the_pointer_stays_on_its_tile() {
     frame_in(&ctx, &mut workspace, Vec::new());
     let output = frame_in(&ctx, &mut workspace, Vec::new());
     let tile = text_at(&output, "Plain crop").expect("the Plain crop tile is drawn");
+    // Crossing the tile shows nothing: the pointer has to rest on it.
     frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(tile)]);
-    frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(tile)]);
+    frame_in(&ctx, &mut workspace, Vec::new());
+    assert_eq!(*workspace.shown(), before, "not rested yet");
+    rest_on(&ctx, &mut workspace, tile);
     assert!(wears(workspace.shown(), "test/plain-crop"), "hovered");
     assert_eq!(*workspace.description(), before, "a preview only");
     let escape = egui::Event::Key {
@@ -1321,8 +1338,7 @@ fn esc_ends_a_hover_preview_while_the_pointer_stays_on_its_tile() {
     );
     frame_in(&ctx, &mut workspace, Vec::new());
     assert_eq!(*workspace.shown(), before);
-    frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(tile)]);
-    frame_in(&ctx, &mut workspace, Vec::new());
+    rest_on(&ctx, &mut workspace, tile);
     assert!(
         wears(workspace.shown(), "test/plain-crop"),
         "hovering the tile again previews it"
@@ -1348,6 +1364,31 @@ fn frame_in(
     theme::run(ctx, input(events), |ui| {
         assert_eq!(workspace.ui(ui, None), None);
     })
+}
+
+/// Moves the pointer to `at` and leaves it there until the tile under it
+/// can be previewed: the rest ([`browser::REST`], a frame being a sixtieth
+/// of a second here) and its models read on the loader's thread.
+fn rest_on(ctx: &egui::Context, workspace: &mut CharacterWorkspace, at: egui::Pos2) {
+    frame_in(ctx, workspace, vec![egui::Event::PointerMoved(at)]);
+    let rest = (browser::REST * 60.0).ceil() as usize + 2;
+    for _ in 0..rest {
+        frame_in(ctx, workspace, Vec::new());
+    }
+    // The models: at most ten seconds, as real time.
+    for _ in 0..2000 {
+        if workspace.browser.over.is_none() || workspace.browser.previewing() {
+            break;
+        }
+        if !workspace.browser.ready {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        frame_in(ctx, workspace, Vec::new());
+        if workspace.browser.ready {
+            frame_in(ctx, workspace, Vec::new());
+            break;
+        }
+    }
 }
 
 /// A press (or release) of the main button at `at`.
@@ -1399,6 +1440,64 @@ fn undo_depth(workspace: &CharacterWorkspace) -> usize {
 }
 
 #[test]
+fn a_tile_crossed_or_scrolled_past_is_not_previewed() {
+    // Paul, 2026-11-25: "noticeable lag when scrolling through or viewing
+    // clothing models". Every tile the pointer crossed was previewed at
+    // once, which read its model on the interface's thread (24 to 147 ms
+    // each, `timing_tests.rs` `browser_costs`). A preview now waits for
+    // the pointer to rest and for the models, read in the background.
+    let (folder, mut workspace) = hair_workspace("browser-rest");
+    let before = workspace.description().clone();
+    let ctx = theme::test_context();
+    frame_in(&ctx, &mut workspace, Vec::new());
+    let output = frame_in(&ctx, &mut workspace, Vec::new());
+    let crop = text_at(&output, "Plain crop").expect("the Plain crop tile is drawn");
+    let bob = text_at(&output, "Streaked bob").expect("the Streaked bob tile is drawn");
+    // Back and forth between two tiles, never long on either.
+    let short = (browser::REST * 60.0) as usize / 2;
+    for pass in 0..8 {
+        let at = if pass % 2 == 0 { crop } else { bob };
+        frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(at)]);
+        for _ in 0..short {
+            frame_in(&ctx, &mut workspace, Vec::new());
+            assert!(!workspace.browser.previewing(), "pass {pass}");
+            assert_eq!(*workspace.shown(), before);
+        }
+        assert!(workspace.browser.over.is_some(), "the tile is known");
+    }
+    // The wheel turning under a still pointer: nothing is previewed
+    // however long it goes on.
+    frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(crop)]);
+    for _ in 0..40 {
+        let wheel = egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(0.0, -1.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: egui::Modifiers::NONE,
+        };
+        frame_in(&ctx, &mut workspace, vec![wheel]);
+        assert!(!workspace.browser.previewing());
+    }
+    // Left to rest, the tile under the pointer is shown, with nothing
+    // worn and no undo step.
+    rest_on(&ctx, &mut workspace, crop);
+    assert!(workspace.browser.previewing());
+    assert_ne!(*workspace.shown(), before);
+    assert_eq!(*workspace.description(), before);
+    assert!(!workspace.can_undo());
+    // Off the tiles it goes at once.
+    frame_in(
+        &ctx,
+        &mut workspace,
+        vec![egui::Event::PointerMoved(egui::pos2(5.0, 5.0))],
+    );
+    frame_in(&ctx, &mut workspace, Vec::new());
+    assert_eq!(*workspace.shown(), before);
+    assert!(workspace.browser.over.is_none());
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
 fn clicking_a_tile_wears_it_and_the_still_pointer_previews_nothing_else() {
     // Paul, 2026-11-24: a click wears (it used to pick a tile to try on,
     // which any edit or page change then took off again). Review fix 2
@@ -1411,26 +1510,26 @@ fn clicking_a_tile_wears_it_and_the_still_pointer_previews_nothing_else() {
     let ctx = theme::test_context();
     frame_in(&ctx, &mut workspace, Vec::new());
     let output = frame_in(&ctx, &mut workspace, Vec::new());
-    // (The shipped styles: "Long and straight" is the tile under "Bob".)
-    let long = text_at(&output, "Long and straight").expect("the Long tile is drawn");
-    let bob = text_at(&output, "Bob").expect("the Bob tile is drawn");
-    assert!(long.y > bob.y + 50.0, "Long is in a lower row than Bob");
-    // A point near the top of Long's tile: a row's pitch above its label
+    // (The shipped styles a male character is offered: "Short and
+    // tousled" is in the row under "Afro".)
+    let long = text_at(&output, "Short and tousled").expect("the Tousled tile is drawn");
+    let bob = text_at(&output, "Afro").expect("the Afro tile is drawn");
+    assert!(long.y > bob.y + 50.0, "Tousled is in a lower row than Afro");
+    // A point near the top of Tousled's tile: a row's pitch above its label
     // is the label of the row above; the tile starts about 20 points lower.
     let at = egui::pos2(long.x, long.y - (long.y - bob.y) + 35.0);
-    frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(at)]);
-    frame_in(&ctx, &mut workspace, vec![egui::Event::PointerMoved(at)]);
+    rest_on(&ctx, &mut workspace, at);
     assert_eq!(
         hair_of(&workspace, workspace.shown()).as_deref(),
-        Some("makehuman/hair-long01"),
-        "the point is on the Long tile: hovered, it is previewed"
+        Some("makehuman/hair-short02"),
+        "the point is on the Tousled tile: hovered, it is previewed"
     );
     assert_eq!(*workspace.description(), before, "and not worn yet");
     click_and_hold_still(&ctx, &mut workspace, at);
     assert_eq!(
         hair_of(&workspace, workspace.description()).as_deref(),
-        Some("makehuman/hair-long01"),
-        "the click wore Long"
+        Some("makehuman/hair-short02"),
+        "the click wore Tousled"
     );
     assert_eq!(undo_depth(&workspace), 1, "as one undo step");
     assert_eq!(
@@ -1448,7 +1547,7 @@ fn clicking_a_tile_wears_it_and_the_still_pointer_previews_nothing_else() {
     });
     assert_eq!(
         hair_of(&workspace, workspace.shown()).as_deref(),
-        Some("makehuman/hair-long01")
+        Some("makehuman/hair-short02")
     );
     workspace.apply(Intent::Undo);
     workspace.apply(Intent::Undo);
@@ -1466,13 +1565,13 @@ fn clicking_the_worn_tile_takes_it_off_and_previews_nothing() {
     workspace.apply(Intent::Browse(Browse::ShowDrafts(true)));
     workspace.apply(Intent::Wear {
         slot: "hair".to_owned(),
-        item: Some("makehuman/hair-bob01".to_owned()),
+        item: Some("makehuman/hair-afro01".to_owned()),
     });
     let before = workspace.description().clone();
     let ctx = theme::test_context();
     frame_in(&ctx, &mut workspace, Vec::new());
     let output = frame_in(&ctx, &mut workspace, Vec::new());
-    let bob = text_at(&output, "Bob").expect("the worn Bob tile is drawn");
+    let bob = text_at(&output, "Afro").expect("the worn Afro tile is drawn");
     click_and_hold_still(&ctx, &mut workspace, bob);
     assert_eq!(
         hair_of(&workspace, workspace.description()),
@@ -1498,8 +1597,8 @@ fn clicking_the_worn_tile_takes_it_off_and_previews_nothing() {
         vec![egui::Event::PointerMoved(egui::pos2(600.0, 400.0))],
     );
     let output = frame_in(&ctx, &mut workspace, Vec::new());
-    let line =
-        text_where(&output, |t| t.starts_with("Bob") && t != "Bob").expect("the worn Bob's line");
+    let line = text_where(&output, |t| t.starts_with("Afro") && t != "Afro")
+        .expect("the worn Afro's line");
     let take_off = egui::pos2(1440.0 - 12.0 - 3.0 - 12.0, line.y);
     click_and_hold_still(&ctx, &mut workspace, take_off);
     assert_eq!(hair_of(&workspace, workspace.description()), None);
@@ -2002,12 +2101,172 @@ fn the_clothing_page_lists_the_garments_cut_for_the_characters_frame() {
     for cut in browser::CUT_TAGS {
         assert!(!listing.kinds.contains(&cut.to_owned()), "{cut}");
     }
-    // A cut other than the body's own narrows the list.
+    // Another cut is another wardrobe, not a narrowed list: its "nothing
+    // worn" tiles and recently used row stay.
     assert!(
-        Filters {
+        !Filters {
             cut: browser::Cut::All,
             ..Filters::default()
         }
         .narrowed()
     );
+}
+
+/// Paul, 2026-11-25: "Separate male and female clothing and hairstyle
+/// options, with appropriate categorization and filtering." Every shipped
+/// garment and hairstyle says who it is made for (`assets/characters/human/
+/// cut.py`), and both pages list the character's own body type's with the
+/// unisex ones until another is picked.
+#[test]
+fn the_shipped_wardrobe_and_hairstyles_are_listed_by_body_type() {
+    let library = library();
+    let shipped = |item: &&ItemManifest| item.id.starts_with("makehuman/");
+    // One tag each, and each kind on both pages.
+    for item in library.items.values().filter(shipped) {
+        let said: Vec<&String> = item
+            .tags
+            .iter()
+            .filter(|tag| browser::CUT_TAGS.contains(&tag.as_str()))
+            .collect();
+        assert_eq!(said.len(), 1, "{} says {said:?}", item.id);
+    }
+    let base = library.base(DEFAULT_BASE).unwrap();
+    assert_eq!(
+        browser::cut_labels(base),
+        ("Male".to_owned(), "Female".to_owned()),
+        "named as the body type's choices are"
+    );
+    let male = human(&library);
+    let mut female = male.clone();
+    female.parameters.insert("frame".to_owned(), 1.0);
+    let list = |description: &Description, shelf, cut| {
+        let filters = Filters {
+            cut,
+            ..Filters::default()
+        };
+        browser::list(
+            &library,
+            description,
+            shelf,
+            &filters,
+            true,
+            &BTreeSet::new(),
+            &[],
+        )
+    };
+    let cuts = |listing: &browser::Listing| -> Vec<Option<bool>> {
+        listing
+            .entries
+            .iter()
+            .filter(|entry| shipped(&entry.item))
+            .map(|entry| browser::cut_for(&entry.item.tags))
+            .collect()
+    };
+    for shelf in [Shelf::Hair, Shelf::Clothing] {
+        let his = list(&male, shelf, browser::Cut::Body);
+        let hers = list(&female, shelf, browser::Cut::Body);
+        assert!(his.cuts && hers.cuts, "{shelf:?} offers the choice");
+        // Each body type's own and the unisex ones, and both kinds.
+        assert!(cuts(&his).iter().all(|cut| *cut != Some(true)), "{shelf:?}");
+        assert!(
+            cuts(&hers).iter().all(|cut| *cut != Some(false)),
+            "{shelf:?}"
+        );
+        assert!(cuts(&his).contains(&Some(false)) && cuts(&his).contains(&None));
+        assert!(cuts(&hers).contains(&Some(true)) && cuts(&hers).contains(&None));
+        assert!(his.entries.iter().all(|entry| entry.other_cut.is_none()));
+        // Asked for by name, the other body type's are listed on this one.
+        // (In another order: there they come after the unisex ones.)
+        let asked = list(&male, shelf, browser::Cut::Feminine);
+        let sorted = |mut cuts: Vec<Option<bool>>| {
+            cuts.sort();
+            cuts
+        };
+        assert_eq!(sorted(cuts(&asked)), sorted(cuts(&hers)), "{shelf:?}");
+        // "All" lists every one: in each slot this body type's and the
+        // unisex ones first, the other's after them and marked.
+        let all = list(&male, shelf, browser::Cut::All);
+        let every = library
+            .items
+            .values()
+            .filter(shipped)
+            .filter(|item| all.slots.iter().any(|slot| slot.id == item.slot))
+            .count();
+        assert_eq!(cuts(&all).len(), every, "{shelf:?}");
+        for slot in &all.slots {
+            let other: Vec<bool> = all
+                .entries
+                .iter()
+                .filter(|entry| entry.item.slot == slot.id)
+                .map(|entry| entry.other_cut.is_some())
+                .collect();
+            assert!(other.is_sorted(), "{}: {other:?}", slot.id);
+        }
+        assert!(
+            all.entries
+                .iter()
+                .filter(|entry| shipped(&entry.item))
+                .all(|entry| entry.other_cut.is_some()
+                    == (browser::cut_for(&entry.item.tags) == Some(true)))
+        );
+    }
+    // The row is lit on the body's own type and follows it; another, once
+    // picked, stays.
+    use browser::Cut;
+    assert_eq!(Cut::Body.shown(Some(false)), Cut::Masculine);
+    assert_eq!(Cut::Body.shown(Some(true)), Cut::Feminine);
+    assert_eq!(Cut::picked(Cut::Masculine, Some(false)), Cut::Body);
+    assert_eq!(Cut::picked(Cut::Feminine, Some(false)), Cut::Feminine);
+    assert_eq!(Cut::picked(Cut::All, Some(true)), Cut::All);
+    assert_eq!(Cut::Feminine.shown(None), Cut::All, "a body without frames");
+}
+
+/// Both pages draw the row, lit on the character's body type; picking the
+/// other lists its hairstyles, marked as made for that body type.
+#[test]
+fn the_pages_have_a_row_for_who_the_items_are_made_for() {
+    let folder = test_folder("browser-made-for");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    for category in [Category::Hair, Category::Clothing] {
+        workspace.apply(Intent::PickCategory(category));
+        let texts = draw(&mut workspace, Vec::new());
+        for wanted in ["Male", "Female", "All"] {
+            assert!(
+                texts.iter().any(|text| text.ends_with(wanted)),
+                "{category:?} has no {wanted}: {texts:?}"
+            );
+        }
+    }
+    workspace.apply(Intent::PickCategory(Category::Hair));
+    let texts = draw(&mut workspace, Vec::new());
+    assert!(texts.iter().any(|text| text == "Short crop"));
+    assert!(!texts.iter().any(|text| text == "Ponytail"), "hers");
+    // "All": hers too, each marked.
+    workspace.apply(Intent::Browse(Browse::Filters(
+        Shelf::Hair,
+        Filters {
+            cut: browser::Cut::All,
+            ..Filters::default()
+        },
+    )));
+    let texts = draw(&mut workspace, Vec::new());
+    assert!(texts.iter().any(|text| text == "Ponytail"));
+    // (The row's own choice is drawn with its icon.)
+    let marked = texts.iter().filter(|text| *text == "Female").count();
+    assert_eq!(marked, 4, "four tiles marked as made for the female body");
+    // The "nothing worn" tile stays: another wardrobe, not a search.
+    assert!(texts.iter().any(|text| text == "Bald"), "{texts:?}");
+    // A female character is offered hers without asking.
+    workspace.apply(Intent::Browse(Browse::Filters(
+        Shelf::Hair,
+        Filters::default(),
+    )));
+    workspace.apply(Intent::Choose {
+        id: "frame".to_owned(),
+        value: 1.0,
+    });
+    let texts = draw(&mut workspace, Vec::new());
+    assert!(texts.iter().any(|text| text == "Ponytail"));
+    assert!(!texts.iter().any(|text| text == "Short crop"), "his");
+    let _ = std::fs::remove_dir_all(&folder);
 }

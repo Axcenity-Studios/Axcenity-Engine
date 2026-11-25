@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/bodice-style-top",
-  "label": "Bodice style top",
+  "label": "Bodice top",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -86,6 +86,7 @@
     ]
   },
   "tags": [
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "BodiceStyleTop.png",

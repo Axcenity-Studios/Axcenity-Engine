@@ -522,3 +522,78 @@ fn a_humanoid_plays_its_animators_idle_walk_run_jump_and_fall_states() {
     );
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+/// With a Land state that goes back to Idle by itself (the default
+/// character's), a Humanoid that comes down standing still plays it, and
+/// is in Idle again when it has played; one that comes down moving goes
+/// straight on walking.
+#[test]
+fn a_humanoid_that_lands_standing_still_plays_its_animators_land_state() {
+    let folder =
+        std::env::temp_dir().join(format!("axcenity-humanoid-lands-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let states: Vec<String> = ["Idle", "Walk", "Run", "Jump", "Fall", "Land"]
+        .iter()
+        .map(|name| {
+            let returns = if *name == "Land" {
+                r#", "returns": { "to": "Idle", "when": "finished", "blend": 0.2 }"#
+            } else {
+                ""
+            };
+            format!(
+                r#"{{ "name": "{name}", "motion": {{ "clip": "" }}, "speed": 1.0, "position": [0.0, 0.0]{returns} }}"#
+            )
+        })
+        .collect();
+    std::fs::write(
+        folder.join("hero.statemachine.json"),
+        format!(
+            r#"{{ "format_version": 2, "default_state": "Idle", "states": [{}] }}"#,
+            states.join(", ")
+        ),
+    )
+    .unwrap();
+    let mut world = World::new();
+    floor(&mut world);
+    character(&mut world, "Player", -20.0, 20.0);
+    let (npc, _) = character(&mut world, "NPC", 0.0, 0.0);
+    make(&mut world, ClassName::Humanoid, "Humanoid", npc, Vec::new());
+    let body = world.find_first_child(npc, "Body").unwrap();
+    let animator = make(
+        &mut world,
+        ClassName::Animator,
+        "Animator",
+        body,
+        vec![(
+            "StateMachine",
+            Value::String("hero.statemachine.json".to_owned()),
+        )],
+    );
+    let mut game = Game::new(world, Assets::new(&folder));
+    let mut played: Vec<String> = Vec::new();
+    let mut watch = |game: &mut Game, frames: usize| {
+        for _ in 0..frames {
+            game.frame();
+            let now = game.world.animator(animator).unwrap().current_state.clone();
+            if played.last() != Some(&now) {
+                played.push(now);
+            }
+        }
+    };
+    watch(&mut game, 20);
+    game.run("workspace.NPC.Humanoid:Jump()");
+    watch(&mut game, 240);
+    // Jumping while it walks: it comes down walking, with no Land.
+    // (15 studs take it 56 frames: it is still on its way as it lands.)
+    game.run("workspace.NPC.Humanoid:MoveTo(Vector3.new(0, 0, -15))");
+    watch(&mut game, 10);
+    game.run("workspace.NPC.Humanoid:Jump()");
+    watch(&mut game, 40);
+    assert_eq!(
+        played,
+        [
+            "Idle", "Jump", "Fall", "Land", "Idle", "Walk", "Jump", "Fall", "Walk"
+        ]
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+}

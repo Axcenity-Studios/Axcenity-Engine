@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/turtleneck-halter",
-  "label": "Turtleneck halter",
+  "label": "Halter turtleneck",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -97,6 +97,7 @@
     ]
   },
   "tags": [
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "TurtleneckHalter.png",

@@ -138,6 +138,7 @@
       ],
       "level": "quick",
       "about": "The body type the character is built on: male or female.",
+      "between": "Masculine to feminine",
       "shapes": [
         {
           "shape": "Frame_Feminine"
@@ -861,6 +862,50 @@
         }
       ],
       "advanced": false
+    },
+    {
+      "id": "hand_size",
+      "label": "Hand size",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "level": "advanced",
+      "about": "How large the hands are for the body.",
+      "attributes": [
+        {
+          "attribute": "HandSize",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "foot_size",
+      "label": "Foot size",
+      "group": "proportions",
+      "range": [
+        0.9,
+        1.15
+      ],
+      "default": 1,
+      "level": "advanced",
+      "about": "How large the feet are for the body.",
+      "attributes": [
+        {
+          "attribute": "FootSize",
+          "from": [
+            0.9,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
     },
     {
       "id": "face_shape_scale_horiz",

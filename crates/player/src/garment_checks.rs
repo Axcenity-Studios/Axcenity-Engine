@@ -724,10 +724,19 @@ pub(super) fn check_motion(
 // idle, the walk and the run from the front, three-quarter and back no
 // gap shows there (2026-11-25). The ponytail swings 2 cm past the head
 // in a stride.
+//
+// Measured again the same day when the collarbones were turned against
+// the chest instead of the world (`mocap.SWUNG`, the motion review;
+// ADR-0049, decision 5: a record follows the motion). The idle's holes
+// 44.6 to 51.7 mm: the men's shirt, about nine hidden corners behind the
+// right armpit (seven of the twelve men are past the old record), where
+// the old bake squared the shoulders to the room while the chest stood
+// turned in the library's stance. The run's 49.4 to 46.0 mm; the walk's
+// is as it was.
 const HUMAN_IDLE_RECORDS: [Record; 1] = [Record {
     what: "holes",
     case: "Idle",
-    most: 0.0446,
+    most: 0.0517,
 }];
 const HUMAN_WALK_RECORDS: [Record; 2] = [
     Record {
@@ -745,7 +754,7 @@ const HUMAN_RUN_RECORDS: [Record; 2] = [
     Record {
         what: "holes",
         case: "Run",
-        most: 0.0494,
+        most: 0.0460,
     },
     Record {
         what: "HairPonytail01 pop",

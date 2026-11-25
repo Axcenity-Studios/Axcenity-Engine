@@ -16,6 +16,7 @@ Machine-specific observations, kept apart from general engine performance. A num
 |---|---|---|---|
 | **Desktop** (`desktop-9950x3d` in `benchmarks/baselines.json`) | AMD Ryzen 9 9950X3D (16 cores, 32 threads), 62 GB RAM, AMD Radeon RX 9070 XT (Vulkan by default), Windows 11 | Real-GPU numbers, the owner's projects, the regression baselines | Several agents often build at once: **pin to CPUs 0–15 (the V-cache CCD)** or results are noise |
 | **Container** | Linux cloud container, 4 vCPU Intel Xeon 2.1 GHz, 15 GB RAM, **no GPU** (lavapipe, Mesa's CPU Vulkan) under Xvfb | CPU-side A/B comparisons, Callgrind | Render and first-frame GPU numbers are software rasterization; steps other than drawing run 1.5–2× slower than the Desktop; lavapipe decodes BC7 in software, hiding cooked-texture gains |
+| **Desktop under Fedora** | The Desktop's hardware under Fedora Linux with Mesa's radv (Vulkan) | The owner's development sessions since 2026-11: Character Studio's captures and editor timing tests | Not pinned, and other builds often run beside a measurement; debug-build numbers (`cargo run`) unless a row says release. Not comparable with the Desktop's Windows numbers |
 | **Laptop** (development.md) | Ryzen 5 5500U (6 cores), 14 GB | Build-time numbers in `docs/development.md` | — |
 
 ## Desktop observations

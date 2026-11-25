@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/tank-keyhole-neck",
-  "label": "Tank keyhole neck",
+  "label": "Keyhole tank top",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -59,6 +59,7 @@
     ]
   },
   "tags": [
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "TankKeyholeNeck.png",

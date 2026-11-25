@@ -299,6 +299,13 @@ pub struct Parameter {
     /// human body's `frame` is Male (0) or Female (1).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub choices: Vec<Choice>,
+    /// The label of a slider beside the `choices` that sets a value
+    /// between them ("Masculine to feminine" under the human body's Male
+    /// and Female). With it the choices are named points of the range: a
+    /// value between two is kept, and wears what the nearest wears.
+    /// Unset, Character Studio keeps the parameter at one of its choices.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub between: Option<String>,
     /// One sentence: the friendly description and the tooltip.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub about: Option<String>,
@@ -330,7 +337,8 @@ pub struct Choice {
 }
 
 impl Parameter {
-    /// The choice nearest `value`, if the parameter has choices.
+    /// The choice nearest `value`, if the parameter has choices: of two
+    /// as near, the first (exactly halfway from Male to Female is Male).
     pub fn nearest_choice(&self, value: f32) -> Option<&Choice> {
         self.choices
             .iter()

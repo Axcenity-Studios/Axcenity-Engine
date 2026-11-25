@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/male-casualsuit04",
-  "label": "Male casualsuit04",
+  "label": "Layered T-shirt and jeans",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -103,7 +103,8 @@
   "tags": [
     "casual",
     "makehuman",
-    "male"
+    "male",
+    "masculine"
   ],
   "thumbnail": "MaleCasualsuit04.png",
   "source": {

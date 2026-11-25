@@ -9,8 +9,8 @@ The library's skeleton is Unreal's mannequin (`pelvis`, `spine_01`,
 `upperarm_l`, ...). Each of its bones that has a counterpart (`BONES`)
 gives that bone its turn: how far the take turns the library's bone from
 its rest, measured in the world, is applied to our bone from its own rest.
-A collarbone takes only where the library's points, from where it points
-standing at ease (`SWUNG`). The two
+A collarbone takes only where the library's points against the chest that
+carries it, from where it points standing at ease (`SWUNG`). The two
 skeletons rest in slightly different A-poses, so the limbs are
 first lined up (`ALIGNED`: our bone's direction at rest turned onto the
 library's, by the shortest way), and the hands by their whole frame (the
@@ -78,7 +78,16 @@ ALIGNED = _aligned()
 #: rests with its shoulders drawn back, 19 degrees behind where it stands,
 #: and ours rest where a person's hang; taken from its rest, every take
 #: rolled our shoulders forward.
+#:
+#: Where it points is measured **in the axes of the chest that carries it**
+#: (`CARRIER`), not in the world's: a collarbone shrugs and reaches against
+#: the ribcage. Measured in the world, a body that leaned, lay down or
+#: turned round left its collarbones behind, twisted about their own
+#: length by as much as the chest had turned (78 degrees crouching, 180 in
+#: the roll, and a turn of 160 degrees in one frame where a sword stroke
+#: spun the body past the point the shortest way round changes sides).
 SWUNG = {side + "Shoulder": f"upperarm_{s}" for side, s in SIDES}
+CARRIER = "spine_03"
 NEUTRAL = (1, "Idle_Loop")
 
 #: What the library's forward takes cover on the ground, metres a second
@@ -318,13 +327,17 @@ class Target:
                 world[name] = carried
                 continue
             if name in SWUNG:
-                # Only where it points: which way its end has gone from
-                # where it rests, by the shortest turn.
-                now = theirs[SWUNG[name]].to_translation() - theirs[counterpart].to_translation()
-                turn = _between(self.neutral[name], now)
+                # Only where it points, against the chest: which way its
+                # end has gone from where it is standing at ease, by the
+                # shortest turn, in the chest's axes. Our bone, as our
+                # chest carries it, is turned as far.
+                chest = _rotation(theirs[CARRIER])
+                now = chest.transposed() @ (theirs[SWUNG[name]].to_translation()
+                                            - theirs[counterpart].to_translation())
+                wanted = chest @ _between(self.neutral[name], now) @ chest.transposed() @ carried
             else:
                 turn = _rotation(theirs[counterpart]) @ self.source_rest[counterpart].transposed()
-            wanted = turn @ self.align.get(name, Matrix.Identity(3)) @ rest
+                wanted = turn @ self.align.get(name, Matrix.Identity(3)) @ rest
             world[name] = wanted
             local[name] = carried.transposed() @ wanted
         travel = (theirs["pelvis"].to_translation() - self.pelvis_rest) * self.reach
@@ -464,7 +477,8 @@ def bake(armature, paths, only=None):
             action = source.play(NEUTRAL[1])
             scene.frame_set(int(round(action.frame_range[0])))
             standing = source.pose()
-            neutral = {ours: standing[toward].to_translation() - standing[BONES[ours]].to_translation()
+            chest = _rotation(standing[CARRIER]).transposed()
+            neutral = {ours: chest @ (standing[toward].to_translation() - standing[BONES[ours]].to_translation())
                        for ours, toward in SWUNG.items()}
         target = Target(armature, source, neutral)
         for name, of_pack, theirs, loops in TAKES:

@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/male-casualsuit02",
-  "label": "Male casualsuit02",
+  "label": "Long-sleeved top and jeans",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -103,7 +103,8 @@
   "tags": [
     "casual",
     "makehuman",
-    "male"
+    "male",
+    "masculine"
   ],
   "thumbnail": "MaleCasualsuit02.png",
   "source": {

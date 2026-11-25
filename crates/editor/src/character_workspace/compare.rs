@@ -214,7 +214,7 @@ impl CharacterWorkspace {
                 self.other = Some(other);
                 self.other_applied = None;
                 // It moves as the current one does (Walk, a gesture).
-                self.pose_previews();
+                self.pose_previews(0.0);
                 other
             }
         };

@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/fedora-cocked",
-  "label": "Fedora cocked",
+  "label": "Fedora, tilted",
   "kind": "accessory",
   "slot": "headwear",
   "tier": "built_in",
@@ -116,7 +116,8 @@
   },
   "tags": [
     "hats",
-    "makehuman"
+    "makehuman",
+    "unisex"
   ],
   "thumbnail": "FedoraCocked.png",
   "source": {

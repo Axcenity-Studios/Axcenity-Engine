@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/crudelowsocks",
-  "label": "Crudelowsocks",
+  "label": "Low socks",
   "kind": "garment",
   "slot": "legwear",
   "layer": 0,
@@ -86,7 +86,8 @@
     ]
   },
   "tags": [
-    "makehuman"
+    "makehuman",
+    "unisex"
   ],
   "thumbnail": "Crudelowsocks.png",
   "source": {

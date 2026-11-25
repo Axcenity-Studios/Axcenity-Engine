@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/stockings-fishnet-small",
-  "label": "Stockings fishnet small",
+  "label": "Fishnet stockings, small",
   "kind": "garment",
   "slot": "legwear",
   "layer": 0,
@@ -85,6 +85,7 @@
     ]
   },
   "tags": [
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "StockingsFishnetSmall.png",

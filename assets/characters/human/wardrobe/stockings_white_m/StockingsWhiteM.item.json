@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/stockings-white-m",
-  "label": "Stockings white m",
+  "label": "White net stockings, medium",
   "kind": "garment",
   "slot": "legwear",
   "layer": 0,
@@ -85,6 +85,7 @@
     ]
   },
   "tags": [
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "StockingsWhiteM.png",

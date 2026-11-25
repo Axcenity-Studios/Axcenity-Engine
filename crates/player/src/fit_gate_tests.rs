@@ -810,7 +810,11 @@ fn human_clothes_cover_the_human_cast() {
     // 7.03 to 5.29 mm, the men's 1 body and 1.06 mm to 4 bodies and
     // 1.77 mm; and once more when the takes were baked on the human
     // base's own skeleton (ADR-0050; the arms and legs now point as the
-    // library's do): the men's 1.77 to 4.25 mm.
+    // library's do): the men's 1.77 to 4.25 mm. And when the collarbones
+    // were turned against the chest instead of the world (`mocap.SWUNG`,
+    // the motion review of 2026-11-25: in the jog they had been left 51
+    // degrees behind the leaning chest): hidden skin showing in the
+    // stride, 48.57 to 34.72 mm.
     let known = [
         ("FemaleCasualsuit01", "rest", 3, 0.00208),
         ("FemaleCasualsuit01", "TPose", 5, 0.00229),
@@ -819,7 +823,7 @@ fn human_clothes_cover_the_human_cast() {
         ("MaleCasualsuit01", "TPose", 1, 0.00100),
         ("MaleCasualsuit01", "Walk@18", 4, 0.00425),
         ("hidden skin showing", "rest", 8, 0.03450),
-        ("hidden skin showing", "Walk@18", 24, 0.04857),
+        ("hidden skin showing", "Walk@18", 24, 0.03472),
     ]
     .map(|(garment, pose, cases, worst)| Known {
         garment,
@@ -958,6 +962,16 @@ const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f
 /// are the same. Measured with the underwear not drawn under a top or a
 /// bottom (`Slot::hidden_by`): before that rule the same day, 145
 /// records, 25 of them the underwear through what was worn over it.
+/// The stride's records were measured again the same day when the
+/// collarbones were turned against the chest instead of the world
+/// (`mocap.SWUNG`, the motion review; ADR-0049, decision 5): 28 of them
+/// moved. Hidden skin showing fell on thirteen garments (the men's first
+/// casual suit 46.31 to 16.69 mm, the fifth 46.37 to 30.00 mm, the elegant
+/// suit 35.99 to 21.82 mm) and two records went; skin through the cloth
+/// rose on seven (the camisole 4.92 to 12.61 mm, the women's first casual
+/// suit 1.76 to 8.44 mm, the sport suit 1.76 to 7.43 mm) and two garments
+/// gained a record of 1 and 2 mm. The shoulders now sit on the chest as
+/// the library's do; the garments are as they were.
 /// Lower these as items improve; never raise one to pass an item.
 #[rustfmt::skip]
 const WARDROBE_KNOWN: [Known; 120] = [
@@ -972,26 +986,26 @@ const WARDROBE_KNOWN: [Known; 120] = [
     known("BoxerBriefs through SweaterFisherman", "Walk@18", 5, 0.00790),
     known("BoxerBriefs through SweaterFisherman", "rest", 3, 0.00769),
     known("CamisoleTop", "TPose", 4, 0.00754),
-    known("CamisoleTop", "Walk@18", 6, 0.00492),
+    known("CamisoleTop", "Walk@18", 6, 0.01261),
     known("CamisoleTop", "rest", 2, 0.00345),
     known("CamisoleTop: hidden skin showing", "TPose", 1, 0.02869),
-    known("CamisoleTop: hidden skin showing", "Walk@18", 1, 0.02452),
+    known("CamisoleTop: hidden skin showing", "Walk@18", 5, 0.02452),
     known("CamisoleTop: hidden skin showing", "rest", 1, 0.02869),
     known("CargoPants", "TPose", 1, 0.00140),
     known("CargoPants", "Walk@18", 6, 0.00991),
     known("CargoPants", "rest", 1, 0.00140),
     known("CrudeMaleShirt", "TPose", 1, 0.00104),
-    known("CrudeMaleShirt", "Walk@18", 5, 0.00245),
-    known("CrudeMaleShirt: hidden skin showing", "Walk@18", 6, 0.02042),
-    known("Crudefemaletshirt: hidden skin showing", "Walk@18", 4, 0.01383),
+    known("CrudeMaleShirt", "Walk@18", 5, 0.00302),
+    known("CrudeMaleShirt: hidden skin showing", "Walk@18", 6, 0.00731),
+    known("Crudefemaletshirt: hidden skin showing", "Walk@18", 6, 0.00598),
     known("FemaleCasualsuit01", "TPose", 2, 0.00206),
-    known("FemaleCasualsuit01", "Walk@18", 2, 0.00176),
+    known("FemaleCasualsuit01", "Walk@18", 3, 0.00844),
     known("FemaleCasualsuit01", "rest", 2, 0.00181),
-    known("FemaleCasualsuit01: hidden skin showing", "Walk@18", 3, 0.02122),
+    known("FemaleCasualsuit01: hidden skin showing", "Walk@18", 3, 0.02173),
     known("FemaleCasualsuit02", "TPose", 3, 0.02364),
     known("FemaleCasualsuit02", "Walk@18", 3, 0.02882),
     known("FemaleCasualsuit02", "rest", 3, 0.02364),
-    known("FemaleCasualsuit02: hidden skin showing", "Walk@18", 3, 0.02463),
+    known("FemaleCasualsuit02: hidden skin showing", "Walk@18", 3, 0.00811),
     known("FemaleElegantsuit01", "TPose", 3, 0.00330),
     known("FemaleElegantsuit01", "Walk@18", 3, 0.00281),
     known("FemaleElegantsuit01", "rest", 3, 0.00337),
@@ -1002,11 +1016,11 @@ const WARDROBE_KNOWN: [Known; 120] = [
     known("FemalePanties01", "Walk@18", 3, 0.01808),
     known("FemalePanties01", "rest", 3, 0.02260),
     known("FemaleSportsuit01", "TPose", 2, 0.00206),
-    known("FemaleSportsuit01", "Walk@18", 2, 0.00176),
+    known("FemaleSportsuit01", "Walk@18", 2, 0.00743),
     known("FemaleSportsuit01", "rest", 2, 0.00181),
-    known("FemaleSportsuit01: hidden skin showing", "Walk@18", 3, 0.03107),
+    known("FemaleSportsuit01: hidden skin showing", "Walk@18", 3, 0.02858),
     known("FemaleTop01", "TPose", 3, 0.01935),
-    known("FemaleTop01", "Walk@18", 3, 0.01460),
+    known("FemaleTop01", "Walk@18", 3, 0.01574),
     known("FemaleTop01", "rest", 3, 0.01612),
     known("JeanShorts", "Walk@18", 2, 0.00136),
     known("LegWarmerSocks", "TPose", 3, 0.00183),
@@ -1015,29 +1029,28 @@ const WARDROBE_KNOWN: [Known; 120] = [
     known("MaleCasualsuit01", "TPose", 1, 0.00179),
     known("MaleCasualsuit01", "Walk@18", 1, 0.00175),
     known("MaleCasualsuit01", "rest", 1, 0.00179),
-    known("MaleCasualsuit01: hidden skin showing", "Walk@18", 3, 0.04631),
+    known("MaleCasualsuit01: hidden skin showing", "Walk@18", 3, 0.01669),
     known("MaleCasualsuit01: hidden skin showing", "rest", 2, 0.03440),
-    known("MaleCasualsuit02: hidden skin showing", "Walk@18", 3, 0.01871),
+    known("MaleCasualsuit02: hidden skin showing", "Walk@18", 3, 0.01244),
     known("MaleCasualsuit03", "TPose", 2, 0.03431),
     known("MaleCasualsuit03", "Walk@18", 1, 0.03200),
     known("MaleCasualsuit03", "rest", 1, 0.03431),
-    known("MaleCasualsuit03: hidden skin showing", "Walk@18", 3, 0.02276),
-    known("MaleCasualsuit04: hidden skin showing", "Walk@18", 3, 0.01875),
+    known("MaleCasualsuit03: hidden skin showing", "Walk@18", 3, 0.01656),
+    known("MaleCasualsuit04", "Walk@18", 1, 0.00104),
+    known("MaleCasualsuit04: hidden skin showing", "Walk@18", 3, 0.01246),
     known("MaleCasualsuit05", "TPose", 2, 0.00480),
-    known("MaleCasualsuit05", "Walk@18", 1, 0.00256),
+    known("MaleCasualsuit05", "Walk@18", 2, 0.00371),
     known("MaleCasualsuit05", "rest", 2, 0.00364),
     known("MaleCasualsuit05: hidden skin showing", "TPose", 3, 0.03880),
-    known("MaleCasualsuit05: hidden skin showing", "Walk@18", 3, 0.04637),
+    known("MaleCasualsuit05: hidden skin showing", "Walk@18", 3, 0.03000),
     known("MaleCasualsuit05: hidden skin showing", "rest", 3, 0.04003),
-    known("MaleCasualsuit06", "Walk@18", 2, 0.01128),
     known("MaleCasualsuit06: hidden skin showing", "TPose", 1, 0.00754),
-    known("MaleCasualsuit06: hidden skin showing", "Walk@18", 2, 0.01912),
+    known("MaleCasualsuit06: hidden skin showing", "Walk@18", 3, 0.01187),
     known("MaleElegantsuit01", "TPose", 1, 0.02895),
     known("MaleElegantsuit01", "Walk@18", 1, 0.02836),
     known("MaleElegantsuit01", "rest", 1, 0.02895),
-    known("MaleElegantsuit01: hidden skin showing", "Walk@18", 3, 0.03599),
-    known("MaleWorksuit01", "Walk@18", 2, 0.00375),
-    known("MaleWorksuit01: hidden skin showing", "Walk@18", 6, 0.02469),
+    known("MaleElegantsuit01: hidden skin showing", "Walk@18", 3, 0.02182),
+    known("MaleWorksuit01: hidden skin showing", "Walk@18", 6, 0.02198),
     known("MaleWorksuit01: hidden skin showing", "rest", 3, 0.01791),
     known("PantsHarem", "TPose", 5, 0.00507),
     known("PantsHarem", "Walk@18", 5, 0.00759),
@@ -1072,9 +1085,10 @@ const WARDROBE_KNOWN: [Known; 120] = [
     known("SweaterFisherman", "Walk@18", 6, 0.01608),
     known("SweaterFisherman", "rest", 5, 0.00376),
     known("TShirtBasicTucked", "TPose", 3, 0.00286),
-    known("TShirtBasicTucked", "Walk@18", 6, 0.00538),
+    known("TShirtBasicTucked", "Walk@18", 6, 0.00411),
     known("TShirtBasicTucked", "rest", 2, 0.00290),
-    known("TankKeyholeNeck: hidden skin showing", "Walk@18", 1, 0.00496),
+    known("TankKeyholeNeck", "Walk@18", 2, 0.00171),
+    known("TankKeyholeNeck: hidden skin showing", "Walk@18", 2, 0.01621),
     known("TurtleneckHalter", "TPose", 6, 0.00997),
     known("TurtleneckHalter", "Walk@18", 6, 0.00897),
     known("TurtleneckHalter", "rest", 1, 0.00245),

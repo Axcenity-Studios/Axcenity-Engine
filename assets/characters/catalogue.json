@@ -40,7 +40,7 @@
     {
       "id": "makehuman/armsleeve-fishnet-large",
       "manifest": "human/wardrobe/armsleeve_fishnet_large/ArmsleeveFishnetLarge.item.json",
-      "label": "Armsleeve fishnet large",
+      "label": "Fishnet sleeves, large",
       "kind": "garment",
       "slot": "gloves",
       "tier": "built_in",
@@ -48,6 +48,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/armsleeve_fishnet_large/ArmsleeveFishnetLarge.png"
@@ -55,7 +56,7 @@
     {
       "id": "makehuman/armsleeve-fishnet-medium",
       "manifest": "human/wardrobe/armsleeve_fishnet_medium/ArmsleeveFishnetMedium.item.json",
-      "label": "Armsleeve fishnet medium",
+      "label": "Fishnet sleeves, medium",
       "kind": "garment",
       "slot": "gloves",
       "tier": "built_in",
@@ -63,6 +64,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/armsleeve_fishnet_medium/ArmsleeveFishnetMedium.png"
@@ -70,7 +72,7 @@
     {
       "id": "makehuman/armsleeve-fishnet-small",
       "manifest": "human/wardrobe/armsleeve_fishnet_small/ArmsleeveFishnetSmall.item.json",
-      "label": "Armsleeve fishnet small",
+      "label": "Fishnet sleeves, small",
       "kind": "garment",
       "slot": "gloves",
       "tier": "built_in",
@@ -78,6 +80,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/armsleeve_fishnet_small/ArmsleeveFishnetSmall.png"
@@ -85,7 +88,7 @@
     {
       "id": "makehuman/armsleeve-white-l",
       "manifest": "human/wardrobe/armsleeve_white_l/ArmsleeveWhiteL.item.json",
-      "label": "Armsleeve white l",
+      "label": "White net sleeves, large",
       "kind": "garment",
       "slot": "gloves",
       "tier": "built_in",
@@ -93,6 +96,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/armsleeve_white_l/ArmsleeveWhiteL.png"
@@ -100,7 +104,7 @@
     {
       "id": "makehuman/armsleeve-white-m",
       "manifest": "human/wardrobe/armsleeve_white_m/ArmsleeveWhiteM.item.json",
-      "label": "Armsleeve white m",
+      "label": "White net sleeves, medium",
       "kind": "garment",
       "slot": "gloves",
       "tier": "built_in",
@@ -108,6 +112,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/armsleeve_white_m/ArmsleeveWhiteM.png"
@@ -115,7 +120,7 @@
     {
       "id": "makehuman/armsleeve-white-s",
       "manifest": "human/wardrobe/armsleeve_white_s/ArmsleeveWhiteS.item.json",
-      "label": "Armsleeve white s",
+      "label": "White net sleeves, small",
       "kind": "garment",
       "slot": "gloves",
       "tier": "built_in",
@@ -123,6 +128,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/armsleeve_white_s/ArmsleeveWhiteS.png"
@@ -130,7 +136,7 @@
     {
       "id": "makehuman/bodice-style-top",
       "manifest": "human/wardrobe/bodice_style_top/BodiceStyleTop.item.json",
-      "label": "Bodice style top",
+      "label": "Bodice top",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -138,6 +144,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/bodice_style_top/BodiceStyleTop.png"
@@ -153,6 +160,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/camisole_top/CamisoleTop.png"
@@ -168,14 +176,15 @@
         "axcenity/human"
       ],
       "tags": [
-        "makehuman"
+        "makehuman",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/cargo_pants/CargoPants.png"
     },
     {
       "id": "makehuman/crude-male-shirt",
       "manifest": "human/wardrobe/crude_male_shirt/CrudeMaleShirt.item.json",
-      "label": "Crude male shirt",
+      "label": "White T-shirt",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -183,14 +192,15 @@
         "axcenity/human"
       ],
       "tags": [
-        "makehuman"
+        "makehuman",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/crude_male_shirt/CrudeMaleShirt.png"
     },
     {
       "id": "makehuman/crudefemaletshirt",
       "manifest": "human/wardrobe/crudefemaletshirt/Crudefemaletshirt.item.json",
-      "label": "Crudefemaletshirt",
+      "label": "White T-shirt",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -198,6 +208,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/crudefemaletshirt/Crudefemaletshirt.png"
@@ -205,7 +216,7 @@
     {
       "id": "makehuman/crudehighsocks",
       "manifest": "human/wardrobe/crudehighsocks/Crudehighsocks.item.json",
-      "label": "Crudehighsocks",
+      "label": "High socks",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -213,14 +224,15 @@
         "axcenity/human"
       ],
       "tags": [
-        "makehuman"
+        "makehuman",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/crudehighsocks/Crudehighsocks.png"
     },
     {
       "id": "makehuman/crudelowsocks",
       "manifest": "human/wardrobe/crudelowsocks/Crudelowsocks.item.json",
-      "label": "Crudelowsocks",
+      "label": "Low socks",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -228,7 +240,8 @@
         "axcenity/human"
       ],
       "tags": [
-        "makehuman"
+        "makehuman",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/crudelowsocks/Crudelowsocks.png"
     },
@@ -244,14 +257,15 @@
       ],
       "tags": [
         "hats",
-        "makehuman"
+        "makehuman",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/fedora/Fedora.png"
     },
     {
       "id": "makehuman/fedora-cocked",
       "manifest": "human/wardrobe/fedora_cocked/FedoraCocked.item.json",
-      "label": "Fedora cocked",
+      "label": "Fedora, tilted",
       "kind": "accessory",
       "slot": "headwear",
       "tier": "built_in",
@@ -260,7 +274,8 @@
       ],
       "tags": [
         "hats",
-        "makehuman"
+        "makehuman",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/fedora_cocked/FedoraCocked.png"
     },
@@ -277,6 +292,7 @@
       "tags": [
         "casual",
         "female",
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/female_casualsuit01/FemaleCasualsuit01.png"
@@ -284,7 +300,7 @@
     {
       "id": "makehuman/female-casualsuit02",
       "manifest": "human/wardrobe/female_casualsuit02/FemaleCasualsuit02.item.json",
-      "label": "Female casualsuit02",
+      "label": "T-shirt and jean shorts",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -294,6 +310,7 @@
       "tags": [
         "casual",
         "female",
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/female_casualsuit02/FemaleCasualsuit02.png"
@@ -301,7 +318,7 @@
     {
       "id": "makehuman/female-elegantsuit01",
       "manifest": "human/wardrobe/female_elegantsuit01/FemaleElegantsuit01.item.json",
-      "label": "Female elegantsuit01",
+      "label": "Blouse and skirt",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -311,6 +328,7 @@
       "tags": [
         "elegant",
         "female",
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/female_elegantsuit01/FemaleElegantsuit01.png"
@@ -318,7 +336,7 @@
     {
       "id": "makehuman/female-panties-01",
       "manifest": "human/wardrobe/female_panties_01/FemalePanties01.item.json",
-      "label": "Female panties 01",
+      "label": "Panties",
       "kind": "garment",
       "slot": "bottom",
       "tier": "built_in",
@@ -327,6 +345,7 @@
       ],
       "tags": [
         "female",
+        "feminine",
         "makehuman",
         "panties",
         "underwear"
@@ -336,7 +355,7 @@
     {
       "id": "makehuman/female-sportsuit01",
       "manifest": "human/wardrobe/female_sportsuit01/FemaleSportsuit01.item.json",
-      "label": "Female sportsuit01",
+      "label": "Crop top and leggings",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -345,6 +364,7 @@
       ],
       "tags": [
         "female",
+        "feminine",
         "makehuman",
         "sport"
       ],
@@ -353,7 +373,7 @@
     {
       "id": "makehuman/female-top-01",
       "manifest": "human/wardrobe/female_top_01/FemaleTop01.item.json",
-      "label": "Female top 01",
+      "label": "Bra top",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -362,6 +382,7 @@
       ],
       "tags": [
         "female",
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/female_top_01/FemaleTop01.png"
@@ -379,7 +400,8 @@
       "tags": [
         "coily",
         "makehuman",
-        "short"
+        "short",
+        "unisex"
       ],
       "thumbnail": "human/hair/afro01/HairAfro01.png"
     },
@@ -394,6 +416,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman",
         "medium",
         "straight"
@@ -411,6 +434,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "fringe",
         "makehuman",
         "medium",
@@ -421,7 +445,7 @@
     {
       "id": "makehuman/hair-braid01",
       "manifest": "human/hair/braid01/HairBraid01.item.json",
-      "label": "Braid01",
+      "label": "Long braid",
       "kind": "groom",
       "slot": "hair",
       "tier": "built_in",
@@ -429,7 +453,11 @@
         "axcenity/human"
       ],
       "tags": [
-        "makehuman"
+        "braided",
+        "feminine",
+        "long",
+        "makehuman",
+        "tied"
       ],
       "thumbnail": "human/hair/braid01/HairBraid01.png"
     },
@@ -446,7 +474,8 @@
       "tags": [
         "long",
         "makehuman",
-        "straight"
+        "straight",
+        "unisex"
       ],
       "thumbnail": "human/hair/long01/HairLong01.png"
     },
@@ -461,6 +490,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "long",
         "makehuman",
         "tied"
@@ -479,6 +509,7 @@
       ],
       "tags": [
         "makehuman",
+        "masculine",
         "short"
       ],
       "thumbnail": "human/hair/short01/HairShort01.png"
@@ -495,7 +526,8 @@
       ],
       "tags": [
         "makehuman",
-        "short"
+        "short",
+        "unisex"
       ],
       "thumbnail": "human/hair/short02/HairShort02.png"
     },
@@ -511,7 +543,8 @@
       ],
       "tags": [
         "makehuman",
-        "short"
+        "short",
+        "unisex"
       ],
       "thumbnail": "human/hair/short03/HairShort03.png"
     },
@@ -527,6 +560,7 @@
       ],
       "tags": [
         "makehuman",
+        "masculine",
         "short"
       ],
       "thumbnail": "human/hair/short04/HairShort04.png"
@@ -542,6 +576,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/jean_shorts/JeanShorts.png"
@@ -549,7 +584,7 @@
     {
       "id": "makehuman/leg-warmer-socks",
       "manifest": "human/wardrobe/leg_warmer_socks/LegWarmerSocks.item.json",
-      "label": "Leg warmer socks",
+      "label": "Leg warmers",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -557,6 +592,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman",
         "socks"
       ],
@@ -575,14 +611,15 @@
       "tags": [
         "casual",
         "makehuman",
-        "male"
+        "male",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/male_casualsuit01/MaleCasualsuit01.png"
     },
     {
       "id": "makehuman/male-casualsuit02",
       "manifest": "human/wardrobe/male_casualsuit02/MaleCasualsuit02.item.json",
-      "label": "Male casualsuit02",
+      "label": "Long-sleeved top and jeans",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -592,14 +629,15 @@
       "tags": [
         "casual",
         "makehuman",
-        "male"
+        "male",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/male_casualsuit02/MaleCasualsuit02.png"
     },
     {
       "id": "makehuman/male-casualsuit03",
       "manifest": "human/wardrobe/male_casualsuit03/MaleCasualsuit03.item.json",
-      "label": "Male casualsuit03",
+      "label": "Striped shirt and jeans",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -609,14 +647,15 @@
       "tags": [
         "casual",
         "makehuman",
-        "male"
+        "male",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/male_casualsuit03/MaleCasualsuit03.png"
     },
     {
       "id": "makehuman/male-casualsuit04",
       "manifest": "human/wardrobe/male_casualsuit04/MaleCasualsuit04.item.json",
-      "label": "Male casualsuit04",
+      "label": "Layered T-shirt and jeans",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -626,14 +665,15 @@
       "tags": [
         "casual",
         "makehuman",
-        "male"
+        "male",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/male_casualsuit04/MaleCasualsuit04.png"
     },
     {
       "id": "makehuman/male-casualsuit05",
       "manifest": "human/wardrobe/male_casualsuit05/MaleCasualsuit05.item.json",
-      "label": "Male casualsuit05",
+      "label": "Jacket and jeans",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -643,14 +683,15 @@
       "tags": [
         "casual",
         "makehuman",
-        "male"
+        "male",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/male_casualsuit05/MaleCasualsuit05.png"
     },
     {
       "id": "makehuman/male-casualsuit06",
       "manifest": "human/wardrobe/male_casualsuit06/MaleCasualsuit06.item.json",
-      "label": "Male casualsuit06",
+      "label": "Grey T-shirt and jeans",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -660,14 +701,15 @@
       "tags": [
         "casual",
         "makehuman",
-        "male"
+        "male",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/male_casualsuit06/MaleCasualsuit06.png"
     },
     {
       "id": "makehuman/male-elegantsuit01",
       "manifest": "human/wardrobe/male_elegantsuit01/MaleElegantsuit01.item.json",
-      "label": "Male elegantsuit01",
+      "label": "Suit and tie",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -677,14 +719,15 @@
       "tags": [
         "elegant",
         "makehuman",
-        "male"
+        "male",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/male_elegantsuit01/MaleElegantsuit01.png"
     },
     {
       "id": "makehuman/male-worksuit01",
       "manifest": "human/wardrobe/male_worksuit01/MaleWorksuit01.item.json",
-      "label": "Male worksuit01",
+      "label": "Overalls",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -692,14 +735,15 @@
         "axcenity/human"
       ],
       "tags": [
-        "makehuman"
+        "makehuman",
+        "masculine"
       ],
       "thumbnail": "human/wardrobe/male_worksuit01/MaleWorksuit01.png"
     },
     {
       "id": "makehuman/pants-harem",
       "manifest": "human/wardrobe/pants_harem/PantsHarem.item.json",
-      "label": "Pants harem",
+      "label": "Harem pants",
       "kind": "garment",
       "slot": "bottom",
       "tier": "built_in",
@@ -707,6 +751,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/pants_harem/PantsHarem.png"
@@ -714,7 +759,7 @@
     {
       "id": "makehuman/pants-wool",
       "manifest": "human/wardrobe/pants_wool/PantsWool.item.json",
-      "label": "Pants wool",
+      "label": "Wool trousers",
       "kind": "garment",
       "slot": "bottom",
       "tier": "built_in",
@@ -724,6 +769,7 @@
       "tags": [
         "makehuman",
         "male",
+        "masculine",
         "pants"
       ],
       "thumbnail": "human/wardrobe/pants_wool/PantsWool.png"
@@ -731,7 +777,7 @@
     {
       "id": "makehuman/polo-t-shirt",
       "manifest": "human/wardrobe/polo-t-shirt/PoloTShirt.item.json",
-      "label": "Polo t shirt",
+      "label": "Polo shirt",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -743,6 +789,7 @@
         "contemporary",
         "makehuman",
         "male",
+        "masculine",
         "profession"
       ],
       "thumbnail": "human/wardrobe/polo-t-shirt/PoloTShirt.png"
@@ -759,14 +806,15 @@
       ],
       "tags": [
         "makehuman",
-        "shoes"
+        "shoes",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/shoes01/Shoes01.png"
     },
     {
       "id": "makehuman/shoes02",
       "manifest": "human/wardrobe/shoes02/Shoes02.item.json",
-      "label": "Shoes02",
+      "label": "Olive shoes",
       "kind": "garment",
       "slot": "shoes",
       "tier": "built_in",
@@ -775,14 +823,15 @@
       ],
       "tags": [
         "makehuman",
-        "shoes"
+        "shoes",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/shoes02/Shoes02.png"
     },
     {
       "id": "makehuman/shoes03",
       "manifest": "human/wardrobe/shoes03/Shoes03.item.json",
-      "label": "Shoes03",
+      "label": "Black shoes, black socks",
       "kind": "garment",
       "slot": "shoes",
       "tier": "built_in",
@@ -791,7 +840,8 @@
       ],
       "tags": [
         "makehuman",
-        "shoes"
+        "shoes",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/shoes03/Shoes03.png"
     },
@@ -807,14 +857,15 @@
       ],
       "tags": [
         "makehuman",
-        "shoes"
+        "shoes",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/shoes04/Shoes04.png"
     },
     {
       "id": "makehuman/shoes05",
       "manifest": "human/wardrobe/shoes05/Shoes05.item.json",
-      "label": "Shoes05",
+      "label": "Light grey shoes",
       "kind": "garment",
       "slot": "shoes",
       "tier": "built_in",
@@ -823,14 +874,15 @@
       ],
       "tags": [
         "makehuman",
-        "shoes"
+        "shoes",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/shoes05/Shoes05.png"
     },
     {
       "id": "makehuman/shoes06",
       "manifest": "human/wardrobe/shoes06/Shoes06.item.json",
-      "label": "Shoes06",
+      "label": "Navy shoes",
       "kind": "garment",
       "slot": "shoes",
       "tier": "built_in",
@@ -839,14 +891,15 @@
       ],
       "tags": [
         "makehuman",
-        "shoes"
+        "shoes",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/shoes06/Shoes06.png"
     },
     {
       "id": "makehuman/sockslacefrill",
       "manifest": "human/wardrobe/sockslacefrill/Sockslacefrill.item.json",
-      "label": "Sockslacefrill",
+      "label": "Lace frill socks",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -854,6 +907,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman",
         "socks"
       ],
@@ -862,7 +916,7 @@
     {
       "id": "makehuman/stockings-fishnet-large",
       "manifest": "human/wardrobe/stockings_fishnet_large/StockingsFishnetLarge.item.json",
-      "label": "Stockings fishnet large",
+      "label": "Fishnet stockings, large",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -870,6 +924,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/stockings_fishnet_large/StockingsFishnetLarge.png"
@@ -877,7 +932,7 @@
     {
       "id": "makehuman/stockings-fishnet-medium",
       "manifest": "human/wardrobe/stockings_fishnet_medium/StockingsFishnetMedium.item.json",
-      "label": "Stockings fishnet medium",
+      "label": "Fishnet stockings, medium",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -885,6 +940,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/stockings_fishnet_medium/StockingsFishnetMedium.png"
@@ -892,7 +948,7 @@
     {
       "id": "makehuman/stockings-fishnet-small",
       "manifest": "human/wardrobe/stockings_fishnet_small/StockingsFishnetSmall.item.json",
-      "label": "Stockings fishnet small",
+      "label": "Fishnet stockings, small",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -900,6 +956,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/stockings_fishnet_small/StockingsFishnetSmall.png"
@@ -907,7 +964,7 @@
     {
       "id": "makehuman/stockings-white-l",
       "manifest": "human/wardrobe/stockings_white_l/StockingsWhiteL.item.json",
-      "label": "Stockings white l",
+      "label": "White net stockings, large",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -915,6 +972,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/stockings_white_l/StockingsWhiteL.png"
@@ -922,7 +980,7 @@
     {
       "id": "makehuman/stockings-white-m",
       "manifest": "human/wardrobe/stockings_white_m/StockingsWhiteM.item.json",
-      "label": "Stockings white m",
+      "label": "White net stockings, medium",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -930,6 +988,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/stockings_white_m/StockingsWhiteM.png"
@@ -937,7 +996,7 @@
     {
       "id": "makehuman/stockings-white-s",
       "manifest": "human/wardrobe/stockings_white_s/StockingsWhiteS.item.json",
-      "label": "Stockings white s",
+      "label": "White net stockings, small",
       "kind": "garment",
       "slot": "legwear",
       "tier": "built_in",
@@ -945,6 +1004,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/stockings_white_s/StockingsWhiteS.png"
@@ -952,7 +1012,7 @@
     {
       "id": "makehuman/sweater-fisherman",
       "manifest": "human/wardrobe/sweater_fisherman/SweaterFisherman.item.json",
-      "label": "Sweater fisherman",
+      "label": "Fisherman sweater",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -962,6 +1022,7 @@
       "tags": [
         "knit",
         "makehuman",
+        "masculine",
         "shirt",
         "sweater",
         "top"
@@ -971,7 +1032,7 @@
     {
       "id": "makehuman/t-shirt-basic-tucked",
       "manifest": "human/wardrobe/t-shirt_basic_tucked/TShirtBasicTucked.item.json",
-      "label": "T shirt basic tucked",
+      "label": "Tucked T-shirt",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -984,14 +1045,15 @@
         "makehuman",
         "shirt",
         "t-shirt",
-        "top"
+        "top",
+        "unisex"
       ],
       "thumbnail": "human/wardrobe/t-shirt_basic_tucked/TShirtBasicTucked.png"
     },
     {
       "id": "makehuman/tank-keyhole-neck",
       "manifest": "human/wardrobe/tank_keyhole_neck/TankKeyholeNeck.item.json",
-      "label": "Tank keyhole neck",
+      "label": "Keyhole tank top",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -999,6 +1061,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/tank_keyhole_neck/TankKeyholeNeck.png"
@@ -1006,7 +1069,7 @@
     {
       "id": "makehuman/turtleneck-halter",
       "manifest": "human/wardrobe/turtleneck_halter/TurtleneckHalter.item.json",
-      "label": "Turtleneck halter",
+      "label": "Halter turtleneck",
       "kind": "garment",
       "slot": "top",
       "tier": "built_in",
@@ -1014,6 +1077,7 @@
         "axcenity/human"
       ],
       "tags": [
+        "feminine",
         "makehuman"
       ],
       "thumbnail": "human/wardrobe/turtleneck_halter/TurtleneckHalter.png"

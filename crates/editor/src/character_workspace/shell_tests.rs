@@ -1032,6 +1032,14 @@ pub(super) fn snap(
     // Each snapshot makes its own GPU device; the editor has one.
     workspace.canvas = Canvas::default();
     workspace.other_canvas = Canvas::default();
+    // And its own egui context: a tile's picture loaded in another one's
+    // is some other texture here (tiles showed each other's pictures).
+    workspace.item_pictures.clear();
+    workspace.preset_pictures.clear();
+    workspace.pictures = thumbnails::Thumbnails::default();
+    workspace
+        .pictures
+        .set_folder(Some(workspace.folder.clone()));
     crate::snapshot::snapshot_rendered(
         &snapshots.join(format!("character-studio-page-{name}.png")),
         egui::vec2(1440.0, 900.0),

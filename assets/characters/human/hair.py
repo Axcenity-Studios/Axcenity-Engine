@@ -44,6 +44,7 @@ sys.path.insert(0, HERE)
 import bpy  # noqa: E402
 
 import build as body_build  # noqa: E402
+import cut  # noqa: E402
 import manifests  # noqa: E402
 import mh  # noqa: E402
 import wardrobe  # noqa: E402
@@ -323,8 +324,9 @@ def main():
                                **({"values": VALUES} if args.shading == "hair" else {})}],
                 "fit": {"method": "shapes", "follows": sorted(set(shapes) & carried)},
                 "groom": {"mesh": {"file": name + ".glb", "object": f"{manifests.ARMATURE}/{name}"}},
-                "tags": sorted(set(words) | {"makehuman"}),
             }
+            # Its own tags, and who it is made for (`cut.py`).
+            item["tags"] = cut.tags_with_cut(item["id"], set(words) | {"makehuman"})
             if args.shading == "hair":
                 # Not the variants that need a data map (dark roots, streaks).
                 item["variants"] = [{"id": vid, "label": vlabel,

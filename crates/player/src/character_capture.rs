@@ -26,9 +26,10 @@
 //! writes `<name>/<light>-<view>.png` at 1280 × 720 and a contact sheet
 //! `<name>.png` (every view under every light, at half size), and
 //! `captures.json` listing what was drawn and the level of detail each
-//! part was drawn at in each view (in the full-body views small parts are
-//! drawn from simpler copies, as in a game; the face view is full
-//! detail). Optional:
+//! part was drawn at in each view, for parts that have simpler copies (in
+//! the full-body views a small part is drawn from one, as in a game; the
+//! face view is full detail; the human base's parts have none, so none
+//! is listed for it). Optional:
 //! `AXCENITY_CAPTURE_LIBRARY` (the character library to use; the
 //! repository's `assets/characters` otherwise), `AXCENITY_CAPTURE_SIZE`
 //! (`1920x1080`), `AXCENITY_CAPTURE_POSE` (`rest`, the A-pose, `idle`, or
@@ -49,7 +50,7 @@
 //!   and cameras, by name, separated by `,` (from [`LIGHTS`] and
 //!   [`MORE_LIGHTS`]: `studio`, `hard`, `warm`, `cool`, `outdoor`; from
 //!   [`VIEWS`] and [`MORE_VIEWS`]: the six above and `face-three-quarter`,
-//!   `face-side`, `skin-close`; from [`HAIR_VIEWS`], R6: `hair-back`,
+//!   `face-side`, `skin-close`, `far`, `farther`; from [`HAIR_VIEWS`], R6: `hair-back`,
 //!   `hair-top`, `hair-hairline`, `hair-temple`, `hair-crown`,
 //!   `hair-nape`). The sheet has a row per light and a column per view,
 //!   as before.
@@ -73,6 +74,32 @@
 //!   reach), or with `all` ray traced ambient occlusion and reflections
 //!   too, on a GPU with ray queries (CO8: they trace the posed characters).
 //!   Every preset has them off, so unset nothing is ray traced.
+//! - `AXCENITY_CAPTURE_FILM=Walk:12,Jump` ([`capture_film`]): motion, where
+//!   a pose shows one moment. Each named clip of the default character
+//!   (a state's name: `assets/animations/Humanoid/<name>.anim.json`) is
+//!   played alone and drawn at that many times spread evenly over its
+//!   whole length, its first and last frames among them (10 when left
+//!   out), written as one sheet per character and clip,
+//!   `<name>-film-<clip>.png` (a row per light and view, a column per
+//!   time, left to right), and the pictures as
+//!   `<name>/film/<clip>/<light>-<view>-<index>.png`. Lights default to
+//!   `studio`. A looping clip's last column is drawn just before its end,
+//!   so a loop that doesn't close shows as a last column unlike the
+//!   first.
+//! - `AXCENITY_CAPTURE_MACHINE=Idle@0,Walk@0.5,Jump@1.5~0.1,until=2.5,shots=16`
+//!   ([`capture_machine`]): the default state machine as a game plays it.
+//!   Each `State@seconds` asks the Animator for that state at that time
+//!   (`~seconds` gives the blend, the Animator's own when left out), as the
+//!   Humanoid does; the character is drawn `shots` times spread evenly
+//!   from 0 to `until` seconds (16 shots, and half a second past the last
+//!   request, when left out), written as `<name>-machine.png` (a row per
+//!   light and view, a column per time) and
+//!   `<name>/machine/<light>-<view>-<index>.png`. It shows what a single
+//!   clip can't: the blends between states. The character stays where it
+//!   stands (no controller moves it).
+//! - `AXCENITY_CAPTURE_FRAMES=<n>`: how many frames are drawn before a
+//!   picture is read (48 unset, which is what TAA needs to settle; fewer
+//!   is faster and enough to judge a pose).
 
 use std::path::{Path, PathBuf};
 
@@ -200,7 +227,23 @@ fn head_lift(world: &World, assets: &Assets, animators: &Animators) -> f32 {
 /// Cameras beside [`VIEWS`] (refinement R1, brief §17.2's face and skin
 /// tests), drawn only when named (`AXCENITY_CAPTURE_VIEWS`) or by a suite,
 /// so the default run and its sheet stay as they were.
-pub(crate) const MORE_VIEWS: [View; 3] = [
+pub(crate) const MORE_VIEWS: [View; 5] = [
+    // The whole character from three and from six times `front`'s
+    // distance: about a third and a sixth of the picture's height, where
+    // a part is small enough on screen to be drawn from a simpler copy if
+    // it has one (a fault that shows only from far away shows here).
+    View {
+        name: "far",
+        eye: [0.0, 2.6, -28.5],
+        target: [0.0, 2.6, 0.0],
+        fov: 35.0,
+    },
+    View {
+        name: "farther",
+        eye: [0.0, 2.6, -57.0],
+        target: [0.0, 2.6, 0.0],
+        fov: 35.0,
+    },
     // The face at 45 degrees and in profile, at `face`'s distance.
     View {
         name: "face-three-quarter",
@@ -1221,6 +1264,207 @@ pub(crate) fn capture_suite(
         .collect()
 }
 
+/// The clips `AXCENITY_CAPTURE_FILM` names with how many times each is
+/// drawn at (`Walk:12,Jump`; 10 when left out, never fewer than 2).
+pub(crate) fn film_named(text: &str) -> Result<Vec<(&'static str, usize)>, String> {
+    text.split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .map(|entry| {
+            let (name, count) = entry.split_once(':').unwrap_or((entry, "10"));
+            let count: usize = count
+                .parse()
+                .map_err(|_| format!("`{entry}`: a film is `Clip` or `Clip:count`"))?;
+            // Kept for the run: a capture is one process.
+            let name: &'static str = Box::leak(name.trim().to_owned().into_boxed_str());
+            Ok((name, count.max(2)))
+        })
+        .collect()
+}
+
+/// How long the default character's clip `name` is, in seconds.
+fn clip_length(name: &str) -> Result<f64, String> {
+    let path = format!(
+        "{}/{name}.anim.json",
+        axcenity_project::DEFAULT_HUMANOID_CLIPS_FOLDER
+    );
+    axcenity_project::default_humanoid_animation_files()
+        .into_iter()
+        .find(|(file, _)| *file == path)
+        .and_then(|(_, text)| axcenity_anim::ClipFile::from_json(&text).ok())
+        .map(|clip| clip.duration)
+        .ok_or_else(|| format!("the default character has no clip `{name}`"))
+}
+
+/// Draws the default character's clip `clip`, played alone on
+/// `description`'s character, at `count` times spread evenly over its
+/// length (the first and the last frame among them), from each of `views`
+/// under each of `lights`. Returns the shots a row at a time (a row per
+/// light and view, a column per time) and the times.
+#[allow(clippy::too_many_arguments)] // The capture's own inputs and the film's two.
+pub(crate) fn capture_film(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    assets: &Assets,
+    description: &Description,
+    settings: Settings,
+    (clip, count): (&'static str, usize),
+    lights: &[Lit],
+    views: &[&View],
+) -> Result<(Vec<Shot>, Vec<f64>), String> {
+    let length = clip_length(clip)?;
+    let stance = Stance::Clip {
+        name: clip,
+        frames: 2,
+    };
+    let (mut world, mut animators) = stage_world(assets, description, stance, settings.face)?;
+    let animation = world
+        .all_below(world.workspace(), |class| class == ClassName::Animation)
+        .into_iter()
+        .next()
+        .ok_or("the stage has no Animation")?;
+    let count = count.max(2);
+    let times: Vec<f64> = (0..count)
+        .map(|index| {
+            let time = length * index as f64 / (count - 1) as f64;
+            // Just short of the end: a looping clip at its end is at its
+            // start again.
+            time.min(length - 1e-4).max(0.0)
+        })
+        .collect();
+    let rows = lights.len() * views.len();
+    let mut columns: Vec<Vec<Shot>> = Vec::with_capacity(count);
+    for &time in &times {
+        if let Some(state) = world.property_animation_mut(animation) {
+            state.seek = Some(time);
+        }
+        // No time passes: the clip stays where it was put.
+        animators.update(&mut world, assets, 0.0);
+        let errors = animators.take_errors();
+        if !errors.is_empty() {
+            return Err(errors.join("; "));
+        }
+        columns.push(draw_staged(
+            device, queue, assets, &mut world, &animators, settings, lights, views,
+        )?);
+    }
+    // A row per light and view, each in the order of the times.
+    let mut columns: Vec<_> = columns.into_iter().map(Vec::into_iter).collect();
+    let mut shots = Vec::with_capacity(rows * count);
+    for _ in 0..rows {
+        for column in &mut columns {
+            shots.extend(column.next());
+        }
+    }
+    Ok((shots, times))
+}
+
+/// What `AXCENITY_CAPTURE_MACHINE` asks for: the states to play with
+/// when and how blended, how long the film runs and how many shots.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct MachineFilm {
+    pub plays: Vec<(String, f64, Option<f64>)>,
+    pub until: f64,
+    pub shots: usize,
+}
+
+/// `AXCENITY_CAPTURE_MACHINE`'s value (`Idle@0,Walk@0.5~0.1,until=2,shots=12`).
+pub(crate) fn machine_named(text: &str) -> Result<MachineFilm, String> {
+    let (mut plays, mut until, mut shots) = (Vec::new(), None, 16);
+    for entry in text.split(',').map(str::trim).filter(|e| !e.is_empty()) {
+        let number = |value: &str| {
+            value
+                .trim()
+                .parse::<f64>()
+                .map_err(|_| format!("`{entry}`: `{value}` isn't a number"))
+        };
+        if let Some(value) = entry.strip_prefix("until=") {
+            until = Some(number(value)?);
+        } else if let Some(value) = entry.strip_prefix("shots=") {
+            shots = number(value)?.max(2.0) as usize;
+        } else {
+            let (state, when) = entry
+                .split_once('@')
+                .ok_or_else(|| format!("`{entry}`: a play is `State@seconds`"))?;
+            let (when, blend) = match when.split_once('~') {
+                Some((when, blend)) => (number(when)?, Some(number(blend)?)),
+                None => (number(when)?, None),
+            };
+            plays.push((state.trim().to_owned(), when, blend));
+        }
+    }
+    let last = plays.iter().map(|play| play.1).fold(0.0, f64::max);
+    Ok(MachineFilm {
+        plays,
+        until: until.unwrap_or(last + 0.5).max(1.0 / 60.0),
+        shots,
+    })
+}
+
+/// Draws `description`'s character as its state machine plays `film`:
+/// the states asked for at their times, as the Humanoid asks, stepped 60
+/// times a second and drawn at the film's shots. Returns the shots a row
+/// at a time (a row per light and view, a column per time) and the times.
+#[allow(clippy::too_many_arguments)] // The capture's own inputs and the film.
+pub(crate) fn capture_machine(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    assets: &Assets,
+    description: &Description,
+    settings: Settings,
+    film: &MachineFilm,
+    lights: &[Lit],
+    views: &[&View],
+) -> Result<(Vec<Shot>, Vec<f64>), String> {
+    const STEP: f64 = 1.0 / 60.0;
+    let (mut world, mut animators) = stage_world(assets, description, Stance::Idle, settings.face)?;
+    let animator = world
+        .all_below(world.workspace(), |class| class == ClassName::Animator)
+        .into_iter()
+        .next()
+        .ok_or("the stage has no Animator")?;
+    let steps = (film.until / STEP).round() as usize;
+    let shot_at = |index: usize| index * steps / (film.shots - 1).max(1);
+    let mut columns: Vec<Vec<Shot>> = Vec::with_capacity(film.shots);
+    let mut times = Vec::with_capacity(film.shots);
+    let mut next_shot = 0;
+    for step in 0..=steps {
+        let (from, to) = ((step as f64 - 1.0) * STEP, step as f64 * STEP);
+        for (state, when, blend) in &film.plays {
+            if *when > from + 1e-9
+                && *when <= to + 1e-9
+                && let Some(live) = world.animator_mut(animator)
+            {
+                live.play = Some(axcenity_core::PlayRequest {
+                    state: state.clone(),
+                    blend: *blend,
+                });
+            }
+        }
+        animators.update(&mut world, assets, if step == 0 { 0.0 } else { STEP });
+        let errors = animators.take_errors();
+        if !errors.is_empty() {
+            return Err(errors.join("; "));
+        }
+        while next_shot < film.shots && shot_at(next_shot) == step {
+            columns.push(draw_staged(
+                device, queue, assets, &mut world, &animators, settings, lights, views,
+            )?);
+            times.push(to);
+            next_shot += 1;
+        }
+    }
+    let rows = lights.len() * views.len();
+    let mut columns: Vec<_> = columns.into_iter().map(Vec::into_iter).collect();
+    let mut shots = Vec::with_capacity(rows * columns.len());
+    for _ in 0..rows {
+        for column in &mut columns {
+            shots.extend(column.next());
+        }
+    }
+    Ok((shots, times))
+}
+
 /// `shots` on one picture at half size, `columns` to a row, rows in order.
 /// Returns its width, height and RGBA pixels.
 pub(crate) fn contact_grid(
@@ -1386,6 +1630,24 @@ fn capture_characters() {
             .collect();
         settings.face = Box::leak(shown.into_boxed_slice());
     }
+    if let Some(frames) = std::env::var("AXCENITY_CAPTURE_FRAMES")
+        .ok()
+        .and_then(|frames| frames.trim().parse().ok())
+    {
+        settings.frames = frames;
+    }
+    let film = std::env::var("AXCENITY_CAPTURE_FILM").ok().map(|names| {
+        film_named(&names).unwrap_or_else(|why| panic!("AXCENITY_CAPTURE_FILM: {why}"))
+    });
+    let machine = std::env::var("AXCENITY_CAPTURE_MACHINE").ok().map(|text| {
+        machine_named(&text).unwrap_or_else(|why| panic!("AXCENITY_CAPTURE_MACHINE: {why}"))
+    });
+    // A film is drawn under `studio` unless lights are named.
+    let filmed = film.is_some() || machine.is_some();
+    let lights = match (filmed, std::env::var("AXCENITY_CAPTURE_LIGHTS")) {
+        (true, Err(_)) => lights_named("studio").expect("a fixed light"),
+        _ => lights,
+    };
     let only = std::env::var("AXCENITY_CAPTURE_ONLY").ok();
     let sheets_only = std::env::var("AXCENITY_CAPTURE_SHEETS").as_deref() == Ok("only");
     let (device, queue) = super::bench_tests::bench_gpu().expect("no graphics adapter");
@@ -1412,6 +1674,105 @@ fn capture_characters() {
             }
         };
         let started = std::time::Instant::now();
+        if let Some(machine) = &machine {
+            // The state machine through its states, and nothing else.
+            let filmed = capture_machine(
+                &device,
+                &queue,
+                &stage.assets,
+                &description,
+                settings,
+                machine,
+                &lights,
+                &views,
+            );
+            match filmed {
+                Ok((shots, times)) => {
+                    let (width, height) = settings.size;
+                    if !sheets_only {
+                        let folder = out.join(&name).join("machine");
+                        for (index, shot) in shots.iter().enumerate() {
+                            let path = folder.join(format!(
+                                "{}-{}-{:02}.png",
+                                shot.light,
+                                shot.view,
+                                index % times.len()
+                            ));
+                            save_png(&path, width, height, &shot.pixels).unwrap();
+                        }
+                    }
+                    let (sheet_w, sheet_h, sheet) =
+                        contact_grid(&shots, settings.size, times.len());
+                    save_png(
+                        &out.join(format!("{name}-machine.png")),
+                        sheet_w,
+                        sheet_h,
+                        &sheet,
+                    )
+                    .unwrap();
+                    println!(
+                        "{name}: the state machine, {} pictures in {:.1} s",
+                        shots.len(),
+                        started.elapsed().as_secs_f64()
+                    );
+                }
+                Err(why) => eprintln!("{name}: the state machine not captured: {why}"),
+            }
+            continue;
+        }
+        if let Some(film) = &film {
+            // Motion: a sheet per clip, and nothing else of this run's.
+            for &(clip, count) in film {
+                let filmed = capture_film(
+                    &device,
+                    &queue,
+                    &stage.assets,
+                    &description,
+                    settings,
+                    (clip, count),
+                    &lights,
+                    &views,
+                );
+                let (shots, times) = match filmed {
+                    Ok(filmed) => filmed,
+                    Err(why) => {
+                        eprintln!("{name}: {clip} not captured: {why}");
+                        continue;
+                    }
+                };
+                let (width, height) = settings.size;
+                if !sheets_only {
+                    let folder = out.join(&name).join("film").join(clip);
+                    for (index, shot) in shots.iter().enumerate() {
+                        let path = folder.join(format!(
+                            "{}-{}-{:02}.png",
+                            shot.light,
+                            shot.view,
+                            index % times.len()
+                        ));
+                        save_png(&path, width, height, &shot.pixels).unwrap();
+                    }
+                }
+                let (sheet_w, sheet_h, sheet) = contact_grid(&shots, settings.size, times.len());
+                save_png(
+                    &out.join(format!("{name}-film-{clip}.png")),
+                    sheet_w,
+                    sheet_h,
+                    &sheet,
+                )
+                .unwrap();
+                println!(
+                    "{name}: {clip}, {} pictures at {:?} s in {:.1} s",
+                    shots.len(),
+                    times
+                        .iter()
+                        .map(|time| (time * 100.0).round() / 100.0)
+                        .collect::<Vec<_>>(),
+                    started.elapsed().as_secs_f64()
+                );
+            }
+            continue;
+        }
         // Each picture with the folder it goes in: the character's own, or
         // a suite's row in it.
         let drawn = match suite {
@@ -1600,12 +1961,12 @@ fn the_same_description_captures_identical_pictures_and_every_view_is_drawn() {
     heavy.parameters.insert("fat".to_owned(), 1.0);
     let other = capture(&device, &queue, &stage.assets, &heavy, settings).unwrap();
     assert!(first[0].pixels != other[0].pixels, "another character");
-    // Each picture says which level of detail the parts were drawn at.
-    assert!(
-        first[0].levels.iter().any(|(part, _)| part == "Body"),
-        "{:?}",
-        first[0].levels
-    );
+    // Each picture says which level of detail its parts were drawn at,
+    // for those that have simpler copies. The human base's have none
+    // (2026-11-25: the loader makes none of a mesh with blend shapes, so a
+    // garment's can't cut through the skin from far away), so it is the
+    // full meshes in every view.
+    assert!(first[0].levels.is_empty(), "{:?}", first[0].levels);
     // The sheet holds them all, at half size.
     let (width, height, sheet) = contact_sheet(&first, settings.size);
     assert_eq!(
@@ -1682,6 +2043,35 @@ fn light_view_and_pose_names_are_read_and_unknown_ones_refused() {
         })
     );
     assert!(stance_named("Walk@soon").is_err());
+}
+
+/// A film names clips with how many times each is drawn; a state machine
+/// film names the states to ask for, when and how blended.
+#[test]
+fn films_are_named_by_clips_and_by_states_at_times() {
+    assert_eq!(
+        film_named("Walk:12, Jump,Yes:1"),
+        Ok(vec![("Walk", 12), ("Jump", 10), ("Yes", 2)])
+    );
+    assert!(film_named("Walk:often").is_err());
+    let film = machine_named("Idle@0, Walk@0.5, Jump@1.5~0.1").unwrap();
+    assert_eq!(
+        film.plays,
+        [
+            ("Idle".to_owned(), 0.0, None),
+            ("Walk".to_owned(), 0.5, None),
+            ("Jump".to_owned(), 1.5, Some(0.1)),
+        ]
+    );
+    assert_eq!((film.until, film.shots), (2.0, 16));
+    let film = machine_named("Walk@1,until=3,shots=7").unwrap();
+    assert_eq!((film.until, film.shots), (3.0, 7));
+    assert!(machine_named("Walk").is_err());
+    assert!(machine_named("Walk@soon").is_err());
+    // Every clip a film can name has a length: the default character's
+    // states, each over its take.
+    assert!((clip_length("Stroll").unwrap() - 40.0 / 30.0).abs() < 1e-3);
+    assert!(clip_length("Wave").is_err());
 }
 
 /// The suites hold brief §17.2's facial and body tests, in order.

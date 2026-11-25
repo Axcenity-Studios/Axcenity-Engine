@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/sockslacefrill",
-  "label": "Sockslacefrill",
+  "label": "Lace frill socks",
   "kind": "garment",
   "slot": "legwear",
   "layer": 0,
@@ -41,6 +41,7 @@
     ]
   },
   "tags": [
+    "feminine",
     "makehuman",
     "socks"
   ],

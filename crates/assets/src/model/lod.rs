@@ -10,7 +10,12 @@
 //! Cut-out primitives (leaves, fences: [`AlphaMode::Mask`]) aren't
 //! simplified: moving their corners stretches the texture's holes, so
 //! leaves changed shape and bushes thinned or clumped visibly at the
-//! switch. A file's own copies of them are still used.
+//! switch. Nor are primitives with blend shapes (a character's body and
+//! what it wears, a face): a copy is made from the rest shape alone and
+//! may move the surface by centimetres, so a garment's simpler copy cut
+//! through the skin under it, and where that skin is hidden
+//! ([`super::hide`]) left holes, from far away only. A file's own copies
+//! of either are still used.
 //! A project's model also keeps them on disk ([`super::lod_cache`]), so
 //! loading it again doesn't simplify again.
 
@@ -93,6 +98,7 @@ pub(super) fn attach(
             full[index].lods.is_empty()
                 && full[index].indices.len() / 3 >= MIN_TRIANGLES
                 && !matches!(full[index].material.alpha_mode, AlphaMode::Mask { .. })
+                && full[index].morphs.is_empty()
         })
         .collect();
     if simplify.is_empty() {
@@ -555,6 +561,23 @@ mod tests {
         let mut leaves = wavy_grid(40);
         leaves.material.alpha_mode = AlphaMode::Mask { cutoff: 0.5 };
         assert!(attach(vec![leaves], None)[0].lods.is_empty());
+    }
+
+    /// A character's body and its garments have blend shapes, and are
+    /// drawn in layers a few millimetres apart: a copy simplified from the
+    /// rest shape doesn't keep that clearance (found 2026-11-25: holes in
+    /// the human base's clothes from far away).
+    #[test]
+    fn a_primitive_with_blend_shapes_is_not_simplified() {
+        let mut garment = wavy_grid(40);
+        assert!(!attach(vec![wavy_grid(40)], None)[0].lods.is_empty());
+        garment.morphs = vec![crate::PrimitiveMorph {
+            target: 0,
+            corners: vec![0],
+            positions: vec![[0.0, 0.1, 0.0]],
+            normals: Vec::new(),
+        }];
+        assert!(attach(vec![garment], None)[0].lods.is_empty());
     }
 
     #[test]

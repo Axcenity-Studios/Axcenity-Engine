@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/armsleeve-white-s",
-  "label": "Armsleeve white s",
+  "label": "White net sleeves, small",
   "kind": "garment",
   "slot": "gloves",
   "layer": 1,
@@ -78,6 +78,7 @@
     ]
   },
   "tags": [
+    "feminine",
     "makehuman"
   ],
   "thumbnail": "ArmsleeveWhiteS.png",

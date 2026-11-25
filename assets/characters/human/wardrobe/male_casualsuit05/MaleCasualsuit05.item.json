@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/male-casualsuit05",
-  "label": "Male casualsuit05",
+  "label": "Jacket and jeans",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -103,7 +103,8 @@
   "tags": [
     "casual",
     "makehuman",
-    "male"
+    "male",
+    "masculine"
   ],
   "thumbnail": "MaleCasualsuit05.png",
   "source": {

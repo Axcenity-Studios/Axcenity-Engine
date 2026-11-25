@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "id": "makehuman/sweater-fisherman",
-  "label": "Sweater fisherman",
+  "label": "Fisherman sweater",
   "kind": "garment",
   "slot": "top",
   "layer": 1,
@@ -109,6 +109,7 @@
   "tags": [
     "knit",
     "makehuman",
+    "masculine",
     "shirt",
     "sweater",
     "top"
