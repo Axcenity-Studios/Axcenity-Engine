@@ -1,0 +1,16 @@
+{
+  "format_version": 2,
+  "name": "Male",
+  "base": "axcenity/human",
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    }
+  ],
+  "preset": {
+    "id": "axcenity/human-male",
+    "kind": "character",
+    "about": "The human base's male body, as it's built: a start for any character.",
+    "order": 10
+  }
+}

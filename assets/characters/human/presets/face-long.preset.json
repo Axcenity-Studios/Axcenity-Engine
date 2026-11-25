@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "Long face",
+  "base": "axcenity/human",
+  "parameters": {
+    "chin_height": 0.5,
+    "face_shape_scale_vert": 0.5,
+    "forehead_scale_vert": 0.4,
+    "nose_scale_vert": 0.3
+  },
+  "preset": {
+    "id": "axcenity/human-face-long",
+    "kind": "face",
+    "about": "A tall head, a high forehead and a long chin.",
+    "order": 50
+  }
+}

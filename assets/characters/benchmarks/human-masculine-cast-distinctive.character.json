@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "human-masculine-cast-distinctive",
+  "base": "axcenity/human",
+  "parameters": {
+    "age": 0.6,
+    "brows_trans_down_up": -0.5,
+    "chin_prominent": 0.6,
+    "frame": 0,
+    "nose_hump": 0.7,
+    "nose_scale_vert": 0.4,
+    "skin": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+ "mpfb": "2.0.18",
+ "shading": "hair",
+ "taken": [
+  {
+   "id": "makehuman/hair-afro01",
+   "label": "Afro",
+   "name": "afro01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 2196,
+   "faces": 1096,
+   "shapes": 121
+  },
+  {
+   "id": "makehuman/hair-bob02",
+   "label": "Blunt bob with a fringe",
+   "name": "bob02",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 1653,
+   "faces": 1124,
+   "shapes": 243
+  },
+  {
+   "id": "makehuman/hair-long01",
+   "label": "Long and straight",
+   "name": "long01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 3239,
+   "faces": 2054,
+   "shapes": 68
+  },
+  {
+   "id": "makehuman/hair-short02",
+   "label": "Short and tousled",
+   "name": "short02",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 1755,
+   "faces": 1672,
+   "shapes": 148
+  },
+  {
+   "id": "makehuman/hair-short04",
+   "label": "Short, brushed forward",
+   "name": "short04",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 865,
+   "faces": 525,
+   "shapes": 150
+  }
+ ],
+ "left_out": []
+}

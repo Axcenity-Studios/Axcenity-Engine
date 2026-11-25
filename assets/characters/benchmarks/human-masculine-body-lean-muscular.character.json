@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "human-masculine-body-lean-muscular",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": -1,
+    "frame": 0,
+    "muscle": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    }
+  ]
+}

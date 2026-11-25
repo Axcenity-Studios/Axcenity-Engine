@@ -360,6 +360,23 @@ fn a_garment_is_hidden_under_the_ones_worn_over_it() {
     assert_eq!(covers(&part("test/tee").tucked_into), ["Skirt.cover.png"]);
     assert_eq!(covers(&part("test/skirt").under), ["Hood.cover.png"]);
     assert!(part("test/skirt").tucked_into.is_empty());
+    // ADR-0046: Shrink_Under activates live only when worn under a higher layer.
+    assert_eq!(
+        part("test/tee").shapes.get(crate::fit::SHRINK_UNDER_SHAPE),
+        Some(&1.0)
+    );
+    assert_eq!(
+        part("test/skirt")
+            .shapes
+            .get(crate::fit::SHRINK_UNDER_SHAPE),
+        Some(&1.0)
+    );
+    // Nothing is over the hood, so it names no shape of its own and wears
+    // the body's identity.
+    assert_eq!(
+        part("test/hood").shapes.get(crate::fit::SHRINK_UNDER_SHAPE),
+        None
+    );
 }
 
 #[test]
@@ -374,4 +391,116 @@ fn garments_are_worn_in_order_of_layer_then_slot() {
     let mut overalls = fixtures::item(fixtures::SKIRT);
     overalls.layer = Some(2);
     assert!(overalls.wearing_order() > order(fixtures::TEE));
+}
+
+/// Three skins for the test body: by frame (0 or 1) and by tone (-1 to 1).
+fn skins() -> Vec<crate::MaterialMap> {
+    let map = |file: &str, frame: f32, tone: f32| crate::MaterialMap {
+        material: "Skin".to_owned(),
+        colour_map: file.to_owned(),
+        at: [("frame".to_owned(), frame), ("tone".to_owned(), tone)].into(),
+        blend: None,
+    };
+    vec![
+        map("skins/light_masculine.jpg", 0.0, -1.0),
+        map("skins/light_feminine.jpg", 1.0, -1.0),
+        map("skins/dark_masculine.jpg", 0.0, 1.0),
+    ]
+}
+
+/// ADR-0048: of the colour maps a base offers for a material, a character
+/// draws the one made nearest its values, as a library path; a base with
+/// none draws its model file's own.
+#[test]
+fn a_material_draws_the_colour_map_nearest_the_characters_values() {
+    let mut library = fixtures::library();
+    let mut description = Description::new("Ada", "test/body");
+    let resolved = resolve(&library, &description).expect("it resolves");
+    assert!(resolved.colour_maps.is_empty(), "the file's own");
+
+    let mut base = fixtures::base();
+    base.material_maps = skins();
+    assert_eq!(base.validate(), Vec::new());
+    library.add_base("test/Body.base.json", base);
+    assert_eq!(library.validate(), Vec::new());
+    let skin = |description: &Description| {
+        let resolved = resolve(&library, description).expect("it resolves");
+        assert_eq!(resolved.colour_maps.len(), 1, "only Skin has maps");
+        resolved.colour_maps["Skin"].clone()
+    };
+    // The defaults (frame 0, tone 0) are as near the light masculine skin
+    // as the dark one: the first of equals.
+    assert_eq!(skin(&description), "test/skins/light_masculine.jpg");
+    description.parameters.insert("tone".to_owned(), 0.2);
+    assert_eq!(skin(&description), "test/skins/dark_masculine.jpg");
+    description.parameters.insert("tone".to_owned(), -0.6);
+    description.parameters.insert("frame".to_owned(), 0.7);
+    assert_eq!(skin(&description), "test/skins/light_feminine.jpg");
+    // No dark feminine skin was made. A distance is a share of the
+    // parameter's range, so a character at frame 1 and tone 0.9 is 0.95
+    // of `tone` from the light feminine skin and the whole of `frame`
+    // from the dark masculine one: the light feminine skin is nearer.
+    description.parameters.insert("tone".to_owned(), 0.9);
+    description.parameters.insert("frame".to_owned(), 1.0);
+    assert_eq!(skin(&description), "test/skins/light_feminine.jpg");
+    description.parameters.insert("frame".to_owned(), 0.6);
+    assert_eq!(skin(&description), "test/skins/dark_masculine.jpg");
+}
+
+/// ADR-0048: a map that names a `blend` parameter fades into its
+/// neighbour along it, the one at the same values of every other
+/// parameter, on the side the character's value lies; without one, or
+/// with no neighbour there, one map gives way to the next at once.
+#[test]
+fn a_colour_map_fades_toward_its_neighbour_along_its_blend_parameter() {
+    let mut base = fixtures::base();
+    base.material_maps = skins();
+    let values = |frame: f32, tone: f32| -> std::collections::BTreeMap<String, f32> {
+        [("frame".to_owned(), frame), ("tone".to_owned(), tone)].into()
+    };
+    let toward = |base: &crate::BaseManifest, frame: f32, tone: f32| {
+        let values = values(frame, tone);
+        let nearest = base.material_maps_for(&values)["Skin"];
+        base.material_blend_for(nearest, &values)
+            .map(|(map, amount)| (map.colour_map.clone(), amount))
+    };
+    assert_eq!(toward(&base, 0.0, -0.5), None, "no map names a blend");
+    for map in &mut base.material_maps {
+        map.blend = Some("tone".to_owned());
+    }
+    assert_eq!(base.validate(), Vec::new());
+    // Light masculine at tone -1, dark masculine at 1: a quarter of the
+    // way is a quarter of the dark one.
+    let (other, amount) = toward(&base, 0.0, -0.5).expect("between two");
+    assert_eq!(other, "skins/dark_masculine.jpg");
+    close(amount, 0.25);
+    assert_eq!(toward(&base, 0.0, -1.0), None, "at its own value");
+    // Past the middle the dark one is the nearest and fades to the light.
+    let (other, amount) = toward(&base, 0.0, 0.5).expect("between two");
+    assert_eq!(other, "skins/light_masculine.jpg");
+    close(amount, 0.25);
+    // The light feminine skin has no dark neighbour on its frame.
+    assert_eq!(toward(&base, 1.0, -0.5), None);
+    // A blend along a parameter the map isn't at is a mistake.
+    base.material_maps[0].blend = Some("height".to_owned());
+    assert_eq!(base.validate().len(), 1, "{:?}", base.validate());
+
+    // Resolving gives the second map as a library path with its share.
+    let mut library = fixtures::library();
+    let mut base = fixtures::base();
+    base.material_maps = skins();
+    for map in &mut base.material_maps {
+        map.blend = Some("tone".to_owned());
+    }
+    library.add_base("test/Body.base.json", base);
+    let mut description = Description::new("Ada", "test/body");
+    description.parameters.insert("tone".to_owned(), 0.6);
+    let resolved = resolve(&library, &description).expect("it resolves");
+    assert_eq!(
+        resolved.colour_maps["Skin"],
+        "test/skins/dark_masculine.jpg"
+    );
+    let (other, amount) = &resolved.colour_blends["Skin"];
+    assert_eq!(other, "test/skins/light_masculine.jpg");
+    close(*amount, 0.2);
 }

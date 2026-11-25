@@ -24,6 +24,10 @@ The uniform (`MapsUniform::shading`): x `SHADING_SKIN` (3), y the defined map's 
 
 `scene::material::modulate` draws a character's values on it (architecture.md §10): `scatter_scale` multiplies `scatter` (0 to 2), and `definition × (1 − softness)` (each 0 to 1) is `normal_blend`. The realistic base manifest drives `definition` from `muscle` and `softness` from `fat`, so only lean, muscular bodies show the defined map's abdominal lines (OPEN-07).
 
+## A second colour map (ADR-0048)
+
+A skin between two colour maps (the human base between two photographed ages) draws a mix of them. `SkinShading::second_colour` is the second map and how much of it shows (0 to 1). It is bound in the **occlusion map's place** through an sRGB view (`create_material`), its share rides in `MapsUniform::uv_offset.z`, and `standard_surface` mixes the two in linear light before the pores, the makeup, the tone and the light. A skin with an occlusion map of its own draws its first colour map alone (`skin_second_colour`); none of it binds nothing and costs nothing. Each distinct share is its own material key. Ray traced reflections and GI see the first map. Tests: `a_skin_materials_shading_picks_its_binding_and_its_defined_map_takes_the_specular_maps_place` (`renderer/tests/skin.rs`), `scene`'s `a_skin_between_two_colour_maps_draws_the_second_by_its_amount`.
+
 ## Makeup and markings (ADR-0042)
 
 A skin whose model file names three masks (glTF material `extras.axcenity_skin_masks: [{index}, {index}, {index}]`, placed like the base colour map; `assets` `ModelMaterial::skin_masks`) can draw makeup and markings: `render::SkinLayers` on `SkinShading::layers`. `scene` puts the masks there with every layer off (`draw_list/materials.rs`), sets the layers from the material value attributes `Mat_<slot>_layer_<id>_<field>` that `avatar::resolve` writes from a description's `skin` block (`material.rs`, `set_skin_layers`), and leaves `layers` out when no layer is on, so skin without makeup binds and costs nothing more.

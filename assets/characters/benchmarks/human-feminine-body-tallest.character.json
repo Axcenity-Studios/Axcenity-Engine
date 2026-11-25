@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "human-feminine-body-tallest",
+  "base": "axcenity/human",
+  "parameters": {
+    "frame": 1,
+    "height": 1.13,
+    "leg_length": 1.125
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ]
+}

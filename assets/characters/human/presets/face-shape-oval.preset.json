@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "Oval",
+  "base": "axcenity/human",
+  "parameters": {
+    "face_shape_oval": 0.7
+  },
+  "preset": {
+    "id": "axcenity/human-face-shape-oval",
+    "kind": "feature",
+    "about": "Widest at the cheeks, a rounded jaw.",
+    "feature": "face_shape",
+    "order": 10
+  }
+}

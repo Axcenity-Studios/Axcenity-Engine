@@ -2,12 +2,12 @@
 title: "ADR-0044: A garment that was not made on the body comes through an intake before the fit"
 type: adr
 adr: 44
-adr_status: Proposed
+adr_status: Superseded
 date: 2026-11-24
 supersedes:
-superseded_by:
+superseded_by: ADR-0046
 affects: [avatar, assets]
-source: [crates/avatar/src/fit/intake/mod.rs, crates/avatar/src/fit/intake/slices.rs, crates/avatar/src/fit/intake/structure.rs, crates/avatar/src/fit/intake/shell.rs, crates/avatar/src/fit/import.rs, crates/avatar/src/fit/transfer.rs, crates/avatar/src/fit/glb.rs, crates/assets/src/model/lod.rs, assets/characters/realistic/clothing/generated/import_generated.py]
+source: [crates/avatar/src/fit/import.rs, crates/avatar/src/fit/transfer.rs, crates/avatar/src/fit/glb.rs]
 docs: [docs/development/character-studio/architecture.md, assets/characters/realistic/clothing/README.md, docs/development/character-studio/progress.md]
 tags: [adr, characters, assets]
 ---

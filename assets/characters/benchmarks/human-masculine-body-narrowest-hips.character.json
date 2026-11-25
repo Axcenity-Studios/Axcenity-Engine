@@ -1,0 +1,14 @@
+{
+  "format_version": 2,
+  "name": "human-masculine-body-narrowest-hips",
+  "base": "axcenity/human",
+  "parameters": {
+    "frame": 0,
+    "hip_width": 0.85
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    }
+  ]
+}

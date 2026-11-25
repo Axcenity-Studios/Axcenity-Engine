@@ -6,7 +6,8 @@ use axcenity_assets::{
     ModelMaterial, Shading as FileShading, StandardMaterial,
 };
 use axcenity_core::{
-    ClassName, Instance, InstanceId, TextureChannel, Value, World, material_value_attribute,
+    ClassName, Instance, InstanceId, MATERIAL_COLOUR_AMOUNT, MATERIAL_COLOUR_MAP,
+    MATERIAL_COLOUR_TOWARD, TextureChannel, Value, World, material_value_attribute,
 };
 use axcenity_render::glam::Mat4;
 use axcenity_render::{
@@ -254,6 +255,46 @@ pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str)
             }
         }
     }
+}
+
+/// A character's colour map for the material named `name` (the attribute
+/// `Mat_<name>_colour_map`, a texture file in the project: ADR-0048), drawn
+/// in place of the model file's own. Everything else of the material stays:
+/// its other maps, its shading and its values, so the image is laid out as
+/// the file's own colour map is. Until the image is read, and if it can't
+/// be, the file's own is drawn.
+pub(crate) fn colour_map(
+    material: &mut Material,
+    instance: &Instance,
+    name: &str,
+    assets: &Assets,
+) {
+    let path = instance
+        .attribute(&material_value_attribute(name, MATERIAL_COLOUR_MAP))
+        .and_then(Value::as_str)
+        .filter(|path| !path.is_empty());
+    if let Some(image) = path.and_then(|path| assets.texture(path)) {
+        material.base_color_texture = Some(texture(&image));
+    }
+    // Between two maps (a skin between two photographed ages): the one it
+    // fades toward and how far, which only the Skin model draws. Until
+    // that image is read, the first is drawn alone.
+    let Shading::Skin(skin) = &mut material.shading else {
+        return;
+    };
+    let attribute = |value: &str| instance.attribute(&material_value_attribute(name, value));
+    let toward = attribute(MATERIAL_COLOUR_TOWARD)
+        .and_then(Value::as_str)
+        .filter(|path| !path.is_empty())
+        .and_then(|path| assets.texture(path));
+    let amount = attribute(MATERIAL_COLOUR_AMOUNT)
+        .and_then(Value::as_number)
+        .filter(|amount| amount.is_finite())
+        .map_or(0.0, |amount| (amount as f32).clamp(0.0, 1.0));
+    skin.second_colour = match toward {
+        Some(image) if amount > 0.0 => Some((texture(&image), amount)),
+        _ => None,
+    };
 }
 
 /// Sets a hair material's values (`avatar`'s Hair model) on its shading:

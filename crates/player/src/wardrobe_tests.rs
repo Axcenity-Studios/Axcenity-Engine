@@ -352,7 +352,12 @@ const fn known(garment: &'static str, pose: &'static str, cases: usize, worst: f
     }
 }
 
-const REST: [Known; 6] = [
+// (2026-11-24: the tee and the joggers were given cover maps, so the
+// underwear is hidden under them: the boxer briefs through the joggers
+// went from 9.0 to 4.6 mm, the bra through the tee in Idle from 16.0 to
+// 7.1 mm, and the briefs no longer come through the joggers at all. The
+// maps hide no skin, so the tee's and the joggers' own records stand.)
+const REST: [Known; 5] = [
     known("Pants_Joggers", "rest", 53, 0.0311),
     known("Pants_Joggers through Shirt_CrewTee", "rest", 54, 0.0185),
     known("Shirt_CrewTee", "rest", 51, 0.0282),
@@ -360,10 +365,9 @@ const REST: [Known; 6] = [
         "Underwear_BoxerBriefs through Pants_Joggers",
         "rest",
         33,
-        0.0090,
+        0.0046,
     ),
     known("Underwear_Bra through Shirt_CrewTee", "rest", 21, 0.0054),
-    known("Underwear_Briefs through Pants_Joggers", "rest", 1, 0.0011),
 ];
 const IDLE: [Known; 5] = [
     known("Pants_Joggers", "idle", 53, 0.0311),
@@ -376,13 +380,13 @@ const IDLE: [Known; 5] = [
         "Underwear_BoxerBriefs through Pants_Joggers",
         "idle",
         32,
-        0.0094,
+        0.0040,
     ),
-    known("Underwear_Bra through Shirt_CrewTee", "idle", 21, 0.0160),
+    known("Underwear_Bra through Shirt_CrewTee", "idle", 21, 0.0071),
 ];
-const WALK: [Known; 6] = [
+const WALK: [Known; 5] = [
     known("Pants_Joggers", "Walk@18", 53, 0.0222),
-    known("Pants_Joggers through Shirt_CrewTee", "Walk@18", 54, 0.0172),
+    known("Pants_Joggers through Shirt_CrewTee", "Walk@18", 54, 0.0157),
     known("Shirt_CrewTee", "Walk@18", 54, 0.0345),
     known(
         "Underwear_BoxerBriefs through Pants_Joggers",
@@ -391,14 +395,8 @@ const WALK: [Known; 6] = [
         0.0089,
     ),
     known("Underwear_Bra through Shirt_CrewTee", "Walk@18", 21, 0.0055),
-    known(
-        "Underwear_Briefs through Pants_Joggers",
-        "Walk@18",
-        6,
-        0.0017,
-    ),
 ];
-const T_POSE: [Known; 6] = [
+const T_POSE: [Known; 5] = [
     known("Pants_Joggers", "TPose", 53, 0.0311),
     known("Pants_Joggers through Shirt_CrewTee", "TPose", 54, 0.0185),
     known("Shirt_CrewTee", "TPose", 54, 0.0258),
@@ -406,12 +404,11 @@ const T_POSE: [Known; 6] = [
         "Underwear_BoxerBriefs through Pants_Joggers",
         "TPose",
         33,
-        0.0090,
+        0.0046,
     ),
     known("Underwear_Bra through Shirt_CrewTee", "TPose", 21, 0.0043),
-    known("Underwear_Briefs through Pants_Joggers", "TPose", 1, 0.0011),
 ];
-const ARMS_RAISED: [Known; 6] = [
+const ARMS_RAISED: [Known; 5] = [
     known("Pants_Joggers", "ArmsRaised", 53, 0.0311),
     known(
         "Pants_Joggers through Shirt_CrewTee",
@@ -424,22 +421,16 @@ const ARMS_RAISED: [Known; 6] = [
         "Underwear_BoxerBriefs through Pants_Joggers",
         "ArmsRaised",
         33,
-        0.0090,
+        0.0046,
     ),
     known(
         "Underwear_Bra through Shirt_CrewTee",
         "ArmsRaised",
         21,
-        0.0038,
-    ),
-    known(
-        "Underwear_Briefs through Pants_Joggers",
-        "ArmsRaised",
-        1,
-        0.0011,
+        0.0025,
     ),
 ];
-const ELBOWS_BENT: [Known; 6] = [
+const ELBOWS_BENT: [Known; 5] = [
     known("Pants_Joggers", "ElbowsBent", 53, 0.0311),
     known(
         "Pants_Joggers through Shirt_CrewTee",
@@ -452,7 +443,7 @@ const ELBOWS_BENT: [Known; 6] = [
         "Underwear_BoxerBriefs through Pants_Joggers",
         "ElbowsBent",
         33,
-        0.0090,
+        0.0046,
     ),
     known(
         "Underwear_Bra through Shirt_CrewTee",
@@ -460,14 +451,8 @@ const ELBOWS_BENT: [Known; 6] = [
         21,
         0.0054,
     ),
-    known(
-        "Underwear_Briefs through Pants_Joggers",
-        "ElbowsBent",
-        1,
-        0.0011,
-    ),
 ];
-const KNEES_BENT: [Known; 6] = [
+const KNEES_BENT: [Known; 5] = [
     known("Pants_Joggers", "KneesBent", 54, 0.0393),
     known(
         "Pants_Joggers through Shirt_CrewTee",
@@ -480,19 +465,13 @@ const KNEES_BENT: [Known; 6] = [
         "Underwear_BoxerBriefs through Pants_Joggers",
         "KneesBent",
         33,
-        0.0090,
+        0.0046,
     ),
     known(
         "Underwear_Bra through Shirt_CrewTee",
         "KneesBent",
         21,
         0.0054,
-    ),
-    known(
-        "Underwear_Briefs through Pants_Joggers",
-        "KneesBent",
-        1,
-        0.0011,
     ),
 ];
 const LODS: [Known; 4] = [

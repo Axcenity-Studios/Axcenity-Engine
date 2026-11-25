@@ -5,6 +5,10 @@ use super::*;
 use crate::character_studio::test_folder;
 use crate::theme;
 
+/// The human base (ADR-0047): MakeHuman's body, shipped beside the
+/// realistic one until it replaces it.
+const HUMAN_BASE: &str = "axcenity/human";
+
 /// The body's `MeshId` and the parts it wears, as [`CharacterWorkspace::worn`]
 /// lists them, with derived models' identity keys left out (a key names a
 /// bake, which the test needn't pin).
@@ -41,15 +45,20 @@ fn the_workspace_offers_the_realistic_body_and_shows_it() {
     for part in ["Eyes", "Teeth", "Lashes", "Brows", "Underwear_BoxerBriefs"] {
         assert!(worn.iter().any(|name| name == part), "{part} in {worn:?}");
     }
-    // Both families are offered (plan section 0, decision 7), the
-    // realistic one first.
+    // Every family is offered (plan section 0, decision 7), the realistic
+    // one first, then by label: the human base (ADR-0047) ships beside the
+    // realistic one until it replaces it.
     assert!(offers_base(&library, DEFAULT_BASE));
+    assert!(offers_base(&library, HUMAN_BASE));
     assert!(offers_base(&library, axcenity_avatar::V1_BASE));
     let families: Vec<&str> = presets::families(&library)
         .iter()
         .map(|base| base.id.as_str())
         .collect();
-    assert_eq!(families, [DEFAULT_BASE, axcenity_avatar::V1_BASE]);
+    assert_eq!(
+        families,
+        [DEFAULT_BASE, HUMAN_BASE, axcenity_avatar::V1_BASE]
+    );
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -386,7 +395,7 @@ fn every_new_character_choice_is_sound_on_both_families() {
         .filter(|(_, _, start)| start.is_none())
         .map(|(label, _, _)| label.as_str())
         .collect();
-    assert_eq!(headings, ["Realistic", "Stylized"]);
+    assert_eq!(headings, ["Realistic", "Human", "Stylized"]);
     let starts: Vec<&Start> = choices.iter().filter_map(|(_, _, s)| s.as_ref()).collect();
     assert_eq!(starts[0], &Start::shipped("male"));
     assert_eq!(
@@ -424,7 +433,7 @@ fn the_workspace_draws_every_category_on_both_bodies_without_a_gpu() {
     let folder = test_folder("workspace-ui");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let ctx = theme::test_context();
-    for base in [DEFAULT_BASE, axcenity_avatar::V1_BASE] {
+    for base in [DEFAULT_BASE, HUMAN_BASE, axcenity_avatar::V1_BASE] {
         workspace.set_base(base);
         for level in selection::Level::ALL {
             workspace.selection.level = level;
@@ -671,5 +680,126 @@ fn the_preview_draws_the_realistic_character() {
         changed > (width * height) as usize / 50,
         "the two bodies look different"
     );
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// ADR-0048: the human base's Skin and Makeup page offers its skins as
+/// one choice, and choosing one writes that skin's file on the body, the
+/// female or the male one with the body type; undo puts the old one back.
+#[test]
+fn the_human_bases_skin_is_a_choice_on_the_skin_page() {
+    let folder = test_folder("workspace-human-skin");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    workspace.set_base(HUMAN_BASE);
+    assert_eq!(workspace.notice, None);
+    workspace.apply(Intent::PickCategory(Category::SkinAndMakeup));
+    let ctx = theme::test_context();
+    let mut drawn = Vec::new();
+    for _ in 0..3 {
+        let output = theme::run(&ctx, Default::default(), |ui| {
+            assert_eq!(workspace.ui(ui, None), None);
+        });
+        drawn = super::shell_tests::drawn_texts(&output);
+    }
+    for label in ["African", "Asian", "Caucasian", "Caucasian 2", "Bodysuit"] {
+        assert!(
+            drawn.iter().any(|text| text == label),
+            "{label} in {drawn:?}"
+        );
+    }
+
+    let attribute =
+        axcenity_core::material_value_attribute("Skin", axcenity_core::MATERIAL_COLOUR_MAP);
+    let skin = |workspace: &CharacterWorkspace| {
+        use axcenity_gameplay::description as applier;
+        let body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
+        workspace
+            .world
+            .get(body)
+            .and_then(|body| body.attribute(&attribute))
+            .and_then(axcenity_core::Value::as_str)
+            .map(str::to_owned)
+    };
+    let file = |name: &str| Some(format!("assets/characters/human/skins/{name}.jpg"));
+    assert_eq!(skin(&workspace), file("young_caucasian_male"));
+    let choice = workspace.base().unwrap().parameter("skin").unwrap().clone();
+    workspace.choose(&choice, 1.0);
+    assert_eq!(skin(&workspace), file("young_asian_male"));
+    let frame = workspace
+        .base()
+        .unwrap()
+        .parameter("frame")
+        .unwrap()
+        .clone();
+    workspace.choose(&frame, 1.0);
+    assert_eq!(skin(&workspace), file("young_asian_female"));
+    workspace.undo();
+    workspace.undo();
+    assert_eq!(skin(&workspace), file("young_caucasian_male"));
+    // The file is in the studio's own library, copied with the base.
+    let copied = folder.join("assets/characters/human/skins/young_asian_female.jpg");
+    assert!(copied.is_file(), "{}", copied.display());
+    // With `AXCENITY_SNAPSHOTS`, the page drawn for real on two skins.
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        for (value, name) in [(0.0, "human-skin-african"), (1.0, "human-skin-asian")] {
+            workspace.choose(&choice, value);
+            super::shell_tests::snap(&mut workspace, &snapshots, name, 8);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// ADR-0047 stage 5: the human base's hairstyles (MakeHuman's, converted
+/// by `hair.py`) are on the Hair page, and one put on is a part on the
+/// body that wears the body's identity, in the colour variant picked.
+#[test]
+fn the_human_bases_hairstyles_are_on_the_hair_page_and_can_be_worn() {
+    let folder = test_folder("workspace-human-hair");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    workspace.set_base(HUMAN_BASE);
+    workspace.apply(Intent::PickCategory(Category::Hair));
+    let ctx = theme::test_context();
+    let mut drawn = Vec::new();
+    for _ in 0..3 {
+        let output = theme::run(&ctx, Default::default(), |ui| {
+            assert_eq!(workspace.ui(ui, None), None);
+        });
+        drawn = super::shell_tests::drawn_texts(&output);
+    }
+    // Every one is a draft, and a page of nothing but drafts lists them.
+    for label in ["Afro", "Long and straight", "Short and tousled"] {
+        assert!(
+            drawn.iter().any(|text| text.contains(label)),
+            "{label} in {drawn:?}"
+        );
+    }
+    assert_eq!(workspace.worn_in("hair"), None, "a new character is bald");
+
+    workspace.wear("hair", Some("makehuman/hair-short02"));
+    assert_eq!(workspace.notice, None);
+    assert_eq!(
+        workspace.worn_in("hair").as_deref(),
+        Some("makehuman/hair-short02")
+    );
+    let worn = worn_models(&workspace);
+    assert!(worn.iter().any(|name| name == "HairShort02"), "{worn:?}");
+    // It keeps to the head through the body type and a face slider.
+    let frame = workspace
+        .base()
+        .unwrap()
+        .parameter("frame")
+        .unwrap()
+        .clone();
+    workspace.choose(&frame, 1.0);
+    assert_eq!(
+        workspace.worn_in("hair").as_deref(),
+        Some("makehuman/hair-short02")
+    );
+    let library = workspace.library();
+    let resolved = axcenity_avatar::resolve(&library, workspace.description()).unwrap();
+    assert_eq!(resolved.problems, Vec::new());
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        super::shell_tests::snap(&mut workspace, &snapshots, "human-hair", 8);
+    }
     let _ = std::fs::remove_dir_all(&folder);
 }

@@ -13,7 +13,7 @@
     "file": "Pants_Joggers.glb",
     "object": "AxcenityRealistic/Pants_Joggers"
   },
-  "hides": [],
+  "cover_map": "Pants_Joggers.cover.png",
   "materials": [
     {
       "name": "Fleece",

@@ -11,7 +11,12 @@
 //!   shape;
 //! - **green**: skin under which a garment worn beneath this one leaves
 //!   its own cloth out (a trouser's waistband under a shirt's hem), found
-//!   by the inner garment's corners' places on the skin ([`skin_uvs`]).
+//!   by the inner garment's corners' places on the skin ([`skin_uvs`]);
+//! - **blue**: the same for a top worn **tucked** into this garment (a
+//!   bottom). Round the hips it is lit wherever the cloth is over the
+//!   skin, with no setback: nothing is seen under a waistband as it is
+//!   under a hem. Anywhere else (the bib and the straps of overalls) it
+//!   is as green.
 //!
 //! **Skin is hidden only where the cloth stays over it.** Given the fit's
 //! poses ([`Proof`]), that is tried: the garment and the body are posed
@@ -137,13 +142,15 @@ pub struct Proof<'a> {
 /// The cover map of the fitted garment `garment` (at rest, with each of
 /// its corners' skin `weights` on the body's joints) over `body` (at
 /// rest), whose triangles' regions are `regions` (skin without a region,
-/// 0, is never hidden: the head and what the base keeps drawn). With
+/// 0, is never hidden: the head and what the base keeps drawn); `tuck`
+/// names the regions round the hips, where a tucked top is under the
+/// garment whole (the map's blue). With
 /// `proof`, skin is hidden where the cloth stays over it in every pose;
 /// without, only under cloth that follows the bones it follows. A body
 /// without texture coordinates has an empty map.
 pub fn cover_map(
     body: &BodyMesh,
-    regions: &[u8],
+    (regions, tuck): (&[u8], &[u8]),
     garment: &Surface,
     weights: (&[[u16; 4]], &[[f32; 4]]),
     proof: Option<&Proof>,
@@ -303,7 +310,10 @@ pub fn cover_map(
         report.skin += usize::from(skin);
         report.cloth += usize::from(cloth);
         let uvs = body.triangles[k].map(|v| Vec2::from(body.uvs[v as usize]));
-        fill(&mut map, uvs, [skin, cloth, true]);
+        // A tucked top goes wherever the cloth is over the skin, but
+        // only round the hips: a strap is no waistband.
+        let tucked = cloth || tuck.contains(&regions[k]);
+        fill(&mut map, uvs, [skin, cloth, tucked]);
     }
     (map, report)
 }

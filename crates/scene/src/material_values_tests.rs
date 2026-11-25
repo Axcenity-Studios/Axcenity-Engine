@@ -8,7 +8,7 @@ use std::sync::Arc;
 use axcenity_core::{ClassName, Color3, InstanceId, Value, World, material_value_attribute};
 use axcenity_render::{Material, NormalMap, Shading, SkinShading, TextureSource};
 
-use crate::material::modulate;
+use crate::material::{colour_map, modulate};
 
 struct Flat;
 
@@ -533,4 +533,143 @@ fn cloth_values_modulate_the_authored_sheen_and_anisotropy() {
         "{}",
         cloth_of(&turned).anisotropy_rotation
     );
+}
+
+/// ADR-0048: a character's colour map (`Mat_<material>_colour_map`, a
+/// texture file in the project) is drawn in place of the material's own
+/// and nothing else of the material changes, so its values still modulate
+/// it. A file that can't be read leaves the material as authored.
+#[test]
+fn a_colour_map_takes_the_place_of_the_materials_own_and_keeps_the_rest() {
+    let project =
+        std::env::temp_dir().join(format!("axcenity-scene-colour-map-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&project);
+    std::fs::create_dir_all(project.join("assets/characters/skins")).unwrap();
+    let image = image::RgbaImage::from_pixel(2, 2, image::Rgba([90, 60, 40, 255]));
+    let mut png = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+    let path = "assets/characters/skins/old.png";
+    std::fs::write(project.join(path), png.into_inner()).unwrap();
+    let assets = axcenity_assets::Assets::new(&project);
+
+    let mut authored = skin();
+    authored.base_color_texture = Some(Arc::new(Flat));
+    let draw = |values: &[(&str, &str, Value)]| {
+        let (world, part) = part(values);
+        let mut material = authored.clone();
+        colour_map(&mut material, world.get(part).unwrap(), "Skin", &assets);
+        modulate(&mut material, world.get(part).unwrap(), "Skin");
+        material
+    };
+    let key = |material: &Material| material.base_color_texture.as_ref().map(|t| t.key());
+    let map = |file: &str| {
+        (
+            "Skin",
+            axcenity_core::MATERIAL_COLOUR_MAP,
+            Value::String(file.into()),
+        )
+    };
+
+    // No map, a map of another material and an empty one: as authored.
+    assert_eq!(key(&draw(&[])), Some(7));
+    assert_eq!(
+        key(&draw(&[(
+            "Iris",
+            axcenity_core::MATERIAL_COLOUR_MAP,
+            Value::String(path.into())
+        )])),
+        Some(7)
+    );
+    assert_eq!(key(&draw(&[map("")])), Some(7));
+
+    let drawn = draw(&[map(path), number("Skin", "roughness_scale", 0.5)]);
+    let texture = drawn.base_color_texture.as_ref().expect("a colour map");
+    assert_ne!(texture.key(), 7, "the file in place of the material's own");
+    assert_eq!(texture.size(), (2, 2));
+    assert_eq!(&texture.rgba()[..4], &[90, 60, 40, 255]);
+    assert_eq!(drawn.base_color, authored.base_color);
+    assert!(drawn.maps.normal.is_some(), "the normal map stays");
+    assert!(
+        (drawn.roughness - 0.3).abs() < 1e-6,
+        "values still modulate"
+    );
+
+    // A file that isn't there: the material's own, and one error.
+    assert!(assets.take_errors().is_empty());
+    assert_eq!(
+        key(&draw(&[map("assets/characters/skins/none.png")])),
+        Some(7)
+    );
+    assert_eq!(assets.take_errors().len(), 1);
+    let _ = std::fs::remove_dir_all(&project);
+}
+
+/// ADR-0048: a skin between two colour maps. The map its own fades toward
+/// (`Mat_<material>_colour_map_toward`) and how far
+/// (`Mat_<material>_colour_map_amount`) become the Skin model's second
+/// colour map; a material that isn't skin, no amount, or a file that
+/// can't be read draws the first map alone.
+#[test]
+fn a_skin_between_two_colour_maps_draws_the_second_by_its_amount() {
+    use axcenity_core::{MATERIAL_COLOUR_AMOUNT, MATERIAL_COLOUR_MAP, MATERIAL_COLOUR_TOWARD};
+    let project = std::env::temp_dir().join(format!(
+        "axcenity-scene-colour-blend-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&project);
+    std::fs::create_dir_all(project.join("skins")).unwrap();
+    for (file, pixel) in [
+        ("young.png", [200, 150, 130, 255]),
+        ("old.png", [150, 110, 90, 255]),
+    ] {
+        let image = image::RgbaImage::from_pixel(2, 2, image::Rgba(pixel));
+        let mut png = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
+        std::fs::write(project.join("skins").join(file), png.into_inner()).unwrap();
+    }
+    let assets = axcenity_assets::Assets::new(&project);
+    let draw = |authored: &Material, toward: &str, amount: f64| {
+        let (world, part) = part(&[
+            (
+                "Skin",
+                MATERIAL_COLOUR_MAP,
+                Value::String("skins/young.png".into()),
+            ),
+            ("Skin", MATERIAL_COLOUR_TOWARD, Value::String(toward.into())),
+            ("Skin", MATERIAL_COLOUR_AMOUNT, Value::Number(amount)),
+        ]);
+        let mut material = authored.clone();
+        colour_map(&mut material, world.get(part).unwrap(), "Skin", &assets);
+        material
+    };
+    let second = |material: &Material| match &material.shading {
+        Shading::Skin(skin) => skin
+            .second_colour
+            .as_ref()
+            .map(|(map, amount)| (map.rgba()[0], *amount)),
+        _ => None,
+    };
+    let skin_material = Material {
+        shading: Shading::Skin(SkinShading::default()),
+        ..skin()
+    };
+    let drawn = draw(&skin_material, "skins/old.png", 0.3);
+    assert_eq!(drawn.base_color_texture.as_ref().unwrap().rgba()[0], 200);
+    assert_eq!(second(&drawn), Some((150, 0.3)));
+    assert_eq!(
+        second(&draw(&skin_material, "skins/old.png", 4.0)),
+        Some((150, 1.0))
+    );
+    assert_eq!(second(&draw(&skin_material, "skins/old.png", 0.0)), None);
+    assert_eq!(second(&draw(&skin_material, "", 0.3)), None);
+    assert_eq!(second(&draw(&skin_material, "skins/none.png", 0.3)), None);
+    // A material that isn't skin draws the first map alone.
+    let standard = draw(&skin(), "skins/old.png", 0.3);
+    assert!(matches!(standard.shading, Shading::Standard));
+    assert_eq!(standard.base_color_texture.as_ref().unwrap().rgba()[0], 200);
+    let _ = std::fs::remove_dir_all(&project);
 }

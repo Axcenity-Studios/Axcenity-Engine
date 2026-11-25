@@ -366,14 +366,30 @@ fn every_shipped_preset_is_sound_listed_and_resolves() {
     assert_eq!(count(PresetKind::Face), Some(9));
     assert_eq!(count(PresetKind::Character), Some(6));
     assert_eq!(count(PresetKind::Feature), Some(16));
-    for (feature, presets) in [("nose", 10), ("face_shape", 6)] {
-        let of_feature = library
+    let of_feature = |base: &str, feature: &str| {
+        library
             .presets
             .values()
+            .filter(|preset| preset.base == base)
             .filter_map(|preset| preset.preset())
             .filter(|block| block.feature.as_deref() == Some(feature))
-            .count();
-        assert_eq!(of_feature, presets, "{feature}");
+            .count()
+    };
+    for (feature, presets) in [("nose", 10), ("face_shape", 6)] {
+        assert_eq!(
+            of_feature("axcenity/realistic", feature),
+            presets,
+            "{feature}"
+        );
+    }
+    // The human base (`assets/characters/human/presets.py`): its two
+    // characters, six builds, eight faces, seven face shapes and noses.
+    let human = |kind| kinds.get(&("axcenity/human".to_owned(), kind)).copied();
+    assert_eq!(human(PresetKind::Character), Some(2));
+    assert_eq!(human(PresetKind::Body), Some(6));
+    assert_eq!(human(PresetKind::Face), Some(8));
+    for (feature, presets) in [("nose", 7), ("face_shape", 7)] {
+        assert_eq!(of_feature("axcenity/human", feature), presets, "{feature}");
     }
 }
 
@@ -738,4 +754,500 @@ fn a_grafted_model_is_the_shipped_one_with_its_new_shapes_last() {
         body_checked,
         "the realistic body has no `grafted_shapes` record: was it built over?"
     );
+}
+
+/// ADR-0048: every colour map a shipped base offers is an image the
+/// engine reads, all of a material the same size; and the human base's
+/// skins are MakeHuman's 22, each drawn by the characters it was made for:
+/// the sex of the skin follows the body type, its age the Age slider, and
+/// Randomize never draws the painted bodysuit.
+#[test]
+fn the_human_bases_skins_follow_the_body_type_and_the_age() {
+    use axcenity_avatar::{Scope, randomize, resolve};
+    let library = read();
+    let assets = axcenity_assets::Assets::new(root());
+    for (id, base) in &library.bases {
+        let mut sizes: BTreeMap<&str, (u32, u32)> = BTreeMap::new();
+        for map in &base.material_maps {
+            let path = library.path_of(id, &map.colour_map).unwrap();
+            let image = assets
+                .texture(&path)
+                .unwrap_or_else(|| panic!("{path}: {:?}", assets.take_errors()));
+            let size = (image.width, image.height);
+            assert_eq!(*sizes.entry(&map.material).or_insert(size), size, "{path}");
+        }
+    }
+
+    let human = library.base("axcenity/human").expect("shipped");
+    let files: std::collections::BTreeSet<&str> = human
+        .material_maps
+        .iter()
+        .map(|map| map.colour_map.as_str())
+        .collect();
+    assert_eq!(files.len(), 22, "MakeHuman's textured skins");
+    let skin = |values: &[(&str, f32)]| {
+        let mut character = Description::new("Skin", "axcenity/human");
+        for (id, value) in values {
+            character.parameters.insert((*id).to_owned(), *value);
+        }
+        let resolved = resolve(&library, &character).unwrap();
+        assert_eq!(resolved.colour_maps.len(), 1);
+        resolved.colour_maps["Skin"].clone()
+    };
+    // The default character: the model file's own skin, as a map.
+    assert_eq!(skin(&[]), "human/skins/young_caucasian_male.jpg");
+    assert_eq!(
+        skin(&[("frame", 1.0)]),
+        "human/skins/young_caucasian_female.jpg"
+    );
+    for (choice, tone) in [(0.0, "african"), (1.0, "asian"), (2.0, "caucasian")] {
+        for (frame, sex) in [(0.0, "male"), (1.0, "female")] {
+            // Young up to a quarter of the Age slider, old from three
+            // quarters, middle-aged between.
+            for (age, word) in [
+                (0.0, "young"),
+                (0.2, "young"),
+                (0.3, "middleage"),
+                (0.7, "middleage"),
+                (0.8, "old"),
+                (1.0, "old"),
+            ] {
+                assert_eq!(
+                    skin(&[("skin", choice), ("frame", frame), ("age", age)]),
+                    format!("human/skins/{word}_{tone}_{sex}.jpg"),
+                );
+            }
+        }
+    }
+    // The second Caucasian pair is young only: older, the first pair's.
+    assert_eq!(
+        skin(&[("skin", 3.0), ("frame", 1.0)]),
+        "human/skins/young_caucasian_female2.jpg"
+    );
+    assert_eq!(
+        skin(&[("skin", 3.0), ("age", 0.2)]),
+        "human/skins/young_caucasian_male2.jpg"
+    );
+    assert_eq!(
+        skin(&[("skin", 3.0), ("age", 0.6)]),
+        "human/skins/middleage_caucasian_male.jpg"
+    );
+    assert_eq!(
+        skin(&[("skin", 3.0), ("age", 1.0)]),
+        "human/skins/old_caucasian_male.jpg"
+    );
+    // The bodysuit is painted on: it stays on at every age.
+    for age in [0.0, 0.5, 1.0] {
+        assert_eq!(
+            skin(&[("skin", 4.0), ("frame", 1.0), ("age", age)]),
+            "human/skins/young_caucasian_female_special_suit.jpg"
+        );
+    }
+
+    // Between two ages the skin fades from one photograph to the next
+    // (each map's `blend`): none of the other at an age a skin was made
+    // for, a half of it where the two are as near, and the same mix from
+    // either side of that, so nothing snaps as the Age slider moves.
+    let blend = |values: &[(&str, f32)]| {
+        let mut character = Description::new("Skin", "axcenity/human");
+        for (id, value) in values {
+            character.parameters.insert((*id).to_owned(), *value);
+        }
+        let resolved = resolve(&library, &character).unwrap();
+        let own = resolved.colour_maps["Skin"].clone();
+        let toward = resolved.colour_blends.get("Skin").cloned();
+        (own, toward)
+    };
+    for age in [0.0, 0.5, 1.0] {
+        assert_eq!(blend(&[("age", age)]).1, None, "age {age}");
+    }
+    let young = "human/skins/young_caucasian_male.jpg".to_owned();
+    let middle = "human/skins/middleage_caucasian_male.jpg".to_owned();
+    let (own, toward) = blend(&[("age", 0.1)]);
+    let (other, amount) = toward.expect("between two skins");
+    assert_eq!((own, other), (young.clone(), middle.clone()));
+    assert!((amount - 0.2).abs() < 1e-5, "{amount}");
+    let (own, toward) = blend(&[("age", 0.4)]);
+    let (other, amount) = toward.expect("between two skins");
+    assert_eq!((own, other), (middle.clone(), young.clone()));
+    assert!((amount - 0.2).abs() < 1e-5, "{amount}");
+    // Just either side of the middle: half of each, whichever is "own".
+    let before = blend(&[("age", 0.2499)]).1.unwrap();
+    let after = blend(&[("age", 0.2501)]).1.unwrap();
+    assert_eq!((before.0, after.0), (middle, young));
+    assert!((before.1 - 0.5).abs() < 1e-3 && (after.1 - 0.5).abs() < 1e-3);
+    // The bodysuit is one image at every age: nothing to fade to.
+    assert_eq!(blend(&[("skin", 4.0), ("age", 0.3)]).1, None);
+    // The second Caucasian pair ages into the first pair's skins.
+    let (own, toward) = blend(&[("skin", 3.0), ("age", 0.1)]);
+    assert_eq!(own, "human/skins/young_caucasian_male2.jpg");
+    assert_eq!(
+        toward.unwrap().0,
+        "human/skins/middleage_caucasian_male.jpg"
+    );
+
+    let start = Description::new("Npc", "axcenity/human");
+    let mut drawn: std::collections::BTreeSet<String> = Default::default();
+    for seed in 0..1000 {
+        let character = randomize(&start, &Scope::All, &Default::default(), seed, &library);
+        assert!(character.parameters["skin"] <= 3.0, "seed {seed}");
+        drawn.extend(
+            resolve(&library, &character)
+                .unwrap()
+                .colour_maps
+                .into_values(),
+        );
+    }
+    assert_eq!(
+        drawn.len(),
+        20,
+        "every photographed skin is drawn: {drawn:?}"
+    );
+}
+
+/// ADR-0047 stage 5: the human base's hairstyles (`hair.py`). Each is a
+/// groom with a mesh in the hair slot, credited, with a picture, on the
+/// Hair shading model; it follows the head's shape and none of the face's
+/// expressions; and every colour variant of it resolves on both body types.
+#[test]
+fn the_human_bases_hairstyles_follow_the_head_and_not_its_expressions() {
+    use axcenity_avatar::{ItemKind, ShadingModel, resolve};
+    let library = read();
+    let human = library.base("axcenity/human").expect("shipped");
+    let hair: Vec<_> = library
+        .items
+        .values()
+        .filter(|item| item.kind == ItemKind::Groom && item.bases.contains(&human.id))
+        .collect();
+    assert!(hair.len() >= 5, "{} hairstyles", hair.len());
+    // The standard facial controls the base has shapes for.
+    let controls = [
+        "Blink_",
+        "Eye_",
+        "Brow_",
+        "Nose_",
+        "Mouth_",
+        "Lip_",
+        "Upper_Lip_",
+        "Lower_Lip_",
+    ];
+    for item in hair {
+        let id = &item.id;
+        assert_eq!(item.slot, "hair", "{id}");
+        assert!(
+            item.is_draft(),
+            "{id}: a converted asset is a draft until reviewed"
+        );
+        let groom = item.groom.as_ref().expect("a groom");
+        assert!(groom.mesh.is_some() && item.model.is_none(), "{id}");
+        let source = item
+            .source
+            .as_ref()
+            .unwrap_or_else(|| panic!("{id}: no credit"));
+        assert!(
+            matches!(source.licence.as_str(), "CC0-1.0" | "CC-BY-4.0") && !source.author.is_empty(),
+            "{id}: {source:?}"
+        );
+        let picture = item.thumbnail.as_deref().expect("a picture");
+        let picture = library.path_of(id, picture).unwrap();
+        assert!(root().join(&picture).is_file(), "{picture}");
+        assert_eq!(item.materials.len(), 1, "{id}");
+        assert_eq!(item.materials[0].shading, ShadingModel::Hair, "{id}");
+        let axcenity_avatar::Fit::Shapes { follows } = &item.fit else {
+            panic!("{id}: fitted by its shapes");
+        };
+        assert!(follows.contains(&"Frame_Feminine".to_owned()), "{id}");
+        let expressions: Vec<&String> = follows
+            .iter()
+            .filter(|shape| controls.iter().any(|control| shape.starts_with(control)))
+            .collect();
+        assert!(expressions.is_empty(), "{id} follows {expressions:?}");
+        assert!(item.variants.len() >= 2, "{id}: colours to pick");
+        for variant in &item.variants {
+            for frame in [0.0, 1.0] {
+                let mut character = Description::new("Hair", &human.id);
+                character.parameters.insert("frame".to_owned(), frame);
+                let mut worn = WornItem::new(id.clone());
+                worn.variant = Some(variant.id.clone());
+                character.items = vec![worn];
+                let problems = character.validate(&library);
+                assert!(
+                    problems.is_empty(),
+                    "{id} {}: {}",
+                    variant.id,
+                    lines(&problems)
+                );
+                let resolved = resolve(&library, &character).unwrap();
+                assert!(
+                    resolved.problems.is_empty(),
+                    "{id}: {:?}",
+                    resolved.problems
+                );
+                let part = resolved
+                    .parts
+                    .iter()
+                    .find(|part| part.item.as_deref() == Some(id.as_str()))
+                    .unwrap_or_else(|| panic!("{id} is worn"));
+                assert_eq!(part.slot.as_deref(), Some("hair"));
+                assert_eq!(
+                    part.materials.get("Hair").map_or(0, |values| values.len()),
+                    variant
+                        .materials
+                        .get("Hair")
+                        .map_or(0, |values| values.len()),
+                    "{id} {}",
+                    variant.id
+                );
+            }
+        }
+    }
+}
+
+/// Paul, 2026-11-24: Randomize draws the human base's hairstyles though
+/// they are drafts (its hair slot says `random_drafts`), so a random
+/// character isn't always bald; it still never draws a draft garment, and
+/// the other bases' drafts are never drawn.
+#[test]
+fn randomize_draws_the_human_bases_hairstyles_and_no_other_draft() {
+    use axcenity_avatar::{Scope, randomize};
+    let library = read();
+    for base in library.bases.values() {
+        let start = Description::new("Npc", &base.id);
+        let mut hair: std::collections::BTreeSet<String> = Default::default();
+        let mut bald = 0;
+        for seed in 0..400 {
+            let character = randomize(&start, &Scope::All, &Default::default(), seed, &library);
+            let mut has_hair = false;
+            for worn in &character.items {
+                let item = library.item(&worn.id).unwrap();
+                has_hair |= item.slot == "hair";
+                // What a parameter's choice wears (the underwear) isn't drawn.
+                let chosen = axcenity_avatar::chosen_slots(&library, &base.id);
+                let drawn_draft = item.is_draft() && !chosen.contains(&item.slot);
+                let allowed = base.slot(&item.slot).is_some_and(|slot| slot.random_drafts);
+                assert!(
+                    !drawn_draft || allowed,
+                    "{} seed {seed} wears the draft {}",
+                    base.id,
+                    item.id
+                );
+                if item.slot == "hair" {
+                    hair.insert(worn.id.clone());
+                }
+            }
+            bald += usize::from(!has_hair);
+        }
+        if base.id == "axcenity/human" {
+            assert_eq!(hair.len(), 5, "every shipped hairstyle is drawn: {hair:?}");
+            // One choice in six is no hair at all.
+            assert!((30..110).contains(&bald), "{bald} of 400 are bald");
+        }
+    }
+}
+
+/// The human base's face is laid out for a person (`face.py`): every
+/// slider has a name that isn't MakeHuman's target name and fits
+/// Character Studio's panel uncut (22 characters), every face page is a
+/// feature with a handle, and every handle can be dragged: each of its
+/// drives names a slider of its own feature's page and a direction on the
+/// screen in at least one framing.
+#[test]
+fn the_human_bases_face_has_readable_names_features_and_handles() {
+    let library = read();
+    let base = library.base("axcenity/human").expect("the human base");
+    for parameter in &base.parameters {
+        let label = &parameter.label;
+        assert!(
+            label.chars().count() <= 22,
+            "`{label}` is cut short in the panel"
+        );
+        assert!(
+            !label.contains('_') && !label.contains("Incr") && !label.contains("Trans"),
+            "`{label}` reads as a target's name"
+        );
+    }
+    let pages: Vec<&str> = base
+        .groups
+        .iter()
+        .filter(|group| group.category == axcenity_avatar::Category::Face)
+        .map(|group| group.id.as_str())
+        .collect();
+    assert_eq!(pages.len(), 10, "{pages:?}");
+    for page in &pages {
+        assert!(base.feature(page).is_some(), "{page} is a feature");
+        assert!(
+            base.handles.iter().any(|handle| handle.feature == *page),
+            "{page} has a handle"
+        );
+    }
+    assert_eq!(base.handles.len(), 24);
+    for handle in &base.handles {
+        assert!(!handle.drives.is_empty(), "{}", handle.id);
+        for drive in &handle.drives {
+            let parameter = base.parameter(&drive.parameter).expect("its slider");
+            assert_eq!(parameter.group, handle.feature, "{}", handle.id);
+            assert!(
+                !drive.screen.is_empty(),
+                "{}: {} can't be dragged in any framing",
+                handle.id,
+                drive.parameter
+            );
+            assert!(drive.travel >= 0.0008, "{}", handle.id);
+        }
+        if let Some(mirror) = &handle.mirror {
+            let other = base.handle(mirror).expect("its mirror");
+            assert_eq!(other.mirror.as_deref(), Some(handle.id.as_str()));
+        }
+    }
+}
+
+/// The human base's layering (ADR-0045 on MakeHuman's clothes, Paul's
+/// test of 2026-11-25: underwear came through the outfits). Every garment
+/// of the base says what it hides beneath it: its cover map's green is lit
+/// wherever its red is (cloth is never left drawn where the skin isn't)
+/// and its blue wherever its green is. The underwear cut from the body
+/// has the shape that presses it onto the skin under other clothes, and
+/// wears it only then; a converted garment carries its corners' places on
+/// the skin, so the engine tucks its edge under what is worn over it (the
+/// socks of the shoes under the jeans). That nothing of the underwear is
+/// then drawn is the player's `the_human_bases_underwear_is_not_drawn_under_an_outfit`.
+/// And the frame moves the twist bones with the limbs they are inside.
+#[test]
+fn the_human_bases_underwear_goes_under_its_clothes() {
+    use axcenity_avatar::{WornItem, resolve};
+    let library = read();
+    let assets = axcenity_assets::Assets::new(root());
+    let mut garments = 0;
+    for (id, item) in &library.items {
+        if !item.bases.iter().any(|base| base == "axcenity/human") {
+            continue;
+        }
+        let Some(cover) = &item.cover_map else {
+            continue;
+        };
+        garments += 1;
+        let path = library.path_of(id, cover).unwrap();
+        let image = assets
+            .texture(&path)
+            .unwrap_or_else(|| panic!("{path}: {:?}", assets.take_errors()));
+        let (mut red, mut green, mut bare, mut untucked) = (0, 0, 0, 0);
+        for texel in image.rgba().chunks_exact(4) {
+            let lit = |channel: usize| texel[channel] >= axcenity_assets::COVERED;
+            red += usize::from(lit(0));
+            green += usize::from(lit(1));
+            bare += usize::from(lit(0) && !lit(1));
+            untucked += usize::from(lit(1) && !lit(2));
+        }
+        assert!(red > 0 && green >= red, "{id}: red {red}, green {green}");
+        assert_eq!(bare, 0, "{id}: skin hidden where cloth beneath isn't");
+        assert_eq!(untucked, 0, "{id}: blue is at least green");
+    }
+    assert_eq!(
+        garments, 6,
+        "the underwear, two outfits and two pairs of shoes"
+    );
+
+    let model = |id: &str| {
+        let item = &library.items[id];
+        let reference = item.model.as_ref().unwrap();
+        let file = library.path_of(id, &reference.file).unwrap();
+        let bytes = std::fs::read(root().join(&file)).unwrap();
+        let pick = Pick::Objects(vec![reference.object.clone().unwrap()]);
+        load_models(&bytes, Path::new("."), ModelFormat::Gltf, &[pick])
+            .unwrap()
+            .remove(0)
+    };
+    const BRIEFS: &str = "axcenity/human-boxer-briefs";
+    const BANDEAU: &str = "axcenity/human-bandeau";
+    for id in [BRIEFS, BANDEAU] {
+        let contents = ModelContents::of(&model(id));
+        assert!(
+            contents
+                .shapes
+                .contains(axcenity_avatar::fit::SHRINK_UNDER_SHAPE),
+            "{id} can be pressed onto the skin"
+        );
+        assert!(!model(id).has_skin_uvs(), "{id} lies on the skin");
+    }
+    for id in [
+        "makehuman/female-casualsuit01",
+        "makehuman/male-casualsuit01",
+        "makehuman/shoes01",
+        "makehuman/shoes04",
+    ] {
+        let garment = model(id);
+        assert!(garment.has_skin_uvs(), "{id} knows its place on the skin");
+        for primitive in &garment.primitives {
+            for uv in &primitive.skin_uvs {
+                assert!(
+                    uv.iter()
+                        .all(|c| c.is_finite() && (-0.01..=1.01).contains(c)),
+                    "{id}: {uv:?}"
+                );
+            }
+        }
+    }
+
+    // Worn: pressed only under something, and hidden by what is over it.
+    let mut character = Description::new("Layers", "axcenity/human");
+    character.parameters.insert("frame".into(), 1.0);
+    character.items = vec![WornItem::new(BRIEFS), WornItem::new(BANDEAU)];
+    let alone = resolve(&library, &character).unwrap();
+    for part in alone.parts.iter().filter(|part| part.item.is_some()) {
+        assert!(part.under.is_empty(), "{}", part.name);
+        assert!(
+            !part
+                .shapes
+                .contains_key(axcenity_avatar::fit::SHRINK_UNDER_SHAPE)
+        );
+    }
+    character
+        .items
+        .push(WornItem::new("makehuman/female-casualsuit01"));
+    let dressed = resolve(&library, &character).unwrap();
+    assert_eq!(dressed.problems, Vec::new());
+    for id in [BRIEFS, BANDEAU] {
+        let part = dressed
+            .parts
+            .iter()
+            .find(|part| part.item.as_deref() == Some(id))
+            .unwrap();
+        assert_eq!(
+            part.shapes
+                .get(axcenity_avatar::fit::SHRINK_UNDER_SHAPE)
+                .copied(),
+            Some(1.0),
+            "{id}"
+        );
+        assert_eq!(
+            part.under,
+            ["human/wardrobe/female_casualsuit01/FemaleCasualsuit01.cover.png"],
+            "{id}"
+        );
+    }
+
+    let human = library.base("axcenity/human").unwrap();
+    let frame = human.parameter("frame").unwrap();
+    for side in ["Left", "Right"] {
+        for bone in [
+            "UpperArmTwist",
+            "LowerArmTwist",
+            "UpperLegTwist",
+            "LowerLegTwist",
+        ] {
+            let twist = format!("{side}{bone}");
+            let inside = format!("{side}{}", bone.trim_end_matches("Twist"));
+            let offset = |name: &str| {
+                frame
+                    .bones
+                    .iter()
+                    .find(|change| change.bone == name)
+                    .and_then(|change| change.offset)
+                    .unwrap_or_else(|| panic!("the frame moves {name}"))
+            };
+            let (a, b) = (offset(&twist), offset(&inside));
+            let apart = (0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f32>().sqrt();
+            assert!(apart < 0.03, "{twist} goes with {inside}: {apart}");
+        }
+    }
 }

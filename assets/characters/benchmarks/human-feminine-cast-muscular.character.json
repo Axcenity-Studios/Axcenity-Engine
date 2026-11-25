@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "name": "human-feminine-cast-muscular",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": 0.1,
+    "frame": 1,
+    "muscle": 0.9,
+    "shoulder_width": 1.05,
+    "skin": 3
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ]
+}

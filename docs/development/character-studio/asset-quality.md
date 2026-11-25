@@ -2,7 +2,7 @@
 
 Paul's decision of 2026-11-17 (plan section 0, decision 10): hair and clothing must be **production-quality assets that visually belong alongside the character models**. "Clean and well made" is not the bar. A generated or imported asset is a **draft** until it passes every requirement below on the benchmark cast, in the engine, and in review.
 
-An item manifest records it as `quality: "draft"` or `"production"` (plan 11.3). Character Studio hides drafts unless "Show drafts" is on. Drafts never appear in default outfits, presets or randomization, and a test holds that.
+An item manifest records it as `quality: "draft"` or `"production"` (plan 11.3). Character Studio hides drafts unless "Show drafts" is on. Drafts never appear in default outfits, presets or randomization, and a test holds that. One exception, by the base's own word (Paul, 2026-11-24): a slot whose base manifest sets `random_drafts` has its drafts drawn by Randomize. The human base sets it on `hair`, where every hairstyle is a draft, so a random character isn't always bald; its draft garments are still never drawn.
 
 Numbers marked *(proposed)* are starting limits, set from the stylized items' measurements and the references. They are tightened as items improve and are **never loosened to pass an item** (plan section 6).
 

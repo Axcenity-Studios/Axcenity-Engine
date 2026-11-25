@@ -1,0 +1,16 @@
+{
+  "format_version": 2,
+  "name": "human-masculine-cast-slim",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": -0.6,
+    "frame": 0,
+    "muscle": -0.2,
+    "skin": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    }
+  ]
+}

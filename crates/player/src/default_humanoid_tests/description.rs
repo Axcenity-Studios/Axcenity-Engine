@@ -813,3 +813,94 @@ fn an_explicit_bake_puts_every_corner_where_the_live_character_has_it() {
     nothing_derived(&game);
     game.no_errors();
 }
+
+/// ADR-0048: the human base's skins. Applying a description writes the
+/// skin's file on the body (`Mat_Skin_colour_map`) and the body draws it in
+/// place of the model file's own colour map; the skin follows the body
+/// type and the age with nothing else of the description changed, and an
+/// item's part never takes it.
+#[test]
+fn the_human_bases_skin_is_a_colour_map_on_the_body_that_follows_its_sliders() {
+    let mut game = game("description-skins");
+    let shipped = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
+    axcenity_project::add_character_packages(&game.folder, &shipped).unwrap();
+    let character = game.character();
+    let attribute =
+        axcenity_core::material_value_attribute("Skin", axcenity_core::MATERIAL_COLOUR_MAP);
+    let human = |parameters: &[(&str, f32)]| {
+        let mut description = Description::new("Ada", "axcenity/human");
+        for (id, value) in parameters {
+            description.parameters.insert((*id).to_owned(), *value);
+        }
+        description
+    };
+    // The skin file the body names, and the texture its Skin material draws.
+    let skin = |game: &mut Game, parameters: &[(&str, f32)]| -> (String, u64) {
+        apply_description(&mut game.world, &game.assets, character, &human(parameters)).unwrap();
+        game.frames(3, MoveInput::default());
+        let body = game.world.find_first_child(character, "Body").unwrap();
+        let file = game
+            .world
+            .get(body)
+            .unwrap()
+            .attribute(&attribute)
+            .and_then(Value::as_str)
+            .expect("the body names its skin")
+            .to_owned();
+        // The base's own parts read the base's maps; an item never does.
+        let worn = parts(game, body);
+        assert!(
+            worn.len() > 5,
+            "the base's parts and the underwear: {worn:?}"
+        );
+        for name in &worn {
+            let part = game.world.find_first_child(body, name).unwrap();
+            let named = game
+                .world
+                .get(part)
+                .unwrap()
+                .attribute(&attribute)
+                .is_some();
+            let own = ["Eyes", "Teeth", "Tongue", "Brows", "Lashes"].contains(&name.as_str());
+            assert_eq!(named, own, "{name}");
+        }
+        let mut terrain = axcenity_scene::TerrainCache::new();
+        let camera = axcenity_render::Camera {
+            position: Vec3::new(0.0, 6.0, 20.0),
+            look_at: Vec3::new(0.0, 3.0, 0.0),
+            fov_y_degrees: 70.0,
+        };
+        let list = axcenity_scene::build_draw_list_posed(
+            &game.world,
+            &game.assets,
+            camera,
+            game.animators.poses(),
+            &mut terrain,
+        );
+        let id = axcenity_scene::item_id(body);
+        let drawn: Vec<u64> = list
+            .items
+            .iter()
+            .filter(|item| item.id == id)
+            .filter_map(|item| item.material.base_color_texture.as_ref().map(|t| t.key()))
+            .collect();
+        assert_eq!(drawn.len(), 1, "the body has one textured material");
+        let errors = game.assets.take_errors();
+        assert!(errors.is_empty(), "{errors:?}");
+        (file, drawn[0])
+    };
+    let folder = "assets/characters/human/skins";
+    let (file, young_male) = skin(&mut game, &[]);
+    assert_eq!(file, format!("{folder}/young_caucasian_male.jpg"));
+    let (file, young_female) = skin(&mut game, &[("frame", 1.0)]);
+    assert_eq!(file, format!("{folder}/young_caucasian_female.jpg"));
+    let (file, old_female) = skin(&mut game, &[("frame", 1.0), ("age", 1.0)]);
+    assert_eq!(file, format!("{folder}/old_caucasian_female.jpg"));
+    let (file, dark) = skin(&mut game, &[("frame", 1.0), ("age", 1.0), ("skin", 0.0)]);
+    assert_eq!(file, format!("{folder}/old_african_female.jpg"));
+    let drawn: std::collections::BTreeSet<u64> =
+        [young_male, young_female, old_female, dark].into();
+    assert_eq!(drawn.len(), 4, "each skin is its own texture");
+    // Back to the first: the same file, read once.
+    assert_eq!(skin(&mut game, &[]).1, young_male);
+}

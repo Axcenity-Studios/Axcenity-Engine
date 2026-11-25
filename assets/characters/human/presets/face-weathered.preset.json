@@ -1,0 +1,21 @@
+{
+  "format_version": 2,
+  "name": "Older face",
+  "base": "axcenity/human",
+  "parameters": {
+    "chin_jaw_drop": 0.3,
+    "eyes_bag_left": 0.5,
+    "eyes_bag_right": 0.5,
+    "eyes_eyefold_down_up_left": -0.4,
+    "eyes_eyefold_down_up_right": -0.4,
+    "face_shape_age": 0.8,
+    "lips_laugh_lines_in_out": -0.6,
+    "lips_upperlip_volume": -0.3
+  },
+  "preset": {
+    "id": "axcenity/human-face-weathered",
+    "kind": "face",
+    "about": "An aged face: lines, heavier lids and a little sag under the chin.",
+    "order": 80
+  }
+}

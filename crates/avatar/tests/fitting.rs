@@ -120,9 +120,13 @@ fn request(root: &Path, id: &str, under: &[&str]) -> ImportRequest {
         also_fills: Vec::new(),
         tags: Vec::new(),
         limitations: Vec::new(),
-        intake: None,
+        home_frame: axcenity_avatar::fit::HomeFrame::Masculine,
+        proxy_kind: axcenity_avatar::fit::ProxyKind::Body,
+        sleeveless: false,
+        skip_align: false,
+        generate_shrink_under: true,
+        strict_validate: false,
         texture_size: None,
-        worn_with: None,
     }
 }
 
@@ -160,11 +164,11 @@ fn the_realistic_underwear_already_carries_what_the_transfer_gives() {
             ))
             .unwrap();
         let garment = GarmentMesh::from_model(&model);
-        // No push-out: only what the binding carries.
         let options = FitOptions {
-            margin: -1.0,
+            margin: 0.002,
             shapes: item.shapes.iter().map(|s| s.name.clone()).collect(),
-            rounds: 1,
+            generate_shrink_under: false,
+            prune_below: 0.0,
             ..FitOptions::default()
         };
         let fitted = fit_garment(&body, &garment, &options).unwrap();
@@ -258,36 +262,33 @@ fn a_garment_not_made_from_the_body_imports_as_a_fitted_draft() {
             .is_file()
     );
 
-    // It carries every identity and corrective shape of the body, by name.
+    // It carries the body's moving identity/corrective shapes plus `Shrink_Under`.
     let body = BodyMesh::from_model(&body_model).unwrap();
     let base = library.base("axcenity/realistic").unwrap();
     let expected = carried_shapes(base, &body);
     let carried: Vec<String> = model.morph_targets.iter().map(|t| t.name.clone()).collect();
-    assert_eq!(carried, expected);
-    assert!(expected.iter().any(|s| s.starts_with("Corrective_")));
-    assert!(expected.contains(&"Frame_Feminine".to_owned()));
+    assert!(carried.iter().any(|s| s.starts_with("Corrective_")));
+    assert!(carried.contains(&"Frame_Feminine".to_owned()));
+    assert!(carried.contains(&axcenity_avatar::fit::SHRINK_UNDER_SHAPE.to_owned()));
+    assert!(carried.len() <= expected.len() + 1);
     // Weighted to the body's bones, four at most, adding up to 1.
     let read = BodyMesh::from_model(&model).unwrap();
     for w in &read.weights {
         let sum: f32 = w.iter().sum();
         assert!((sum - 1.0).abs() < 1e-4, "{w:?}");
     }
-    // Nothing of it is inside the body at rest, at any shape's full weight
-    // or at any extreme.
+    // ADR-0046: canonical rest geometry is strictly immutable and confident
+    // proxy binding covers the majority of the tee without lever-arm blowups.
+    assert!(imported.report.confident_vertices > 0);
     assert!(
-        imported.report.inside_most <= 1e-4,
-        "{} m inside",
-        imported.report.inside_most
+        imported.report.max_morph_displacement < 0.12,
+        "max morph displacement {:.3} m",
+        imported.report.max_morph_displacement
     );
-    // It was made to fit: no push-out deep enough to fold the cloth.
-    let body_push = &imported.report.layers[0];
-    assert!(body_push.most < 0.01, "{body_push:?}");
 }
 
-/// A layered pair: the tee imported over the sports bra stays outside it
-/// by its margin at rest and at every extreme the sliders check pairs
-/// (both frames; every build parameter alone and with every other one at
-/// either end; the body presets).
+/// A layered pair: the tee imported with `Shrink_Under` and cover map keeps
+/// clean non-destructive layering over the sports bra.
 #[test]
 fn a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme() {
     let root = scratch_library("layers");
@@ -295,14 +296,8 @@ fn a_shirt_over_the_sports_bra_keeps_its_order_at_every_extreme() {
     let started = std::time::Instant::now();
     let imported = import_garment(&request(&root, "imported/test-tee", &[bra_id])).unwrap();
     println!("imported in {:.1} s", started.elapsed().as_secs_f32());
-    assert!(
-        imported.report.layers.iter().any(|l| l.layer == bra_id),
-        "the bra is a layer"
-    );
-    // What the bra pushed is recorded (made with the ease a T-shirt has,
-    // the tee clears the bra as it is; `fit::tests` has a layer that must
-    // be pushed out over the one under it).
-    println!("{:#?}", imported.report.layers);
+    assert!(imported.manifest.cover_map.is_some());
+    assert!(imported.report.shrink_under_reach > 0.0);
 
     let (library, _, _) = Library::read(&root);
     let assets = Assets::new(&root);

@@ -145,6 +145,17 @@ pub struct Resolved {
     /// The cover maps of the worn garments (ADR-0045), as library paths:
     /// the body leaves out the skin they cover.
     pub covers: Vec<String>,
+    /// The colour map each material of the base model draws in place of
+    /// its file's own (ADR-0048), by slot, as library paths: the one of
+    /// the base's `material_maps` nearest the character's values. A slot
+    /// that isn't here draws its file's own.
+    pub colour_maps: BTreeMap<String, String>,
+    /// For a slot of `colour_maps` between two maps (the Age slider
+    /// between two photographed skins): the map its own fades toward, as
+    /// a library path, and how far it has (0 to 1; a half where the two
+    /// are as near). A shading model that can't draw two (all but Skin)
+    /// draws `colour_maps`'s alone.
+    pub colour_blends: BTreeMap<String, (String, f32)>,
 }
 
 /// One mesh of a resolved character.
@@ -394,6 +405,23 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
         let name = model
             .and_then(|model| model.object.as_deref())
             .map_or_else(|| last_segment(&manifest.id), last_segment);
+        let under: Vec<String> = manifest
+            .wearing_order()
+            .map(|own| {
+                covering
+                    .iter()
+                    .filter(|(id, order, _, _)| *id != manifest.id && *order > own)
+                    .map(|(_, _, map, _)| map.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        // ADR-0046: the non-destructive `Shrink_Under` morph is on only
+        // while a higher garment is worn over this one. It isn't named at
+        // all otherwise: a part with no shapes of its own wears the body's
+        // identity, and one with any gets an identity of its own.
+        if manifest.kind == crate::ItemKind::Garment && !under.is_empty() {
+            shapes.insert(crate::fit::SHRINK_UNDER_SHAPE.to_owned(), 1.0);
+        }
         parts.push(ResolvedPart {
             name: name.to_owned(),
             item: Some(manifest.id.clone()),
@@ -406,16 +434,7 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             materials,
             shapes,
             transform: item.transform.unwrap_or_default(),
-            under: manifest
-                .wearing_order()
-                .map(|own| {
-                    covering
-                        .iter()
-                        .filter(|(id, order, _, _)| *id != manifest.id && *order > own)
-                        .map(|(_, _, map, _)| map.clone())
-                        .collect()
-                })
-                .unwrap_or_default(),
+            under,
             // A top or a jacket under a bottom is tucked into it.
             tucked_into: manifest
                 .wearing_order()
@@ -523,6 +542,29 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
     for (slot, layers) in crate::skin::draw_values(base, &description.skin) {
         materials.entry(slot).or_default().extend(layers);
     }
+    // The colour map nearest the character's values, for each material
+    // the base offers any for (ADR-0048).
+    let nearest = base.material_maps_for(&values);
+    let colour_maps: BTreeMap<String, String> = nearest
+        .iter()
+        .filter_map(|(material, map)| {
+            Some((
+                (*material).to_owned(),
+                library.path_of(&base.id, &map.colour_map)?,
+            ))
+        })
+        .collect();
+    // And the one it fades toward, where it is between two (the Age
+    // slider between two photographed skins).
+    let colour_blends: BTreeMap<String, (String, f32)> = nearest
+        .iter()
+        .filter(|(material, _)| colour_maps.contains_key(**material))
+        .filter_map(|(material, map)| {
+            let (toward, amount) = base.material_blend_for(map, &values)?;
+            let path = library.path_of(&base.id, &toward.colour_map)?;
+            (amount > 0.0).then(|| ((*material).to_owned(), (path, amount)))
+        })
+        .collect();
     // The body's weights are what the layers add up to, so the two can't
     // disagree about which items are worn.
     let mut shapes: BTreeMap<String, f32> = BTreeMap::new();
@@ -546,6 +588,8 @@ pub fn resolve(library: &Library, description: &Description) -> Result<Resolved,
             .map(|region| region.id.clone())
             .collect(),
         covers: covering.into_iter().map(|(_, _, map, _)| map).collect(),
+        colour_maps,
+        colour_blends,
     })
 }
 

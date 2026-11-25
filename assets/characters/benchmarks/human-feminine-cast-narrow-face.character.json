@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "human-feminine-cast-narrow-face",
+  "base": "axcenity/human",
+  "parameters": {
+    "chin_width": -0.5,
+    "face_shape_oval": 0.4,
+    "face_shape_scale_horiz": -0.6,
+    "frame": 1
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ]
+}

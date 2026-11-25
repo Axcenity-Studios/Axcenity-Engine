@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "human-feminine-cast-athletic",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": -0.4,
+    "frame": 1,
+    "muscle": 0.6,
+    "skin": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ]
+}

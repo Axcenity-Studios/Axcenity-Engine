@@ -2,6 +2,12 @@
   "format_version": 1,
   "bases": [
     {
+      "id": "axcenity/human",
+      "manifest": "human/Human.base.json",
+      "label": "Human",
+      "family": "human"
+    },
+    {
       "id": "axcenity/realistic",
       "manifest": "realistic/Realistic.base.json",
       "label": "Realistic",
@@ -149,6 +155,34 @@
         "short",
         "straight",
         "side-part"
+      ]
+    },
+    {
+      "id": "axcenity/human-bandeau",
+      "manifest": "human/items/bandeau/Bandeau.item.json",
+      "label": "Bandeau top",
+      "kind": "garment",
+      "slot": "underwear_top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "underwear"
+      ]
+    },
+    {
+      "id": "axcenity/human-boxer-briefs",
+      "manifest": "human/items/boxer-briefs/BoxerBriefs.item.json",
+      "label": "Boxer briefs",
+      "kind": "garment",
+      "slot": "underwear_bottom",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "underwear"
       ]
     },
     {
@@ -309,9 +343,369 @@
         "cotton",
         "short-sleeve"
       ]
+    },
+    {
+      "id": "makehuman/female-casualsuit01",
+      "manifest": "human/wardrobe/female_casualsuit01/FemaleCasualsuit01.item.json",
+      "label": "T-shirt and jeans",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "female",
+        "makehuman"
+      ],
+      "thumbnail": "human/wardrobe/female_casualsuit01/FemaleCasualsuit01.png"
+    },
+    {
+      "id": "makehuman/hair-afro01",
+      "manifest": "human/hair/afro01/HairAfro01.item.json",
+      "label": "Afro",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "coily",
+        "makehuman",
+        "short"
+      ],
+      "thumbnail": "human/hair/afro01/HairAfro01.png"
+    },
+    {
+      "id": "makehuman/hair-bob02",
+      "manifest": "human/hair/bob02/HairBob02.item.json",
+      "label": "Blunt bob with a fringe",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "fringe",
+        "makehuman",
+        "medium",
+        "straight"
+      ],
+      "thumbnail": "human/hair/bob02/HairBob02.png"
+    },
+    {
+      "id": "makehuman/hair-long01",
+      "manifest": "human/hair/long01/HairLong01.item.json",
+      "label": "Long and straight",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "long",
+        "makehuman",
+        "straight"
+      ],
+      "thumbnail": "human/hair/long01/HairLong01.png"
+    },
+    {
+      "id": "makehuman/hair-short02",
+      "manifest": "human/hair/short02/HairShort02.item.json",
+      "label": "Short and tousled",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "short"
+      ],
+      "thumbnail": "human/hair/short02/HairShort02.png"
+    },
+    {
+      "id": "makehuman/hair-short04",
+      "manifest": "human/hair/short04/HairShort04.item.json",
+      "label": "Short, brushed forward",
+      "kind": "groom",
+      "slot": "hair",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "short"
+      ],
+      "thumbnail": "human/hair/short04/HairShort04.png"
+    },
+    {
+      "id": "makehuman/male-casualsuit01",
+      "manifest": "human/wardrobe/male_casualsuit01/MaleCasualsuit01.item.json",
+      "label": "Shirt and jeans",
+      "kind": "garment",
+      "slot": "top",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "casual",
+        "makehuman",
+        "male"
+      ],
+      "thumbnail": "human/wardrobe/male_casualsuit01/MaleCasualsuit01.png"
+    },
+    {
+      "id": "makehuman/shoes01",
+      "manifest": "human/wardrobe/shoes01/Shoes01.item.json",
+      "label": "Brown leather shoes",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "shoes"
+      ],
+      "thumbnail": "human/wardrobe/shoes01/Shoes01.png"
+    },
+    {
+      "id": "makehuman/shoes04",
+      "manifest": "human/wardrobe/shoes04/Shoes04.item.json",
+      "label": "Black shoes",
+      "kind": "garment",
+      "slot": "shoes",
+      "tier": "built_in",
+      "bases": [
+        "axcenity/human"
+      ],
+      "tags": [
+        "makehuman",
+        "shoes"
+      ],
+      "thumbnail": "human/wardrobe/shoes04/Shoes04.png"
     }
   ],
   "presets": [
+    {
+      "id": "axcenity/human-body-athletic",
+      "file": "human/presets/body-athletic.preset.json",
+      "label": "Athletic",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-average",
+      "file": "human/presets/body-average.preset.json",
+      "label": "Average",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-elder",
+      "file": "human/presets/body-elder.preset.json",
+      "label": "Elderly",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-heavyset",
+      "file": "human/presets/body-heavyset.preset.json",
+      "label": "Heavyset",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-muscular",
+      "file": "human/presets/body-muscular.preset.json",
+      "label": "Muscular",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-body-slim",
+      "file": "human/presets/body-slim.preset.json",
+      "label": "Slim",
+      "kind": "body",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-angular",
+      "file": "human/presets/face-angular.preset.json",
+      "label": "Angular features",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-broad",
+      "file": "human/presets/face-broad.preset.json",
+      "label": "Broad face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-gaunt",
+      "file": "human/presets/face-gaunt.preset.json",
+      "label": "Gaunt face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-heavy",
+      "file": "human/presets/face-heavy.preset.json",
+      "label": "Heavy face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-long",
+      "file": "human/presets/face-long.preset.json",
+      "label": "Long face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-narrow",
+      "file": "human/presets/face-narrow.preset.json",
+      "label": "Narrow face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-diamond",
+      "file": "human/presets/face-shape-diamond.preset.json",
+      "label": "Diamond",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-heart",
+      "file": "human/presets/face-shape-heart.preset.json",
+      "label": "Heart",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-long",
+      "file": "human/presets/face-shape-long.preset.json",
+      "label": "Long",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-oval",
+      "file": "human/presets/face-shape-oval.preset.json",
+      "label": "Oval",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-pear",
+      "file": "human/presets/face-shape-pear.preset.json",
+      "label": "Pear",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-round",
+      "file": "human/presets/face-shape-round.preset.json",
+      "label": "Round",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-shape-square",
+      "file": "human/presets/face-shape-square.preset.json",
+      "label": "Square",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-soft",
+      "file": "human/presets/face-soft.preset.json",
+      "label": "Soft features",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-face-weathered",
+      "file": "human/presets/face-weathered.preset.json",
+      "label": "Older face",
+      "kind": "face",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-female",
+      "file": "human/presets/female.preset.json",
+      "label": "Female",
+      "kind": "character",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-male",
+      "file": "human/presets/male.preset.json",
+      "label": "Male",
+      "kind": "character",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-aquiline",
+      "file": "human/presets/nose-aquiline.preset.json",
+      "label": "Aquiline",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-bulbous",
+      "file": "human/presets/nose-bulbous.preset.json",
+      "label": "Bulbous",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-button",
+      "file": "human/presets/nose-button.preset.json",
+      "label": "Button",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-long-thin",
+      "file": "human/presets/nose-long-thin.preset.json",
+      "label": "Long and thin",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-snub",
+      "file": "human/presets/nose-snub.preset.json",
+      "label": "Snub",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-straight",
+      "file": "human/presets/nose-straight.preset.json",
+      "label": "Straight",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
+    {
+      "id": "axcenity/human-nose-wide",
+      "file": "human/presets/nose-wide.preset.json",
+      "label": "Wide",
+      "kind": "feature",
+      "base": "axcenity/human"
+    },
     {
       "id": "axcenity/realistic-athletic-female",
       "file": "realistic/presets/athletic-female.preset.json",

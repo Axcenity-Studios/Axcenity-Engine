@@ -1,48 +1,22 @@
-//! Imports a garment into a character library (CO9's import flow,
-//! `axcenity_avatar::fit::import_garment`) from the command line:
+//! Imports a canonical A-pose single-shell garment into a character library
+//! (ADR-0046, `axcenity_avatar::fit::import_garment`) from the command line:
 //!
 //! ```text
 //! cargo run -p axcenity-avatar --release --example import_garment -- \
 //!     <garment.obj|.glb> <library folder> <base ID> <item ID> <label> <folder in the library> \
-//!     [--under <item ID>]... [--slot <slot>] [--layer <0-3>] [--margin <metres>] \
+//!     [--slot <slot>] [--layer <0-3>] [--margin <metres>] \
+//!     [--frame masculine|feminine|both] [--proxy body|skirt] \
+//!     [--no-shrink-under] [--strict-validate] \
 //!     [--also-fills <slot>]... [--tag <tag>]... \
 //!     [--limit <parameter>=<low>..<high>=<note>]... \
 //!     [--author <name>] [--licence <SPDX ID>] \
-//!     [--intake] [--kind top|trousers|skirt|one_piece] \
-//!     [--ease snug|regular|loose|oversized] [--scale <metres a unit>] \
-//!     [--conform none|structured|partial|moderate|body|strong] \
-//!     [--cut-for <shape>=<weight>]... [--keep-inner-wall] \
-//!     [--textures <pixels a side>] [--triangles <budget>] \
-//!     [--worn-with <item ID>]... [--tucked] [--worn-most <metres>]
+//!     [--textures <pixels a side>]
 //! ```
-//!
-//! `--worn-with` names a bottom of the library the garment will be worn
-//! with: its cloth below the waist is moved outside that bottom's
-//! (`axcenity_avatar::fit::Hang`), by `--worn-most` at the most (0.03),
-//! or with `--tucked` drawn in under it.
-//!
-//! `--also-fills` names another slot the item takes (a jumpsuit in the
-//! top slot: `bottom`), `--tag` a tag for the browser, and `--limit` a
-//! known limit on a base parameter (a garment cut for the feminine frame:
-//! `frame=0.5..1=Cut for the feminine frame`).
-//!
-//! `--intake` (or any of the flags after it) is for a garment that was not
-//! made on the body: a generated or downloaded one in its own size, place
-//! and pose (`axcenity_avatar::fit::prepare`).
-//!
-//! It aligns the garment to the base body, fits it (binding, weights,
-//! the body's identity and corrective shapes, push-out from the body and
-//! the items named with `--under`), finds its regions and slot, draws a
-//! thumbnail, writes the model, binding, thumbnail and item manifest into
-//! the folder and lists the item in the library's catalogue. The item is a
-//! draft until reviewed. Prints the fitting report.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use axcenity_avatar::fit::{
-    Conform, Ease, GarmentKind, ImportRequest, IntakeOptions, Worn, WornWithRequest, import_garment,
-};
+use axcenity_avatar::fit::{HomeFrame, ImportRequest, ProxyKind, import_garment};
 use axcenity_avatar::{Limitation, Source};
 
 fn main() -> ExitCode {
@@ -58,11 +32,6 @@ fn main() -> ExitCode {
         found
     };
     let under = take("--under");
-    let worn_with = take("--worn-with");
-    let worn_most = take("--worn-most")
-        .pop()
-        .and_then(|m| m.parse().ok())
-        .unwrap_or(0.03);
     let also_fills = take("--also-fills");
     let tags = take("--tag");
     let limitations: Vec<Limitation> = take("--limit")
@@ -91,18 +60,15 @@ fn main() -> ExitCode {
         .pop()
         .unwrap_or_else(|| "NOASSERTION".to_owned());
     let texture_size = take("--textures").pop().and_then(|s| s.parse().ok());
-    let triangles: Option<usize> = take("--triangles").pop().and_then(|s| s.parse().ok());
-    let kind = take("--kind").pop();
-    let ease = take("--ease").pop();
-    let conform = take("--conform").pop();
-    let scale = take("--scale").pop().and_then(|s| s.parse().ok());
-    let cut_for: Vec<(String, f32)> = take("--cut-for")
-        .iter()
-        .filter_map(|pair| {
-            let (shape, weight) = pair.split_once('=')?;
-            Some((shape.to_owned(), weight.parse().ok()?))
-        })
-        .collect();
+    let home_frame = match take("--frame").pop().as_deref() {
+        Some("feminine") => HomeFrame::Feminine,
+        Some("both") => HomeFrame::Both,
+        _ => HomeFrame::Masculine,
+    };
+    let proxy_kind = match take("--proxy").pop().as_deref() {
+        Some("skirt") => ProxyKind::Skirt,
+        _ => ProxyKind::Body,
+    };
     let mut flag = |name: &str| -> bool {
         let found = args.iter().position(|a| a == name);
         if let Some(at) = found {
@@ -110,57 +76,20 @@ fn main() -> ExitCode {
         }
         found.is_some()
     };
-    let keep_inner_wall = flag("--keep-inner-wall");
-    let tucked = flag("--tucked");
-    let intake = flag("--intake")
-        || kind.is_some()
-        || ease.is_some()
-        || conform.is_some()
-        || scale.is_some()
-        || !cut_for.is_empty()
-        || triangles.is_some()
-        || keep_inner_wall;
-    let intake = intake.then(|| IntakeOptions {
-        kind: kind.as_deref().and_then(|kind| match kind {
-            "top" => Some(GarmentKind::Top),
-            "trousers" => Some(GarmentKind::Trousers),
-            "skirt" => Some(GarmentKind::Skirt),
-            "one_piece" => Some(GarmentKind::OnePiece),
-            _ => None,
-        }),
-        ease: match ease.as_deref() {
-            Some("snug") => Ease::Snug,
-            Some("loose") => Ease::Loose,
-            Some("oversized") => Ease::Oversized,
-            _ => Ease::Regular,
-        },
-        conform: conform.as_deref().and_then(|conform| match conform {
-            "none" => Some(Conform::None),
-            "structured" => Some(Conform::Structured),
-            "partial" => Some(Conform::Partial),
-            "moderate" => Some(Conform::Moderate),
-            "body" => Some(Conform::Body),
-            "strong" => Some(Conform::Strong),
-            _ => None,
-        }),
-        scale,
-        cut_for,
-        keep_inner_wall,
-        triangles,
-        ..IntakeOptions::default()
-    });
+    let generate_shrink_under = !flag("--no-shrink-under");
+    let strict_validate = flag("--strict-validate");
+    let sleeveless = flag("--sleeveless");
+    let skip_align = flag("--canonical");
     let [source, library, base, id, label, folder] = match <[String; 6]>::try_from(args) {
         Ok(positional) => positional,
         Err(_) => {
             eprintln!(
-                "usage: import_garment <garment> <library> <base ID> <item ID> <label> <folder> [--under <item ID>]... [--slot <slot>] [--layer <n>] [--margin <m>] [--author <name>] [--licence <SPDX>]"
+                "usage: import_garment <garment> <library> <base ID> <item ID> <label> <folder> [--slot <slot>] [--layer <0-3>] [--margin <m>] [--frame masculine|feminine|both] [--proxy body|skirt] [--no-shrink-under] [--strict-validate] [--author <name>] [--licence <SPDX>] [--textures <px>]"
             );
             return ExitCode::FAILURE;
         }
     };
     let request = ImportRequest {
-        // The runtime's twist and helper bones, so the fit poses are the
-        // runtime's.
         finish_pose: Some(|rig, pose| axcenity_anim::twist::drive(rig, pose, &mut [])),
         source: PathBuf::from(source),
         library: PathBuf::from(library),
@@ -181,13 +110,13 @@ fn main() -> ExitCode {
         also_fills,
         tags,
         limitations,
-        intake,
+        home_frame,
+        proxy_kind,
+        sleeveless,
+        skip_align,
+        generate_shrink_under,
+        strict_validate,
         texture_size,
-        worn_with: (!worn_with.is_empty()).then_some(WornWithRequest {
-            items: worn_with,
-            worn: if tucked { Worn::Tucked } else { Worn::Over },
-            most: worn_most,
-        }),
     };
     let started = std::time::Instant::now();
     match import_garment(&request) {
@@ -199,20 +128,23 @@ fn main() -> ExitCode {
                 started.elapsed().as_secs_f32()
             );
             println!(
-                "slot {}, layer {:?}, hides {:?}",
-                imported.manifest.slot, imported.manifest.layer, imported.manifest.hides
+                "  slot: {}, layer: {:?}, confident: {}, inpainted: {}, max_morph: {:.2} mm, shrink_under: {:.2} mm",
+                imported.manifest.slot,
+                imported.manifest.layer,
+                imported.report.confident_vertices,
+                imported.report.inpainted_vertices,
+                imported.report.max_morph_displacement * 1000.0,
+                imported.report.shrink_under_reach * 1000.0,
             );
-            println!("alignment {:?}", imported.alignment);
-            if let Some(intake) = &imported.intake {
-                println!("intake {intake:#?}");
+            if !imported.report.validation.warnings.is_empty() {
+                for w in &imported.report.validation.warnings {
+                    eprintln!("  validation warning: {w}");
+                }
             }
-            println!("coverage {:?}", imported.coverage);
-            println!("cover map {:?}", imported.cover);
-            println!("{:#?}", imported.report);
             ExitCode::SUCCESS
         }
         Err(err) => {
-            eprintln!("couldn't import: {err}");
+            eprintln!("import failed: {err}");
             ExitCode::FAILURE
         }
     }

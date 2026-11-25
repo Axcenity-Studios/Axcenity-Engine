@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "Heavyset",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": 0.8,
+    "muscle": 0.2
+  },
+  "preset": {
+    "id": "axcenity/human-body-heavyset",
+    "kind": "body",
+    "about": "A heavy body with some muscle under it.",
+    "order": 50
+  }
+}

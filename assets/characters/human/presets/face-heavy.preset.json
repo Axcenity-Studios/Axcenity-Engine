@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "name": "Heavy face",
+  "base": "axcenity/human",
+  "parameters": {
+    "cheeks_volume_left": 0.6,
+    "cheeks_volume_right": 0.6,
+    "chin_jaw_drop": 0.4,
+    "face_shape_fat": 0.8,
+    "neck_double": 0.7,
+    "neck_neck_circ": 0.5
+  },
+  "preset": {
+    "id": "axcenity/human-face-heavy",
+    "kind": "face",
+    "about": "A full face with a double chin and a thick neck.",
+    "order": 60
+  }
+}

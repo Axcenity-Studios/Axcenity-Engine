@@ -10,6 +10,21 @@
 /// What every material value attribute starts with.
 pub const MATERIAL_VALUE_PREFIX: &str = "Mat_";
 
+/// The name, in a material's place for values, of the colour map a
+/// character's material draws in place of its model file's own
+/// (`Mat_Skin_colour_map`, ADR-0048): a texture file in the project, as a
+/// string. It is the one thing here that replaces a map; the values still
+/// modulate what it shows.
+pub const MATERIAL_COLOUR_MAP: &str = "colour_map";
+
+/// Beside [`MATERIAL_COLOUR_MAP`], for a material between two colour maps
+/// (a skin between two photographed ages): the map its own fades toward
+/// (`Mat_Skin_colour_map_toward`, a texture file as a string) and how far
+/// it has (`Mat_Skin_colour_map_amount`, a number from 0 to 1). Only a
+/// shading model that can draw two colour maps reads them (Skin).
+pub const MATERIAL_COLOUR_TOWARD: &str = "colour_map_toward";
+pub const MATERIAL_COLOUR_AMOUNT: &str = "colour_map_amount";
+
 /// The attribute holding the value `value` (`tint`, `roughness_scale`,
 /// `melanin`, …) of the material named `material` (`Mat_Skin_tint`).
 /// Characters an attribute name can't hold become `_`.
@@ -39,5 +54,9 @@ mod tests {
         let odd = material_value_attribute("Hair.Secondary 2", "roughness_scale");
         assert_eq!(odd, "Mat_Hair_Secondary_2_roughness_scale");
         assert!(crate::is_attribute_name(&odd));
+        assert_eq!(
+            material_value_attribute("Skin", MATERIAL_COLOUR_MAP),
+            "Mat_Skin_colour_map"
+        );
     }
 }

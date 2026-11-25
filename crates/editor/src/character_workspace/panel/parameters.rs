@@ -370,14 +370,26 @@ fn parameter(
                 width,
             );
             ui.spacing_mut().item_spacing.x = 2.0;
-            for choice in &parameter.choices {
-                if widgets::chip(ui, &choice.label, picked == Some(choice.value)).clicked() {
-                    out = Some(Intent::Choose {
-                        id: parameter.id.clone(),
-                        value: choice.value,
-                    });
-                }
-            }
+            // The choices take the width up to the lock's column and go
+            // on to more lines when there are more than fit (a body's
+            // five skins): none is ever past the panel's edge.
+            let room = (ui.available_width() - 2.0 * row::MARK - 8.0).max(0.0);
+            ui.allocate_ui_with_layout(
+                egui::vec2(room, 0.0),
+                egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true),
+                |ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(2.0, 2.0);
+                    for choice in &parameter.choices {
+                        let chip = widgets::chip(ui, &choice.label, picked == Some(choice.value));
+                        if chip.clicked() {
+                            out = Some(Intent::Choose {
+                                id: parameter.id.clone(),
+                                value: choice.value,
+                            });
+                        }
+                    }
+                },
+            );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 // Under the slider rows' locks: their reset's column is
                 // the last.

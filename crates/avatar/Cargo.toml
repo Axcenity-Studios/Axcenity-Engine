@@ -10,8 +10,9 @@ authors.workspace = true
 # Runtime (player, server): no renderer, window, UI or Instance code here.
 [dependencies]
 axcenity-assets.workspace = true
-# Fitting garments to bodies (CO9, `fit`): vectors, and the import's
-# thumbnails as PNG.
+# Fitting garments to bodies (CO9, ADR-0046, `fit`): sparse biharmonic solver,
+# vectors, and the import's thumbnails as PNG.
+faer.workspace = true
 glam.workspace = true
 image.workspace = true
 serde.workspace = true

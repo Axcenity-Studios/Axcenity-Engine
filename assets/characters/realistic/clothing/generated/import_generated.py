@@ -1,52 +1,28 @@
-"""Imports generated garments (text- or image-to-3D models: thick closed
-shells in their own size, place and pose) into a character library, through
-the engine's intake and fit (`axcenity_avatar::fit::prepare`, `import_garment`).
+"""Imports canonical A-pose single-shell garments (prepped by
+`prep_meshy_garments.py`) into a character library using ADR-0046's
+non-destructive proxy fitting and biharmonic inpainting (`import_garment`).
 
     cargo build -p axcenity-avatar --release --example import_garment
-    python -I assets/characters/realistic/clothing/generated/import_generated.py \
-        --source <folder of .glb files> --library <a copy of assets/characters> \
-        [--only <text>]... [--textures 2048] [--jobs 4] [--reports <folder>] [--no-dependents]
-    python -I .../import_generated.py --library <library> --check
+    python3 -I assets/characters/realistic/clothing/generated/import_generated.py \
+        --source <folder of prepped .glb files> --library <a copy of assets/characters> \
+        [--only <text>]... [--textures 2048] [--jobs 4] [--reports <folder>] \
+        [--no-strict-validate]
+    python3 -I .../import_generated.py --library <library> --check
 
-`garments.json` beside this file lists the garments: the start of each
-source file's name, the item's ID, label, slot and layer, the hints the
-intake can't read from the mesh (`kind`, `ease`, `conform`, `cut_for`,
-`triangles`),
-the other slots it takes (`also_fills`: a one-piece or a dress takes
-`bottom` too, so nothing is worn under it that it would cross), who it is
-cut for (`frame`: `masculine`, `feminine` or `unisex`, which become a tag
-and, by the list's `frames`, a limit on the body's `frame` for the
-browser's "Fits this body"), and at its top the `author` and `licence`
-every item is recorded with (an entry's own replace them).
-The source files are not in the repository. Each garment is imported in a
-copy of the library (so several run at once), then its folder and catalogue
-entry are put into `--library`. Every item made is a draft.
+`garments.json` beside this file lists the 33 source garments, each tagged with:
+- `frame`: `masculine`, `feminine`, or `unisex` (unisex items generate both a
+  masculine home-frame primary item and a `-feminine` feminine home-frame
+  variant from `<stem>_feminine.glb`).
+- `proxy`: `body` or `skirt` (for dresses, skirts, and long coats).
+- `slot`, `layer`, `also_fills`, `author`, `licence`.
 
-**Bottoms first.** A top or a jacket is fitted for the bottoms it will be
-worn with (`axcenity_avatar::fit::Hang`): its cloth below the waist hangs
-outside theirs, by `worn_most` metres at the most, or, for an entry with
-`"worn": "tucked"` (a top that lies on the body: its `layer` is 0, under
-the bottoms'), is drawn in under theirs. So the import runs in two rounds:
-everything that is fitted to the body alone (the bottoms among them), then
-the tops and jackets, each given the bottoms now in the library
-(`--worn-with`). The rounds keep themselves whole:
-
-- a top is selected (`--only`) and a bottom it needs isn't in the library:
-  the bottom is imported first;
-- a bottom is selected: every top and jacket fitted for it is imported
-  again after it (`--no-dependents` leaves them, and they are then out of
-  date).
-
-`<library>/generated.worn-with.json` records which bottoms (by the SHA-256
-of their models) each top was fitted for; `--check` compares it with the
-library and the list, and fails when a top is out of date: a bottom was
-added, changed or taken out since. The wardrobe pack's `build_pack.py`
-runs the same check.
+Under ADR-0046, garments are fitted independently without rest-mesh mutation:
+layering uses ADR-0045 UV cover maps plus a live `Shrink_Under` morph target
+activated by `avatar::resolve` whenever an overlapping higher layer is worn.
 """
 
 import argparse
 import concurrent.futures
-import hashlib
 import json
 import pathlib
 import shutil
@@ -58,101 +34,110 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[4]
 TOOL = REPO / "target" / "release" / "examples" / "import_garment"
 BASE = "axcenity/realistic"
-RECORD = "generated.worn-with.json"
 
 
-def worn(entry):
-    """How `entry` is worn with the bottoms: `over` them, `tucked` into
-    them, or `None` for what isn't worn with one (a bottom, a dress, a
-    one-piece)."""
-    if entry["slot"] not in ("top", "outerwear") or "bottom" in entry.get("also_fills", []):
-        return None
-    return entry.get("worn", "over")
-
-
-def bottoms_for(entry, listed):
-    """The IDs of the bottoms `entry` is fitted for: every bottom worn
-    under it by the engine's wearing order (a bottom of its layer or a
-    lower one), or, tucked, every bottom."""
-    how = worn(entry)
-    if how is None:
-        return []
-    return [b["id"] for b in listed["garments"] if b["slot"] == "bottom" and "bottom" not in b.get("also_fills", [])
-            and (how == "tucked" or b["layer"] <= entry["layer"])]
-
-
-def model_hash(library, item):
-    """The SHA-256 of `item`'s model in `library`, or `None` when it has none."""
-    catalogue = json.loads((library / "catalogue.json").read_text())
-    for listed in catalogue["items"]:
-        if listed["id"] == item:
-            manifest = library / listed["manifest"]
-            model = manifest.parent / json.loads(manifest.read_text())["model"]["file"]
-            return hashlib.sha256(model.read_bytes()).hexdigest() if model.exists() else None
-    return None
-
-
-def check(library, listed):
-    """What is out of date in `library`: one line for each top or jacket
-    that wasn't fitted for the bottoms the library now has."""
-    wrong = []
-    path = library / RECORD
-    record = json.loads(path.read_text())["garments"] if path.exists() else {}
+def expand_entries(listed):
+    """Expand `garments.json` into concrete import jobs. Unisex garments produce
+    both a masculine home-frame primary item and a `-feminine` home-frame variant."""
+    jobs = []
     for entry in listed["garments"]:
-        if model_hash(library, entry["id"]) is None:
-            continue
-        wanted = {b: model_hash(library, b) for b in bottoms_for(entry, listed)}
-        wanted = {b: h for b, h in wanted.items() if h}
-        if not wanted:
-            continue
-        have = record.get(entry["id"])
-        if have is None:
-            wrong.append(f"{entry['id']}: not fitted for any bottom")
-            continue
-        if have["worn"] != worn(entry):
-            wrong.append(f"{entry['id']}: fitted {have['worn']}, listed {worn(entry)}")
-        for bottom in sorted(set(wanted) | set(have["with"])):
-            if bottom not in have["with"]:
-                wrong.append(f"{entry['id']}: not fitted for {bottom}")
-            elif bottom not in wanted:
-                wrong.append(f"{entry['id']}: fitted for {bottom}, which is gone")
-            elif have["with"][bottom] != wanted[bottom]:
-                wrong.append(f"{entry['id']}: {bottom} has changed since it was fitted for it")
-    return wrong
+        frame = entry.get("frame", "masculine")
+        if frame == "unisex":
+            masc = dict(entry)
+            masc["_home_frame"] = "masculine"
+            masc["_suffix"] = ""
+            jobs.append(masc)
+
+            fem = dict(entry)
+            fem["id"] = entry["id"] + "-feminine"
+            fem["label"] = entry["label"] + " (Feminine)"
+            fem["frame"] = "feminine"
+            fem["_home_frame"] = "feminine"
+            fem["_suffix"] = "_feminine"
+            jobs.append(fem)
+        else:
+            job = dict(entry)
+            job["_home_frame"] = frame
+            job["_suffix"] = ""
+            jobs.append(job)
+    return jobs
 
 
-def command(entry, source, library, listed, textures):
+def resolve_source(source_dir: pathlib.Path, entry: dict):
+    """Find the matching prepped `.glb` file for `entry` (accounting for `_feminine` suffix)."""
+    suffix = entry.get("_suffix", "")
+    matches = sorted(source_dir.glob(entry["file"] + "*.glb"))
+    if suffix:
+        fem_matches = [p for p in matches if p.stem.endswith(suffix)]
+        return fem_matches[0] if fem_matches else None
+    non_fem = [p for p in matches if not p.stem.endswith("_feminine")]
+    return non_fem[0] if non_fem else None
+
+
+def command(entry, source, library, listed, textures, strict_validate):
     name = entry["id"].split("/")[-1]
     under = listed["under"]
-    cmd = [str(TOOL), str(source), str(library), BASE, entry["id"], entry["label"],
-           f"realistic/imports/{name}", "--slot", entry["slot"], "--layer", str(entry["layer"]),
-           "--intake", "--author", entry.get("author", listed.get("author", "unknown")),
-           "--licence", entry.get("licence", listed.get("licence", "NOASSERTION"))]
-    for flag in ("kind", "ease", "conform", "triangles", "scale"):
-        if flag in entry:
-            cmd += [f"--{flag}", str(entry[flag])]
-    for shape, weight in entry.get("cut_for", {}).items():
-        cmd += ["--cut-for", f"{shape}={weight}"]
+    cmd = [
+        str(TOOL),
+        str(source),
+        str(library),
+        BASE,
+        entry["id"],
+        entry["label"],
+        f"realistic/imports/{name}",
+        "--slot",
+        entry["slot"],
+        "--layer",
+        str(entry["layer"]),
+        "--frame",
+        entry["_home_frame"],
+        "--proxy",
+        entry.get("proxy", "body"),
+        "--canonical",
+        "--author",
+        entry.get("author", listed.get("author", "unknown")),
+        "--licence",
+        entry.get("licence", listed.get("licence", "NOASSERTION")),
+    ]
+    if strict_validate:
+        cmd += ["--strict-validate"]
+    if not entry.get("has_sleeves", False):
+        cmd += ["--sleeveless"]
     for slot in entry.get("also_fills", []):
         cmd += ["--also-fills", slot]
-    frame = listed.get("frames", {}).get(entry.get("frame", ""), {})
-    if "tag" in frame:
-        cmd += ["--tag", frame["tag"]]
-    if "limit" in frame:
-        cmd += ["--limit", frame["limit"]]
+    frame_meta = listed.get("frames", {}).get(entry.get("frame", ""), {})
+    if "tag" in frame_meta:
+        cmd += ["--tag", frame_meta["tag"]]
+    if "limit" in frame_meta:
+        cmd += ["--limit", frame_meta["limit"]]
     for tag in entry.get("tags", []):
         cmd += ["--tag", tag]
     for item in under["bottom" if entry["slot"] == "bottom" else "other"]:
         cmd += ["--under", item]
-    for item in bottoms_for(entry, listed):
-        cmd += ["--worn-with", item]
-    if worn(entry) == "tucked":
-        cmd += ["--tucked"]
-    if worn(entry) and "worn_most" in listed:
-        cmd += ["--worn-most", str(listed["worn_most"])]
     if textures:
         cmd += ["--textures", str(textures)]
     return cmd
+
+
+def check_library(library: pathlib.Path, listed: dict):
+    """Verify every imported `generated/*` item in `library` has an existing model and manifest."""
+    catalogue_path = library / "catalogue.json"
+    if not catalogue_path.exists():
+        return [f"missing catalogue: {catalogue_path}"]
+    catalogue = json.loads(catalogue_path.read_text())
+    wrong = []
+    for item in catalogue.get("items", []):
+        if not item["id"].startswith("generated/"):
+            continue
+        manifest_path = library / item["manifest"]
+        if not manifest_path.exists():
+            wrong.append(f"{item['id']}: missing manifest {item['manifest']}")
+            continue
+        manifest = json.loads(manifest_path.read_text())
+        model_path = manifest_path.parent / manifest["model"]["file"]
+        if not model_path.exists():
+            wrong.append(f"{item['id']}: missing model {model_path}")
+    return wrong
 
 
 def main():
@@ -162,89 +147,89 @@ def main():
     parser.add_argument("--only", action="append", default=[])
     parser.add_argument("--textures", type=int, default=2048)
     parser.add_argument("--jobs", type=int, default=4)
-    parser.add_argument("--reports", type=pathlib.Path,
-                        help="a folder for what the tool said of each garment (<name>.txt)")
-    parser.add_argument("--no-dependents", action="store_true",
-                        help="don't import again the tops fitted for a bottom that is imported")
-    parser.add_argument("--check", action="store_true",
-                        help="only say which tops are out of date with the library's bottoms")
+    parser.add_argument(
+        "--reports",
+        type=pathlib.Path,
+        help="a folder for what the tool said of each garment (<name>.txt)",
+    )
+    parser.add_argument(
+        "--no-strict-validate",
+        action="store_true",
+        help="allow importing garments with validation warnings",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="verify all imported generated garments in --library are intact",
+    )
     args = parser.parse_args()
     listed = json.loads((HERE / "garments.json").read_text())
     if args.check:
-        wrong = check(args.library, listed)
+        wrong = check_library(args.library, listed)
         for line in wrong:
-            print("OUT OF DATE:", line)
+            print("BROKEN:", line)
         if not wrong:
-            print("every top and jacket is fitted for the library's bottoms")
+            print("all imported generated garments in library are intact (ADR-0046)")
         sys.exit(1 if wrong else 0)
     if not args.source:
-        sys.exit("--source: the folder of .glb files")
+        sys.exit("--source: the folder of prepped .glb files")
     if not TOOL.exists():
         sys.exit(f"build the import tool first: {TOOL} is missing")
 
-    by_id = {e["id"]: e for e in listed["garments"]}
-    chosen = {e["id"] for e in listed["garments"] if not args.only or any(o in e["id"] for o in args.only)}
-    # A top's bottoms that the library hasn't, first; a bottom's tops, after it.
-    for item in sorted(chosen):
-        for bottom in bottoms_for(by_id[item], listed):
-            if bottom not in chosen and model_hash(args.library, bottom) is None:
-                print(f"{bottom}: imported first, for {item}")
-                chosen.add(bottom)
-    if not args.no_dependents:
-        for entry in listed["garments"]:
-            needs = [b for b in bottoms_for(entry, listed) if b in chosen]
-            if entry["id"] not in chosen and needs and model_hash(args.library, entry["id"]) is not None:
-                print(f"{entry['id']}: imported again, fitted for {', '.join(needs)}")
-                chosen.add(entry["id"])
-    rounds = [[e for e in listed["garments"] if e["id"] in chosen and worn(e) is None],
-              [e for e in listed["garments"] if e["id"] in chosen and worn(e) is not None]]
+    all_jobs = expand_entries(listed)
+    chosen = [
+        e
+        for e in all_jobs
+        if not args.only or any(o in e["id"] or o in e["file"] for o in args.only)
+    ]
+    strict_validate = not args.no_strict_validate
 
     def one(entry, scratch):
-        files = sorted(args.source.glob(entry["file"] + "*.glb"))
-        if not files:
-            return entry, None, "no source file"
+        src = resolve_source(args.source, entry)
+        if src is None:
+            return entry, None, f"no source file for {entry['file']}{entry.get('_suffix', '')}"
         library = pathlib.Path(scratch) / entry["id"].split("/")[-1]
         subprocess.run(["cp", "-r", "--reflink=auto", str(args.library), str(library)], check=True)
-        done = subprocess.run(command(entry, files[0], library, listed, args.textures),
-                              capture_output=True, text=True)
-        return entry, library, (done.stdout if done.returncode == 0 else None) or done.stderr.strip()
+        done = subprocess.run(
+            command(entry, src, library, listed, args.textures, strict_validate),
+            capture_output=True,
+            text=True,
+        )
+        out = (done.stdout or "") + ("\n" + done.stderr if done.stderr else "")
+        return entry, library if done.returncode == 0 else None, out.strip()
 
     failed = 0
-    record_path = args.library / RECORD
-    record = json.loads(record_path.read_text()) if record_path.exists() else {"format": 1, "garments": {}}
-    with tempfile.TemporaryDirectory() as scratch, concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
-        for entries in rounds:
-            # Each round's copies are made of the library as the round before left it.
-            for entry, library, output in list(pool.map(lambda e: one(e, scratch), entries)):
-                name = entry["id"].split("/")[-1]
-                if args.reports:
-                    args.reports.mkdir(parents=True, exist_ok=True)
-                    (args.reports / f"{name}.txt").write_text(output or "")
-                folder = library / "realistic" / "imports" / name if library else None
-                if folder is None or not folder.is_dir():
-                    failed += 1
-                    print(f"{entry['id']}: FAILED: {output[-300:]}")
-                    continue
-                target = args.library / "realistic" / "imports" / name
-                shutil.rmtree(target, ignore_errors=True)
-                shutil.copytree(folder, target)
-                made = [i for i in json.loads((library / "catalogue.json").read_text())["items"]
-                        if i["id"] == entry["id"]]
-                catalogue = json.loads((args.library / "catalogue.json").read_text())
-                catalogue["items"] = [i for i in catalogue["items"] if i["id"] != entry["id"]] + made
-                (args.library / "catalogue.json").write_text(json.dumps(catalogue, indent=2) + "\n")
-                record["garments"].pop(entry["id"], None)
-                if worn(entry):
-                    # The bottoms it was fitted for, as its own copy of the library had them.
-                    fitted = {b: model_hash(library, b) for b in bottoms_for(entry, listed)}
-                    record["garments"][entry["id"]] = {"worn": worn(entry), "with": dict(sorted(fitted.items()))}
-                print(f"{entry['id']}: imported")
-                shutil.rmtree(library, ignore_errors=True)
-            record["garments"] = dict(sorted(record["garments"].items()))
-            record_path.write_text(json.dumps(record, indent=2) + "\n")
-    wrong = check(args.library, listed)
+    with tempfile.TemporaryDirectory() as scratch, concurrent.futures.ThreadPoolExecutor(
+        args.jobs
+    ) as pool:
+        for entry, library, output in list(pool.map(lambda e: one(e, scratch), chosen)):
+            name = entry["id"].split("/")[-1]
+            if args.reports:
+                args.reports.mkdir(parents=True, exist_ok=True)
+                (args.reports / f"{name}.txt").write_text((output or "") + "\n")
+            folder = library / "realistic" / "imports" / name if library else None
+            if folder is None or not folder.is_dir():
+                failed += 1
+                print(f"{entry['id']}: FAILED: {output[-300:]}")
+                continue
+            target = args.library / "realistic" / "imports" / name
+            shutil.rmtree(target, ignore_errors=True)
+            shutil.copytree(folder, target)
+            made = [
+                i
+                for i in json.loads((library / "catalogue.json").read_text())["items"]
+                if i["id"] == entry["id"]
+            ]
+            catalogue = json.loads((args.library / "catalogue.json").read_text())
+            catalogue["items"] = [i for i in catalogue["items"] if i["id"] != entry["id"]] + made
+            (args.library / "catalogue.json").write_text(json.dumps(catalogue, indent=2) + "\n")
+            first_line = output.splitlines()[0] if output else "imported"
+            print(f"{entry['id']}: {first_line}")
+            shutil.rmtree(library, ignore_errors=True)
+
+    wrong = check_library(args.library, listed)
     for line in wrong:
-        print("OUT OF DATE:", line)
+        print("BROKEN:", line)
     sys.exit(1 if failed or wrong else 0)
 
 

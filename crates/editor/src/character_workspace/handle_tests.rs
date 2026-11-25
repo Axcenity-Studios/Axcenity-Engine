@@ -1250,3 +1250,101 @@ fn the_lips_tint_is_the_mouth_not_the_muzzle() {
         assert!(area >= 3.0, "{feature}'s tint is {area:.1} cm2");
     }
 }
+
+/// ADR-0047's polish pass: the human base's face has features and handles
+/// of its own (worked out by `face.py` from where MakeHuman's targets
+/// move the skin). The nose's page offers its seven shapes, its three
+/// handles are on the face, and a drag through the tip is one step that
+/// writes the sliders the handle drives. Every handle of every feature
+/// can be reached: it shows in the Face view or with the camera turned an
+/// eighth of the way round (one whose skin moves toward the camera, the
+/// bridge's hump, has nothing to drag from the front). With
+/// `AXCENITY_SNAPSHOTS`, the Face page, the nose selected and the Skin
+/// page drawn for real.
+#[test]
+fn the_human_bases_nose_has_shapes_and_a_handle_that_moves_it() {
+    let mut studio = Studio::new("handles-human-nose");
+    studio.workspace.set_base("axcenity/human");
+    assert_eq!(studio.workspace.notice, None);
+    studio.workspace.apply(Intent::PickCategory(Category::Face));
+    studio.workspace.selection.level = Level::Detailed;
+    studio.settle();
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        super::shell_tests::snap(&mut studio.workspace, &snapshots, "human-face", 8);
+    }
+    let steps = studio.undo_depth();
+    let before = studio.workspace.description().clone();
+    studio.select("nose", ViewPreset::Face);
+    let drawn = super::shell_tests::drawn_texts(&studio.frame(Vec::new()));
+    for text in [
+        "SHAPE", "Straight", "Aquiline", "Button", "Wide", "Bulbous", "Snub",
+    ] {
+        assert!(drawn.iter().any(|t| t == text), "{text} in {drawn:?}");
+    }
+    assert!(!drawn.iter().any(|t| t == "Heart"), "{drawn:?}");
+    studio.handle("nose_wing");
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        super::shell_tests::snap(&mut studio.workspace, &snapshots, "human-nose", 8);
+        studio.settle();
+    }
+
+    let at = studio.handle("nose_tip");
+    studio.drag(at, vec2(0.0, 40.0));
+    let dragged = studio.workspace.description().clone();
+    assert_eq!(studio.undo_depth(), steps + 1, "one drag, one step");
+    let base = studio.workspace.base().unwrap();
+    let drives: Vec<&str> = base
+        .handle("nose_tip")
+        .unwrap()
+        .drives
+        .iter()
+        .map(|drive| drive.parameter.as_str())
+        .collect();
+    let changed: Vec<&String> = dragged
+        .parameters
+        .iter()
+        .filter(|(id, value)| before.parameters.get(*id) != Some(value))
+        .map(|(id, _)| id)
+        .collect();
+    assert!(!changed.is_empty(), "the drag moved the nose");
+    for id in &changed {
+        assert!(drives.contains(&id.as_str()), "{id} isn't the tip's");
+    }
+    studio.workspace.apply(Intent::Undo);
+    assert_eq!(studio.workspace.description(), &before);
+
+    let base = studio.workspace.base().unwrap().clone();
+    assert_eq!(base.features.len(), 10);
+    assert_eq!(base.handles.len(), 24);
+    for feature in &base.features {
+        studio.select(&feature.id, ViewPreset::Face);
+        let mut shown = std::collections::BTreeSet::new();
+        for yaw in [None, Some(45.0), Some(-45.0)] {
+            if let Some(yaw) = yaw {
+                studio.turn(yaw);
+            }
+            for handle in base.handles.iter().filter(|h| h.feature == feature.id) {
+                if studio.workspace.handle_on_screen(&handle.id).is_some() {
+                    shown.insert(handle.id.clone());
+                }
+            }
+        }
+        let own: std::collections::BTreeSet<String> = base
+            .handles
+            .iter()
+            .filter(|h| h.feature == feature.id)
+            .map(|h| h.id.clone())
+            .collect();
+        assert!(!own.is_empty(), "{} has a handle", feature.id);
+        assert_eq!(shown, own, "{}'s handles can all be reached", feature.id);
+    }
+
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        studio.workspace.apply(Intent::PickFeature(None));
+        studio
+            .workspace
+            .apply(Intent::PickCategory(Category::SkinAndMakeup));
+        studio.settle();
+        super::shell_tests::snap(&mut studio.workspace, &snapshots, "human-skin-tone", 8);
+    }
+}

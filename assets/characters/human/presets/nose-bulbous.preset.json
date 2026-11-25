@@ -1,0 +1,17 @@
+{
+  "format_version": 2,
+  "name": "Bulbous",
+  "base": "axcenity/human",
+  "parameters": {
+    "nose_nostrils_width": 0.3,
+    "nose_point_width": 0.6,
+    "nose_volume": 0.8
+  },
+  "preset": {
+    "id": "axcenity/human-nose-bulbous",
+    "kind": "feature",
+    "about": "A wide, round tip.",
+    "feature": "nose",
+    "order": 130
+  }
+}

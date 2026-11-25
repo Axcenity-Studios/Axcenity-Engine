@@ -1,5 +1,5 @@
 {
-  "about": "The generated garments the realistic wardrobe is imported from: one entry per source file (matched by the start of its name), with what the intake can't read from the mesh (`kind`, `ease`, `cut_for`, `triangles`) and how closely it follows the body (`conform`: `structured` for jackets and coats, `partial` for sweaters and loose trousers, `moderate` for shirts and jeans, `body` for T-shirts and tank tops, `strong` for leggings) and what the browser needs to know (`also_fills`: a one-piece or a dress takes the bottoms slot too; `frame`: who it is cut for, `masculine`, `feminine` or `unisex`). A top or a jacket is fitted for the bottoms it is worn with: hanging over them (the default), by `worn_most` metres at the most, or, with `\"worn\": \"tucked\"` and layer 0, drawn in under them, for a top that lies on the body (import_generated.py, \"Bottoms first\"). See README.md.",
+  "about": "The 33 generated garments for the realistic wardrobe under ADR-0046: one entry per source file (matched by the start of its name), tagged with its HomeFrame (`masculine`, `feminine`, or `unisex` — unisex items generate both masculine and feminine home-frame variants), ProxyKind (`body` or `skirt` for dresses, skirts, and long coats), anatomical placement `z_range` (metres, Y-up) and `has_sleeves` for upstream Blender prep (`prep_meshy_garments.py`), and browser metadata (`slot`, `layer`, `also_fills`). Non-destructive `Shrink_Under` and ADR-0045 cover maps replace the old two-round `Hang` fitting.",
   "author": "Axcenity",
   "licence": "CC-BY-4.0",
   "under": {
@@ -13,7 +13,6 @@
       "axcenity/realistic-sports-bra"
     ]
   },
-  "worn_most": 0.03,
   "frames": {
     "masculine": {
       "tag": "masculine",
@@ -35,7 +34,9 @@
       "slot": "top",
       "layer": 2,
       "frame": "unisex",
-      "conform": "partial",
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.79, 1.56],
       "triangles": 6000
     },
     {
@@ -45,10 +46,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "feminine",
-      "conform": "strong",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.05],
       "triangles": 6000
     },
     {
@@ -58,10 +58,9 @@
       "slot": "outerwear",
       "layer": 3,
       "frame": "feminine",
-      "conform": "structured",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.88, 1.54],
       "triangles": 10000
     },
     {
@@ -70,11 +69,11 @@
       "label": "Formal tuxedo",
       "slot": "outerwear",
       "layer": 3,
-      "also_fills": [
-        "bottom"
-      ],
+      "also_fills": ["bottom"],
       "frame": "masculine",
-      "conform": "structured",
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.04, 1.54],
       "triangles": 10000
     },
     {
@@ -84,13 +83,10 @@
       "slot": "top",
       "layer": 0,
       "frame": "feminine",
-      "conform": "body",
-      "ease": "snug",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
-      "triangles": 6000,
-      "worn": "tucked"
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.90, 1.43],
+      "triangles": 6000
     },
     {
       "file": "Meshy_AI_black_running_shorts",
@@ -99,7 +95,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "unisex",
-      "conform": "moderate",
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.68, 1.05],
       "triangles": 6000
     },
     {
@@ -109,10 +107,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "feminine",
-      "conform": "moderate",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "skirt",
+      "has_sleeves": false,
+      "z_range": [0.63, 1.08],
       "triangles": 6000
     },
     {
@@ -121,16 +118,24 @@
       "label": "Evening dress",
       "slot": "top",
       "layer": 1,
-      "also_fills": [
-        "bottom"
-      ],
+      "also_fills": ["bottom"],
       "frame": "feminine",
-      "conform": "body",
-      "kind": "top",
-      "ease": "snug",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "skirt",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.47],
+      "triangles": 10000
+    },
+    {
+      "file": "Meshy_AI_burgundy_evening_dres",
+      "id": "generated/burgundy-evening-dress",
+      "label": "Evening dress (high-detail)",
+      "slot": "top",
+      "layer": 1,
+      "also_fills": ["bottom"],
+      "frame": "feminine",
+      "proxy": "skirt",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.47],
       "triangles": 10000
     },
     {
@@ -140,10 +145,9 @@
       "slot": "outerwear",
       "layer": 3,
       "frame": "feminine",
-      "conform": "structured",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "skirt",
+      "has_sleeves": true,
+      "z_range": [0.48, 1.55],
       "triangles": 10000
     },
     {
@@ -152,14 +156,11 @@
       "label": "Business pantsuit",
       "slot": "outerwear",
       "layer": 3,
-      "also_fills": [
-        "bottom"
-      ],
+      "also_fills": ["bottom"],
       "frame": "feminine",
-      "conform": "structured",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.04, 1.54],
       "triangles": 10000
     },
     {
@@ -169,7 +170,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "masculine",
-      "conform": "moderate",
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.05],
       "triangles": 6000
     },
     {
@@ -179,10 +182,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "feminine",
-      "conform": "body",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.05],
       "triangles": 6000
     },
     {
@@ -192,7 +194,9 @@
       "slot": "outerwear",
       "layer": 3,
       "frame": "unisex",
-      "conform": "structured",
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.83, 1.58],
       "triangles": 10000
     },
     {
@@ -202,7 +206,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "unisex",
-      "conform": "partial",
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.08],
       "triangles": 6000
     },
     {
@@ -212,7 +218,9 @@
       "slot": "bottom",
       "layer": 2,
       "frame": "unisex",
-      "conform": "partial",
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.49],
       "triangles": 10000
     },
     {
@@ -222,10 +230,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "feminine",
-      "conform": "moderate",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.66, 1.05],
       "triangles": 6000
     },
     {
@@ -235,7 +242,9 @@
       "slot": "outerwear",
       "layer": 3,
       "frame": "unisex",
-      "conform": "structured",
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.86, 1.57],
       "triangles": 10000
     },
     {
@@ -245,7 +254,9 @@
       "slot": "top",
       "layer": 2,
       "frame": "unisex",
-      "conform": "partial",
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.78, 1.51],
       "triangles": 6000
     },
     {
@@ -255,10 +266,9 @@
       "slot": "top",
       "layer": 2,
       "frame": "feminine",
-      "conform": "partial",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.92, 1.51],
       "triangles": 6000
     },
     {
@@ -268,10 +278,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "feminine",
-      "conform": "partial",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.06],
       "triangles": 6000
     },
     {
@@ -281,7 +290,9 @@
       "slot": "outerwear",
       "layer": 3,
       "frame": "unisex",
-      "conform": "structured",
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.87, 1.55],
       "triangles": 10000
     },
     {
@@ -291,9 +302,10 @@
       "slot": "top",
       "layer": 0,
       "frame": "masculine",
-      "conform": "body",
-      "triangles": 6000,
-      "worn": "tucked"
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.78, 1.54],
+      "triangles": 6000
     },
     {
       "file": "Meshy_AI_olive_cargo_pants",
@@ -302,7 +314,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "unisex",
-      "conform": "partial",
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.04, 1.06],
       "triangles": 6000
     },
     {
@@ -311,14 +325,11 @@
       "label": "Jumpsuit",
       "slot": "top",
       "layer": 1,
-      "also_fills": [
-        "bottom"
-      ],
+      "also_fills": ["bottom"],
       "frame": "feminine",
-      "conform": "moderate",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.04, 1.53],
       "triangles": 10000
     },
     {
@@ -328,10 +339,9 @@
       "slot": "top",
       "layer": 1,
       "frame": "feminine",
-      "conform": "moderate",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.75, 1.52],
       "triangles": 6000
     },
     {
@@ -340,15 +350,11 @@
       "label": "Shirt dress",
       "slot": "top",
       "layer": 1,
-      "also_fills": [
-        "bottom"
-      ],
+      "also_fills": ["bottom"],
       "frame": "feminine",
-      "conform": "moderate",
-      "ease": "snug",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "skirt",
+      "has_sleeves": true,
+      "z_range": [0.28, 1.54],
       "triangles": 10000
     },
     {
@@ -358,13 +364,10 @@
       "slot": "top",
       "layer": 0,
       "frame": "feminine",
-      "conform": "body",
-      "ease": "snug",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
-      "triangles": 6000,
-      "worn": "tucked"
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.78, 1.48],
+      "triangles": 6000
     },
     {
       "file": "Meshy_AI_ruby_red_cocktail",
@@ -372,15 +375,11 @@
       "label": "Cocktail dress",
       "slot": "top",
       "layer": 1,
-      "also_fills": [
-        "bottom"
-      ],
+      "also_fills": ["bottom"],
       "frame": "feminine",
-      "conform": "body",
-      "ease": "snug",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "skirt",
+      "has_sleeves": false,
+      "z_range": [0.45, 1.47],
       "triangles": 10000
     },
     {
@@ -389,16 +388,11 @@
       "label": "Maxi dress",
       "slot": "top",
       "layer": 1,
-      "also_fills": [
-        "bottom"
-      ],
+      "also_fills": ["bottom"],
       "frame": "feminine",
-      "conform": "body",
-      "kind": "top",
-      "ease": "snug",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "skirt",
+      "has_sleeves": false,
+      "z_range": [0.05, 1.49],
       "triangles": 10000
     },
     {
@@ -408,7 +402,9 @@
       "slot": "bottom",
       "layer": 1,
       "frame": "masculine",
-      "conform": "moderate",
+      "proxy": "body",
+      "has_sleeves": false,
+      "z_range": [0.55, 1.04],
       "triangles": 6000
     },
     {
@@ -418,7 +414,9 @@
       "slot": "top",
       "layer": 2,
       "frame": "unisex",
-      "conform": "partial",
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.81, 1.54],
       "triangles": 6000
     },
     {
@@ -428,10 +426,9 @@
       "slot": "top",
       "layer": 1,
       "frame": "feminine",
-      "conform": "partial",
-      "cut_for": {
-        "Frame_Feminine": 1
-      },
+      "proxy": "body",
+      "has_sleeves": true,
+      "z_range": [0.84, 1.49],
       "triangles": 6000
     }
   ]

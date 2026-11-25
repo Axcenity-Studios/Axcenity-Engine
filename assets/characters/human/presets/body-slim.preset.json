@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "Slim",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": -0.6,
+    "muscle": -0.2
+  },
+  "preset": {
+    "id": "axcenity/human-body-slim",
+    "kind": "body",
+    "about": "Little fat and little muscle.",
+    "order": 20
+  }
+}

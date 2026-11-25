@@ -710,6 +710,10 @@ fn mesh_part_draw_items(
             material.base_color_texture = None;
         }
         if has_values {
+            // A SurfaceAppearance has already replaced every map.
+            if appearance.is_none() {
+                material::colour_map(&mut material, instance, &primitive.material.name, assets);
+            }
             material::modulate(&mut material, instance, &primitive.material.name);
         }
         items.push(DrawItem {

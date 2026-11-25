@@ -32,17 +32,16 @@ mod bind;
 mod cover;
 mod coverage;
 mod glb;
-mod hang;
 mod hiding;
 mod import;
-mod intake;
-mod mend;
-mod parts;
+mod inpaint;
 mod pose;
 mod posed;
+mod proxy;
 mod surface;
 mod thumbnail;
 mod transfer;
+mod validate;
 
 #[cfg(test)]
 mod tests;
@@ -52,35 +51,37 @@ use std::sync::Arc;
 use axcenity_assets::{Model, Rig};
 use glam::{Mat3, Mat4, Vec3};
 
-pub use bind::{Binding, Bound, bind, place};
+pub use bind::{
+    BIND_REACH, BINDING_VERSION, Binding, Bound, CONFIDENT_DIAG_RATIO, CONFIDENT_NORMAL_MAX_DEG,
+    ProxyBinding, VertexBind, bind, bind_proxy, place,
+};
 pub use cover::{COVER_SIZE, ClothAt, CoverMap, CoverReport, Proof, cover_map, skin_uvs};
 pub use coverage::{
     Coverage, HIDE_SHARE, RegionMap, SlotGuess, classify, coverage, hidden_regions,
     triangle_regions,
 };
 pub use glb::{FittedModel, PieceMaps, write_fitted_glb};
-pub use hang::{Hang, Hung, Worn, WornWith};
 pub use hiding::{CREASE_ACROSS, HOLE, HOLE_REACH, outside_cloth, pose_safe_hides, uncovered};
 pub use import::{
-    Alignment, ImportRequest, Imported, WornWithRequest, align, extremes_of, import_garment,
-    pose_states_of, remake_cover_map,
+    Alignment, ImportRequest, Imported, align, extremes_of, import_garment, pose_states_of,
+    remake_cover_map,
 };
-pub use intake::{
-    Conform, Ease, GarmentKind, IntakeOptions, IntakeReport, Openings, Prepared, Welding,
-    describe_reading, prepare,
-};
-pub use mend::Mended;
+pub use inpaint::{BiharmonicSolver, inpaint_weights};
 pub use pose::{
     CORRECTIVE_RULES, CorrectiveRule, FinishPose, FitPose, corrective_weights, fit_poses, skin,
     skin_matrices,
 };
 pub use posed::PoseReport;
+pub use proxy::{
+    BodyPart, FitProxy, LAYER_ENVELOPE_OFFSETS, ProxyKind, ProxyVertex, envelope_offset,
+};
 pub use surface::{Hit, Surface, closest_on_triangle, vertex_normals};
 pub use thumbnail::{thumbnail, write_png};
 pub use transfer::{
-    FitOptions, FitReport, Fitted, Layer, LayerOffset, carried_shapes, extremes_near, fit_garment,
-    transfer_weights,
+    CarriedShape, DEFAULT_PRUNE_BELOW, FitOptions, FitReport, Fitted, HomeFrame, Layer,
+    SHRINK_UNDER_SHAPE, carried_shapes, fit_garment, transfer_weights,
 };
+pub use validate::{MIN_LIMB_RADIUS_M, ValidationReport, validate_garment};
 
 /// Why a garment couldn't be fitted or imported.
 #[derive(Debug, thiserror::Error)]

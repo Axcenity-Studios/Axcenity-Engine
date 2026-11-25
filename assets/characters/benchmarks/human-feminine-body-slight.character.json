@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "name": "human-feminine-body-slight",
+  "base": "axcenity/human",
+  "parameters": {
+    "fat": -1,
+    "frame": 1,
+    "muscle": -1
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    },
+    {
+      "id": "axcenity/human-bandeau"
+    }
+  ]
+}

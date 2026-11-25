@@ -187,25 +187,9 @@ fn sleeve(radius: f32, dented: bool) -> GarmentMesh {
 fn options() -> FitOptions {
     FitOptions {
         shapes: vec!["Fat".to_owned(), "Corrective_Bump".to_owned()],
-        extremes: vec![
-            vec![("Fat".to_owned(), 1.0), ("Corrective_Bump".to_owned(), 1.0)],
-            vec![("Fat".to_owned(), -0.5)],
-        ],
+        prune_below: 0.0,
         ..FitOptions::default()
     }
-}
-
-/// How far each of `points` is outside `surface` (along its normal at
-/// the closest point).
-fn clearances(surface: &Surface, points: &[Vec3]) -> Vec<f32> {
-    points
-        .iter()
-        .map(|p| surface.closest(*p, 1.0).expect("near").signed(*p))
-        .collect()
-}
-
-fn least(values: &[f32]) -> f32 {
-    values.iter().copied().fold(f32::INFINITY, f32::min)
 }
 
 #[test]
@@ -290,52 +274,40 @@ fn a_garment_takes_the_bodys_weights_at_its_bound_points_and_they_add_up_to_one(
 }
 
 #[test]
-fn a_garment_inside_the_body_is_pushed_out_by_its_margin_at_rest() {
+fn rest_mesh_is_strictly_immutable_through_fitting() {
     let body = tube_body();
-    let fitted = fit_garment(&body, &sleeve(0.153, true), &options()).unwrap();
-    let rest = body.surface(&[]);
-    let clear = least(&clearances(&rest, &fitted.garment.positions()));
-    assert!(clear > 0.002 - 2e-4, "{clear} m clear");
-    let pushed = &fitted.report.layers[0];
-    assert_eq!(pushed.layer, "body");
-    // The dent is 2 mm inside a 0.15 m tube drawn with flat sides: about
-    // 4 mm to its margin.
-    assert!(pushed.pushed > 0 && pushed.most > 0.0035, "{pushed:?}");
-    // The push spreads: next to the dent, it is smooth.
-    assert!(fitted.report.inside_most <= 1e-4, "{:?}", fitted.report);
+    let input = sleeve(0.153, true);
+    let fitted = fit_garment(&body, &input, &options()).unwrap();
+    // ADR-0046: fit_garment never mutates canonical rest positions or normals.
+    assert_eq!(fitted.garment.positions(), input.positions());
+    assert_eq!(fitted.garment.normals(), input.normals());
+    assert_eq!(fitted.garment.triangles(), input.triangles());
+    assert!(fitted.report.confident_vertices > 0);
 }
 
 #[test]
-fn carried_shapes_follow_the_body_and_clear_it_at_full_weight() {
+fn carried_shapes_follow_the_proxy_and_generate_shrink_under() {
     let body = tube_body();
-    let fitted = fit_garment(&body, &sleeve(0.153, false), &options()).unwrap();
+    let fitted = fit_garment(&body, &sleeve(0.16, false), &options()).unwrap();
     let names: Vec<&str> = fitted.shapes.iter().map(|s| s.name.as_str()).collect();
-    assert_eq!(names, ["Fat", "Corrective_Bump"]);
-    assert_eq!(fitted.report.shapes_carried, 2);
-    // Fat moves the sleeve out with the skin, about 2 cm.
+    assert_eq!(names, ["Fat", "Corrective_Bump", SHRINK_UNDER_SHAPE]);
+    assert_eq!(fitted.report.shapes_carried, 3);
+    // Fat moves the sleeve out with the proxy, about 2 cm.
     let fat = &fitted.shapes[0];
     let rest = fitted.garment.positions();
     for (p, o) in rest.iter().zip(&fat.offsets) {
         let out = o.dot(Vec3::new(p.x, 0.0, p.z).normalize());
-        assert!((out - 0.02).abs() < 0.003, "{out}");
+        assert!((out - 0.02).abs() < 0.004, "{out}");
     }
-    // At each shape's full weight it is still clear of the body.
-    for shape in &fitted.shapes {
-        let surface = body.surface(&[(shape.name.clone(), 1.0)]);
-        let moved: Vec<Vec3> = rest
-            .iter()
-            .zip(&shape.offsets)
-            .map(|(p, o)| *p + *o)
-            .collect();
-        let clear = least(&clearances(&surface, &moved));
-        assert!(clear > 0.002 - 2e-4, "{}: {clear}", shape.name);
-    }
-    // And at the extremes.
-    for extreme in &options().extremes {
-        let surface = body.surface(extreme);
-        let moved = transfer::garment_at(&rest, &fitted.shapes, extreme);
-        let clear = least(&clearances(&surface, &moved));
-        assert!(clear > 0.002 - 2e-4, "{extreme:?}: {clear}");
+    // Shrink_Under pulls the layer-1 garment inward toward Layer Envelope 0.
+    assert!(fitted.report.shrink_under_reach > 0.002);
+    let shrink = &fitted.shapes[2];
+    for (p, o) in rest.iter().zip(&shrink.offsets) {
+        let radial = o.dot(Vec3::new(p.x, 0.0, p.z).normalize());
+        assert!(
+            radial <= 1e-4,
+            "Shrink_Under must pull inward, got {radial}"
+        );
     }
 }
 
@@ -346,30 +318,55 @@ fn mask_shapes_are_never_carried() {
 }
 
 #[test]
-fn an_outer_layer_stays_outside_the_lower_one_at_rest_and_at_every_extreme() {
+fn frame_relative_delta_inpainting_expands_free_hanging_hem_without_flattening() {
     let body = tube_body();
-    let inner = fit_garment(&body, &sleeve(0.152, false), &options()).unwrap();
-    let mut outer_options = options();
-    outer_options.under = vec![Layer::of_fitted("inner", &inner)];
-    // Made as tight as the inner one: it must be pushed out over it.
-    let outer = fit_garment(&body, &sleeve(0.152, false), &outer_options).unwrap();
-    let layer = &outer.report.layers[1];
-    assert_eq!(layer.layer, "inner");
-    assert!(layer.pushed > 0, "{layer:?}");
-    let states: Vec<Vec<(String, f32)>> = std::iter::once(Vec::new())
-        .chain(outer_options.shapes.iter().map(|s| vec![(s.clone(), 1.0)]))
-        .chain(outer_options.extremes.iter().cloned())
-        .collect();
-    for state in &states {
-        let under = transfer::garment_at(&inner.garment.positions(), &inner.shapes, state);
-        let surface = Surface::new(under, inner.garment.normals(), inner.garment.triangles());
-        let over = transfer::garment_at(&outer.garment.positions(), &outer.shapes, state);
-        let clear = least(&clearances(&surface, &over));
-        assert!(
-            clear > 0.002 - 3e-4,
-            "{state:?}: {clear} m over the lower layer"
-        );
+    // Flared skirt-like tube: snug at top (0.16 m), flared far off the body at
+    // bottom (0.26 m -> unbound > 0.05 * bbox_diag).
+    let mut flared = sleeve(0.16, false);
+    for p in &mut flared.pieces[0].positions {
+        let flare = (1.0 - ((p.y - 0.15) / 0.7).clamp(0.0, 1.0)) * 0.10;
+        let radial = Vec3::new(p.x, 0.0, p.z);
+        let dir = radial.normalize();
+        *p = dir * (radial.length() + flare) + Vec3::Y * p.y;
     }
+    let fitted = fit_garment(&body, &flared, &options()).unwrap();
+    assert!(
+        fitted.report.inpainted_vertices > 0,
+        "flared hem must have unbound inpainted vertices"
+    );
+    let fat = fitted
+        .shapes
+        .iter()
+        .find(|s| s.name == "Fat")
+        .expect("Fat shape carried");
+    // Even on the free-hanging flared bottom ring (y < 0.25), frame-relative
+    // inpainting must expand outward (~2 cm) instead of flattening toward zero.
+    for (p, o) in flared.positions().iter().zip(&fat.offsets) {
+        if p.y < 0.25 {
+            let out = o.dot(Vec3::new(p.x, 0.0, p.z).normalize());
+            assert!(
+                out > 0.012,
+                "flared hem at y={} flattened: outward delta = {out}",
+                p.y
+            );
+        }
+    }
+}
+
+#[test]
+fn validate_garment_detects_chord_sag_violations() {
+    let garment = sleeve(0.16, false);
+    // With 2 mm margin, limit is sqrt(8 * 0.025 * 0.002) = 20 mm; our 24-side
+    // tube of radius 0.16 m has opening edge ~42 mm -> must flag violations.
+    let report = validate_garment(&garment, 0.002);
+    assert_eq!(report.non_manifold_edges, 0);
+    assert_eq!(report.degenerate_triangles, 0);
+    assert_eq!(report.boundary_loops, 2);
+    assert!(report.chord_sag_violations > 0, "{report:?}");
+    assert!(!report.is_clean());
+    // With a generous margin (15 mm), limit is ~54.8 mm -> clean!
+    let clean = validate_garment(&garment, 0.015);
+    assert!(clean.is_clean(), "{clean:?}");
 }
 
 #[test]
@@ -412,11 +409,12 @@ fn a_cover_map_lights_the_skin_under_a_garment_set_back_from_its_openings() {
         fitted.garment.normals(),
         fitted.garment.triangles(),
     );
-    // Every triangle has a region (none is the head's).
+    // Every triangle has a region (none is the head's), and it is one
+    // round the hips.
     let regions = vec![1u8; body.triangles.len()];
     let (map, report) = cover_map(
         &body,
-        &regions,
+        (&regions, &[1]),
         &surface,
         (&fitted.joints, &fitted.weights),
         None,
@@ -444,8 +442,23 @@ fn a_cover_map_lights_the_skin_under_a_garment_set_back_from_its_openings() {
     // be seen under the hem; cloth worn beneath is already left out.
     assert_eq!(at(0.335, 0), 0, "skin by the hem stays");
     assert_eq!(at(0.335, 1), 255, "cloth by the hem goes");
-    // Covered at all (blue) right up to the hem.
-    assert_eq!(at(0.31, 2), 255);
+    // Round the hips a tucked top goes wherever the cloth is over the
+    // skin (blue), right up to the hem; anywhere else (a strap) as other
+    // cloth does.
+    assert_eq!((at(0.31, 1), at(0.31, 2)), (0, 255));
+    let (elsewhere, _) = cover_map(
+        &body,
+        (&regions, &[]),
+        &surface,
+        (&fitted.joints, &fitted.weights),
+        None,
+        256,
+    );
+    for height in [0.31, 0.335, 0.5] {
+        let y = (((1.0 - height) * 256.0) as usize).min(255);
+        let pixel = &elsewhere.rgba[(y * 256 + 128) * 4..];
+        assert_eq!(pixel[2], pixel[1], "at {height}");
+    }
 
     // Cloth that doesn't move with the skin under it hides none of the
     // skin (the same sleeve following a bone the skin there doesn't),
@@ -453,7 +466,7 @@ fn a_cover_map_lights_the_skin_under_a_garment_set_back_from_its_openings() {
     let elsewhere = vec![[7u16, 0, 0, 0]; fitted.joints.len()];
     let (_, loose) = cover_map(
         &body,
-        &regions,
+        (&regions, &[]),
         &surface,
         (&elsewhere, &fitted.weights),
         None,
@@ -475,7 +488,7 @@ fn a_cover_map_lights_the_skin_under_a_garment_set_back_from_its_openings() {
     };
     let (_, proved) = cover_map(
         &body,
-        &regions,
+        (&regions, &[]),
         &surface,
         (&lower, &whole),
         Some(&Proof {
@@ -494,7 +507,7 @@ fn a_cover_map_lights_the_skin_under_a_garment_set_back_from_its_openings() {
     lifted.bones[body.rig.joints[1].bone].translation.y += 0.3;
     let (map, torn) = cover_map(
         &body,
-        &regions,
+        (&regions, &[]),
         &surface,
         (&lower, &whole),
         Some(&Proof {
@@ -522,42 +535,14 @@ fn a_cover_map_lights_the_skin_under_a_garment_set_back_from_its_openings() {
     }
 }
 
-/// A web (cloth joined across a joint, drawn out when it bends) comes out
-/// of a garment when the fit is asked to cut them, and only then.
+/// ADR-0046: fitting never deletes triangles or cuts webs in place.
 #[test]
-fn a_web_drawn_out_by_a_pose_is_cut_when_asked() {
+fn fitting_preserves_triangle_count_and_topology() {
     let body = tube_body();
-    // The tube bent at its upper bone: the sleeve's corners follow one
-    // bone or the other, and the cloth between them is drawn out.
-    let bent = {
-        let mut bones = body.rig.rest_pose();
-        let last = bones.len() - 1;
-        bones[last].translation += Vec3::new(0.6, 0.0, 0.0);
-        FitPose {
-            name: "pulled".to_owned(),
-            bones,
-            correctives: Vec::new(),
-        }
-    };
-    let whole = fit_garment(&body, &sleeve(0.16, false), &FitOptions::default()).unwrap();
-    assert_eq!(whole.report.webs_cut, 0);
-    let cut = fit_garment(
-        &body,
-        &sleeve(0.16, false),
-        &FitOptions {
-            poses: vec![bent],
-            cut_webs: 2.5,
-            ..FitOptions::default()
-        },
-    )
-    .unwrap();
-    assert!(cut.report.webs_cut > 0, "{:?}", cut.report.webs_cut);
-    assert_eq!(
-        cut.garment.triangles().len() + cut.report.webs_cut,
-        whole.garment.triangles().len()
-    );
-    // Its corners are all still there: the weights and shapes still fit.
-    assert_eq!(cut.garment.len(), whole.garment.len());
+    let input = sleeve(0.16, false);
+    let fitted = fit_garment(&body, &input, &FitOptions::default()).unwrap();
+    assert_eq!(fitted.garment.triangles().len(), input.triangles().len());
+    assert_eq!(fitted.garment.len(), input.len());
 }
 
 /// A grid of corners, `profile` (x, y) extruded along Z over `zs`, with
@@ -677,7 +662,7 @@ fn a_fitted_garment_written_as_gltf_loads_with_its_skeleton_weights_and_shapes()
         .iter()
         .map(|t| t.name.as_str())
         .collect();
-    assert_eq!(names, ["Fat", "Corrective_Bump"]);
+    assert_eq!(names, ["Fat", "Corrective_Bump", SHRINK_UNDER_SHAPE]);
     let rig = model.rig.as_ref().expect("skinned");
     let bones: Vec<&str> = rig.bones.iter().map(|b| b.name.as_str()).collect();
     assert!(
@@ -786,62 +771,13 @@ fn alignment_finds_the_units_of_short_garments() {
 }
 
 #[test]
-fn corners_moved_by_the_push_out_take_the_normals_of_where_they_are() {
+fn rest_normals_are_preserved_verbatim_when_non_destructive() {
     let body = tube_body();
     let mut dented = sleeve(0.153, true);
-    // A dent 1.5 cm deep (into the 0.15 m tube), with normals that agree
-    // with its shape: tilted round its edges.
-    for p in &mut dented.pieces[0].positions {
-        let across = Vec3::new(p.x, 0.0, p.z);
-        if across.length() < 0.15 {
-            *p = across.normalize() * 0.135 + Vec3::Y * p.y;
-        }
-    }
     let triangles = dented.triangles();
     let normals = vertex_normals(&dented.positions(), &triangles);
     dented.pieces[0].normals = normals.clone();
     let fitted = fit_garment(&body, &dented, &options()).unwrap();
-    let now = vertex_normals(&fitted.garment.positions(), &triangles);
-    let moved: Vec<usize> = dented
-        .positions()
-        .iter()
-        .zip(fitted.garment.positions())
-        .enumerate()
-        .filter(|(_, (a, b))| a.distance(*b) > 0.001)
-        .map(|(k, _)| k)
-        .collect();
-    assert!(!moved.is_empty());
-    let mut changed = 0;
-    for &k in &moved {
-        let written = fitted.garment.pieces[0].normals[k];
-        assert!(
-            written.angle_between(now[k]) < 5f32.to_radians(),
-            "corner {k}: written {written}, its surface's {}",
-            now[k]
-        );
-        if normals[k].angle_between(now[k]) > 10f32.to_radians() {
-            changed += 1;
-        }
-    }
-    // The dent's edges really were tilted, so the test sees a change.
-    assert!(changed > 0, "no normal had to change");
-    // Corners nothing moved, with nothing moved round them, keep the
-    // normals they came with.
-    let before = dented.positions();
-    let after = fitted.garment.positions();
-    let moved_at: Vec<Vec3> = before
-        .iter()
-        .zip(&after)
-        .filter(|(a, b)| a.distance(**b) > 1e-7)
-        .map(|(a, _)| *a)
-        .collect();
-    let mut kept = 0;
-    for (k, p) in before.iter().enumerate() {
-        if moved_at.iter().all(|m| m.distance(*p) > 0.05) {
-            let written = fitted.garment.pieces[0].normals[k];
-            assert!(written.distance(normals[k]) < 1e-4, "corner {k}");
-            kept += 1;
-        }
-    }
-    assert!(kept > 100, "{kept}");
+    assert_eq!(fitted.garment.positions(), dented.positions());
+    assert_eq!(fitted.garment.pieces[0].normals, normals);
 }

@@ -59,6 +59,39 @@ pub struct BaseManifest {
     /// in the model file: what a description's `skin` block turns on.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skin_layers: Vec<crate::SkinLayerSpec>,
+    /// Colour maps its materials can draw in place of the model file's
+    /// own (ADR-0048): images beside the manifest, one of them chosen by
+    /// the character's parameter values ([`Self::material_maps_for`]). A
+    /// skin for each age, tone and body type is a list of these.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub material_maps: Vec<MaterialMap>,
+}
+
+/// A colour map one of a base model's materials can draw in place of the
+/// model file's own (ADR-0048). The material keeps everything else it has
+/// (its other maps, its shading model, its values, which still modulate
+/// it), so the image is laid out as the file's own colour map is.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MaterialMap {
+    /// The material slot it is for.
+    pub material: String,
+    /// The image, relative to the manifest.
+    pub colour_map: String,
+    /// The parameter values it was made for (`{"skin": 1, "frame": 0,
+    /// "age": 0.5}`). Of a material's maps the one nearest the character's
+    /// values is drawn, so every map of a material names the same
+    /// parameters.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub at: BTreeMap<String, f32>,
+    /// One of `at`'s parameters along which it fades into its neighbour
+    /// (the Age slider between the young and the middle-aged skin): the
+    /// map of the same material at the same values of every other
+    /// parameter and the next value of this one, on the side the
+    /// character's value lies ([`BaseManifest::material_blend_for`]).
+    /// Without it, or on a material whose shading can't draw two colour
+    /// maps (only Skin can), one map gives way to the next at once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blend: Option<String>,
 }
 
 /// Brief §3.3's three levels of customization. A value a newer version
@@ -433,6 +466,12 @@ pub struct Slot {
     pub category: Category,
     #[serde(default, skip_serializing_if = "is_false")]
     pub multiple: bool,
+    /// Randomize draws this slot's drafts too. It never draws a draft
+    /// otherwise (asset-quality.md section 5); a base whose every
+    /// hairstyle is still a draft sets it on its hair slot, so a random
+    /// character isn't always bald.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub random_drafts: bool,
     /// What wearing nothing here is called ("Bald"); "None" when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub empty_label: Option<String>,
@@ -515,6 +554,83 @@ impl BaseManifest {
     /// The skin layer `id` it offers.
     pub fn skin_layer(&self, id: &str) -> Option<&crate::SkinLayerSpec> {
         self.skin_layers.iter().find(|layer| layer.id == id)
+    }
+
+    /// The colour map each material draws for a character whose parameter
+    /// values are `values` ([`crate::parameter_values`]): of the maps the
+    /// base offers for a material, the one whose `at` is nearest, counting
+    /// each parameter's distance as a share of its range; the first of
+    /// equals. A material with no maps isn't in the result and draws its
+    /// model file's own.
+    pub fn material_maps_for(
+        &self,
+        values: &BTreeMap<String, f32>,
+    ) -> BTreeMap<&str, &MaterialMap> {
+        let distance = |map: &MaterialMap| -> f32 {
+            map.at
+                .iter()
+                .map(|(id, at)| {
+                    let span = self
+                        .parameter(id)
+                        .map_or(1.0, |parameter| {
+                            (parameter.range[1] - parameter.range[0]).abs()
+                        })
+                        .max(f32::EPSILON);
+                    let value = values.get(id).copied().unwrap_or(0.0);
+                    ((value - at) / span).powi(2)
+                })
+                .sum()
+        };
+        let mut nearest: BTreeMap<&str, (&MaterialMap, f32)> = BTreeMap::new();
+        for map in &self.material_maps {
+            let far = distance(map);
+            match nearest.get(map.material.as_str()) {
+                Some((_, best)) if *best <= far => {}
+                _ => {
+                    nearest.insert(&map.material, (map, far));
+                }
+            }
+        }
+        nearest
+            .into_iter()
+            .map(|(material, (map, _))| (material, map))
+            .collect()
+    }
+
+    /// The map `nearest` (one of [`Self::material_maps_for`]'s) fades
+    /// toward for a character whose parameter values are `values`, and how
+    /// far it has (0 at `nearest`'s own value, a half where the two are as
+    /// near): its neighbour along its `blend` parameter, on the side the
+    /// character's value lies. `None` when it has no `blend`, the value is
+    /// its own, or there is no neighbour there (or it is the same image).
+    pub fn material_blend_for(
+        &self,
+        nearest: &MaterialMap,
+        values: &BTreeMap<String, f32>,
+    ) -> Option<(&MaterialMap, f32)> {
+        let along = nearest.blend.as_ref()?;
+        let own = *nearest.at.get(along)?;
+        let value = values.get(along).copied()?;
+        if value == own {
+            return None;
+        }
+        let neighbour = self
+            .material_maps
+            .iter()
+            .filter(|map| map.material == nearest.material && map.at.len() == nearest.at.len())
+            .filter(|map| {
+                map.at
+                    .iter()
+                    .all(|(id, at)| id == along || nearest.at.get(id) == Some(at))
+            })
+            .filter_map(|map| Some((map, *map.at.get(along)?)))
+            .filter(|(_, at)| (at - own) * (value - own) > 0.0)
+            .min_by(|a, b| (a.1 - own).abs().total_cmp(&(b.1 - own).abs()))?;
+        let (map, at) = neighbour;
+        if map.colour_map == nearest.colour_map {
+            return None;
+        }
+        Some((map, ((value - own) / (at - own)).clamp(0.0, 1.0)))
     }
 
     /// The category of `parameter`'s group, if it has one.
@@ -602,6 +718,9 @@ impl BaseManifest {
             crate::material::check_slot(p, &format!("materials[{index}]"), slot);
         }
         crate::skin::check_specs(p, self);
+        for (index, map) in self.material_maps.iter().enumerate() {
+            self.check_material_map(p, &format!("material_maps[{index}]"), index, map);
+        }
         unique(p, "features", self.features.iter().map(|f| &f.id));
         for (index, feature) in self.features.iter().enumerate() {
             self.check_feature(p, &format!("features[{index}]"), feature);
@@ -617,6 +736,53 @@ impl BaseManifest {
             check_id(p, &format!("defaults.items[{index}]"), id);
         }
         problems
+    }
+
+    /// A colour map is for a material the base has, is a path, sits at
+    /// values of parameters the base has, inside their ranges, and at
+    /// other values than every earlier map of its material.
+    fn check_material_map(&self, p: &mut Vec<Problem>, at: &str, index: usize, map: &MaterialMap) {
+        if !self.materials.iter().any(|slot| slot.name == map.material) {
+            p.push(Problem::new(
+                at,
+                format!("names no material `{}`", map.material),
+            ));
+        }
+        check_path(p, &format!("{at}.colour_map"), &map.colour_map);
+        for (id, value) in &map.at {
+            match self.parameter(id) {
+                None => p.push(Problem::new(at, format!("is at no parameter `{id}`"))),
+                Some(parameter) => {
+                    let [low, high] = parameter.range;
+                    if !(value.is_finite() && *value >= low.min(high) && *value <= low.max(high)) {
+                        p.push(Problem::new(
+                            at,
+                            format!("is at {value} of `{id}`, outside its range"),
+                        ));
+                    }
+                }
+            }
+        }
+        if let Some(along) = &map.blend
+            && !map.at.contains_key(along)
+        {
+            p.push(Problem::new(
+                at,
+                format!("blends along `{along}`, which it isn't at a value of"),
+            ));
+        }
+        let twice = self.material_maps[..index]
+            .iter()
+            .any(|earlier| earlier.material == map.material && earlier.at == map.at);
+        if twice {
+            p.push(Problem::new(
+                at,
+                format!(
+                    "is at the same values as an earlier map of `{}`",
+                    map.material
+                ),
+            ));
+        }
     }
 
     fn check_parameter(&self, p: &mut Vec<Problem>, at: &str, parameter: &Parameter) {

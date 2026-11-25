@@ -1274,7 +1274,9 @@ pub(super) fn material_textures(
             maps.normal.as_ref().map(|map| &map.texture),
             Some(first),
             maps.roughness.as_ref().map(|map| &map.texture),
-            maps.occlusion.as_ref().map(|map| &map.texture),
+            skin_second_colour(material)
+                .map(|(map, _)| map)
+                .or(maps.occlusion.as_ref().map(|map| &map.texture)),
             Some(second),
             Some(third),
             match &material.shading {
@@ -1304,7 +1306,10 @@ pub(super) fn material_textures(
         maps.normal.as_ref().map(|map| &map.texture),
         maps.metalness.as_ref().map(|map| &map.texture),
         maps.roughness.as_ref().map(|map| &map.texture),
-        maps.occlusion.as_ref().map(|map| &map.texture),
+        // A skin's second colour map takes the occlusion map's place.
+        skin_second_colour(material)
+            .map(|(map, _)| map)
+            .or(maps.occlusion.as_ref().map(|map| &map.texture)),
         maps.emissive.as_ref(),
         maps.opacity.as_ref().map(|map| &map.texture),
         // A toon ramp takes the specular map's place, and so does skin's
@@ -1315,6 +1320,26 @@ pub(super) fn material_textures(
             _ => maps.specular.as_ref(),
         },
     ]
+}
+
+/// A skin's second colour map and how much of it shows (ADR-0048: a skin
+/// between two photographed ages), when it is drawn: it rides in the
+/// occlusion map's place, so not on a skin with an occlusion map, and not
+/// at none of it.
+fn skin_second_colour(material: &Material) -> Option<(&Arc<dyn TextureSource>, f32)> {
+    match &material.shading {
+        Shading::Skin(skin)
+            if material.water.is_none()
+                && material.terrain.is_none()
+                && material.maps.occlusion.is_none() =>
+        {
+            skin.second_colour
+                .as_ref()
+                .map(|(map, amount)| (map, amount.clamp(0.0, 1.0)))
+                .filter(|(_, amount)| *amount > 0.0)
+        }
+        _ => None,
+    }
 }
 
 /// A skin material's makeup and markings, when it has them (water and
@@ -1583,7 +1608,9 @@ pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
         uv_offset: [
             item.material.uv_offset[0],
             item.material.uv_offset[1],
-            0.0,
+            // How much of a skin's second colour map shows (skin.wgsl's
+            // place for it: the occlusion map's).
+            skin_second_colour(&item.material).map_or(0.0, |(_, amount)| amount),
             0.0,
         ],
         shading,

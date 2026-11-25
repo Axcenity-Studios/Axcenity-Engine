@@ -176,6 +176,7 @@ fn a_skin_materials_shading_picks_its_binding_and_its_defined_map_takes_the_spec
         defined_normal: Some(defined.clone()),
         normal_blend: 0.4,
         layers: None,
+        ..Default::default()
     })));
     assert_eq!(key.textures[7], Some(defined.key()), "the defined map");
     assert_eq!(maps_uniform_of(&key).shading, [SHADING_SKIN, 0.4, 1.5, 0.0]);
@@ -185,8 +186,34 @@ fn a_skin_materials_shading_picks_its_binding_and_its_defined_map_takes_the_spec
         defined_normal: Some(defined),
         normal_blend: 3.0,
         layers: None,
+        ..Default::default()
     })));
     assert_eq!(maps_uniform_of(&key).shading, [SHADING_SKIN, 1.0, 0.0, 0.0]);
+
+    // A skin between two colour maps (ADR-0048): the second rides in the
+    // occlusion map's place and its share in the uniform, held to 0 to 1;
+    // none of it binds nothing, and it isn't an occlusion map.
+    let second = leaning(0x5e_02, 5.0);
+    let between = |amount: f32| {
+        material_key(&shaded(Shading::Skin(SkinShading {
+            second_colour: Some((second.clone(), amount)),
+            ..Default::default()
+        })))
+    };
+    let key = between(0.25);
+    assert_eq!(key.textures[4], Some(second.key()), "the second colour map");
+    let uniform = maps_uniform_of(&key);
+    assert_eq!(uniform.uv_offset[2], 0.25);
+    assert_eq!(uniform.settings[2], 0.0, "no occlusion is read from it");
+    assert_eq!(maps_uniform_of(&between(7.0)).uv_offset[2], 1.0);
+    let none = between(0.0);
+    assert_eq!(none.textures[4], None);
+    assert_eq!(maps_uniform_of(&none).uv_offset[2], 0.0);
+    assert_ne!(
+        between(0.25),
+        between(0.5),
+        "each share is its own material"
+    );
 }
 
 /// The red and green of the pixels across the middle of a 12 mm ball (a

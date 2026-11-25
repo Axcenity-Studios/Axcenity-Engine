@@ -1,0 +1,265 @@
+{
+  "format_version": 1,
+  "id": "makehuman/hair-afro01",
+  "label": "Afro",
+  "kind": "groom",
+  "slot": "hair",
+  "tier": "built_in",
+  "bases": [
+    "axcenity/human"
+  ],
+  "materials": [
+    {
+      "name": "Hair",
+      "shading": "hair",
+      "label": "Hair",
+      "role": "primary",
+      "values": [
+        "melanin",
+        "redness",
+        "dye",
+        "dye_amount",
+        "tint",
+        "highlight",
+        "shift_scale",
+        "roughness_scale"
+      ]
+    }
+  ],
+  "fit": {
+    "method": "shapes",
+    "follows": [
+      "Face_Chin_Bones_Decr",
+      "Face_Chin_Bones_Incr",
+      "Face_Chin_Height_Decr",
+      "Face_Chin_Height_Incr",
+      "Face_Chin_Triangle",
+      "Face_Ear_Flap_Decr_Left",
+      "Face_Ear_Flap_Decr_Right",
+      "Face_Ear_Flap_Incr_Left",
+      "Face_Ear_Flap_Incr_Right",
+      "Face_Ear_Rot_Backward_Left",
+      "Face_Ear_Rot_Backward_Right",
+      "Face_Ear_Rot_Forward_Left",
+      "Face_Ear_Rot_Forward_Right",
+      "Face_Ear_Scale_Decr_Left",
+      "Face_Ear_Scale_Decr_Right",
+      "Face_Ear_Scale_Depth_Decr_Left",
+      "Face_Ear_Scale_Depth_Decr_Right",
+      "Face_Ear_Scale_Depth_Incr_Left",
+      "Face_Ear_Scale_Depth_Incr_Right",
+      "Face_Ear_Scale_Incr_Left",
+      "Face_Ear_Scale_Incr_Right",
+      "Face_Ear_Scale_Vert_Decr_Left",
+      "Face_Ear_Scale_Vert_Decr_Right",
+      "Face_Ear_Scale_Vert_Incr_Left",
+      "Face_Ear_Scale_Vert_Incr_Right",
+      "Face_Ear_Shape_Pointed_Left",
+      "Face_Ear_Shape_Pointed_Right",
+      "Face_Ear_Shape_Round_Left",
+      "Face_Ear_Shape_Round_Right",
+      "Face_Ear_Shape_Square_Left",
+      "Face_Ear_Shape_Square_Right",
+      "Face_Ear_Shape_Triangle_Left",
+      "Face_Ear_Shape_Triangle_Right",
+      "Face_Ear_Trans_Backward_Left",
+      "Face_Ear_Trans_Backward_Right",
+      "Face_Ear_Trans_Down_Left",
+      "Face_Ear_Trans_Down_Right",
+      "Face_Ear_Trans_Forward_Left",
+      "Face_Ear_Trans_Forward_Right",
+      "Face_Ear_Trans_Up_Left",
+      "Face_Ear_Trans_Up_Right",
+      "Face_Ear_Wing_Decr_Left",
+      "Face_Ear_Wing_Decr_Right",
+      "Face_Ear_Wing_Incr_Left",
+      "Face_Ear_Wing_Incr_Right",
+      "Face_Eyebrows_Angle_Down",
+      "Face_Eyebrows_Trans_Backward",
+      "Face_Eyebrows_Trans_Down",
+      "Face_Eyebrows_Trans_Forward",
+      "Face_Eyebrows_Trans_Up",
+      "Face_Forehead_Nubian_Decr",
+      "Face_Forehead_Nubian_Incr",
+      "Face_Forehead_Scale_Vert_Decr",
+      "Face_Forehead_Scale_Vert_Incr",
+      "Face_Forehead_Temple_Decr",
+      "Face_Forehead_Temple_Incr",
+      "Face_Forehead_Trans_Backward",
+      "Face_Forehead_Trans_Forward",
+      "Face_Head_Age_Decr",
+      "Face_Head_Age_Incr",
+      "Face_Head_Angle_In",
+      "Face_Head_Angle_Out",
+      "Face_Head_Back_Scale_Depth_Decr",
+      "Face_Head_Back_Scale_Depth_Incr",
+      "Face_Head_Diamond",
+      "Face_Head_Fat_Decr",
+      "Face_Head_Fat_Incr",
+      "Face_Head_Invertedtriangular",
+      "Face_Head_Oval",
+      "Face_Head_Rectangular",
+      "Face_Head_Round",
+      "Face_Head_Scale_Depth_Decr",
+      "Face_Head_Scale_Depth_Incr",
+      "Face_Head_Scale_Horiz_Decr",
+      "Face_Head_Scale_Horiz_Incr",
+      "Face_Head_Scale_Vert_Decr",
+      "Face_Head_Scale_Vert_Incr",
+      "Face_Head_Square",
+      "Face_Head_Trans_Backward",
+      "Face_Head_Trans_Down",
+      "Face_Head_Trans_Forward",
+      "Face_Head_Trans_In",
+      "Face_Head_Trans_Out",
+      "Face_Head_Trans_Up",
+      "Face_Head_Triangular",
+      "Face_Measure_Neck_Circ_Decr",
+      "Face_Measure_Neck_Circ_Incr",
+      "Face_Measure_Neck_Height_Decr",
+      "Face_Measure_Neck_Height_Incr",
+      "Face_Neck_Back_Scale_Depth_Decr",
+      "Face_Neck_Back_Scale_Depth_Incr",
+      "Face_Neck_Double_Decr",
+      "Face_Neck_Double_Incr",
+      "Face_Neck_Scale_Depth_Decr",
+      "Face_Neck_Scale_Depth_Incr",
+      "Face_Neck_Scale_Horiz_Decr",
+      "Face_Neck_Scale_Horiz_Incr",
+      "Face_Neck_Scale_Vert_Decr",
+      "Face_Neck_Scale_Vert_Incr",
+      "Face_Neck_Trans_Backward",
+      "Face_Neck_Trans_Down",
+      "Face_Neck_Trans_Forward",
+      "Face_Neck_Trans_In",
+      "Face_Neck_Trans_Out",
+      "Face_Neck_Trans_Up",
+      "Feminine_Age_Old",
+      "Feminine_Fat_Down",
+      "Feminine_Muscle_Down_Fat_Down",
+      "Feminine_Muscle_Down_Fat_Up",
+      "Feminine_Muscle_Up",
+      "Feminine_Muscle_Up_Fat_Down",
+      "Feminine_Muscle_Up_Fat_Up",
+      "Frame_Feminine",
+      "Masculine_Age_Old",
+      "Masculine_Fat_Down",
+      "Masculine_Muscle_Down",
+      "Masculine_Muscle_Down_Fat_Down",
+      "Masculine_Muscle_Down_Fat_Up",
+      "Masculine_Muscle_Up",
+      "Masculine_Muscle_Up_Fat_Down",
+      "Masculine_Muscle_Up_Fat_Up"
+    ]
+  },
+  "groom": {
+    "mesh": {
+      "file": "HairAfro01.glb",
+      "object": "AxcenityHuman/HairAfro01"
+    }
+  },
+  "tags": [
+    "coily",
+    "makehuman",
+    "short"
+  ],
+  "variants": [
+    {
+      "id": "black",
+      "label": "Black",
+      "materials": {
+        "Hair": {
+          "melanin": 0.95,
+          "redness": -0.3
+        }
+      }
+    },
+    {
+      "id": "dark-brown",
+      "label": "Dark brown",
+      "materials": {
+        "Hair": {
+          "melanin": 0.5,
+          "redness": 0.0
+        }
+      }
+    },
+    {
+      "id": "brown",
+      "label": "Brown",
+      "materials": {
+        "Hair": {
+          "melanin": 0.1,
+          "redness": 0.15
+        }
+      }
+    },
+    {
+      "id": "auburn",
+      "label": "Auburn",
+      "materials": {
+        "Hair": {
+          "melanin": -0.2,
+          "redness": 0.9,
+          "dye": "#8a3a1c",
+          "dye_amount": 0.5
+        }
+      }
+    },
+    {
+      "id": "ginger",
+      "label": "Ginger",
+      "materials": {
+        "Hair": {
+          "melanin": -0.5,
+          "redness": 1.0,
+          "dye": "#b5562a",
+          "dye_amount": 0.5
+        }
+      }
+    },
+    {
+      "id": "blonde",
+      "label": "Blonde",
+      "materials": {
+        "Hair": {
+          "melanin": -0.9,
+          "redness": 0.35,
+          "dye": "#d9b877",
+          "dye_amount": 0.55
+        }
+      }
+    },
+    {
+      "id": "platinum",
+      "label": "Platinum",
+      "materials": {
+        "Hair": {
+          "melanin": -1.0,
+          "redness": -0.5,
+          "dye": "#e9e2d0",
+          "dye_amount": 0.35
+        }
+      }
+    },
+    {
+      "id": "grey",
+      "label": "Grey",
+      "materials": {
+        "Hair": {
+          "melanin": -0.75,
+          "redness": -1.0,
+          "dye": "#bdbcb8",
+          "dye_amount": 0.55
+        }
+      }
+    }
+  ],
+  "thumbnail": "HairAfro01.png",
+  "source": {
+    "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+    "licence": "CC0-1.0",
+    "url": "http://www.makehumancommunity.org"
+  },
+  "quality": "draft"
+}

@@ -1,0 +1,27 @@
+{
+  "format_version": 2,
+  "name": "human-masculine-cast-asymmetry",
+  "base": "axcenity/human",
+  "parameters": {
+    "cheeks_bones_left": -0.3,
+    "cheeks_bones_right": 0.3,
+    "ears_scale_left": -0.35,
+    "ears_scale_right": 0.35,
+    "ears_trans_down_up_left": 0.35,
+    "ears_trans_down_up_right": -0.35,
+    "ears_wing_left": -0.35,
+    "ears_wing_right": 0.35,
+    "eyes_corner1_down_up_left": 0.125,
+    "eyes_corner1_down_up_right": -0.125,
+    "eyes_scale_left": -0.125,
+    "eyes_scale_right": 0.125,
+    "eyes_trans_down_up_left": 0.175,
+    "eyes_trans_down_up_right": -0.175,
+    "frame": 0
+  },
+  "items": [
+    {
+      "id": "axcenity/human-boxer-briefs"
+    }
+  ]
+}

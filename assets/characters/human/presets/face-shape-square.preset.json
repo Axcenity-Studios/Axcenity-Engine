@@ -1,0 +1,15 @@
+{
+  "format_version": 2,
+  "name": "Square",
+  "base": "axcenity/human",
+  "parameters": {
+    "face_shape_square": 0.7
+  },
+  "preset": {
+    "id": "axcenity/human-face-shape-square",
+    "kind": "feature",
+    "about": "A wide jaw with strong corners.",
+    "feature": "face_shape",
+    "order": 30
+  }
+}
