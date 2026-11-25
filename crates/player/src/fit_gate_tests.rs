@@ -585,7 +585,7 @@ pub(super) const HOLES: &str = "hidden skin showing";
 /// Layered pairs the gate checks: (the lower layer, the upper one). A
 /// lower layer never comes through the upper one where the upper one
 /// covers it at rest.
-const LAYERS: [(&str, &str); 7] = [
+const LAYERS: [(&str, &str); 10] = [
     // The realistic sports bra under the test tee.
     ("Underwear_Bra", "TestTee"),
     // The stylized cargo pants' waistband under the tee's hem, and the
@@ -598,6 +598,10 @@ const LAYERS: [(&str, &str); 7] = [
     ("Underwear_Bra", "Shirt_CrewTee"),
     ("Underwear_BoxerBriefs", "Pants_Joggers"),
     ("Underwear_Briefs", "Pants_Joggers"),
+    // The human base's cut underwear under MakeHuman's outfits.
+    ("BoxerBriefs", "MaleCasualsuit01"),
+    ("BoxerBriefs", "FemaleCasualsuit01"),
+    ("Bandeau", "FemaleCasualsuit01"),
 ];
 
 /// The cover each garment of `garments` gives at rest: (garment name,
@@ -1286,16 +1290,21 @@ fn human_clothes_cover_the_human_cast() {
     // showing" is skin the outfits' files hide (`delete_verts`, their cover
     // maps) that their cloth doesn't cover: one corner at the men's
     // collar at rest (34 mm), and the ankles and insteps between the jeans
-    // and the shoes in the stride (the white patches of Known limitations).
+    // and the shoes in the stride.
+    // 2026-11-25: the two walk records fell (8.87 to 7.03 mm, 55.13 to
+    // 48.57 mm) when each body shape was brought into the pose about its
+    // own joints (`build.py` `shape_moves`), and the underwear under each
+    // outfit joined the gate ([`LAYERS`]): no corner of it through either
+    // outfit in any of the three poses.
     let known = [
         ("FemaleCasualsuit01", "rest", 3, 0.00208),
         ("FemaleCasualsuit01", "TPose", 5, 0.00229),
-        ("FemaleCasualsuit01", "Walk@18", 12, 0.00887),
+        ("FemaleCasualsuit01", "Walk@18", 12, 0.00703),
         ("MaleCasualsuit01", "rest", 1, 0.00100),
         ("MaleCasualsuit01", "TPose", 1, 0.00100),
         ("MaleCasualsuit01", "Walk@18", 1, 0.00106),
         ("hidden skin showing", "rest", 8, 0.03450),
-        ("hidden skin showing", "Walk@18", 24, 0.05513),
+        ("hidden skin showing", "Walk@18", 24, 0.04857),
     ]
     .map(|(garment, pose, cases, worst)| Known {
         garment,
@@ -1304,4 +1313,64 @@ fn human_clothes_cover_the_human_cast() {
         worst,
     });
     check("human", &failures, &known);
+}
+
+/// Paul's test of 2026-11-25: the human base's underwear came through its
+/// outfits. Worn alone the briefs and the bandeau are drawn whole; under
+/// an outfit that covers them nothing of either is drawn, on every body
+/// of the human cast (their cloth is left out under the outfit's cover
+/// map, ADR-0045), and the socks of the shoes are cut where the jeans
+/// cover them.
+#[test]
+fn the_human_bases_underwear_is_not_drawn_under_an_outfit() {
+    let stage = Stage::new("fit-gate-human-layers", &repository_library()).expect("the stage");
+    let cast = benchmarks("human-")
+        .into_iter()
+        .filter(|d| d.name.contains("-cast-") || d.name.contains("-body-"));
+    let mut checked = 0;
+    for description in cast {
+        let feminine = description.name.contains("-feminine-");
+        let (suit, shoes) = if feminine {
+            ("makehuman/female-casualsuit01", "makehuman/shoes04")
+        } else {
+            ("makehuman/male-casualsuit01", "makehuman/shoes01")
+        };
+        let triangles = |items: &[&str]| {
+            let mut worn_now = description.clone();
+            for id in items {
+                if !worn_now.items.iter().any(|worn| worn.id == *id) {
+                    worn_now.items.push(WornItem::new(*id));
+                }
+            }
+            let (_, garments) = worn(&stage.assets, &worn_now, Stance::Rest);
+            move |name: &str| {
+                garments
+                    .iter()
+                    .find(|garment| garment.name.starts_with(name))
+                    .map(|garment| garment.triangles.len())
+            }
+        };
+        let alone = triangles(&[shoes]);
+        let dressed = triangles(&[shoes, suit]);
+        for name in ["BoxerBriefs", "Bandeau"] {
+            let Some(whole) = alone(name) else {
+                continue;
+            };
+            assert!(whole > 1000, "{}: {name} alone", description.name);
+            assert_eq!(
+                dressed(name),
+                Some(0),
+                "{}: {name} under {suit}",
+                description.name
+            );
+            checked += 1;
+        }
+        let (bare, covered) = (alone("Shoes").unwrap(), dressed("Shoes").unwrap());
+        assert!(
+            covered < bare,
+            "{}: the socks under the jeans ({covered} of {bare})",
+            description.name
+        );
+    }
+    assert!(checked >= 50, "{checked} checked");
 }

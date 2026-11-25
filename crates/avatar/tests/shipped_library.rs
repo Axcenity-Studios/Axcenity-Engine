@@ -1100,3 +1100,154 @@ fn the_human_bases_face_has_readable_names_features_and_handles() {
         }
     }
 }
+
+/// The human base's layering (ADR-0045 on MakeHuman's clothes, Paul's
+/// test of 2026-11-25: underwear came through the outfits). Every garment
+/// of the base says what it hides beneath it: its cover map's green is lit
+/// wherever its red is (cloth is never left drawn where the skin isn't)
+/// and its blue wherever its green is. The underwear cut from the body
+/// has the shape that presses it onto the skin under other clothes, and
+/// wears it only then; a converted garment carries its corners' places on
+/// the skin, so the engine tucks its edge under what is worn over it (the
+/// socks of the shoes under the jeans). That nothing of the underwear is
+/// then drawn is the player's `the_human_bases_underwear_is_not_drawn_under_an_outfit`.
+/// And the frame moves the twist bones with the limbs they are inside.
+#[test]
+fn the_human_bases_underwear_goes_under_its_clothes() {
+    use axcenity_avatar::{WornItem, resolve};
+    let library = read();
+    let assets = axcenity_assets::Assets::new(root());
+    let mut garments = 0;
+    for (id, item) in &library.items {
+        if !item.bases.iter().any(|base| base == "axcenity/human") {
+            continue;
+        }
+        let Some(cover) = &item.cover_map else {
+            continue;
+        };
+        garments += 1;
+        let path = library.path_of(id, cover).unwrap();
+        let image = assets
+            .texture(&path)
+            .unwrap_or_else(|| panic!("{path}: {:?}", assets.take_errors()));
+        let (mut red, mut green, mut bare, mut untucked) = (0, 0, 0, 0);
+        for texel in image.rgba().chunks_exact(4) {
+            let lit = |channel: usize| texel[channel] >= axcenity_assets::COVERED;
+            red += usize::from(lit(0));
+            green += usize::from(lit(1));
+            bare += usize::from(lit(0) && !lit(1));
+            untucked += usize::from(lit(1) && !lit(2));
+        }
+        assert!(red > 0 && green >= red, "{id}: red {red}, green {green}");
+        assert_eq!(bare, 0, "{id}: skin hidden where cloth beneath isn't");
+        assert_eq!(untucked, 0, "{id}: blue is at least green");
+    }
+    assert_eq!(
+        garments, 6,
+        "the underwear, two outfits and two pairs of shoes"
+    );
+
+    let model = |id: &str| {
+        let item = &library.items[id];
+        let reference = item.model.as_ref().unwrap();
+        let file = library.path_of(id, &reference.file).unwrap();
+        let bytes = std::fs::read(root().join(&file)).unwrap();
+        let pick = Pick::Objects(vec![reference.object.clone().unwrap()]);
+        load_models(&bytes, Path::new("."), ModelFormat::Gltf, &[pick])
+            .unwrap()
+            .remove(0)
+    };
+    const BRIEFS: &str = "axcenity/human-boxer-briefs";
+    const BANDEAU: &str = "axcenity/human-bandeau";
+    for id in [BRIEFS, BANDEAU] {
+        let contents = ModelContents::of(&model(id));
+        assert!(
+            contents
+                .shapes
+                .contains(axcenity_avatar::fit::SHRINK_UNDER_SHAPE),
+            "{id} can be pressed onto the skin"
+        );
+        assert!(!model(id).has_skin_uvs(), "{id} lies on the skin");
+    }
+    for id in [
+        "makehuman/female-casualsuit01",
+        "makehuman/male-casualsuit01",
+        "makehuman/shoes01",
+        "makehuman/shoes04",
+    ] {
+        let garment = model(id);
+        assert!(garment.has_skin_uvs(), "{id} knows its place on the skin");
+        for primitive in &garment.primitives {
+            for uv in &primitive.skin_uvs {
+                assert!(
+                    uv.iter()
+                        .all(|c| c.is_finite() && (-0.01..=1.01).contains(c)),
+                    "{id}: {uv:?}"
+                );
+            }
+        }
+    }
+
+    // Worn: pressed only under something, and hidden by what is over it.
+    let mut character = Description::new("Layers", "axcenity/human");
+    character.parameters.insert("frame".into(), 1.0);
+    character.items = vec![WornItem::new(BRIEFS), WornItem::new(BANDEAU)];
+    let alone = resolve(&library, &character).unwrap();
+    for part in alone.parts.iter().filter(|part| part.item.is_some()) {
+        assert!(part.under.is_empty(), "{}", part.name);
+        assert!(
+            !part
+                .shapes
+                .contains_key(axcenity_avatar::fit::SHRINK_UNDER_SHAPE)
+        );
+    }
+    character
+        .items
+        .push(WornItem::new("makehuman/female-casualsuit01"));
+    let dressed = resolve(&library, &character).unwrap();
+    assert_eq!(dressed.problems, Vec::new());
+    for id in [BRIEFS, BANDEAU] {
+        let part = dressed
+            .parts
+            .iter()
+            .find(|part| part.item.as_deref() == Some(id))
+            .unwrap();
+        assert_eq!(
+            part.shapes
+                .get(axcenity_avatar::fit::SHRINK_UNDER_SHAPE)
+                .copied(),
+            Some(1.0),
+            "{id}"
+        );
+        assert_eq!(
+            part.under,
+            ["human/wardrobe/female_casualsuit01/FemaleCasualsuit01.cover.png"],
+            "{id}"
+        );
+    }
+
+    let human = library.base("axcenity/human").unwrap();
+    let frame = human.parameter("frame").unwrap();
+    for side in ["Left", "Right"] {
+        for bone in [
+            "UpperArmTwist",
+            "LowerArmTwist",
+            "UpperLegTwist",
+            "LowerLegTwist",
+        ] {
+            let twist = format!("{side}{bone}");
+            let inside = format!("{side}{}", bone.trim_end_matches("Twist"));
+            let offset = |name: &str| {
+                frame
+                    .bones
+                    .iter()
+                    .find(|change| change.bone == name)
+                    .and_then(|change| change.offset)
+                    .unwrap_or_else(|| panic!("the frame moves {name}"))
+            };
+            let (a, b) = (offset(&twist), offset(&inside));
+            let apart = (0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f32>().sqrt();
+            assert!(apart < 0.03, "{twist} goes with {inside}: {apart}");
+        }
+    }
+}

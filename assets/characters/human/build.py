@@ -234,6 +234,34 @@ def added_bones():
     return [(side + name, side + inside) for side, _, _ in SIDES for name, inside, _, _ in TWISTS]
 
 
+def bone_heads(joints):
+    """{bone: its head} for the contract's `joints` and the twist bones
+    `build_armature` adds inside them."""
+    out = {name: head for name, (head, _, _) in joints.items()}
+    for side, _, _ in SIDES:
+        for name, inside, _, (a, _) in TWISTS:
+            head, tail, _ = joints[side + inside]
+            out[side + name] = head.lerp(tail, a)
+    return out
+
+
+def head_moves(joints, theirs):
+    """How far each bone's head is in `theirs` from where it is in
+    `joints` (glTF axes), for a parameter's `bones`. The twist bones are
+    among them: the engine leaves a bone no change names where it is
+    whatever its parent does (`assets` `identity.rs`), and a twist bone
+    left on the default body's arm turns the forearm's skin about a line
+    that isn't in the arm (a notch at the elbow of the feminine frame,
+    whose arms are 12 cm lower)."""
+    ours, theirs = bone_heads(joints), bone_heads(theirs)
+    out = {}
+    for name, head in ours.items():
+        d = theirs[name] - head
+        if name != "Root" and d.length > 0.0005:
+            out[name] = to_gltf(d)
+    return out
+
+
 def build_armature(joints):
     """The stylized humanoid's armature for `joints`, plus the twist bones."""
     rig = stylized_rig()
@@ -408,8 +436,36 @@ def material_of(name, mhmat, alpha=None, extras=None):
                            extras=extras)
 
 
-def make_object(name, piece, points, shapes, groups, material, armature):
-    """A skinned mesh object with its shapes, under `armature`."""
+#: The attribute a fitted garment's corners carry: the body's own texture
+#: coordinates at the skin each lies over (`axcenity_assets`'
+#: `SKIN_UV_ATTRIBUTE`). With it what is worn over the garment hides it by
+#: its cover map as it hides one the engine fitted: the triangles under
+#: the cover go, and the ones that reach out from under it dip their
+#: covered corners into the body, so the garment's edge goes under the
+#: outer one's hem and doesn't stand through it.
+SKIN_UV = "_AXCENITY_SKIN_UV"
+
+
+def skin_uvs_of(body, body_points, points):
+    """Each of a garment's corners' place on the skin: the body's texture
+    coordinates (glTF's, v down) at the skin point nearest it."""
+    from mathutils.bvhtree import BVHTree
+    from mathutils.interpolate import poly_3d_calc
+    tree = BVHTree.FromPolygons([Vector(p) for p in body_points], [tuple(int(c) for c in face) for face in body.faces])
+    out = np.zeros((len(points), 2))
+    for v, p in enumerate(points):
+        at, _, index, _ = tree.find_nearest(Vector(p))
+        corners = [Vector(body_points[c]) for c in body.faces[index]]
+        shares = poly_3d_calc(corners, at)
+        u = sum(w * uv[0] for w, uv in zip(shares, body.uvs[index]))
+        t = sum(w * uv[1] for w, uv in zip(shares, body.uvs[index]))
+        out[v] = (u, 1.0 - t)
+    return out
+
+
+def make_object(name, piece, points, shapes, groups, material, armature, skin_uvs=None):
+    """A skinned mesh object with its shapes, under `armature`. With
+    `skin_uvs` (one per corner) it carries them as `SKIN_UV`."""
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata([tuple(p) for p in points], [], piece.faces)
     layer = mesh.uv_layers.new(name="UVMap")
@@ -417,6 +473,11 @@ def make_object(name, piece, points, shapes, groups, material, armature):
     layer.data.foreach_set("uv", [c for uv in flat for c in uv])
     mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
     mesh.materials.append(material)
+    if skin_uvs is not None:
+        # After the texture coordinates: made before them, the exporter
+        # no longer finds which set a material's textures use.
+        attribute = mesh.attributes.new(name=SKIN_UV, type="FLOAT2", domain="POINT")
+        attribute.data.foreach_set("vector", np.asarray(skin_uvs, dtype=np.float32).ravel())
     mesh.update()
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.scene.collection.objects.link(obj)
@@ -488,20 +549,122 @@ def write_region_map(path, piece, regions, size=1024):
     Image.fromarray(a).save(path, optimize=True)
 
 
-def write_cover(path, body, hidden, size=1024):
-    """An item's cover map (ADR-0045): red where the body's skin is left
-    out under the garment, over the body's texture coordinates. A face
-    goes only when every corner of it is hidden. Returns the faces lit."""
-    from PIL import Image, ImageDraw
-    image = Image.new("RGB", (size, size), (0, 0, 0))
-    draw = ImageDraw.Draw(image)
+#: A cover map's green and blue (ADR-0045: the skin over which a garment
+#: worn beneath leaves its own cloth out). Cloth is "over" a skin corner
+#: when a line out along the corner's normal meets it within `CLOTH_REACH`
+#: (started `CLOTH_BELOW` under the skin: MakeHuman's clothes dip into
+#: skin they hide); a loose skirt far off the thigh covers nothing, and
+#: what is worn under it is far from it too. From the garment's openings
+#: the cover is set back by the cloth's distance from the skin there,
+#: between `CLOTH_LEAST` and `CLOTH_MOST` (the engine's own setback of
+#: cloth worn beneath, `avatar::fit::cover`): one sees a little way under
+#: a loose hem.
+CLOTH_REACH = 0.10
+CLOTH_BELOW = 0.005
+CLOTH_GAIN, CLOTH_LEAST, CLOTH_MOST = 1.0, 0.003, 0.040
+#: Round the hips a bottom's blue has no setback: a top tucked into it
+#: isn't seen under its waistband.
+HIP_REGIONS = ("waist", "hips", "thighs_top")
+#: How far a cover's green and blue are grown (texels of 1024). Over the
+#: skin by one, for the rounding of a face's edge. Past the edge of the
+#: body's texture islands by `COVER_PAST`, where there is no skin: a
+#: garment's corner is placed on the map by the skin nearest it, which at
+#: a seam of the texture coordinates (the middle of the crotch) is on an
+#: island's very edge, and the engine counts a corner covered when most
+#: of the map round it is lit, a hundredth of the map each way
+#: (`axcenity_assets` `PINHOLE`): without this the underwear kept a strip
+#: of 40 triangles along that seam under any trousers.
+COVER_GROW = 1
+COVER_PAST = 12
+
+
+def cloth_over(body_points, body_faces, points, faces):
+    """(covered, set back) for each of the body's corners under the
+    garment whose corners are `points` and faces `faces`: whether cloth is
+    over it, and whether it is over it clear of the garment's openings
+    (`CLOTH_*`)."""
+    from mathutils.bvhtree import BVHTree
+    from mathutils.kdtree import KDTree
+    tree = BVHTree.FromPolygons([Vector(p) for p in points], [tuple(int(c) for c in face) for face in faces])
+    normals = underwear.normals_of(body_points, body_faces)
+    covered = np.zeros(len(body_points), dtype=bool)
+    off = np.zeros(len(body_points))
+    for v, (p, n) in enumerate(zip(body_points, normals)):
+        start = Vector(p - n * CLOTH_BELOW)
+        hit, _, _, distance = tree.ray_cast(start, Vector(n), CLOTH_REACH + CLOTH_BELOW)
+        if hit is not None:
+            covered[v] = True
+            off[v] = max(distance - CLOTH_BELOW, 0.0)
+    bare = np.nonzero(~covered)[0]
+    clear = covered.copy()
+    if len(bare):
+        near = KDTree(len(bare))
+        for k, v in enumerate(bare):
+            near.insert(Vector(body_points[v]), k)
+        near.balance()
+        for v in np.nonzero(covered)[0]:
+            setback = min(max(CLOTH_GAIN * off[v], CLOTH_LEAST), CLOTH_MOST)
+            _, _, distance = near.find(Vector(body_points[v]))
+            clear[v] = distance > setback
+    return covered, clear
+
+
+def write_cover(path, body, hidden, under=None, whole=None, size=1024):
+    """An item's cover map (ADR-0045), over the body's texture
+    coordinates: red where the body's skin is left out under the garment,
+    green where a garment worn beneath it leaves its cloth out (`under`,
+    per body corner) and blue where a top tucked into it does (`whole`,
+    per body **face**; as green when None). A face is lit only when every
+    corner of it is. Without `under` (a garment nothing is worn beneath)
+    green and blue stay dark. Returns the faces lit in red."""
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter
+    red, green, blue, skin = (Image.new("L", (size, size), 0) for _ in range(4))
+    draws = [ImageDraw.Draw(image) for image in (red, green, blue, skin)]
     lit = 0
-    for corners, uvs in zip(body.faces, body.uvs):
+    for index, (corners, uvs) in enumerate(zip(body.faces, body.uvs)):
+        at = [(u * size, (1 - v) * size) for u, v in uvs]
+        draws[3].polygon(at, fill=255, outline=255)
         if all(hidden[c] for c in corners):
-            draw.polygon([(u * size, (1 - v) * size) for u, v in uvs], fill=(255, 0, 0))
+            draws[0].polygon(at, fill=255)
             lit += 1
-    image.save(path, optimize=True)
+        if under is None:
+            continue
+        beneath = all(under[c] for c in corners)
+        if beneath:
+            draws[1].polygon(at, fill=255, outline=255)
+        if beneath if whole is None else whole[index]:
+            draws[2].polygon(at, fill=255, outline=255)
+    if under is not None:
+        scale = size / 1024
+        near = ImageFilter.MaxFilter(2 * max(1, round(COVER_GROW * scale)) + 1)
+        far = ImageFilter.MaxFilter(2 * max(1, round(COVER_PAST * scale)) + 1)
+        no_skin = ImageChops.invert(skin)
+
+        def grown(channel):
+            past = ImageChops.multiply(channel.filter(far), no_skin)
+            return ImageChops.lighter(channel.filter(near), past)
+
+        green, blue = grown(green), grown(blue)
+    Image.merge("RGB", (red, green, blue)).save(path, optimize=True)
     return lit
+
+
+def cloth_cover(body, body_points, body_groups, points, faces, hidden, bottom=False):
+    """`write_cover`'s (under, whole) for a garment on the body: the skin
+    its cloth is over clear of its openings, and for a `bottom` the faces
+    round the hips its cloth is over at all. Skin the garment hides
+    (`hidden`, per body corner) is under it whatever the line out of it
+    met: MakeHuman's clothes dip under skin their files hide, and cloth
+    left drawn where the skin isn't would hang in the air."""
+    covered, clear = cloth_over(body_points, body.faces, points, faces)
+    covered, clear = covered | hidden, clear | hidden
+    if not bottom:
+        return clear, None
+    hips = {manifests.REGION_INDEX[region] for region in HIP_REGIONS}
+    whole = []
+    for corners, region in zip(body.faces, face_regions(body, body_groups)):
+        whole.append(all(covered[c] for c in corners) if region in hips else all(clear[c] for c in corners))
+    return clear, whole
 
 
 def skin_triangles(points, faces):
@@ -551,6 +714,8 @@ def write_cut_item(root, spec, build, joints, body_points, body_groups, body_sha
         # frame has them; the cloth's stand-off is kept on the rest body.
         on = body_points + body_shapes[laid_on]
         for bone, offset in frame_bones.items():
+            if bone not in at:  # a twist bone: made from the bone it is inside
+                continue
             head, tail, parent = at[bone]
             move = Vector((offset[0], -offset[2], offset[1]))
             at[bone] = (head + move, tail + move, parent)
@@ -564,6 +729,11 @@ def write_cut_item(root, spec, build, joints, body_points, body_groups, body_sha
         d = underwear.shape_moves(garment, moves)
         if np.abs(d).max() > LEAST:
             shapes[shape] = d
+    follows = sorted(shapes)
+    # Pressed onto the skin while anything is worn over it (the resolver
+    # turns `Shrink_Under` on then, ADR-0046): it is never the underwear
+    # that stands through a tight garment's cloth.
+    shapes[underwear.SHRINK_UNDER] = garment["shrink"]
     os.makedirs(folder, exist_ok=True)
     armature = build_armature(joints)
     material = simple_material("Underwear", (0.035, 0.037, 0.045, 1.0), roughness=0.85)
@@ -574,14 +744,16 @@ def write_cut_item(root, spec, build, joints, body_points, body_groups, body_sha
     for a in list(bpy.data.armatures):
         bpy.data.armatures.remove(a)
     bpy.data.materials.remove(material)  # the next item's is named the same
-    lit = write_cover(os.path.join(folder, name + ".cover.png"), build.body, garment["hidden"])
+    under, whole = cloth_cover(build.body, body_points, body_groups, garment["points"], garment["faces"],
+                               garment["hidden"])
+    lit = write_cover(os.path.join(folder, name + ".cover.png"), build.body, garment["hidden"], under, whole)
     item = {
         "format_version": 1, "id": item_id, "label": label, "kind": "garment",
         "slot": slot, "layer": 0, "tier": "built_in", "bases": [manifests.BASE_ID],
         "model": {"file": name + ".glb", "object": f"{ARMATURE}/{name}"},
         "cover_map": name + ".cover.png",
         "materials": [{"name": "Underwear", "shading": "cloth", "label": "Cloth", "role": "primary"}],
-        "fit": {"method": "shapes", "follows": sorted(shapes)},
+        "fit": {"method": "shapes", "follows": follows},
         "tags": ["underwear"],
         "about": "Cut from the body's own surface, so it follows every body slider.",
         "source": {"author": "Axcenity Engine contributors, from MakeHuman's base mesh (CC0)",
@@ -591,7 +763,7 @@ def write_cut_item(root, spec, build, joints, body_points, body_groups, body_sha
     with open(os.path.join(folder, name + ".item.json"), "w", newline="\n") as f:
         json.dump(item, f, indent=2)
         f.write("\n")
-    return {"corners": int(len(garment["points"])), "faces": len(garment["faces"]), "shapes": len(shapes),
+    return {"corners": int(len(garment["points"])), "faces": len(garment["faces"]), "shapes": len(follows),
             "hidden_faces": lit}
 
 
@@ -605,7 +777,10 @@ def export(path, armature, objects, extras=False, morph_normals=True):
         filepath=path, export_format="GLB", use_selection=True,
         export_skins=True, export_morph=True, export_morph_normal=morph_normals, export_try_sparse_sk=True,
         export_animations=False, export_yup=True, export_def_bones=False, export_leaf_bone=False,
-        export_tangents=False, export_image_format="AUTO", export_extras=extras)
+        export_tangents=False, export_image_format="AUTO", export_extras=extras,
+        # Attributes of our own (`SKIN_UV`); the exporter writes those
+        # whose names start with an underscore.
+        export_attributes=True)
 
 
 def to_gltf(d):
@@ -641,6 +816,7 @@ class Build:
         self.floor = posed[:, 2].min()
         self.scale = HEIGHT / (posed[:, 2].max() - self.floor)
         self.moves = {name: self.samples.shape(terms) for name, terms in SHAPES.items()}
+        self.poses = {}
         # The face: what it does (expression shapes, live) and who it is
         # (identity parameters), from MakeHuman's targets (`face.py`).
         count = len(self.rest)
@@ -660,10 +836,46 @@ class Build:
     def body_points(self):
         return self.stand(mh.Repose.points(self.body_matrix, self.rest[self.skin]))
 
+    def pose_at(self, settings):
+        """The way into the engine's pose for the MakeHuman body with
+        these settings, about that body's own joints."""
+        key = key_of(settings)
+        if key not in self.poses:
+            self.poses[key] = mh.Repose(self.bones, mh.joint_centres(self.cubes, self.samples.at(settings)))
+        return self.poses[key]
+
+    def shape_moves(self, name, weights, place, blends=None):
+        """The shape `name`'s moves, in the engine's pose and size, of the
+        corners with MakeHuman's `weights` that `place` puts on a
+        MakeHuman body (all its corners).
+
+        A body shape (`SHAPES`) is the difference of whole bodies, each
+        brought into the engine's pose **about its own joints**. Turning
+        the difference itself by the default body's bones is not the same
+        thing where two bones turn differently (the elbow, which the pose
+        straightens) and the joint between them moves: the feminine
+        frame's elbow is 12 cm from the masculine one's, and her forearm
+        came out a centimetre or two off her upper arm, a notch at every
+        elbow. A face shape moves no joint to speak of and is turned as it
+        is."""
+        terms = SHAPES.get(name)
+        if terms is None:
+            rest = place(self.rest)
+            return mh.Repose.moves(self.pose.blend(weights), place(self.rest + self.moves[name]) - rest) * self.scale
+        blends = {} if blends is None else blends
+        total = 0.0
+        for weight, settings in terms:
+            key = key_of(settings)
+            if key not in blends:
+                blends[key] = mh.Repose.points(self.pose_at(settings).blend(weights),
+                                               place(self.samples.at(settings)))
+            total = total + weight * blends[key]
+        return total * self.scale
+
     def body_shapes(self):
-        out = {}
-        for name, moves in self.moves.items():
-            d = mh.Repose.moves(self.body_matrix, moves[self.skin]) * self.scale
+        out, blends = {}, {}
+        for name in self.moves:
+            d = self.shape_moves(name, self.body.weights, lambda body: body[self.skin], blends)
             if np.abs(d).max() > LEAST:
                 out[name] = d
         return out
@@ -676,9 +888,9 @@ class Build:
         matrix = self.pose.blend(piece.weights)
         rest = clothes.place(self.rest)
         points = self.stand(mh.Repose.points(matrix, rest))
-        shapes = {}
-        for name, moves in self.moves.items():
-            d = mh.Repose.moves(matrix, clothes.place(self.rest + moves) - rest) * self.scale
+        shapes, blends = {}, {}
+        for name in self.moves:
+            d = self.shape_moves(name, piece.weights, clothes.place, blends)
             if np.abs(d).max() > LEAST:
                 shapes[name] = d
         return piece, points, shapes
@@ -696,27 +908,26 @@ class Build:
         return contract_joints(centres, pose, lambda p: (p - floor) * self.scale)
 
     def shape_bone_offsets(self, joints, shape):
-        """How far a shape at full weight moves each contract bone's head
-        (glTF axes): the joint cubes move with the body's corners."""
-        centres = mh.joint_centres(self.cubes, self.rest + self.moves[shape])
-        theirs = contract_joints(centres, self.pose, self.stand)
-        out = {}
-        for name, (head, _, _) in joints.items():
-            d = theirs[name][0] - head
-            if name != "Root" and d.length > 0.0005:
-                out[name] = to_gltf(d)
-        return out
+        """How far a shape at full weight moves each bone's head (glTF
+        axes): the joint cubes move with the body's corners."""
+        terms = SHAPES.get(shape)
+        if terms is None:
+            centres = mh.joint_centres(self.cubes, self.rest + self.moves[shape])
+            return head_moves(joints, contract_joints(centres, self.pose, self.stand))
+        # A body shape: the difference of its bodies' own joints, each
+        # body brought into the pose about them (`shape_moves`).
+        moved = {}
+        for weight, settings in terms:
+            centres = mh.joint_centres(self.cubes, self.samples.at(settings))
+            heads = bone_heads(contract_joints(centres, self.pose_at(settings), self.stand))
+            for name, head in heads.items():
+                moved[name] = moved.get(name, Vector((0.0, 0.0, 0.0))) + weight * head
+        return {name: to_gltf(d) for name, d in moved.items() if name != "Root" and d.length > 0.0005}
 
     def bone_offsets(self, joints, settings):
         """How far each contract bone's head is from the rest body's on
         the body with these settings (glTF axes), for a parameter's `bones`."""
-        theirs = self.joints(self.samples.at(settings))
-        out = {}
-        for name, (head, _, _) in joints.items():
-            d = theirs[name][0] - head
-            if name != "Root" and d.length > 0.0005:
-                out[name] = to_gltf(d)
-        return out
+        return head_moves(joints, self.joints(self.samples.at(settings)))
 
 
 def check_clothes(build, obj, clothes):
@@ -774,7 +985,9 @@ def main():
         report["parts"].setdefault(name, {}).update(corners=int(len(points)), shapes=len(shapes))
 
     joints = build.joints()
-    frame_bones = build.bone_offsets(joints, F)
+    # The feminine frame's joints, as its skin is brought into the pose
+    # (the same floor, the same way: `shape_moves`).
+    frame_bones = build.shape_bone_offsets(joints, "Frame_Feminine")
     build_expressions = set(build.expressions)
     face_parameters = [p for p in build.face_parameters
                        if any(p.get(end) in body_shapes for end in ("low", "high"))]

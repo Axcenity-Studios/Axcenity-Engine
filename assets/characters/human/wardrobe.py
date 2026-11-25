@@ -9,9 +9,14 @@ add-on (`mh.py`; none of its code is in this repository).
 Each garment is fitted to the body by MPFB, brought into the engine's pose
 on the body's skeleton with MakeHuman's own weights, and given the body's
 shapes (what its clothes file makes of each of them), so it follows every
-body slider with nothing to fit at run time (`fit: shapes`). The body
-corners its file hides (`delete_verts`) become its cover map (ADR-0045:
-red over the body's texture coordinates is skin left out under it).
+body slider with nothing to fit at run time (`fit: shapes`). Its cover
+map (ADR-0045, over the body's texture coordinates) says what it hides:
+red, the skin left out under it, is the body corners its file hides
+(`delete_verts`); green and blue, where a garment worn beneath it leaves
+its own cloth out, are where its cloth lies over the skin
+(`build.cloth_cover`). Each of its corners carries its place on the skin
+(`build.skin_uvs_of`), so worn under another garment it is cut and its
+edge sunk as a garment the engine fitted.
 
 **Licence gate.** A garment is taken only when its own file's header and
 its pack's metadata both say CC0 or CC BY, and agree (`vet`). Anything
@@ -78,6 +83,10 @@ def kind_of(name, tags, entry):
             # In an underwear pack a top is an underwear top.
             if category == "underwear" and slot == "top" and not fills:
                 return "underwear_top", 0, []
+            # A top made tucked in is worn under the bottoms (layer 0:
+            # `ItemManifest::wearing_order`), so their waistband hides it.
+            if slot == "top" and not fills and "_tucked_" in words_in:
+                return slot, 0, []
             return slot, layer, list(fills)
     by_category = {"underwear": ("underwear_bottom", 0, []), "shirts": ("top", 1, []), "pants": ("bottom", 1, []),
                    "shoes": ("shoes", 1, []), "gloves": ("gloves", 1, []), "hats": ("headwear", None, []),
@@ -169,6 +178,8 @@ def main():
     body_hidden_of = np.full(len(build.rest), -1, dtype=np.int64)
     body_hidden_of[build.skin] = np.arange(len(build.skin))
     carried = set(build.body_shapes())
+    body_points = build.body_points()
+    body_groups, _ = body_build.humanoid_weights(build.body.weights, build.names, build.parent_of)
 
     taken, left = [], []
     work = []
@@ -210,7 +221,8 @@ def main():
             armature = body_build.build_armature(joints)
             try:
                 material = body_build.material_of(name, mhmat, alpha="cut")
-                obj = body_build.make_object(name, piece, points, shapes, groups, material, armature)
+                obj = body_build.make_object(name, piece, points, shapes, groups, material, armature,
+                                             body_build.skin_uvs_of(build.body, body_points, points))
                 body_build.export(os.path.join(folder, name + ".glb"), armature, [obj])
             except Exception as error:  # one bad file mustn't stop the rest
                 left.append({"file": clothes.path, "reason": f"it couldn't be made: {error}"})
@@ -219,7 +231,12 @@ def main():
             finally:
                 for o in list(bpy.data.objects):
                     bpy.data.objects.remove(o)
-            lit = body_build.write_cover(os.path.join(folder, name + ".cover.png"), build.body, hidden)
+            # What is worn beneath it is left out under its cloth (the
+            # cover map's green; blue for a top tucked into a bottom).
+            under, whole = body_build.cloth_cover(build.body, body_points, body_groups, points, piece.faces,
+                                                  hidden, bottom=slot == "bottom")
+            lit = body_build.write_cover(os.path.join(folder, name + ".cover.png"), build.body, hidden, under,
+                                         whole)
             item = {
                 "format_version": 1,
                 "id": "makehuman/" + clothes.name.lower().replace("_", "-").replace(" ", "-"),

@@ -40,6 +40,11 @@ LEG_SHARE = 0.36
 #: the skin's own dips to a tenth of a millimetre from it, so skin left
 #: drawn under the cloth shows through in specks; the rim covers the edge.
 SETBACK = 0.0005
+#: The shape that presses the cloth onto the skin while something is worn
+#: over it (the engine turns it on by this name: `avatar::fit`'s
+#: `SHRINK_UNDER_SHAPE`), and how far off the skin it is left.
+SHRINK_UNDER = "Shrink_Under"
+PRESSED = 0.001
 RELAX_ROUNDS = 30
 #: The farthest the cloth is let stand off its own skin where it spans a
 #: hollow (between the buttocks, at the groin, under the bust).
@@ -259,6 +264,10 @@ def cut_garment(points, faces, weights, f):
     source = np.concatenate([np.arange(len(cloth)), np.array(extra_mix, dtype=np.int64)])
     mi, mj, mt = i[source], j[source], t[source]
     offset = all_points - (points[mi] * (1 - mt) + points[mj] * mt)
+    # Pressed: each cloth corner down its own line to `PRESSED` off its
+    # skin; the rim, already under the skin, stays.
+    shrink = np.zeros_like(all_points)
+    shrink[:len(cloth)] = -out_of_skin * np.maximum(height - PRESSED, 0.0)[:, None]
 
     dense = np.zeros((count, 0))
     bones = sorted(weights)
@@ -281,7 +290,7 @@ def cut_garment(points, faces, weights, f):
     height = (all_points[:, 2] - all_points[:, 2].min()) / max(np.ptp(all_points[:, 2]), 1e-6)
     uvs = [[(float(angle[c]), float(height[c])) for c in face] for face in all_faces]
     return {"faces": all_faces, "points": all_points, "mix": (mi, mj, mt), "offset": offset, "uvs": uvs,
-            "groups": groups, "hidden": f > SETBACK}
+            "groups": groups, "hidden": f > SETBACK, "shrink": shrink}
 
 
 def shape_moves(garment, body_moves):

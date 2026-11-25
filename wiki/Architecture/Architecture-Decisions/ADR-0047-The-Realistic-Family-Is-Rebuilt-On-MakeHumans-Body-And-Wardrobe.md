@@ -72,6 +72,10 @@ MPFB, the Blender add-on that builds MakeHuman bodies, is GPL-3.0-or-later. The 
 | 6 | The whole wardrobe converted, reviewed and published; cloth-under-cloth hiding | Not started |
 | 7 | Retire `axcenity/realistic`, its wardrobe scripts and `prep_meshy_garments.py` | Not started |
 
+## Notes
+
+- **2026-11-25 (faults Paul found testing Character Studio before the merge).** Three, all in how the package brings MakeHuman's data into the engine, none in the decision. (1) *Underwear came through the outfits*: the converter wrote only the red of a cover map (ADR-0045), so nothing worn beneath a garment was ever left out. It now writes green and blue from where the garment's cloth lies over the skin, gives a converted garment its corners' places on the skin (so the engine cuts and sinks it under another as it does its own fitted garments), and the cut underwear has a `Shrink_Under` shape. (2) *The feminine frame's arms were notched at the elbow*: a body shape's moves were turned into the engine's pose with the default body's bones; they are now the difference of whole bodies each posed about its own joints, and a parameter's `bones` name the twist bones. (3) *White shapes at the ankles*: the socks that come with MakeHuman's shoes, standing through the jeans; gone with (1). Measured: 108 gate checks of the underwear under an outfit, none failing; the shape change moves the feminine frame's skin by up to 13 mm and lowers two walk records.
+
 ## Implementation references
 
 - `assets/characters/human/mh.py` (driving MPFB, the clothes reader, the re-pose), `build.py` (the body, the skeleton, the export), `manifests.py`, `wardrobe.py` (the converter, `vet`, `CREDITS.md`)

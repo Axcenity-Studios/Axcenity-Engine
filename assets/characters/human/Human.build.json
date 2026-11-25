@@ -13,16 +13,16 @@
   "Masculine_Muscle_Up_Fat_Down": 20.51,
   "Masculine_Muscle_Down_Fat_Up": 92.32,
   "Masculine_Muscle_Down_Fat_Down": 86.46,
-  "Masculine_Age_Old": 72.99,
+  "Masculine_Age_Old": 80.68,
   "Feminine_Muscle_Up": 26.73,
   "Feminine_Fat_Up": 20.85,
   "Feminine_Muscle_Down": 33.5,
   "Feminine_Fat_Down": 29.58,
-  "Feminine_Muscle_Up_Fat_Up": 53.42,
+  "Feminine_Muscle_Up_Fat_Up": 53.34,
   "Feminine_Muscle_Up_Fat_Down": 26.1,
   "Feminine_Muscle_Down_Fat_Up": 93.61,
   "Feminine_Muscle_Down_Fat_Down": 70.16,
-  "Feminine_Age_Old": 81.88,
+  "Feminine_Age_Old": 57.85,
   "Blink_Left": 10.32,
   "Eye_Closed_Left": 10.32,
   "Eye_Squint_Left": 3.74,
@@ -379,8 +379,8 @@
    "hidden_faces": 464
   },
   "Bandeau": {
-   "corners": 984,
-   "faces": 1424,
+   "corners": 972,
+   "faces": 1410,
    "shapes": 19,
    "hidden_faces": 484
   }
@@ -2699,7 +2699,7 @@
      {
       "bone": "Head",
       "offset": [
-       0.0,
+       -0.0,
        0.13582,
        0.01144
       ]
@@ -2817,7 +2817,7 @@
      {
       "bone": "Head",
       "offset": [
-       0.0,
+       -0.0,
        -0.06739,
        0.08454
       ]
@@ -4247,152 +4247,152 @@
  "frame_bones": {
   "Hips": [
    0.0,
-   -0.09929,
+   -0.09889,
    0.02034
   ],
   "Spine": [
    0.0,
-   -0.09929,
+   -0.09889,
    0.02034
   ],
   "Chest": [
    0.0,
-   -0.12178,
+   -0.12138,
    0.01957
   ],
   "UpperChest": [
    0.0,
-   -0.07461,
+   -0.07422,
    0.06301
   ],
   "Neck": [
    0.0,
-   -0.13948,
+   -0.13908,
    -0.01289
   ],
   "Head": [
    0.0,
-   -0.131,
+   -0.1306,
    -0.00667
   ],
   "Jaw": [
    0.0,
-   -0.13441,
+   -0.13401,
    -0.00464
   ],
   "LeftEye": [
    -0.00093,
-   -0.13619,
+   -0.13579,
    -0.01664
   ],
   "LeftShoulder": [
    -8e-05,
-   -0.13283,
+   -0.13243,
    -0.00146
   ],
   "LeftUpperArm": [
    -0.03296,
-   -0.11785,
+   -0.11745,
    0.00296
   ],
   "LeftLowerArm": [
    -0.04688,
-   -0.10393,
+   -0.10354,
    0.00296
   ],
   "LeftHand": [
    -0.08719,
-   -0.06362,
+   -0.06322,
    0.00296
   ],
   "LeftThumbProximal": [
    -0.09301,
-   -0.05739,
+   -0.05699,
    -0.00127
   ],
   "LeftThumbIntermediate": [
    -0.09265,
-   -0.0537,
+   -0.0533,
    -0.00585
   ],
   "LeftThumbDistal": [
    -0.09442,
-   -0.04794,
+   -0.04754,
    -0.0103
   ],
   "LeftIndexProximal": [
    -0.10092,
-   -0.04779,
+   -0.04739,
    8e-05
   ],
   "LeftIndexIntermediate": [
    -0.10319,
-   -0.04325,
+   -0.04285,
    -0.0004
   ],
   "LeftIndexDistal": [
    -0.10448,
-   -0.03881,
+   -0.03841,
    -0.00095
   ],
   "LeftMiddleProximal": [
    -0.10054,
-   -0.04761,
+   -0.04722,
    0.0052
   ],
   "LeftMiddleIntermediate": [
    -0.10258,
-   -0.04175,
+   -0.04135,
    0.00643
   ],
   "LeftMiddleDistal": [
    -0.10387,
-   -0.03701,
+   -0.03661,
    0.00689
   ],
   "LeftRingProximal": [
    -0.09881,
-   -0.04874,
+   -0.04834,
    0.00905
   ],
   "LeftRingIntermediate": [
    -0.10039,
-   -0.04358,
+   -0.04319,
    0.01115
   ],
   "LeftRingDistal": [
    -0.10166,
-   -0.03906,
+   -0.03867,
    0.01202
   ],
   "LeftLittleProximal": [
    -0.09539,
-   -0.04926,
+   -0.04886,
    0.01241
   ],
   "LeftLittleIntermediate": [
    -0.09617,
-   -0.04554,
+   -0.04515,
    0.01393
   ],
   "LeftLittleDistal": [
    -0.0962,
-   -0.04271,
+   -0.04232,
    0.01486
   ],
   "LeftUpperLeg": [
    -0.01426,
-   -0.1055,
+   -0.1051,
    0.02517
   ],
   "LeftLowerLeg": [
    -0.01769,
-   -0.05943,
+   -0.05903,
    0.02103
   ],
   "LeftFoot": [
    -0.03442,
-   -0.00331,
+   -0.00291,
    0.01496
   ],
   "LeftToes": [
@@ -4402,123 +4402,163 @@
   ],
   "RightEye": [
    0.00093,
-   -0.13619,
+   -0.13579,
    -0.01664
   ],
   "RightShoulder": [
    8e-05,
-   -0.13283,
+   -0.13243,
    -0.00146
   ],
   "RightUpperArm": [
    0.03296,
-   -0.11785,
+   -0.11745,
    0.00296
   ],
   "RightLowerArm": [
    0.04688,
-   -0.10393,
+   -0.10354,
    0.00296
   ],
   "RightHand": [
    0.08719,
-   -0.06362,
+   -0.06322,
    0.00296
   ],
   "RightThumbProximal": [
    0.09301,
-   -0.05739,
+   -0.05699,
    -0.00127
   ],
   "RightThumbIntermediate": [
    0.09265,
-   -0.0537,
+   -0.0533,
    -0.00585
   ],
   "RightThumbDistal": [
    0.09442,
-   -0.04794,
+   -0.04754,
    -0.0103
   ],
   "RightIndexProximal": [
    0.10092,
-   -0.04779,
+   -0.04739,
    8e-05
   ],
   "RightIndexIntermediate": [
    0.10319,
-   -0.04325,
+   -0.04285,
    -0.0004
   ],
   "RightIndexDistal": [
    0.10448,
-   -0.03881,
+   -0.03841,
    -0.00095
   ],
   "RightMiddleProximal": [
    0.10054,
-   -0.04761,
+   -0.04722,
    0.0052
   ],
   "RightMiddleIntermediate": [
    0.10258,
-   -0.04175,
+   -0.04135,
    0.00643
   ],
   "RightMiddleDistal": [
    0.10387,
-   -0.03701,
+   -0.03661,
    0.00689
   ],
   "RightRingProximal": [
    0.09881,
-   -0.04874,
+   -0.04834,
    0.00905
   ],
   "RightRingIntermediate": [
    0.10039,
-   -0.04358,
+   -0.04319,
    0.01115
   ],
   "RightRingDistal": [
    0.10166,
-   -0.03906,
+   -0.03867,
    0.01202
   ],
   "RightLittleProximal": [
    0.09539,
-   -0.04926,
+   -0.04886,
    0.01241
   ],
   "RightLittleIntermediate": [
    0.09617,
-   -0.04554,
+   -0.04515,
    0.01393
   ],
   "RightLittleDistal": [
    0.0962,
-   -0.04271,
+   -0.04232,
    0.01486
   ],
   "RightUpperLeg": [
    0.01426,
-   -0.1055,
+   -0.1051,
    0.02517
   ],
   "RightLowerLeg": [
    0.01769,
-   -0.05943,
+   -0.05903,
    0.02103
   ],
   "RightFoot": [
    0.03442,
-   -0.00331,
+   -0.00291,
    0.01496
   ],
   "RightToes": [
    0.03164,
    0.0,
    -0.00248
+  ],
+  "LeftUpperArmTwist": [
+   -0.03408,
+   -0.11634,
+   0.00296
+  ],
+  "LeftLowerArmTwist": [
+   -0.06703,
+   -0.08338,
+   0.00296
+  ],
+  "LeftUpperLegTwist": [
+   -0.01453,
+   -0.10142,
+   0.02483
+  ],
+  "LeftLowerLegTwist": [
+   -0.02605,
+   -0.03097,
+   0.018
+  ],
+  "RightUpperArmTwist": [
+   0.03408,
+   -0.11634,
+   0.00296
+  ],
+  "RightLowerArmTwist": [
+   0.06703,
+   -0.08338,
+   0.00296
+  ],
+  "RightUpperLegTwist": [
+   0.01453,
+   -0.10142,
+   0.02483
+  ],
+  "RightLowerLegTwist": [
+   0.02605,
+   -0.03097,
+   0.018
   ]
  },
  "skins": {
