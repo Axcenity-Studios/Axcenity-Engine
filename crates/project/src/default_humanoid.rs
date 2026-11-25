@@ -1,5 +1,6 @@
 //! The default humanoid (`docs/research/default-humanoid.md`, stage HD3):
-//! the skinned character in the repository's `assets/characters/humanoid`,
+//! the human base's default body (`assets/characters/human/Humanoid.glb`,
+//! MakeHuman's, made by `default_model.py`) and the starter animations,
 //! built into the engine like the default sky, so a project can have it
 //! without importing anything. [`add_default_humanoid`] writes its model,
 //! its starter animations (clips linked to the glTF animation file's takes
@@ -12,7 +13,8 @@
 //! body the controller measures, walks and collides with: 0.60 m across and
 //! 5 studs tall, 1 stud = 0.35 m) and the visible MeshPart `Body`, welded
 //! to it and not colliding, whose Animator plays the state machine. The
-//! Humanoid plays the Idle, Walk, Run, Jump and Fall states as it moves.
+//! Humanoid plays the Idle, Walk, Run, Jump and Fall states as it moves,
+//! and Land when it comes down standing still.
 
 use super::*;
 use axcenity_core::{Value, Vector3};
@@ -30,24 +32,12 @@ pub const DEFAULT_HUMANOID_STATE_MACHINE_PATH: &str =
 /// `StarterPlayer.StarterCharacter` names in a new character template.
 pub const DEFAULT_CHARACTER_PREFAB_PATH: &str = "assets/prefabs/Character.prefab.json";
 
-/// The default humanoid as one skinned mesh (`Humanoid.glb`).
+/// The default humanoid's model (`Humanoid.glb`): the human base's
+/// default body in its underwear, with its face's control shapes and no
+/// others. What a character is drawn as before its description is
+/// applied, and where a project has no character library.
 pub static DEFAULT_HUMANOID_MODEL: &[u8] =
-    include_bytes!("../../../assets/characters/humanoid/Humanoid.glb");
-
-/// Its parts on the same skeleton, each its own object
-/// (`HumanoidParts.glb`): see [`HUMANOID_PARTS`].
-pub static DEFAULT_HUMANOID_PARTS: &[u8] =
-    include_bytes!("../../../assets/characters/humanoid/HumanoidParts.glb");
-
-/// What the parts file's shapes and garments need besides vertices
-/// (`Humanoid.customization.json`): the bones the frame and face shapes
-/// move, each garment's category and the clothing masks it needs, the
-/// hair styles and the default outfit. Character Studio reads it.
-pub static DEFAULT_HUMANOID_CUSTOMIZATION: &str =
-    include_str!("../../../assets/characters/humanoid/Humanoid.customization.json");
-
-/// The parts file, in a project ([`add_humanoid_parts`]).
-pub const DEFAULT_HUMANOID_PARTS_PATH: &str = "assets/models/Humanoid/HumanoidParts.glb";
+    include_bytes!("../../../assets/characters/human/Humanoid.glb");
 
 /// The default character's sockets (Attachments in its `Body` that follow
 /// a bone, `anim`'s sockets) and their bones: an accessory with an
@@ -62,44 +52,21 @@ pub const HUMANOID_SOCKETS: [(&str, &str); 7] = [
     ("RightFootSocket", "RightFoot"),
 ];
 
-/// The parts in [`DEFAULT_HUMANOID_PARTS`], by object name: the body (one
-/// seamless mesh, head included, with the face, frame, build, identity and
-/// clothing mask shapes), the face's eyes, teeth, brows and lashes, the
-/// clothes and the hair styles (no hair is bald). Which masks each garment
-/// needs is in `Humanoid.customization.json`.
-pub const HUMANOID_PARTS: [&str; 17] = [
-    "Body",
-    "Eyes",
-    "Teeth",
-    "Brows",
-    "Lashes",
-    "Shirt_Tee",
-    "Jacket_Cropped",
-    "Pants_Cargo",
-    "Shoes_Sneakers",
-    "Underwear_Briefs",
-    "Underwear_Top",
-    "Hair_Swept",
-    "Hair_Bob",
-    "Hair_Long",
-    "Hair_Crop",
-    "Hair_Buzz",
-    "Hair_Ponytail",
-];
-
-/// Its 32 starter animations (`HumanoidAnimations.glb`).
+/// Its 86 starter animations (`HumanoidAnimations.glb`): the 84 takes of
+/// Quaternius's Universal Animation Library (CC0), baked onto this
+/// skeleton (`assets/characters/human/mocap.py`), and its walk and jog
+/// again with root motion.
 pub static DEFAULT_HUMANOID_ANIMATIONS: &[u8] =
-    include_bytes!("../../../assets/characters/humanoid/HumanoidAnimations.glb");
+    include_bytes!("../../../assets/characters/human/HumanoidAnimations.glb");
 
 /// Studs per metre: the 1.75 m humanoid is 5 studs tall, as Axcenity's
 /// characters are.
 pub const STUDS_PER_METRE: f32 = 5.0 / 1.75;
 
 /// The model's box in its file (metres, glTF axes: Y up, facing +Z), its
-/// A-posed hands out to the sides and its hair above 1.75 m. A test checks
-/// it against the file.
-pub(crate) const MODEL_MIN: [f32; 3] = [-0.6092, 0.0, -0.1511];
-pub(crate) const MODEL_MAX: [f32; 3] = [0.6092, 1.7819, 0.2153];
+/// A-posed hands out to the sides. A test checks it against the file.
+pub(crate) const MODEL_MIN: [f32; 3] = [-0.6672, 0.0, -0.1042];
+pub(crate) const MODEL_MAX: [f32; 3] = [0.6672, 1.75, 0.2133];
 
 /// The root part's size in studs: 0.30 m round (the spec's capsule radius)
 /// and 5 studs tall.
@@ -118,17 +85,50 @@ struct State {
 enum End {
     /// Goes round.
     Loops,
-    /// Holds its last frame (Jump, until the Humanoid plays Fall).
+    /// Holds its last frame (a pose to stay in: an aim, lying dead).
     Holds,
     /// Goes back to Idle.
     ReturnsToIdle,
+    /// Goes on to the state named, the one the library made the take to
+    /// lead into or to be played from: the last frame of `Jump` is the
+    /// first of `Fall`, `SitDown` ends seated as `Sit` starts, and a
+    /// pistol shot starts and ends in the pistol stance, not in Idle.
+    /// Measured on 2026-11-25: every such pair is within 13 degrees a bone
+    /// and 3 mm at the hips, but the spell's cast (23 degrees from its
+    /// stance) and the sword's attack (23 mm).
+    GoesTo(&'static str),
 }
 
+impl End {
+    /// The state it goes to when its take has played, if it goes to one.
+    fn next(self) -> Option<&'static str> {
+        match self {
+            End::Loops | End::Holds => None,
+            End::ReturnsToIdle => Some("Idle"),
+            End::GoesTo(state) => Some(state),
+        }
+    }
+}
+
+/// What the library's forward takes cover on the ground, metres a second
+/// (`mocap.SPEEDS`, its own root motion): the jog that the `Run` take is,
+/// its sprint and its crouched walk.
+const JOG_SPEED: f64 = 5.36;
+const SPRINT_SPEED: f64 = 8.25;
+const CROUCH_WALK_SPEED: f64 = 0.75;
+/// Studs per metre, as a `f64` for the speeds below.
+const STUDS: f64 = 5.0 / 1.75;
+
 /// The default state machine's states. Walk and Run play the Run and
-/// Sprint takes faster, so the feet keep up with the controller's default
-/// `WalkSpeed` (16 studs a second) and `RunSpeed` (32): the Run take covers
-/// 3.6 m a second (10.3 studs), Sprint 6.0 m (17.1 studs).
-const STATES: [State; 26] = {
+/// Sprint takes, a little faster, so the feet keep up with the
+/// controller's default `WalkSpeed` (16 studs a second) and `RunSpeed`
+/// (32): the Run take covers 5.36 m a second (15.3 studs), Sprint 8.25 m
+/// (23.6 studs). The library's own walk (0.97 m a second) is `Stroll`.
+/// After the states the Humanoid and Insert > Character play come one for
+/// every other take of the file, so each can be played by name. A state
+/// whose take doesn't loop says where it goes when the take has played
+/// ([`End`]).
+const STATES: [State; 84] = {
     use End::*;
     const fn s(name: &'static str, take: &'static str, speed: f64, end: End) -> State {
         State {
@@ -138,11 +138,15 @@ const STATES: [State; 26] = {
             end,
         }
     }
+    /// A state that plays the take of its own name as it is.
+    const fn t(name: &'static str, end: End) -> State {
+        s(name, name, 1.0, end)
+    }
     [
         s("Idle", "Idle", 1.0, Loops),
-        s("Walk", "Run", 16.0 / (3.6 * 5.0 / 1.75), Loops),
-        s("Run", "Sprint", 32.0 / (6.0 * 5.0 / 1.75), Loops),
-        s("Jump", "Jump", 1.0, Holds),
+        s("Walk", "Run", 16.0 / (JOG_SPEED * STUDS), Loops),
+        s("Run", "Sprint", 32.0 / (SPRINT_SPEED * STUDS), Loops),
+        s("Jump", "Jump", 1.0, GoesTo("Fall")),
         s("Fall", "Fall", 1.0, Loops),
         s("Land", "Land", 1.0, ReturnsToIdle),
         s("Sit", "Sit", 1.0, Loops),
@@ -150,26 +154,85 @@ const STATES: [State; 26] = {
         s(
             "CrouchWalk",
             "CrouchWalk",
-            16.0 * CROUCH_SPEED_SCALE / (0.9 * 5.0 / 1.75),
+            16.0 * CROUCH_SPEED_SCALE / (CROUCH_WALK_SPEED * STUDS),
             Loops,
         ),
         s("Swim", "Swim", 1.0, Loops),
-        s("Climb", "Climb", 1.0, Loops),
         s("Push", "Push", 1.0, Loops),
-        s("Pull", "Pull", 1.0, Loops),
-        s("Wave", "Wave", 1.0, ReturnsToIdle),
-        s("Point", "Point", 1.0, ReturnsToIdle),
         s("PickUp", "PickUp", 1.0, ReturnsToIdle),
-        s("Use", "Use", 1.0, ReturnsToIdle),
         s("Interact", "Interact", 1.0, ReturnsToIdle),
-        s("Cheer", "Cheer", 1.0, ReturnsToIdle),
-        s("Clap", "Clap", 1.0, Loops),
-        s("Shrug", "Shrug", 1.0, ReturnsToIdle),
         s("Dance", "Dance", 1.0, Loops),
         s("HitReact", "HitReact", 1.0, ReturnsToIdle),
-        s("WalkBackward", "WalkBackward", 1.0, Loops),
-        s("WalkLeft", "WalkLeft", 1.0, Loops),
-        s("WalkRight", "WalkRight", 1.0, Loops),
+        // The library's other takes (`mocap.TAKES`), each under its name.
+        s("Stroll", "Walk", 1.0, Loops),
+        t("WalkFormal", Loops),
+        t("WalkCarry", Loops),
+        t("IdleTalking", Loops),
+        t("IdleFoldArms", Loops),
+        t("IdlePhone", Loops),
+        t("IdleTorch", Loops),
+        t("IdleLantern", Loops),
+        t("IdleRail", Loops),
+        t("IdleRailCall", GoesTo("IdleRail")),
+        t("Yes", ReturnsToIdle),
+        t("No", Loops),
+        t("SwimIdle", Loops),
+        t("SitDown", GoesTo("Sit")),
+        t("StandUp", ReturnsToIdle),
+        t("SitTalking", Loops),
+        t("GetUp", ReturnsToIdle),
+        t("Drive", Loops),
+        t("Roll", ReturnsToIdle),
+        t("SlideStart", GoesTo("Slide")),
+        t("Slide", Loops),
+        t("SlideEnd", ReturnsToIdle),
+        t("ClimbUp", ReturnsToIdle),
+        t("HighJump", GoesTo("HighJumpFall")),
+        t("HighJumpFall", Loops),
+        t("HighJumpLand", ReturnsToIdle),
+        t("Death", Holds),
+        t("HitHead", ReturnsToIdle),
+        t("Knockback", Holds),
+        t("Fix", ReturnsToIdle),
+        t("OpenChest", ReturnsToIdle),
+        t("Consume", ReturnsToIdle),
+        t("Harvest", ReturnsToIdle),
+        t("PlantSeed", ReturnsToIdle),
+        t("Water", ReturnsToIdle),
+        t("ChopTree", Loops),
+        t("Throw", ReturnsToIdle),
+        t("PunchJab", ReturnsToIdle),
+        t("PunchCross", ReturnsToIdle),
+        t("Hook", GoesTo("HookRecover")),
+        t("HookRecover", ReturnsToIdle),
+        t("SwordIdle", Loops),
+        t("SwordAttack", GoesTo("SwordIdle")),
+        t("SwordBlock", ReturnsToIdle),
+        t("SwordDash", ReturnsToIdle),
+        t("SwordSlashA", GoesTo("SwordSlashARecover")),
+        t("SwordSlashARecover", ReturnsToIdle),
+        t("SwordSlashB", GoesTo("SwordSlashBRecover")),
+        t("SwordSlashBRecover", ReturnsToIdle),
+        t("SwordSlashC", ReturnsToIdle),
+        t("SwordCombo", ReturnsToIdle),
+        t("SwordHeavyCombo", ReturnsToIdle),
+        t("ShieldIdle", Loops),
+        t("ShieldBreak", GoesTo("ShieldIdle")),
+        t("ShieldDash", ReturnsToIdle),
+        t("ShieldBash", ReturnsToIdle),
+        t("PistolIdle", Loops),
+        t("PistolAim", Holds),
+        t("PistolAimUp", Holds),
+        t("PistolAimDown", Holds),
+        t("PistolShoot", GoesTo("PistolIdle")),
+        t("PistolReload", GoesTo("PistolIdle")),
+        t("SpellStart", GoesTo("SpellIdle")),
+        t("SpellIdle", Loops),
+        t("SpellCast", GoesTo("SpellIdle")),
+        t("SpellEnd", ReturnsToIdle),
+        t("ZombieIdle", Loops),
+        t("ZombieWalk", Loops),
+        t("ZombieScratch", GoesTo("ZombieIdle")),
     ]
 };
 
@@ -177,11 +240,33 @@ const STATES: [State; 26] = {
 /// a clip per state, the state machine and the `Character` prefab) and
 /// returns the prefab's path. Files already there are kept, so this never
 /// writes over a creator's own (a changed clip or prefab stays changed).
-/// The character library goes with it ([`add_character_library`]), so the
-/// character can be given a description (`Humanoid:ApplyDescription`).
+/// A character library isn't part of it: [`add_default_game_character`]
+/// brings the human base, so the character can be given a description
+/// (`Humanoid:ApplyDescription`).
 pub fn add_default_humanoid(project: &Path) -> Result<&'static str, SaveError> {
-    add_character_library(project)?;
-    let write = |path: &str, bytes: &[u8]| write_missing(project, path, bytes);
+    write_default_humanoid(project, write_missing)
+}
+
+/// [`add_default_humanoid`] for a folder the engine keeps for itself
+/// (Character Studio's own, which no creator edits): every file of the
+/// default humanoid there that isn't this engine's is written again, so
+/// the folder never plays an earlier build's animations. Without it a
+/// folder made by an earlier build kept that build's animation file and
+/// state machine beside this build's clips: takes the file didn't have
+/// played nothing, and the others played the old motion at the new
+/// lengths (seen in Character Studio on 2026-11-25, with a folder made on
+/// the 21st). Returns the prefab's path.
+pub fn refresh_default_humanoid(folder: &Path) -> Result<&'static str, SaveError> {
+    write_default_humanoid(folder, write_changed)
+}
+
+/// Writes the default humanoid's files into `project` through `write`,
+/// which decides what happens to a file already there.
+fn write_default_humanoid(
+    project: &Path,
+    write: fn(&Path, &str, &[u8]) -> Result<(), SaveError>,
+) -> Result<&'static str, SaveError> {
+    let write = |path: &str, bytes: &[u8]| write(project, path, bytes);
     write(DEFAULT_HUMANOID_MODEL_PATH, DEFAULT_HUMANOID_MODEL)?;
     write(
         DEFAULT_HUMANOID_ANIMATIONS_PATH,
@@ -211,40 +296,17 @@ pub(crate) fn write_missing(project: &Path, path: &str, bytes: &[u8]) -> Result<
     fs::write(&file, bytes).map_err(SaveError::new(&file))
 }
 
-/// Writes the default humanoid's parts file ([`DEFAULT_HUMANOID_PARTS_PATH`])
-/// into `project` if it isn't there, for [`humanoid_part`] (stage HD4).
-pub fn add_humanoid_parts(project: &Path) -> Result<(), SaveError> {
-    write_missing(project, DEFAULT_HUMANOID_PARTS_PATH, DEFAULT_HUMANOID_PARTS)
-}
-
-/// The `MeshId` of the part `name` (one of [`HUMANOID_PARTS`]) in the
-/// parts file, with the LODs that come with it.
-pub fn humanoid_part_mesh_id(name: &str) -> String {
-    format!("{DEFAULT_HUMANOID_PARTS_PATH}#AxcenityHumanoid/{name}")
-}
-
-/// Puts the part `name` (one of [`HUMANOID_PARTS`]) on the character
-/// whose skinned MeshPart is `body`: a MeshPart named `name` inside it,
-/// which takes its pose and its place from `body` (`anim`'s followers), so
-/// it needs no size or position, and doesn't collide, so the controller's
-/// root part stays the body. Swapping it for another part is setting its
-/// `MeshId`. The project needs [`add_humanoid_parts`].
-pub fn humanoid_part(world: &mut World, body: InstanceId, name: &str) -> InstanceId {
-    let part = world.create(ClassName::MeshPart).expect("not a service");
-    world.set_name(part, name).expect("just made");
-    for (property, value) in [
-        ("MeshId", Value::String(humanoid_part_mesh_id(name))),
-        ("CanCollide", Value::Bool(false)),
-        ("CanQuery", Value::Bool(false)),
-        ("CanTouch", Value::Bool(false)),
-        ("Massless", Value::Bool(true)),
-    ] {
-        world
-            .set_property(part, property, value)
-            .expect("a MeshPart has it");
+/// Writes `bytes` to `path` in `project` unless the file there holds them
+/// already.
+fn write_changed(project: &Path, path: &str, bytes: &[u8]) -> Result<(), SaveError> {
+    let file = project.join(path);
+    if fs::read(&file).is_ok_and(|there| there == bytes) {
+        return Ok(());
     }
-    world.set_parent(part, Some(body)).expect("a part");
-    part
+    if let Some(folder) = file.parent() {
+        fs::create_dir_all(folder).map_err(SaveError::new(folder))?;
+    }
+    fs::write(&file, bytes).map_err(SaveError::new(&file))
 }
 
 /// A MeshPart's `Size` and its middle's offset from the feet, in studs, for
@@ -257,77 +319,6 @@ fn body_box(min: [f32; 3], max: [f32; 3]) -> (Vector3, Vector3) {
         Vector3::new(size(0), size(1), size(2)),
         Vector3::new(-middle(0), middle(1), -middle(2)),
     )
-}
-
-/// A box's lowest and highest corners.
-type Corners = ([f32; 3], [f32; 3]);
-
-/// The box of each of [`HUMANOID_PARTS`] in the parts file (metres), read
-/// once.
-fn part_box(name: &str) -> Option<Corners> {
-    static BOXES: std::sync::OnceLock<Vec<Option<Corners>>> = std::sync::OnceLock::new();
-    let boxes = BOXES.get_or_init(|| {
-        HUMANOID_PARTS
-            .iter()
-            .map(|name| {
-                let mesh_id = humanoid_part_mesh_id(name);
-                let (_, pick) = axcenity_assets::Pick::of_mesh_id(&mesh_id);
-                let model = axcenity_assets::load_models(
-                    DEFAULT_HUMANOID_PARTS,
-                    Path::new("."),
-                    axcenity_assets::ModelFormat::Gltf,
-                    &[pick],
-                )
-                .ok()?
-                .pop()?;
-                let (center, size) = (model.center, model.size);
-                Some((
-                    std::array::from_fn(|axis| center[axis] - size[axis] * 0.5),
-                    std::array::from_fn(|axis| center[axis] + size[axis] * 0.5),
-                ))
-            })
-            .collect()
-    });
-    let index = HUMANOID_PARTS.iter().position(|part| *part == name)?;
-    boxes[index]
-}
-
-/// The default character built from parts ([`HUMANOID_PARTS`]) instead of
-/// one mesh: like [`default_character`], but its `Body` is the body from
-/// the parts file (head included), and each of `parts` (the rest of
-/// [`HUMANOID_PARTS`]: the face's parts, clothes, a hair style) is a
-/// MeshPart inside it that follows its pose ([`humanoid_part`]). One draw
-/// per part instead of one in all, for a character whose parts change.
-/// Clothes cover the body by the body's mask shapes, which the character's
-/// appearance sets (Character Studio, `docs/research/character-studio.md`
-/// CS3); until then the body is drawn whole under them. The project needs
-/// [`add_default_humanoid`] and [`add_humanoid_parts`].
-pub fn modular_character(world: &mut World, position: Vector3, parts: &[&str]) -> InstanceId {
-    let character = default_character(world, position);
-    let body = world
-        .find_first_child(character, "Body")
-        .expect("default_character makes it");
-    if let Some((min, max)) = part_box("Body") {
-        let (size, middle) = body_box(min, max);
-        let middle = Vector3::new(
-            position.x + middle.x,
-            position.y + middle.y,
-            position.z + middle.z,
-        );
-        for (property, value) in [
-            ("MeshId", Value::String(humanoid_part_mesh_id("Body"))),
-            ("Size", Value::Vector3(size)),
-            ("Position", Value::Vector3(middle)),
-        ] {
-            world
-                .set_property(body, property, value)
-                .expect("a MeshPart has it");
-        }
-    }
-    for part in parts.iter().filter(|part| **part != "Body") {
-        humanoid_part(world, body, part);
-    }
-    character
 }
 
 /// The default humanoid's clip files and state machine, as `(path, text)`:
@@ -361,17 +352,16 @@ pub fn default_humanoid_animation_files() -> Vec<(String, String)> {
             "events": [],
         });
         files.push((clip.clone(), pretty(&text)));
-        // Laid out in rows of six in the editor's graph.
-        let (column, row) = (index % 6, index / 6);
+        // Laid out in rows of eight in the editor's graph.
+        let (column, row) = (index % 8, index / 8);
         let mut entry = serde_json::json!({
             "name": state.name,
             "motion": { "clip": clip },
             "speed": state.speed,
             "position": [column as f64 * 180.0, row as f64 * 110.0],
         });
-        if state.end == End::ReturnsToIdle {
-            entry["returns"] =
-                serde_json::json!({ "to": "Idle", "when": "finished", "blend": 0.2 });
+        if let Some(next) = state.end.next() {
+            entry["returns"] = serde_json::json!({ "to": next, "when": "finished", "blend": 0.2 });
         }
         states.push(entry);
     }
@@ -559,6 +549,90 @@ mod tests {
         for state in ["Idle", "Walk", "Run", "Jump", "Fall", "Sit"] {
             assert!(machine.state(state).is_some(), "{state}");
         }
+        // Every take of the file can be played by a state, but the
+        // versions with root motion (clips of a creator's own).
+        assert_eq!(takes.len(), 86);
+        let played: std::collections::BTreeSet<&str> =
+            STATES.iter().map(|state| state.take).collect();
+        let unplayed: Vec<&str> = takes
+            .iter()
+            .map(|take| take.name.as_str())
+            .filter(|name| !played.contains(name))
+            .collect();
+        assert_eq!(unplayed, ["Run_RootMotion", "Walk_RootMotion"]);
+        let names: std::collections::BTreeSet<&str> =
+            STATES.iter().map(|state| state.name).collect();
+        assert_eq!(names.len(), STATES.len(), "no state twice");
+        // A state that goes on to another names one the machine has, and
+        // only a state whose take doesn't loop goes anywhere.
+        for state in &STATES {
+            let made = machine.state(state.name).unwrap();
+            match state.end.next() {
+                Some(next) => {
+                    assert!(machine.state(next).is_some(), "{} to {next}", state.name);
+                    assert_eq!(made.returns.as_ref().unwrap().to, next, "{}", state.name);
+                }
+                None => assert!(made.returns.is_none(), "{}", state.name),
+            }
+        }
+    }
+
+    /// A take the library made to lead into another ends in the pose the
+    /// other starts in, and one made to be played from a stance starts and
+    /// ends in it: where a state goes when its take has played is where
+    /// the body already is, within what the blend covers. (Each of these
+    /// held its last frame or went to Idle before 2026-11-25: a pistol
+    /// shot dropped the arms, a call from the rail stood away from it.)
+    #[test]
+    fn a_state_goes_on_to_the_state_its_take_ends_in() {
+        let model = axcenity_assets::load_model(
+            DEFAULT_HUMANOID_MODEL,
+            Path::new(""),
+            axcenity_assets::ModelFormat::Gltf,
+        )
+        .unwrap();
+        let rig = model.rig.as_deref().unwrap();
+        let takes = axcenity_assets::load_takes(
+            DEFAULT_HUMANOID_ANIMATIONS,
+            axcenity_assets::ModelFormat::Gltf,
+        )
+        .unwrap();
+        let take = |state: &str| {
+            let state = STATES.iter().find(|s| s.name == state).unwrap();
+            takes.iter().find(|take| take.name == state.take).unwrap()
+        };
+        let pose = |take: &axcenity_assets::Take, time: f32| {
+            let mut pose = rig.rest_pose();
+            take.sample(time, &take.bind(rig), rig, &mut pose);
+            pose
+        };
+        let mut checked = 0;
+        for state in &STATES {
+            let End::GoesTo(next) = state.end else {
+                continue;
+            };
+            let from = take(state.name);
+            let (last, first) = (pose(from, from.duration), pose(take(next), 0.0));
+            let mut worst = (0.0_f32, "");
+            for (index, bone) in rig.bones.iter().enumerate() {
+                let turn = last[index]
+                    .rotation
+                    .angle_between(first[index].rotation)
+                    .to_degrees();
+                if turn > worst.0 {
+                    worst = (turn, bone.name.as_str());
+                }
+            }
+            assert!(
+                worst.0 < 25.0,
+                "{} ends {:.1} degrees from where {next} starts ({})",
+                state.name,
+                worst.0,
+                worst.1
+            );
+            checked += 1;
+        }
+        assert_eq!(checked, 15);
     }
 
     #[test]
@@ -612,6 +686,63 @@ mod tests {
     }
 
     #[test]
+    fn refreshing_it_replaces_an_earlier_builds_files_and_adding_it_keeps_them() {
+        let folder = std::env::temp_dir().join(format!(
+            "axcenity-default-humanoid-refresh-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&folder);
+        fs::create_dir_all(&folder).unwrap();
+        // A folder as an earlier build left it: another animation file,
+        // another state machine and a clip of another length.
+        let stale = [
+            DEFAULT_HUMANOID_ANIMATIONS_PATH,
+            DEFAULT_HUMANOID_MODEL_PATH,
+            DEFAULT_HUMANOID_STATE_MACHINE_PATH,
+            "assets/animations/Humanoid/Idle.anim.json",
+            DEFAULT_CHARACTER_PREFAB_PATH,
+        ];
+        for path in stale {
+            write_missing(&folder, path, b"an earlier build's").unwrap();
+        }
+        add_default_humanoid(&folder).unwrap();
+        for path in stale {
+            assert_eq!(
+                fs::read(folder.join(path)).unwrap(),
+                b"an earlier build's",
+                "{path}: a project's file is kept"
+            );
+        }
+        assert_eq!(
+            refresh_default_humanoid(&folder).unwrap(),
+            DEFAULT_CHARACTER_PREFAB_PATH
+        );
+        assert_eq!(
+            fs::read(folder.join(DEFAULT_HUMANOID_ANIMATIONS_PATH)).unwrap(),
+            DEFAULT_HUMANOID_ANIMATIONS
+        );
+        assert_eq!(
+            fs::read(folder.join(DEFAULT_HUMANOID_MODEL_PATH)).unwrap(),
+            DEFAULT_HUMANOID_MODEL
+        );
+        for (path, text) in default_humanoid_animation_files() {
+            assert_eq!(
+                fs::read_to_string(folder.join(&path)).unwrap(),
+                text,
+                "{path}"
+            );
+        }
+        let prefab = fs::read_to_string(folder.join(DEFAULT_CHARACTER_PREFAB_PATH)).unwrap();
+        assert!(prefab.contains("HumanoidRootPart"), "the engine's prefab");
+        // Nothing is written when nothing differs.
+        let file = folder.join(DEFAULT_HUMANOID_ANIMATIONS_PATH);
+        let written = fs::metadata(&file).unwrap().modified().unwrap();
+        refresh_default_humanoid(&folder).unwrap();
+        assert_eq!(fs::metadata(&file).unwrap().modified().unwrap(), written);
+        let _ = fs::remove_dir_all(&folder);
+    }
+
+    #[test]
     fn its_feet_are_at_the_position_and_it_faces_minus_z() {
         let mut world = World::new();
         let model = default_character(&mut world, Vector3::new(4.0, 10.0, -2.0));
@@ -636,317 +767,10 @@ mod tests {
             (body.y - body_size.y * 0.5 - 10.0).abs() < 1e-4,
             "feet on the ground"
         );
-        assert!((body_size.y - 1.7819 * STUDS_PER_METRE).abs() < 1e-3);
+        assert!((body_size.y - 1.75 * STUDS_PER_METRE).abs() < 1e-3);
         assert_eq!(
             property("Body", "Orientation"),
             Vector3::new(0.0, 180.0, 0.0)
         );
-    }
-
-    #[test]
-    fn every_part_is_an_object_of_the_parts_file_on_the_same_skeleton() {
-        let picks: Vec<axcenity_assets::Pick> = HUMANOID_PARTS
-            .iter()
-            .map(|name| {
-                let mesh_id = humanoid_part_mesh_id(name);
-                let (file, pick) = axcenity_assets::Pick::of_mesh_id(&mesh_id);
-                assert_eq!(file, DEFAULT_HUMANOID_PARTS_PATH);
-                pick
-            })
-            .collect();
-        let models = axcenity_assets::load_models(
-            DEFAULT_HUMANOID_PARTS,
-            Path::new("."),
-            axcenity_assets::ModelFormat::Gltf,
-            &picks,
-        )
-        .unwrap();
-        let whole = axcenity_assets::load_model(
-            DEFAULT_HUMANOID_MODEL,
-            Path::new("."),
-            axcenity_assets::ModelFormat::Gltf,
-        )
-        .unwrap();
-        let bones = |model: &axcenity_assets::Model| -> Vec<String> {
-            let rig = model.rig.as_ref().expect("skinned");
-            rig.bones.iter().map(|bone| bone.name.clone()).collect()
-        };
-        for (name, model) in HUMANOID_PARTS.iter().zip(&models) {
-            assert_eq!(bones(model), bones(&whole), "{name}");
-        }
-        let mut world = World::new();
-        let character = default_character(&mut world, Vector3::default());
-        let body = world.find_first_child(character, "Body").unwrap();
-        let hair = humanoid_part(&mut world, body, "Hair_Crop");
-        let instance = world.get(hair).unwrap();
-        assert_eq!(instance.parent(), Some(body));
-        assert_eq!(
-            instance.property("CanCollide").and_then(Value::as_bool),
-            Some(false)
-        );
-    }
-
-    /// The stylized base model's Character Data (`avatar`, Character Studio
-    /// overhaul CO1, made by `assets/characters/humanoid/manifests.py`)
-    /// describes this default humanoid: the same parts file, sockets, body
-    /// sliders, parts and default outfit.
-    #[test]
-    fn the_character_data_manifests_describe_the_default_humanoid() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
-        let (library, _, problems) = axcenity_avatar::Library::read(&root);
-        assert!(problems.is_empty(), "{problems:?}");
-        let base = library.base(axcenity_avatar::V1_BASE).unwrap();
-        let file = library.path_of(&base.id, &base.model.file).unwrap();
-        assert_eq!(fs::read(root.join(&file)).unwrap(), DEFAULT_HUMANOID_PARTS);
-        let sockets: Vec<(&str, &str)> = base
-            .sockets
-            .iter()
-            .map(|socket| (socket.name.as_str(), socket.bone.as_str()))
-            .collect();
-        assert_eq!(sockets, HUMANOID_SOCKETS);
-        let attributes: Vec<&str> = base
-            .parameters
-            .iter()
-            .flat_map(|parameter| parameter.attributes.iter())
-            .map(|driver| driver.attribute.as_str())
-            .collect();
-        assert_eq!(attributes, axcenity_anim::BODY_SLIDERS);
-        // Every object of the parts file is the body, one of its always-worn
-        // parts or an item's model, and nothing else.
-        let mut mesh_ids: Vec<String> = std::iter::once(&base.model.body)
-            .chain(&base.model.parts)
-            .map(|object| format!("{DEFAULT_HUMANOID_PARTS_PATH}#{object}"))
-            .collect();
-        // (The realistic body's items are its own package's.)
-        for item in library.items.values().filter(|item| {
-            item.bases
-                .iter()
-                .any(|base| base == axcenity_avatar::V1_BASE)
-        }) {
-            for model in item.models() {
-                assert_eq!(library.path_of(&item.id, &model.file).unwrap(), file);
-                let object = model.object.as_deref().unwrap();
-                mesh_ids.push(format!("{DEFAULT_HUMANOID_PARTS_PATH}#{object}"));
-            }
-        }
-        mesh_ids.sort();
-        let mut parts: Vec<String> = HUMANOID_PARTS
-            .iter()
-            .map(|part| humanoid_part_mesh_id(part))
-            .collect();
-        parts.sort();
-        assert_eq!(mesh_ids, parts);
-        // The default outfit is the customization file's.
-        let custom: serde_json::Value =
-            serde_json::from_str(DEFAULT_HUMANOID_CUSTOMIZATION).unwrap();
-        let part_of = |id: &str| {
-            let (part, _) = axcenity_avatar::V1_ITEMS
-                .iter()
-                .find(|(_, item)| *item == id)
-                .unwrap();
-            serde_json::Value::from(*part)
-        };
-        let defaults: Vec<serde_json::Value> =
-            base.defaults.items.iter().map(|id| part_of(id)).collect();
-        assert_eq!(defaults[0], custom["default"]["hair"]);
-        assert_eq!(
-            serde_json::Value::from(defaults[1..].to_vec()),
-            custom["default"]["outfit"]
-        );
-    }
-
-    #[test]
-    fn a_modular_character_leads_its_parts_from_the_body() {
-        let mut world = World::new();
-        let dressed = [
-            "Eyes",
-            "Teeth",
-            "Brows",
-            "Lashes",
-            "Shirt_Tee",
-            "Pants_Cargo",
-            "Shoes_Sneakers",
-            "Hair_Long",
-        ];
-        let character = modular_character(&mut world, Vector3::new(4.0, 0.0, 0.0), &dressed);
-        let body = world.find_first_child(character, "Body").unwrap();
-        let property = |world: &World, id, name| world.get(id).unwrap().property(name).cloned();
-        assert_eq!(
-            property(&world, body, "MeshId"),
-            Some(Value::String(humanoid_part_mesh_id("Body")))
-        );
-        // The body is the whole person, head included, so it stays drawn:
-        // clothes hide skin with its mask shapes, not by hiding it.
-        assert_ne!(
-            property(&world, body, "Transparency"),
-            Some(Value::Number(1.0))
-        );
-        for part in dressed {
-            let id = world.find_first_child(body, part).unwrap();
-            assert_eq!(
-                property(&world, id, "MeshId"),
-                Some(Value::String(humanoid_part_mesh_id(part)))
-            );
-        }
-        // The body's box: feet on the ground at the position, the whole
-        // 1.75 m (5 studs) person.
-        let size = property(&world, body, "Size")
-            .and_then(|v| v.as_vector3())
-            .unwrap();
-        let at = property(&world, body, "Position")
-            .and_then(|v| v.as_vector3())
-            .unwrap();
-        assert!((at.y - size.y * 0.5).abs() < 0.05, "{at:?} {size:?}");
-        assert!(size.y > 4.8 && size.y < 5.2, "{size:?}");
-        assert!((at.x - 4.0).abs() < 0.5);
-    }
-
-    /// A model's triangles in its file's units (metres; glTF axes, Y up and
-    /// the front +Z), each with its material's name. Loading fits a model
-    /// into the unit cube per axis; `size` and `center` undo that.
-    fn file_triangles(model: &axcenity_assets::Model) -> Vec<([[f32; 3]; 3], String)> {
-        let file = |p: [f32; 3]| -> [f32; 3] {
-            std::array::from_fn(|axis| p[axis] * model.size[axis] + model.center[axis])
-        };
-        let mut out = Vec::new();
-        for primitive in &model.primitives {
-            for corner in primitive.indices.chunks_exact(3) {
-                let triangle = [0, 1, 2].map(|k| file(primitive.positions[corner[k] as usize]));
-                out.push((triangle, primitive.material.name.clone()));
-            }
-        }
-        out
-    }
-
-    /// How far along `dir` from `origin` a ray meets `triangle`, if it does
-    /// (Möller–Trumbore).
-    fn ray_hit(origin: [f32; 3], dir: [f32; 3], triangle: &[[f32; 3]; 3]) -> Option<f32> {
-        let sub = |a: [f32; 3], b: [f32; 3]| [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-        let cross = |a: [f32; 3], b: [f32; 3]| {
-            [
-                a[1] * b[2] - a[2] * b[1],
-                a[2] * b[0] - a[0] * b[2],
-                a[0] * b[1] - a[1] * b[0],
-            ]
-        };
-        let dot = |a: [f32; 3], b: [f32; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-        let (e1, e2) = (sub(triangle[1], triangle[0]), sub(triangle[2], triangle[0]));
-        let p = cross(dir, e2);
-        let det = dot(e1, p);
-        if det.abs() < 1e-12 {
-            return None;
-        }
-        let s = sub(origin, triangle[0]);
-        let u = dot(s, p) / det;
-        let q = cross(s, e1);
-        let v = dot(dir, q) / det;
-        if u < 0.0 || v < 0.0 || u + v > 1.0 {
-            return None;
-        }
-        let t = dot(e2, q) / det;
-        (t > 0.0).then_some(t)
-    }
-
-    /// Horizontal rays round the waist, from the hips to the lower chest
-    /// (0.88 to 1.15 m, every centimetre, 16 directions; higher, the A-pose
-    /// arms come within 30 cm of the axis): a point on the body's axis (2 cm
-    /// in front of the origin) and the direction out.
-    fn waist_rays() -> Vec<([f32; 3], [f32; 3])> {
-        let mut rays = Vec::new();
-        for step in 0..=27 {
-            let height = 0.88 + step as f32 * 0.01;
-            for k in 0..16 {
-                let angle = k as f32 * std::f32::consts::TAU / 16.0;
-                rays.push(([0.0, height, 0.02], [angle.sin(), 0.0, angle.cos()]));
-            }
-        }
-        rays
-    }
-
-    /// The triangles within `reach` of the body's axis between the hips and
-    /// the chest, which the waist rays can meet.
-    fn near_the_waist(
-        triangles: Vec<([[f32; 3]; 3], String)>,
-        reach: f32,
-    ) -> Vec<([[f32; 3]; 3], String)> {
-        triangles
-            .into_iter()
-            .filter(|(triangle, _)| {
-                triangle
-                    .iter()
-                    .any(|p| p[1] > 0.85 && p[1] < 1.23 && p[0].hypot(p[2] - 0.02) < reach)
-            })
-            .collect()
-    }
-
-    /// The shipped default has no hole round its waist. The skin its outfit
-    /// covers is removed from it, so a gap between its garments is a hole
-    /// into the empty body: every waist ray must leave through a triangle
-    /// within 30 cm. (CS1's T-shirt was cut along each arm by an infinite
-    /// plane, which also cut the torso and lifted the hem at the flanks:
-    /// defect 1 of `docs/development/character-studio/audit.md`.)
-    #[test]
-    fn the_default_character_has_no_hole_round_its_waist() {
-        let model = axcenity_assets::load_models(
-            DEFAULT_HUMANOID_MODEL,
-            Path::new("."),
-            axcenity_assets::ModelFormat::Gltf,
-            &[axcenity_assets::Pick::Whole],
-        )
-        .unwrap()
-        .pop()
-        .unwrap();
-        let triangles = near_the_waist(file_triangles(&model), 0.35);
-        let holes: Vec<String> = waist_rays()
-            .into_iter()
-            .filter(|(origin, dir)| {
-                !triangles
-                    .iter()
-                    .any(|(triangle, _)| ray_hit(*origin, *dir, triangle).is_some_and(|t| t < 0.30))
-            })
-            .map(|(origin, dir)| format!("{:.2} m toward {:.2},{:.2}", origin[1], dir[0], dir[2]))
-            .collect();
-        assert!(holes.is_empty(), "rays out through a hole: {holes:?}");
-    }
-
-    /// The modular character shows no skin between its garments round the
-    /// waist, with the default outfit and with the T-shirt and trousers
-    /// alone: from 26 cm out (inside the A-pose arms), each waist ray meets
-    /// clothing before the body's skin.
-    #[test]
-    fn the_modular_outfit_covers_the_waist_with_and_without_the_jacket() {
-        for outfit in [
-            &["Shirt_Tee", "Pants_Cargo", "Jacket_Cropped"][..],
-            &["Shirt_Tee", "Pants_Cargo"][..],
-        ] {
-            let mut objects = vec!["AxcenityHumanoid/Body".to_owned()];
-            objects.extend(outfit.iter().map(|part| format!("AxcenityHumanoid/{part}")));
-            let model = axcenity_assets::load_models(
-                DEFAULT_HUMANOID_PARTS,
-                Path::new("."),
-                axcenity_assets::ModelFormat::Gltf,
-                &[axcenity_assets::Pick::Objects(objects)],
-            )
-            .unwrap()
-            .pop()
-            .unwrap();
-            let triangles = near_the_waist(file_triangles(&model), 0.35);
-            let bare: Vec<String> = waist_rays()
-                .into_iter()
-                .filter_map(|(axis, dir)| {
-                    let origin = [axis[0] + dir[0] * 0.26, axis[1], axis[2] + dir[2] * 0.26];
-                    let inward = [-dir[0], 0.0, -dir[2]];
-                    let first = triangles
-                        .iter()
-                        .filter_map(|(triangle, material)| {
-                            ray_hit(origin, inward, triangle).map(|t| (t, material))
-                        })
-                        .min_by(|a, b| a.0.total_cmp(&b.0))?;
-                    (first.1 == "Skin")
-                        .then(|| format!("{:.2} m from {:.2},{:.2}", axis[1], dir[0], dir[2]))
-                })
-                .collect();
-            assert!(bare.is_empty(), "{outfit:?}: skin shows at {bare:?}");
-        }
     }
 }

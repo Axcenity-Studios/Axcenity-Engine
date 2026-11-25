@@ -24,6 +24,7 @@
 
 mod catalogue;
 mod choices;
+mod cut;
 mod description;
 pub mod fit;
 mod ids;
@@ -45,6 +46,7 @@ mod tests;
 
 pub use catalogue::{CATALOGUE_VERSION, Catalogue, CatalogueBase, CatalogueItem, CataloguePreset};
 pub use choices::{chosen_slots, wear_choice, wear_choices};
+pub use cut::{CUT_TAGS, FRAME, feminine_frame, made_for, made_for_body};
 pub use description::{DESCRIPTION_VERSION, Description, Transform, WornItem};
 pub use ids::{is_valid_id, is_valid_path, resolve_path};
 pub use item::{
@@ -62,7 +64,7 @@ pub use material::{
     Colour, MaterialRole, MaterialSlot, MaterialValue, MaterialValues, ShadingModel, ValueKind,
     ValueSpec,
 };
-pub use migrate::{V1_BASE, V1_ITEMS};
+pub use migrate::{DEFAULT_BASE, V1_BASE, V1_ITEMS};
 pub use model_check::{ModelContents, ModelRef};
 pub use preset::{
     PRESET_SUFFIX, PresetInfo, PresetKind, apply_preset, check_preset, matches_preset,

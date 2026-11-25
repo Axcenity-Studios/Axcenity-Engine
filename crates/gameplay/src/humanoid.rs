@@ -786,7 +786,11 @@ impl Humanoids {
 
     /// Plays the Animator state that matches the Humanoid's: Idle, Walk or
     /// Run on the ground (by how fast it moved since last frame), Jump and
-    /// Fall in the air, if its state machine has a state by that name.
+    /// Fall in the air, if its state machine has a state by that name. One
+    /// that comes down standing still plays Land first, where the state
+    /// machine has a Land state that goes on to another by itself (the
+    /// default character's goes back to Idle): moving, jumping again or
+    /// crouching takes over from it at once.
     #[allow(clippy::too_many_arguments)]
     fn animate(
         &mut self,
@@ -829,6 +833,23 @@ impl Humanoids {
                 .as_ref()
                 .is_some_and(|file| file.state(name).is_some())
         };
+        // A Land that never ends by itself would be stood in for good.
+        let lands = || {
+            machine()
+                .as_ref()
+                .and_then(|file| file.state(LAND))
+                .is_some_and(|land| land.returns.is_some())
+        };
+        // Land is still playing out: asked for and not yet started, or the
+        // state the Animator is in.
+        let landing = self.playing.get(&humanoid) == Some(&Some(LAND))
+            && pieces
+                .animator
+                .and_then(|animator| world.animator(animator))
+                .is_some_and(|live| {
+                    live.current_state == LAND
+                        || live.play.as_ref().is_some_and(|play| play.state == LAND)
+                });
         let wanted = match state {
             Some(State::Running | State::Landed) => {
                 let controller = pieces.controller.unwrap_or(humanoid);
@@ -838,6 +859,8 @@ impl Humanoids {
                 if speed < 0.5 {
                     Some(if crouched && has("Crouch") {
                         "Crouch"
+                    } else if landing || (state == Some(State::Landed) && !crouched && lands()) {
+                        LAND
                     } else {
                         "Idle"
                     })
@@ -853,13 +876,23 @@ impl Humanoids {
             Some(State::Freefall) => Some("Fall"),
             _ => None,
         };
-        if self.playing.get(&humanoid) == Some(&wanted) {
+        let playing = self.playing.get(&humanoid).copied();
+        if playing == Some(wanted) {
             return;
         }
         self.playing.insert(humanoid, wanted);
         let (Some(name), Some(animator)) = (wanted, pieces.animator) else {
             return;
         };
+        // Land went back to Idle by itself: nothing to ask for.
+        if name == "Idle"
+            && playing == Some(Some(LAND))
+            && world
+                .animator(animator)
+                .is_some_and(|live| live.current_state == "Idle")
+        {
+            return;
+        }
         // A state machine that doesn't read still gets the request, as before.
         if path.is_empty() || (machine().is_some() && !has(name)) {
             return;
@@ -867,11 +900,18 @@ impl Humanoids {
         if let Some(live) = world.animator_mut(animator) {
             live.play = Some(PlayRequest {
                 state: name.to_owned(),
-                blend: None,
+                // The ground is met at once: a landing blends in faster
+                // than the Animator's own quarter second.
+                blend: (name == LAND).then_some(LAND_BLEND),
             });
         }
     }
 }
+
+/// The Animator state a Humanoid plays as it comes down standing still.
+const LAND: &str = "Land";
+/// How long the fall blends into the landing, in seconds.
+const LAND_BLEND: f64 = 0.1;
 
 /// The state the pieces say the character is in.
 fn derive(

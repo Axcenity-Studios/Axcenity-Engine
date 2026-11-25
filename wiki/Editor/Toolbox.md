@@ -57,11 +57,12 @@ flowchart LR
   I --> K["kept: wardrobe/pack.json,<br/>previews/"]
   P -->|"Ask::Get"| F["character_pack::fetch_item<br/>(.part, size, SHA-256)"]
   F --> S["wardrobe/staging/&lt;item&gt;/"]
-  S -->|"wardrobe::install"| L["assets/characters/<br/>realistic/imports/&lt;name&gt;/<br/>+ catalogue.json"]
+  S -->|"wardrobe::install"| L["assets/characters/<br/>&lt;the path the pack gives&gt;/<br/>+ catalogue.json"]
   L --> B["Clothing browser<br/>(Your library)"]
 ```
 
 - Nothing is fetched until the list is asked for; the answer is kept, and the kept list fetches nothing.
+- The page lists a garment only when its manifest names the character's base, and the install refuses one whose base the library hasn't. The garments published in the Axcenity Wardrobe so far were made for the realistic base (their paths are `realistic/imports/<name>/`), which the engine no longer ships ([ADR-0050](../Architecture/Architecture-Decisions/ADR-0050-The-Engine-Ships-One-Character-Family-MakeHumans-Body-With-Quaterniuss-Animations.md), 2026-11-25), so a character on the human base is offered none of them.
 - The index is untrusted: files come only from under the pack's own address; an item is kept only when its ID and paths are plain names, all its files sit in its own folder and are `.glb`, `.json` or `.png`, and its manifest is among them (others are left out and counted).
 - A file is put in place only when its size and SHA-256 match; an item reaches the library only whole. The install refuses an ID the library has at another path and a folder that holds anything else the catalogue lists, so a pack never writes over the engine's items or a person's own.
 - Downloads run one at a time on a thread of their own (`Progress`: bytes done and a cancel flag); the World and the workspace are only touched on the editor's thread, when a message arrives.

@@ -138,6 +138,7 @@
       ],
       "level": "quick",
       "about": "The body type the character is built on: male or female.",
+      "between": "Masculine to feminine",
       "shapes": [
         {
           "shape": "Frame_Feminine"
@@ -861,6 +862,50 @@
         }
       ],
       "advanced": false
+    },
+    {
+      "id": "hand_size",
+      "label": "Hand size",
+      "group": "proportions",
+      "range": [
+        0.85,
+        1.15
+      ],
+      "default": 1,
+      "level": "advanced",
+      "about": "How large the hands are for the body.",
+      "attributes": [
+        {
+          "attribute": "HandSize",
+          "from": [
+            0.85,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
+    },
+    {
+      "id": "foot_size",
+      "label": "Foot size",
+      "group": "proportions",
+      "range": [
+        0.9,
+        1.15
+      ],
+      "default": 1,
+      "level": "advanced",
+      "about": "How large the feet are for the body.",
+      "attributes": [
+        {
+          "attribute": "FootSize",
+          "from": [
+            0.9,
+            1.15
+          ]
+        }
+      ],
+      "advanced": true
     },
     {
       "id": "face_shape_scale_horiz",
@@ -7923,12 +7968,18 @@
     {
       "id": "underwear_top",
       "label": "Underwear top",
-      "category": "clothing"
+      "category": "clothing",
+      "hidden_by": [
+        "top"
+      ]
     },
     {
       "id": "underwear_bottom",
       "label": "Underwear",
-      "category": "clothing"
+      "category": "clothing",
+      "hidden_by": [
+        "bottom"
+      ]
     },
     {
       "id": "top",
@@ -8579,7 +8630,7 @@
             0.0,
             -0.0
           ],
-          "travel": 0.0172,
+          "travel": 0.0344,
           "screen": {
             "front": [
               1.0,
@@ -8622,7 +8673,7 @@
             1.0,
             -0.0
           ],
-          "travel": 0.02337,
+          "travel": 0.04674,
           "screen": {
             "front": [
               0.0,
@@ -8670,7 +8721,7 @@
             0.05773,
             0.99833
           ],
-          "travel": 0.0149,
+          "travel": 0.0298,
           "screen": {
             "three_quarter": [
               0.997,
@@ -8689,7 +8740,7 @@
             1.0,
             -0.0
           ],
-          "travel": 0.01427,
+          "travel": 0.02854,
           "screen": {
             "front": [
               0.0,
@@ -8737,7 +8788,7 @@
             0.99518,
             -0.0
           ],
-          "travel": 0.00361,
+          "travel": 0.00722,
           "screen": {
             "front": [
               0.098,
@@ -8785,7 +8836,7 @@
             1.0,
             -0.0
           ],
-          "travel": 0.00455,
+          "travel": 0.0091,
           "screen": {
             "front": [
               0.0,
@@ -8812,7 +8863,7 @@
             0.0,
             -0.0
           ],
-          "travel": 0.00395,
+          "travel": 0.0079,
           "screen": {
             "front": [
               1.0,
@@ -8857,7 +8908,7 @@
             1.0,
             -0.0
           ],
-          "travel": 0.00455,
+          "travel": 0.0091,
           "screen": {
             "front": [
               0.0,
@@ -8884,7 +8935,7 @@
             0.0,
             -0.0
           ],
-          "travel": 0.00395,
+          "travel": 0.0079,
           "screen": {
             "front": [
               -1.0,
@@ -8929,7 +8980,7 @@
             0.99869,
             -0.0
           ],
-          "travel": 0.00198,
+          "travel": 0.00396,
           "screen": {
             "front": [
               0.051,
@@ -8978,7 +9029,7 @@
             0.99705,
             -0.0
           ],
-          "travel": 0.00198,
+          "travel": 0.00396,
           "screen": {
             "front": [
               -0.077,
@@ -9027,7 +9078,7 @@
             0.0,
             1.0
           ],
-          "travel": 0.01022,
+          "travel": 0.02044,
           "screen": {
             "three_quarter": [
               1.0,
@@ -9046,7 +9097,7 @@
             0.93221,
             -0.36192
           ],
-          "travel": 0.00922,
+          "travel": 0.01844,
           "screen": {
             "front": [
               0.0,
@@ -9094,7 +9145,7 @@
             0.16178,
             0.98683
           ],
-          "travel": 0.00313,
+          "travel": 0.00626,
           "screen": {
             "three_quarter": [
               0.974,
@@ -9132,7 +9183,7 @@
             -0.05471,
             -0.0
           ],
-          "travel": 0.0037,
+          "travel": 0.0074,
           "screen": {
             "front": [
               0.999,
@@ -9175,7 +9226,7 @@
             -0.01884,
             0.04711
           ],
-          "travel": 0.00537,
+          "travel": 0.01074,
           "screen": {
             "front": [
               1.0,
@@ -9198,7 +9249,7 @@
             1.0,
             -0.0
           ],
-          "travel": 0.00268,
+          "travel": 0.00536,
           "screen": {
             "front": [
               0.0,
@@ -9247,7 +9298,7 @@
             -0.01884,
             0.04711
           ],
-          "travel": 0.00537,
+          "travel": 0.01074,
           "screen": {
             "front": [
               -1.0,
@@ -9270,7 +9321,7 @@
             1.0,
             -0.0
           ],
-          "travel": 0.00268,
+          "travel": 0.00536,
           "screen": {
             "front": [
               0.0,
@@ -9319,7 +9370,7 @@
             -0.16181,
             0.37541
           ],
-          "travel": 0.00782,
+          "travel": 0.01564,
           "screen": {
             "front": [
               0.985,
@@ -9368,7 +9419,7 @@
             -0.16181,
             0.37541
           ],
-          "travel": 0.00782,
+          "travel": 0.01564,
           "screen": {
             "front": [
               -0.985,
@@ -9417,7 +9468,7 @@
             0.0,
             -0.02969
           ],
-          "travel": 0.00511,
+          "travel": 0.01022,
           "screen": {
             "front": [
               1.0,
@@ -9440,7 +9491,7 @@
             1.0,
             -0.0
           ],
-          "travel": 0.00476,
+          "travel": 0.00952,
           "screen": {
             "front": [
               0.0,
@@ -9488,7 +9539,7 @@
             -0.56189,
             0.8173
           ],
-          "travel": 0.00198,
+          "travel": 0.00396,
           "screen": {
             "front": [
               -0.222,
@@ -9536,7 +9587,7 @@
             0.06543,
             0.99786
           ],
-          "travel": 0.00309,
+          "travel": 0.00618,
           "screen": {
             "three_quarter": [
               0.996,
@@ -9555,7 +9606,7 @@
             -1.0,
             -0.0
           ],
-          "travel": 0.00228,
+          "travel": 0.00456,
           "screen": {
             "front": [
               0.0,
@@ -9603,7 +9654,7 @@
             0.0,
             1.0
           ],
-          "travel": 0.01062,
+          "travel": 0.02124,
           "screen": {
             "three_quarter": [
               1.0,
@@ -9622,7 +9673,7 @@
             -1.0,
             -0.0
           ],
-          "travel": 0.01533,
+          "travel": 0.03066,
           "screen": {
             "front": [
               0.0,
@@ -9670,7 +9721,7 @@
             -0.98017,
             0.16803
           ],
-          "travel": 0.00723,
+          "travel": 0.01446,
           "screen": {
             "front": [
               0.107,
@@ -9718,7 +9769,7 @@
             0.02515,
             -0.0
           ],
-          "travel": 0.00805,
+          "travel": 0.0161,
           "screen": {
             "front": [
               1.0,
@@ -9761,7 +9812,7 @@
             0.0,
             0.51569
           ],
-          "travel": 0.01246,
+          "travel": 0.02492,
           "screen": {
             "front": [
               1.0,
@@ -9788,7 +9839,7 @@
             0.4193,
             -0.71528
           ],
-          "travel": 0.00615,
+          "travel": 0.0123,
           "screen": {
             "front": [
               0.8,
@@ -9837,7 +9888,7 @@
             0.0,
             0.51569
           ],
-          "travel": 0.01246,
+          "travel": 0.02492,
           "screen": {
             "front": [
               -1.0,
@@ -9860,7 +9911,7 @@
             0.4193,
             -0.71528
           ],
-          "travel": 0.00615,
+          "travel": 0.0123,
           "screen": {
             "front": [
               -0.8,
@@ -9909,7 +9960,7 @@
             0.00211,
             -0.29454
           ],
-          "travel": 0.00566,
+          "travel": 0.01132,
           "screen": {
             "front": [
               1.0,

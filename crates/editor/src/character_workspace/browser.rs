@@ -18,11 +18,14 @@
 //!   the listed items' tags), "Recolourable" (a colour role or variants),
 //!   "Fits this body" (no `limitations` range the character is outside)
 //!   and "Favourites".
-//! - **Who a garment is cut for** ([`Cut`]): the Clothing page lists the
-//!   garments for the character's own frame (masculine or feminine, with
-//!   the unisex ones), or one frame's, or all of them. A garment says
-//!   which with a tag (`masculine`, `feminine`, `unisex`; one that says
-//!   nothing is for both).
+//! - **Who an item is made for** ([`Cut`]): the Hair and Clothing pages
+//!   list what is made for the character's own body type (male or female,
+//!   with the unisex items), or one body type's, or everything: a row of
+//!   its own under the search, lit on the character's body type until
+//!   another is picked. An item says which with a tag (`masculine`,
+//!   `feminine`, `unisex`; one that says nothing is for both). Listed
+//!   beside the others, an item made for the other body type comes after
+//!   them in its slot and is marked with that body type's name.
 //! - **The online wardrobe** (`wardrobe.rs`, `Browser::online`): the
 //!   Clothing page shows the library's clothes or, in their place, the
 //!   Axcenity Wardrobe's garments to download into the library.
@@ -37,6 +40,16 @@
 //!   puts the character back. After a click or Esc the tile under the
 //!   still pointer is not previewed again until the pointer moves off it
 //!   ([`Browser::muted`]).
+//! - **A preview waits for the pointer to rest, and for its models.** The
+//!   panel says which tile the pointer is over ([`Browse::Over`]); what
+//!   that tile would show is read on the loader's thread
+//!   ([`CharacterWorkspace::warm`], [`Browser::ready`]), and the panel
+//!   asks for the preview ([`Browse::Hover`]) only once the pointer has
+//!   stayed on the tile for [`REST`] seconds without scrolling and those
+//!   models are in. Before (measured 2026-11-25, `timing_tests.rs`
+//!   `browser_costs`) every tile the pointer crossed read its model on the
+//!   interface's thread, 24 to 147 ms each: scrolling the page with the
+//!   pointer over it stalled once per tile.
 //! - **The worn items' own controls** fold to one line each
 //!   ([`Browser::unfolded`], editor state).
 //!
@@ -54,6 +67,11 @@ use axcenity_avatar::{
 use super::intent::Gesture;
 use super::thumbnails::Subject;
 use super::{Category, CharacterWorkspace, presets, value_of};
+
+/// How long the pointer stays on a tile before the tile is previewed, in
+/// seconds: long enough that tiles crossed on the way to another, or
+/// scrolled past, aren't, and short enough to feel like a hover.
+pub const REST: f64 = 0.15;
 
 /// How many items "Recently used" keeps.
 pub const MAX_RECENT_ITEMS: usize = 12;
@@ -86,7 +104,7 @@ impl Shelf {
     }
 }
 
-/// Whose garments the Clothing page lists.
+/// Whose garments and hairstyles a page lists.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Cut {
     /// The ones cut for the character's own frame, and the unisex ones.
@@ -101,26 +119,6 @@ pub enum Cut {
 }
 
 impl Cut {
-    pub const ALL: [Cut; 4] = [Cut::Body, Cut::Masculine, Cut::Feminine, Cut::All];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Cut::Body => "This body",
-            Cut::Masculine => "Masculine",
-            Cut::Feminine => "Feminine",
-            Cut::All => "All",
-        }
-    }
-
-    pub fn about(self) -> &'static str {
-        match self {
-            Cut::Body => "Clothes cut for this character's frame, and unisex ones",
-            Cut::Masculine => "Clothes cut for the masculine frame, and unisex ones",
-            Cut::Feminine => "Clothes cut for the feminine frame, and unisex ones",
-            Cut::All => "Every garment, whoever it is cut for",
-        }
-    }
-
     /// Whether it lists a garment with `tags` on a body that is feminine
     /// or not (`None`: a body without frames, which every cut fits).
     pub fn lists(self, tags: &[String], feminine_body: Option<bool>) -> bool {
@@ -130,35 +128,58 @@ impl Cut {
             Cut::Masculine => Some(false),
             Cut::Feminine => Some(true),
         };
-        match (cut_for(tags), wanted) {
-            (Some(cut), Some(wanted)) => cut == wanted,
-            _ => true,
+        axcenity_avatar::made_for_body(tags, wanted)
+    }
+}
+
+pub use axcenity_avatar::{CUT_TAGS, FRAME, made_for as cut_for};
+
+/// What `base` calls its two body types, masculine then feminine: the
+/// labels of its frame's choices ("Male", "Female") where it has them.
+pub fn cut_labels(base: &BaseManifest) -> (String, String) {
+    let choices = base
+        .parameter(FRAME)
+        .map(|frame| frame.choices.as_slice())
+        .unwrap_or_default();
+    let label = |feminine: bool, otherwise: &str| {
+        choices
+            .iter()
+            .find(|choice| (choice.value >= 0.5) == feminine)
+            .map_or_else(|| otherwise.to_owned(), |choice| choice.label.clone())
+    };
+    (label(false, "Masculine"), label(true, "Feminine"))
+}
+
+impl Cut {
+    /// The choice a page shows lit for this cut on a body that is feminine
+    /// or not: [`Cut::Body`] is that body's own, and every cut is "all"
+    /// on a body without frames.
+    pub fn shown(self, feminine_body: Option<bool>) -> Cut {
+        match (self, feminine_body) {
+            (_, None) => Cut::All,
+            (Cut::Body, Some(true)) => Cut::Feminine,
+            (Cut::Body, Some(false)) => Cut::Masculine,
+            (cut, _) => cut,
+        }
+    }
+
+    /// The cut to keep when `picked` is chosen on such a body: the body's
+    /// own is kept as [`Cut::Body`], so the page goes on following the
+    /// body type when it is changed.
+    pub fn picked(picked: Cut, feminine_body: Option<bool>) -> Cut {
+        if picked == Cut::Body.shown(feminine_body) && feminine_body.is_some() {
+            Cut::Body
+        } else {
+            picked
         }
     }
 }
 
-/// The tags that say who a garment is cut for.
-pub const CUT_TAGS: [&str; 3] = ["masculine", "feminine", "unisex"];
-/// The base parameter a body's frame is (0 masculine, 1 feminine).
-pub const FRAME: &str = "frame";
-
-/// Whether a garment with `tags` is cut for the feminine frame
-/// (`Some(true)`), the masculine one (`Some(false)`) or both (`None`:
-/// unisex, or it doesn't say).
-pub fn cut_for(tags: &[String]) -> Option<bool> {
-    let has = |tag: &str| tags.iter().any(|t| t.eq_ignore_ascii_case(tag));
-    match (has("masculine"), has("feminine")) {
-        (true, false) => Some(false),
-        (false, true) => Some(true),
-        _ => None,
-    }
-}
-
-/// Whether `description`'s body is nearer the feminine frame than the
-/// masculine one; `None` when its base has no frames.
+/// Whether `description`'s body is the feminine frame rather than the
+/// masculine one (`avatar::feminine_frame`: by the nearer choice of a
+/// frame that is one); `None` when its base has no frames.
 pub fn feminine_body(description: &Description, base: &BaseManifest) -> Option<bool> {
-    base.parameter(FRAME)?;
-    Some(value_of(description, Some(base), FRAME) >= 0.5)
+    axcenity_avatar::feminine_frame(base, description)
 }
 
 /// A page's search and filters (editor state).
@@ -195,11 +216,12 @@ impl Default for Filters {
 
 impl Filters {
     /// Whether anything narrows the list (the "Recently used" row shows
-    /// only on the whole list).
+    /// only on the whole list). Who the items are made for doesn't: it is
+    /// which wardrobe is open, with its own "nothing worn" tiles and
+    /// recently used row.
     pub fn narrowed(&self) -> bool {
         let default = Filters::default();
         !self.search.trim().is_empty()
-            || self.cut != default.cut
             || self.slot.is_some()
             || self.kind.is_some()
             || self.recolourable
@@ -226,7 +248,11 @@ pub enum Browse {
     /// The Clothing page shows the online wardrobe (`wardrobe.rs`) in
     /// place of the library's clothes, or the library's again.
     Online(bool),
-    /// The tile under the pointer (`None`: none): previewed while it is.
+    /// The tile the pointer is over (`None`: none), whether or not it is
+    /// previewed yet: what it would show is loaded in the background.
+    Over(Option<Pick>),
+    /// The tile to preview (`None`: none): the one under the pointer, once
+    /// the pointer has rested on it and its models are loaded.
     Hover(Option<Pick>),
     /// A tile was clicked (what the click wears follows as its own
     /// intent): its preview ends and it is muted, so the tile under the
@@ -245,6 +271,12 @@ pub struct Browser {
     /// The Clothing page shows the online wardrobe, not the library.
     pub online: bool,
     pub hovered: Option<Pick>,
+    /// The tile the pointer is over, previewed yet or not.
+    pub over: Option<Pick>,
+    /// Whether what [`Browser::over`] would show is loaded (or can't be):
+    /// its preview can start without reading a model on the interface's
+    /// thread. Brought up to date each frame by the shell.
+    pub ready: bool,
     /// What the preview shows in the character's place while a tile is
     /// hovered: the character wearing it.
     pub preview: Option<Description>,
@@ -293,15 +325,17 @@ impl Browser {
         self.preview = None;
     }
 
-    /// Whether the panel should report `hovered`, the tile under the
-    /// pointer now (`moved`: the pointer moved this frame): when it
-    /// changed, and once the pointer has moved off a muted tile (so the
-    /// mute ends). A still pointer never ends a mute, though the tiles
-    /// may shift under it.
-    pub fn hover_changed(&self, hovered: &Option<Pick>, moved: bool) -> bool {
+    /// Whether the panel should report `shown`, the tile to preview now
+    /// (the one the pointer has rested on, or none): when it changed, and
+    /// once the pointer has moved off a muted tile (so the mute ends).
+    /// `over` is the tile under the pointer, rested or not, and `moved`
+    /// whether the pointer moved this frame: a still pointer never ends a
+    /// mute, though the tiles may shift under it, and nor does a pointer
+    /// that moves about on the muted tile.
+    pub fn hover_changed(&self, over: &Option<Pick>, shown: &Option<Pick>, moved: bool) -> bool {
         match &self.muted {
-            Some(_) => moved && *hovered != self.muted,
-            None => *hovered != self.hovered,
+            Some(_) => moved && *over != self.muted,
+            None => *shown != self.hovered,
         }
     }
 
@@ -376,6 +410,9 @@ pub struct Entry<'a> {
     pub favourite: bool,
     /// A limitation the character is outside of (its note).
     pub misfit: Option<String>,
+    /// Made for the other body type than the character's (`Some(true)`:
+    /// for the feminine one), when it says so and the body has a type.
+    pub other_cut: Option<bool>,
     /// What wearing it takes off besides its own slot (labels).
     pub takes_off: Vec<String>,
 }
@@ -521,6 +558,7 @@ pub fn list<'a>(
     let chosen = chosen_slots(library, &base.id);
     let slots = page_slots(base, shelf, &chosen);
     let worn_ids: BTreeSet<&str> = description.items.iter().map(|w| w.id.as_str()).collect();
+    let feminine = feminine_body(description, base);
     let entry = |item: &'a ItemManifest| -> Entry<'a> {
         let slot = slots
             .iter()
@@ -542,6 +580,7 @@ pub fn list<'a>(
             worn: worn_ids.contains(item.id.as_str()),
             favourite: favourites.contains(&item.id),
             misfit: misfit(item, description, base),
+            other_cut: cut_for(&item.tags).filter(|cut| feminine.is_some_and(|body| body != *cut)),
             takes_off,
         }
     };
@@ -568,7 +607,6 @@ pub fn list<'a>(
     kinds.dedup();
     let cuts = kinds.iter().any(|kind| CUT_TAGS.contains(&kind.as_str()));
     kinds.retain(|kind| !CUT_TAGS.contains(&kind.as_str()));
-    let feminine = feminine_body(description, base);
     // Asked for another frame's garments, the frame is no misfit.
     let fits = |entry: &Entry| {
         entry.worn
@@ -595,12 +633,14 @@ pub fn list<'a>(
         .filter(|entry| !filters.fits || fits(entry))
         .filter(|entry| !filters.favourites || entry.favourite)
         .collect();
-    // By slot in the base's order, then label; favourites first (a stable
-    // sort keeps the rest in order).
+    // By slot in the base's order, what is made for this body type (and
+    // the unisex items) before the other's, then label; favourites first
+    // (a stable sort keeps the rest in order).
     let slot_order = |entry: &Entry| slots.iter().position(|slot| slot.id == entry.item.slot);
     entries.sort_by(|a, b| {
         slot_order(a)
             .cmp(&slot_order(b))
+            .then_with(|| a.other_cut.is_some().cmp(&b.other_cut.is_some()))
             .then_with(|| a.item.label.cmp(&b.item.label))
     });
     entries.sort_by_key(|entry| !entry.favourite);
@@ -612,6 +652,7 @@ pub fn list<'a>(
             .iter()
             .filter(|id| !worn_ids.contains(id.as_str()))
             .filter_map(|id| shown.iter().find(|item| item.id == *id))
+            .filter(|item| filters.cut.lists(&item.tags, feminine))
             .take(RECENT_SHOWN)
             .map(|item| entry(item))
             .collect()
@@ -766,6 +807,11 @@ impl CharacterWorkspace {
                 // A tile previewed was one of the library's.
                 self.browser.hovered = None;
             }
+            Browse::Over(pick) => {
+                self.browser.over = pick;
+                self.warm_tile();
+                return;
+            }
             Browse::Hover(pick) => {
                 if !self.browser.hover(pick) {
                     return;
@@ -787,6 +833,47 @@ impl CharacterWorkspace {
         let library = self.library();
         self.browser.update_preview(&self.description, &library);
         self.refresh();
+    }
+
+    /// Starts reading what the tile under the pointer would show (the
+    /// character wearing it) on the loader's thread, and notes whether it
+    /// is all in ([`Browser::ready`]). Called when the pointer comes over a
+    /// tile and each frame while it waits there.
+    pub(super) fn warm_tile(&mut self) {
+        let ready = match &self.browser.over {
+            Some(pick) => {
+                let library = self.library();
+                let shown = dressed(
+                    &self.description,
+                    &library,
+                    &pick.slot,
+                    pick.item.as_deref(),
+                );
+                self.warm(&shown, &library)
+            }
+            None => false,
+        };
+        self.browser.ready = ready;
+    }
+
+    /// Asks the loader for every model `description` is drawn from that
+    /// isn't loaded, without waiting: whether they are all in, or can't
+    /// be (a character that can't be resolved, a model that failed, which
+    /// the preview then says as it always did).
+    pub(super) fn warm(&self, description: &Description, library: &Library) -> bool {
+        use axcenity_assets::LoadStatus;
+        let Ok(resolved) = axcenity_avatar::resolve(library, description) else {
+            return true;
+        };
+        let folder = axcenity_avatar::LIBRARY_FOLDER;
+        let mut ready = true;
+        for part in std::iter::once(&resolved.body).chain(&resolved.parts) {
+            let ticket = self
+                .assets
+                .request_model(&format!("{folder}/{}", part.model));
+            ready &= ticket.status() != LoadStatus::Loading;
+        }
+        ready
     }
 
     /// Takes a tile's preview off the character.

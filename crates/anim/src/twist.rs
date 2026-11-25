@@ -40,9 +40,9 @@
 //! | `KneeHelper` | `UpperLeg` | `LowerLeg` |
 //!
 //! A helper has the parent of the bone it reads and stays on that bone's
-//! joint. The realistic base body (`assets/characters/realistic`, `rig.py`)
-//! is built and weighted for exactly this, and its QA scripts
-//! (`qa_scene.py` `Character.drive`) turn the bones by the same rule.
+//! joint. The human base has the four twist bones a side
+//! (`assets/characters/human/build.py` `TWISTS`) and no helpers; the
+//! realistic base, retired by ADR-0050, was built and weighted for both.
 //!
 //! Body sliders ([`crate::BodyShape`]) scale a bone's own vertices; a
 //! twist bone takes its limb's scale and a helper its joint's, so skin
@@ -444,35 +444,31 @@ mod tests {
         ));
     }
 
-    /// The pose path turns the shipped body's twist and helper bones
-    /// before it poses the skin, in the pose its parts then follow.
+    /// The pose path turns the shipped body's twist bones before it poses
+    /// the skin, in the pose its parts then follow.
     #[test]
     fn the_pose_path_drives_the_shipped_body_before_it_is_skinned() {
         use axcenity_assets::{ModelFormat, Pick, load_models};
         use std::path::Path;
 
         let file = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../assets/characters/realistic/RealisticParts.glb");
+            .join("../../assets/characters/human/HumanParts.glb");
         let bytes = std::fs::read(file).unwrap();
-        let picks = [Pick::Objects(vec!["AxcenityRealistic/Body".to_owned()])];
+        let picks = [Pick::Objects(vec!["AxcenityHuman/Body".to_owned()])];
         let models = load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks).unwrap();
         let model = &models[0];
         let rig = model.rig.clone().unwrap();
         let bone = |name: &str| rig.bone(name).unwrap();
-        let (hand, knee) = (bone("LeftHand"), bone("RightLowerLeg"));
+        let hand = bone("LeftHand");
         let mut pose = rig.rest_pose();
-        // The hand turned a quarter about the forearm, a knee bent.
+        // The hand turned a quarter about the forearm.
         let forearm = rig.bones[hand].rest.translation.normalize();
         pose[hand].rotation = Quat::from_axis_angle(forearm, FRAC_PI_2) * pose[hand].rotation;
-        pose[knee].rotation *= Quat::from_axis_angle(Vec3::X, -1.5);
         let at_rest = model.pose_shaped(&pose, &[]).unwrap();
         let posed = crate::animators::skinned_for_test(model, &rig, &mut pose, &mut []).unwrap();
         let twist = bone("LeftLowerArmTwist");
         let turned = pose[twist].rotation * rig.bones[twist].rest.rotation.inverse();
         assert!((twist_angle(turned, forearm) - FRAC_PI_2 / 2.0).abs() < 1e-3);
-        let helper = bone("RightKneeHelper");
-        let bent = pose[helper].rotation * rig.bones[helper].rest.rotation.inverse();
-        assert!((bent.to_axis_angle().1 - 0.75).abs() < 1e-3);
         // And the skin was posed with them: those bones' joints moved.
         let moved = |index: usize| {
             let joint = rig
@@ -482,99 +478,40 @@ mod tests {
                 .unwrap();
             !posed.joints()[joint].abs_diff_eq(at_rest.joints()[joint], 1e-5)
         };
-        assert!(moved(twist) && moved(helper));
+        assert!(moved(twist));
     }
 
-    /// The realistic base body's skeleton, as shipped, is driven as its
-    /// build weighted it: every bone its build data lists is found, with
-    /// the same limb, source and share, lying along its limb or on its
-    /// joint.
+    /// The human base's skeleton, as shipped, has its eight twist bones
+    /// found, each lying along its limb and not turned against it at rest
+    /// (`assets/characters/human/build.py` `TWISTS`).
     #[test]
-    fn the_shipped_realistic_skeleton_is_driven_as_it_was_built() {
+    fn the_shipped_skeletons_twist_bones_are_found_along_their_limbs() {
         use axcenity_assets::{ModelFormat, Pick, load_models};
         use std::path::Path;
 
-        let folder =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/realistic");
-        let data: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(folder.join("Realistic.build.json")).unwrap(),
-        )
-        .unwrap();
-        let bytes = std::fs::read(folder.join("RealisticParts.glb")).unwrap();
-        let picks = [Pick::Objects(vec!["AxcenityRealistic/Body".to_owned()])];
+        let file = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../assets/characters/human/HumanParts.glb");
+        let bytes = std::fs::read(file).unwrap();
+        let picks = [Pick::Objects(vec!["AxcenityHuman/Body".to_owned()])];
         let models = load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks).unwrap();
         let rig = models[0].rig.clone().unwrap();
         let driven = DrivenBones::detect(&rig);
-        let name = |bone: usize| rig.bones[bone].name.as_str();
-        let mut built = Vec::new();
-        for twist in data["twists"].as_array().unwrap() {
-            for side in SIDES {
-                let of = |key: &str| format!("{side}{}", twist[key].as_str().unwrap());
-                let share = twist["share"].as_f64().unwrap() as f32;
-                built.push((of("bone"), of("inside"), of("reads"), share));
-            }
-        }
-        for helper in data["helpers"].as_array().unwrap() {
-            assert_eq!(helper["share"].as_f64().unwrap() as f32, HELPER_SHARE);
-            for side in SIDES {
-                let of = |key: &str| format!("{side}{}", helper[key].as_str().unwrap());
-                let parent = helper["parent"].as_str().unwrap();
-                let parent = if parent == "Hips" {
-                    parent.to_owned()
-                } else {
-                    of("parent")
-                };
-                built.push((of("bone"), parent, of("reads"), HELPER_SHARE));
-            }
-        }
-        assert_eq!(driven.0.len(), built.len());
-        assert_eq!(built.len(), 16);
+        assert_eq!(driven.0.len(), 8);
         for one in &driven.0 {
-            let found = match *one {
-                Driven::Twist {
-                    bone,
-                    inside,
-                    reads,
-                    share,
-                } => {
-                    // Along its limb, and not turned against it at rest.
-                    let at = rig.bones[bone].rest.translation;
-                    assert!(
-                        at.x.abs() < 1e-4 && at.z.abs() < 1e-4 && at.y > 0.0,
-                        "{}",
-                        name(bone)
-                    );
-                    assert!(
-                        close(rig.bones[bone].rest.rotation, Quat::IDENTITY),
-                        "{}",
-                        name(bone)
-                    );
-                    (
-                        name(bone).to_owned(),
-                        name(inside).to_owned(),
-                        name(reads).to_owned(),
-                        share,
-                    )
-                }
-                Driven::Helper { bone, reads } => {
-                    // On its joint, turned as the bone it reads.
-                    let (own, read) = (rig.bones[bone].rest, rig.bones[reads].rest);
-                    assert!(
-                        own.translation.distance(read.translation) < 1e-4,
-                        "{}",
-                        name(bone)
-                    );
-                    assert!(close(own.rotation, read.rotation), "{}", name(bone));
-                    let parent = rig.bones[bone].parent.unwrap();
-                    (
-                        name(bone).to_owned(),
-                        name(parent).to_owned(),
-                        name(reads).to_owned(),
-                        HELPER_SHARE,
-                    )
-                }
+            let Driven::Twist { bone, inside, .. } = *one else {
+                panic!("the human base has no helper bones");
             };
-            assert!(built.contains(&found), "{found:?}");
+            let name = rig.bones[bone].name.as_str();
+            assert_eq!(rig.bones[bone].parent, Some(inside), "{name}");
+            let at = rig.bones[bone].rest.translation;
+            assert!(
+                at.x.abs() < 1e-4 && at.z.abs() < 1e-4 && at.y > 0.0,
+                "{name}: {at:?}"
+            );
+            assert!(
+                close(rig.bones[bone].rest.rotation, Quat::IDENTITY),
+                "{name}"
+            );
         }
     }
 }

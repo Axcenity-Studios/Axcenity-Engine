@@ -91,7 +91,7 @@ impl EditorApp {
 
     /// Applies `description` to the game character `link` names, as one
     /// undo step, after giving the project's library what it wears (from
-    /// the studio's library, `studio`: both families and a person's own
+    /// the studio's library, `studio`: the engine's and a person's own
     /// items).
     fn apply_studio_character(
         &mut self,
@@ -112,8 +112,9 @@ impl EditorApp {
         {
             return Err("it isn't in the world any more".to_owned());
         }
-        axcenity_project::add_character_library(&project)
-            .and_then(|()| axcenity_project::add_character_packages(&project, studio))
+        // What this character names, not the studio's whole wardrobe.
+        axcenity_project::add_character_packages_for(&project, studio, &[description])
+            .map(|_| ())
             .map_err(|err| format!("could not write the project's character library: {err}"))?;
         let before = self.world.clone();
         match applier::apply_description(&mut self.world, &self.assets, link.character, description)
@@ -150,9 +151,9 @@ impl EditorApp {
     }
 
     /// The default game character at `position` for Insert > Character,
-    /// named `name`: the realistic one, applied now so it shows at once
-    /// (OPEN-21, OPEN-22), when the project's library has it; else the
-    /// stylized default character.
+    /// named `name`: the described human character, applied now so it
+    /// shows at once (OPEN-21, OPEN-22), when the project's library has
+    /// the base; else the default humanoid as it is.
     pub(super) fn default_game_character(
         &mut self,
         position: axcenity_core::Vector3,

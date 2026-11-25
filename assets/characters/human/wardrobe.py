@@ -18,7 +18,9 @@ its own cloth out, are where its cloth lies over the skin
 (`build.skin_uvs_of`), so worn under another garment it is cut and its
 edge sunk as a garment the engine fitted.
 
-**Licence gate.** A garment is taken only when its own file's header and
+**Licence gate.** (This converter's, for a library outside the
+repository; the repository itself takes only the CC0 ones of what is
+converted: `take_library.py`.) A garment is taken only when its own file's header and
 its pack's metadata both say CC0 or CC BY, and agree (`vet`). Anything
 else is left out with the reason (some packs listed as CC0 hold files
 whose headers still say AGPL3, and outfits of characters that aren't
@@ -45,6 +47,7 @@ import numpy as np  # noqa: E402
 
 import build as body_build  # noqa: E402
 import manifests  # noqa: E402
+import cut  # noqa: E402
 import mh  # noqa: E402
 
 SOURCE_URL = "https://static.makehumancommunity.org/assets/assetpacks.html"
@@ -60,9 +63,13 @@ KINDS = (
     (("stocking", "pantyhose", "sock", "tights", "legwarmer", "leg_warmer"), "legwear", 0, ()),
     (("glove", "mitten", "armsleeve", "arm_sleeve"), "gloves", 1, ()),
     (("hat", "fedora", "cap", "helmet", "hood", "beanie", "crown", "headband"), "headwear", None, ()),
-    (("bra", "bikini_top", "bikinitop", "camisole", "bandeau"), "underwear_top", 0, ()),
+    # Underwear and swimwear are a top or a bottom of layer 0, worn over
+    # the underwear cut from the body, which they hide where they cover
+    # it: the base's own underwear slots are the body type's
+    # (`avatar::chosen_slots`), and nothing else can be worn in them.
+    (("bra", "bikini_top", "bikinitop", "camisole", "bandeau"), "top", 0, ()),
     (("underwear", "brief", "boxer", "panties", "panty", "thong", "lingerie", "bikini", "swim", "slip"),
-     "underwear_bottom", 0, ()),
+     "bottom", 0, ()),
     (("dress", "gown", "robe", "tunic", "jumpsuit", "overall", "suit", "uniform", "costume", "outfit",
       "romper", "babydoll", "teddy"), "top", 1, ("bottom",)),
     (("skirt", "kilt"), "bottom", 1, ()),
@@ -80,15 +87,15 @@ def kind_of(name, tags, entry):
     words_in = "_" + re.sub(r"[^a-z0-9]+", "_", " ".join([name] + tags).lower()) + "_"
     for words, slot, layer, fills in KINDS:
         if any(w in words_in for w in words):
-            # In an underwear pack a top is an underwear top.
+            # In an underwear pack a top is worn as underwear: layer 0.
             if category == "underwear" and slot == "top" and not fills:
-                return "underwear_top", 0, []
+                return "top", 0, []
             # A top made tucked in is worn under the bottoms (layer 0:
             # `ItemManifest::wearing_order`), so their waistband hides it.
             if slot == "top" and not fills and "_tucked_" in words_in:
                 return slot, 0, []
             return slot, layer, list(fills)
-    by_category = {"underwear": ("underwear_bottom", 0, []), "shirts": ("top", 1, []), "pants": ("bottom", 1, []),
+    by_category = {"underwear": ("bottom", 0, []), "shirts": ("top", 1, []), "pants": ("bottom", 1, []),
                    "shoes": ("shoes", 1, []), "gloves": ("gloves", 1, []), "hats": ("headwear", None, []),
                    "skirts": ("bottom", 1, []), "dress": ("top", 1, ["bottom"]), "suits": ("top", 1, ["bottom"])}
     return by_category.get(category)
@@ -98,10 +105,57 @@ def object_name(name):
     return "".join(part.capitalize() for part in re.split(r"[^A-Za-z0-9]+", name) if part)
 
 
-# Names for people, where the asset's own name is a file name.
+# Names for people, where the asset's own name is a file name: by the
+# garment's folder name. Written from each garment as drawn on the
+# body (2026-11-25): the files' own names read as file names.
 LABELS = {
-    "male_casualsuit01": "Shirt and jeans", "female_casualsuit01": "T-shirt and jeans",
-    "shoes01": "Brown leather shoes", "shoes04": "Black shoes",
+    "male_casualsuit01": "Shirt and jeans",
+    "male_casualsuit02": "Long-sleeved top and jeans",
+    "male_casualsuit03": "Striped shirt and jeans",
+    "male_casualsuit04": "Layered T-shirt and jeans",
+    "male_casualsuit05": "Jacket and jeans",
+    "male_casualsuit06": "Grey T-shirt and jeans",
+    "male_elegantsuit01": "Suit and tie",
+    "male_worksuit01": "Overalls",
+    "crude_male_shirt": "White T-shirt",
+    "polo-t-shirt": "Polo shirt",
+    "pants_wool": "Wool trousers",
+    "sweater_fisherman": "Fisherman sweater",
+    "t-shirt_basic_tucked": "Tucked T-shirt",
+    "crudehighsocks": "High socks",
+    "crudelowsocks": "Low socks",
+    "shoes01": "Brown leather shoes",
+    "shoes02": "Olive shoes",
+    "shoes03": "Black shoes, black socks",
+    "shoes04": "Black shoes",
+    "shoes05": "Light grey shoes",
+    "shoes06": "Navy shoes",
+    "fedora_cocked": "Fedora, tilted",
+    "female_casualsuit01": "T-shirt and jeans",
+    "female_casualsuit02": "T-shirt and jean shorts",
+    "female_elegantsuit01": "Blouse and skirt",
+    "female_sportsuit01": "Crop top and leggings",
+    "female_top_01": "Bra top",
+    "female_panties_01": "Panties",
+    "crudefemaletshirt": "White T-shirt",
+    "bodice_style_top": "Bodice top",
+    "tank_keyhole_neck": "Keyhole tank top",
+    "turtleneck_halter": "Halter turtleneck",
+    "pants_harem": "Harem pants",
+    "leg_warmer_socks": "Leg warmers",
+    "sockslacefrill": "Lace frill socks",
+    "stockings_fishnet_large": "Fishnet stockings, large",
+    "stockings_fishnet_medium": "Fishnet stockings, medium",
+    "stockings_fishnet_small": "Fishnet stockings, small",
+    "stockings_white_l": "White net stockings, large",
+    "stockings_white_m": "White net stockings, medium",
+    "stockings_white_s": "White net stockings, small",
+    "armsleeve_fishnet_large": "Fishnet sleeves, large",
+    "armsleeve_fishnet_medium": "Fishnet sleeves, medium",
+    "armsleeve_fishnet_small": "Fishnet sleeves, small",
+    "armsleeve_white_l": "White net sleeves, large",
+    "armsleeve_white_m": "White net sleeves, medium",
+    "armsleeve_white_s": "White net sleeves, small",
 }
 # The pack's name for MakeHuman's own assets, as their files credit them.
 AUTHORS = {"makehuman_system": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)"}
@@ -253,8 +307,10 @@ def main():
                 "cover_map": name + ".cover.png",
                 "materials": [{"name": name, "shading": "standard"}],
                 "fit": {"method": "shapes", "follows": sorted(set(shapes) & carried)},
-                "tags": sorted({t.lower() for t in clothes.tags if "makehuman" not in t.lower()} | {"makehuman"}),
             })
+            # Its own tags, and who it is made for (`cut.py`).
+            item["tags"] = cut.tags_with_cut(
+                item["id"], {t.lower() for t in clothes.tags if "makehuman" not in t.lower()} | {"makehuman"})
             thumb = os.path.join(clothes.folder, os.path.splitext(os.path.basename(clothes.path))[0] + ".thumb")
             if os.path.exists(thumb):
                 # MakeHuman's `.thumb` files are PNG images.

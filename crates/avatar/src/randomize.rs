@@ -50,7 +50,9 @@ pub fn random_span(range: [f32; 2], random: Option<[f32; 2]>) -> [f32; 2] {
 /// A random character from `description`: what `scope` names is drawn
 /// again from `seed`; what `locks` names (parameter IDs and slot IDs)
 /// never changes; everything else, the name included, is kept. A
-/// parameter with choices takes one of its choices. The same inputs always
+/// parameter with choices takes one of its choices, and an item made for
+/// one body type ([`crate::made_for`]) is drawn only on that one. The same
+/// inputs always
 /// give the same character, on every machine. A description whose base
 /// model `library` lacks comes back unchanged.
 pub fn randomize(
@@ -219,6 +221,7 @@ fn draw_items(
     redrawn: &[&str],
 ) {
     let slot_of = |id: &str| library.item(id).map(|item| item.slot.clone());
+    let feminine = crate::feminine_frame(base, out);
     out.items
         .retain(|worn| slot_of(&worn.id).is_none_or(|slot| !redrawn.contains(&slot.as_str())));
     let mut filled: BTreeSet<String> = out
@@ -258,6 +261,8 @@ fn draw_items(
                     item.quality != Some(Quality::Draft)
                         || base.slot(slot).is_some_and(|slot| slot.random_drafts)
                 })
+                // Only what is made for the body drawn above, or for both.
+                .filter(|item| crate::made_for_body(&item.tags, feminine))
                 .filter(|item| !worn.iter().any(|other| other.id == item.id))
                 .filter(|item| !worn.iter().any(|other| item.conflicts_with(other)))
                 .filter(|item| {

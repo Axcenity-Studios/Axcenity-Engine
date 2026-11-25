@@ -379,6 +379,44 @@ fn a_garment_is_hidden_under_the_ones_worn_over_it() {
     );
 }
 
+/// A slot can say another slot's item takes its own off the character
+/// (`Slot::hidden_by`, the human base's cut underwear under a top or a
+/// bottom): it stays worn, with no problem, but has no part, hides no
+/// region and covers nothing; it is drawn again when the other goes.
+#[test]
+fn an_item_in_a_slot_hidden_by_another_is_worn_but_not_drawn() {
+    let mut library = fixtures::rich_library();
+    let mut base = fixtures::rich_base();
+    let top = base.slots.iter_mut().find(|slot| slot.id == "top").unwrap();
+    top.hidden_by = vec!["outerwear".to_owned()];
+    assert!(base.validate().is_empty(), "{:?}", base.validate());
+    library.add_base("test/Body.base.json", base);
+    let mut tee = library.item("test/tee").expect("in the fixtures").clone();
+    tee.cover_map = Some("Tee.cover.png".to_owned());
+    library.add_item("test/items/tee.item.json", tee);
+
+    let mut description = Description::new("Ada", "test/body");
+    description.items.push(WornItem::new("test/tee"));
+    let alone = resolve(&library, &description).expect("it resolves");
+    let drawn = |resolved: &crate::Resolved, id: &str| {
+        resolved
+            .parts
+            .iter()
+            .any(|part| part.item.as_deref() == Some(id))
+    };
+    assert!(drawn(&alone, "test/tee"));
+    assert!(alone.hidden_regions.contains(&"torso".to_owned()));
+    assert_eq!(alone.covers.len(), 1);
+
+    description.items.push(WornItem::new("test/hood"));
+    let under = resolve(&library, &description).expect("it resolves");
+    assert!(under.problems.is_empty(), "{:?}", under.problems);
+    assert!(drawn(&under, "test/hood"));
+    assert!(!drawn(&under, "test/tee"));
+    assert!(!under.hidden_regions.contains(&"torso".to_owned()));
+    assert!(under.covers.is_empty(), "{:?}", under.covers);
+}
+
 #[test]
 fn garments_are_worn_in_order_of_layer_then_slot() {
     let order = |text: &str| fixtures::item(text).wearing_order();

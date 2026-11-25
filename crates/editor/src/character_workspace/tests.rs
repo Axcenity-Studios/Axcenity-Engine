@@ -1,13 +1,10 @@
 use std::collections::BTreeMap;
 
+use super::selection::Level;
 use super::stage::ViewPreset;
 use super::*;
 use crate::character_studio::test_folder;
 use crate::theme;
-
-/// The human base (ADR-0047): MakeHuman's body, shipped beside the
-/// realistic one until it replaces it.
-const HUMAN_BASE: &str = "axcenity/human";
 
 /// The body's `MeshId` and the parts it wears, as [`CharacterWorkspace::worn`]
 /// lists them, with derived models' identity keys left out (a key names a
@@ -20,53 +17,52 @@ fn worn_models(workspace: &CharacterWorkspace) -> Vec<String> {
         .collect()
 }
 
-/// Overhaul CO12: the workspace offers every body family the engine ships,
-/// the semi-realistic one first, and shows it with its own parts.
+/// Overhaul CO12: the workspace offers every body family the engine ships
+/// (one: the human base, ADR-0047) and shows it with its own parts.
 #[test]
-fn the_workspace_offers_the_realistic_body_and_shows_it() {
-    let folder = test_folder("workspace-realistic");
+fn the_workspace_offers_the_human_body_and_shows_it() {
+    let folder = test_folder("workspace-human");
     let started = Instant::now();
     let workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
-    println!("opened on the realistic body in {:?}", started.elapsed());
+    println!("opened on the human body in {:?}", started.elapsed());
     let library = workspace.library();
     assert!(
         library.base(DEFAULT_BASE).is_some(),
         "the shipped library was copied in"
     );
-    assert!(library.base(axcenity_avatar::V1_BASE).is_some());
+    assert_eq!(DEFAULT_BASE, "axcenity/human");
     assert_eq!(workspace.description().base, DEFAULT_BASE);
     assert_eq!(workspace.notice, None);
 
     let worn = worn_models(&workspace);
     assert!(
-        worn[0].starts_with("assets/characters/realistic/RealisticParts.glb#"),
-        "the body is the realistic one: {worn:?}"
+        worn[0].starts_with("assets/characters/human/HumanParts.glb#AxcenityHuman/Body"),
+        "the body is the human one: {worn:?}"
     );
-    for part in ["Eyes", "Teeth", "Lashes", "Brows", "Underwear_BoxerBriefs"] {
+    for part in ["Eyes", "Teeth", "Tongue", "Lashes", "Brows", "BoxerBriefs"] {
         assert!(worn.iter().any(|name| name == part), "{part} in {worn:?}");
     }
-    // Every family is offered (plan section 0, decision 7), the realistic
-    // one first, then by label: the human base (ADR-0047) ships beside the
-    // realistic one until it replaces it.
+    // Every family the library has is offered (plan section 0, decision
+    // 7): the engine ships the human base alone.
     assert!(offers_base(&library, DEFAULT_BASE));
-    assert!(offers_base(&library, HUMAN_BASE));
-    assert!(offers_base(&library, axcenity_avatar::V1_BASE));
+    assert!(!offers_base(&library, axcenity_avatar::V1_BASE));
     let families: Vec<&str> = presets::families(&library)
         .iter()
         .map(|base| base.id.as_str())
         .collect();
-    assert_eq!(
-        families,
-        [DEFAULT_BASE, HUMAN_BASE, axcenity_avatar::V1_BASE]
-    );
+    assert_eq!(families, [DEFAULT_BASE]);
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// The realistic body is Male or Female, a choice and not a slider: each
-/// wears its own underwear, the switch is one undo step, and a value in
-/// between (from an older file) is taken to the nearest.
+/// The human body is Male or Female, a choice: each wears its own
+/// underwear (boxer briefs; the female one a bandeau top too) and the
+/// switch is one undo step. A frame between the two is kept (the slider
+/// under the choice, `Parameter::between`) and wears what the nearer one
+/// does.
 #[test]
 fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
+    const BRIEFS: &str = "axcenity/human-boxer-briefs";
+    const BANDEAU: &str = "axcenity/human-bandeau";
     let folder = test_folder("workspace-frame");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let frame = workspace
@@ -80,7 +76,7 @@ fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     assert_eq!(workspace.parameter("frame"), 0.0);
     assert_eq!(
         workspace.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-boxer-briefs")
+        Some(BRIEFS)
     );
     assert_eq!(workspace.worn_in("underwear_top"), None);
 
@@ -88,22 +84,19 @@ fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     assert_eq!(workspace.parameter("frame"), 1.0);
     assert_eq!(
         workspace.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-briefs")
+        Some(BRIEFS)
     );
-    assert_eq!(
-        workspace.worn_in("underwear_top").as_deref(),
-        Some("axcenity/realistic-sports-bra")
-    );
+    assert_eq!(workspace.worn_in("underwear_top").as_deref(), Some(BANDEAU));
     let worn = worn_models(&workspace);
-    assert!(worn.iter().any(|name| name == "Underwear_Bra"), "{worn:?}");
-    assert!(
-        !worn.iter().any(|name| name == "Underwear_BoxerBriefs"),
-        "{worn:?}"
-    );
+    for part in ["Bandeau", "BoxerBriefs"] {
+        assert!(worn.iter().any(|name| name == part), "{part} in {worn:?}");
+    }
 
     workspace.undo();
     assert_eq!(workspace.parameter("frame"), 0.0);
     assert_eq!(workspace.worn_in("underwear_top"), None);
+    let worn = worn_models(&workspace);
+    assert!(!worn.iter().any(|name| name == "Bandeau"), "{worn:?}");
 
     // The underwear follows the choice and can't be taken off or swapped:
     // the Clothing page has no chips for it, and an edit that tries is
@@ -112,26 +105,26 @@ fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     assert_eq!(chosen, ["underwear_bottom", "underwear_top"]);
     workspace.choose(&frame, 1.0);
     workspace.wear("underwear_top", None);
-    workspace.wear("underwear_bottom", Some("axcenity/realistic-boxer-briefs"));
+    workspace.wear("underwear_bottom", Some("makehuman/female-panties-01"));
     assert_eq!(
         workspace.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-briefs")
+        Some(BRIEFS)
     );
-    assert_eq!(
-        workspace.worn_in("underwear_top").as_deref(),
-        Some("axcenity/realistic-sports-bra")
-    );
+    assert_eq!(workspace.worn_in("underwear_top").as_deref(), Some(BANDEAU));
+    workspace.wear("underwear_top", Some("makehuman/camisole-top"));
+    assert_eq!(workspace.worn_in("underwear_top").as_deref(), Some(BANDEAU));
     workspace.edit(|description| description.items.clear());
     assert_eq!(
         workspace.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-briefs")
+        Some(BRIEFS)
     );
+    assert_eq!(workspace.worn_in("underwear_top").as_deref(), Some(BANDEAU));
     workspace.choose(&frame, 0.0);
-    workspace.wear("underwear_top", Some("axcenity/realistic-sports-bra"));
+    workspace.wear("underwear_top", Some(BANDEAU));
     assert_eq!(workspace.worn_in("underwear_top"), None);
     assert_eq!(
         workspace.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-boxer-briefs")
+        Some(BRIEFS)
     );
 
     // A saved character without its underwear (an older file) gets it.
@@ -141,26 +134,102 @@ fn male_or_female_is_a_choice_that_wears_its_own_underwear() {
     let reopened = CharacterWorkspace::open(&folder, bare, true).unwrap();
     assert_eq!(
         reopened.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-briefs")
+        Some(BRIEFS)
     );
-    assert_eq!(
-        reopened.worn_in("underwear_top").as_deref(),
-        Some("axcenity/realistic-sports-bra")
-    );
+    assert_eq!(reopened.worn_in("underwear_top").as_deref(), Some(BANDEAU));
 
-    // A value between the two is taken to the nearest choice.
-    workspace.edit(|description| {
-        description.parameters.insert("frame".to_owned(), 0.7);
+    // A frame between the two is kept (Paul, 2026-11-25: "Restore the
+    // ability to adjust character frame options"; until then it was taken
+    // to the nearest choice), and dresses as the nearer body type: its
+    // slider's drag is one undo step.
+    assert_eq!(frame.between.as_deref(), Some("Masculine to feminine"));
+    // (Undone until nothing is left, on a copy.)
+    let steps = |workspace: &CharacterWorkspace| {
+        let mut history = workspace.history.clone();
+        let mut description = workspace.description().clone();
+        let mut depth = 0;
+        while let Some(before) = history.undo(description) {
+            description = before;
+            depth += 1;
+        }
+        depth
+    };
+    let before = steps(&workspace);
+    workspace.apply(Intent::SetParameter {
+        id: "frame".to_owned(),
+        value: 0.3,
+        gesture: Gesture::Drag,
     });
-    assert_eq!(workspace.parameter("frame"), 1.0);
+    workspace.apply(Intent::SetParameter {
+        id: "frame".to_owned(),
+        value: 0.7,
+        gesture: Gesture::Commit,
+    });
+    assert_eq!(workspace.parameter("frame"), 0.7);
+    assert_eq!(steps(&workspace), before + 1, "one step for the drag");
+    assert_eq!(workspace.worn_in("underwear_top").as_deref(), Some(BANDEAU));
+    workspace.apply(Intent::SetParameter {
+        id: "frame".to_owned(),
+        value: 0.3,
+        gesture: Gesture::Commit,
+    });
+    assert_eq!(workspace.parameter("frame"), 0.3);
+    assert_eq!(workspace.worn_in("underwear_top"), None);
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some(BRIEFS)
+    );
+    // Exactly halfway dresses as the first choice, and the clothes
+    // offered go by the same rule.
+    assert_eq!(
+        frame.nearest_choice(0.5).map(|c| c.label.as_str()),
+        Some("Male")
+    );
+    let mut halfway = workspace.description().clone();
+    halfway.parameters.insert("frame".to_owned(), 0.5);
+    let base = workspace.base().unwrap().clone();
+    assert_eq!(browser::feminine_body(&halfway, &base), Some(false));
+    halfway.parameters.insert("frame".to_owned(), 0.51);
+    assert_eq!(browser::feminine_body(&halfway, &base), Some(true));
+    // It is saved and opened as it is.
+    workspace.save().unwrap();
+    let saved = workspace.description().clone();
+    let reopened = CharacterWorkspace::open(&folder, saved.clone(), true).unwrap();
+    assert_eq!(*reopened.description(), saved);
+    assert_eq!(reopened.parameter("frame"), 0.3);
+    // The row: from the Detailed level, under the choice; Quick is the
+    // choice alone. Hand and foot size are Advanced.
+    workspace.apply(Intent::PickCategory(Category::Body));
+    let drawn = |workspace: &mut CharacterWorkspace, level| {
+        workspace.apply(Intent::PickLevel(level));
+        let ctx = crate::theme::test_context();
+        let mut texts = Vec::new();
+        for _ in 0..2 {
+            let output = crate::theme::run(&ctx, Default::default(), |ui| {
+                let _ = workspace.ui(ui, None);
+            });
+            texts = super::shell_tests::drawn_texts(&output);
+        }
+        texts
+    };
+    let has = |texts: &[String], wanted: &str| texts.iter().any(|text| text == wanted);
+    let quick = drawn(&mut workspace, Level::Quick);
+    assert!(has(&quick, "Male") && has(&quick, "Female"), "{quick:?}");
+    assert!(!has(&quick, "Masculine to feminine"));
+    let detailed = drawn(&mut workspace, Level::Detailed);
+    assert!(has(&detailed, "Masculine to feminine"), "{detailed:?}");
+    assert!(has(&detailed, "0.30"), "its value: {detailed:?}");
+    assert!(!has(&detailed, "Hand size"));
+    let advanced = drawn(&mut workspace, Level::Advanced);
+    assert!(has(&advanced, "Hand size") && has(&advanced, "Foot size"));
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// A slider on the realistic body changes the preview's identity, worn
+/// A slider on the human body changes the preview's identity, worn
 /// live (ADR-0041): the body keeps its base model and wears a new identity
 /// key, nothing is baked, and a drag is shown while it goes on.
 #[test]
-fn a_slider_changes_the_realistic_preview_while_it_is_dragged() {
+fn a_slider_changes_the_preview_while_it_is_dragged() {
     let folder = test_folder("workspace-slider");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let body = applier::body_of(&workspace.world, workspace.character.unwrap()).unwrap();
@@ -206,7 +275,7 @@ fn symmetry_moves_a_parameters_mirror_too() {
         .parameters
         .iter()
         .find(|parameter| parameter.mirror.is_some())
-        .expect("the realistic face has mirrored pairs")
+        .expect("the human face has mirrored pairs")
         .clone();
     let right = left.mirror.clone().unwrap();
     let [low, high] = left.range;
@@ -224,38 +293,12 @@ fn symmetry_moves_a_parameters_mirror_too() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// Picking the other body starts that body's default character, keeping
-/// the name; undo goes back.
+/// A character file CS2's workspace saved (format 1) is read as a
+/// character on the stylized body wearing what it wore. The library no
+/// longer ships that body, so the workspace shows the default character
+/// under the file's name and says so; what it saves is format 2.
 #[test]
-fn switching_the_body_starts_its_default_character_and_undo_returns() {
-    let folder = test_folder("workspace-switch");
-    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
-    workspace.edit(|description| description.name = "Sam".to_owned());
-    let realistic = workspace.description().clone();
-
-    workspace.set_base(axcenity_avatar::V1_BASE);
-    assert_eq!(workspace.description().base, axcenity_avatar::V1_BASE);
-    assert_eq!(workspace.description().name, "Sam");
-    let worn = worn_models(&workspace);
-    assert!(
-        worn[0].starts_with("assets/characters/humanoid/"),
-        "{worn:?}"
-    );
-    assert!(
-        workspace.worn_in("hair").is_some(),
-        "the stylized body wears its default outfit"
-    );
-
-    workspace.undo();
-    assert_eq!(workspace.description(), &realistic);
-    assert!(worn_models(&workspace)[0].starts_with("assets/characters/realistic/"));
-    let _ = std::fs::remove_dir_all(&folder);
-}
-
-/// A character file CS2's workspace saved (format 1) opens on the stylized
-/// body wearing what it wore, and saves as format 2.
-#[test]
-fn a_format_1_character_file_opens_on_the_stylized_body_and_saves_as_format_2() {
+fn a_format_1_character_file_opens_as_the_default_character_with_a_notice() {
     let folder = test_folder("workspace-format-1");
     let file = folder.join("Old.character.json");
     std::fs::write(
@@ -265,19 +308,35 @@ fn a_format_1_character_file_opens_on_the_stylized_body_and_saves_as_format_2() 
             "bottom": "Pants_Cargo", "shoes": "Shoes_Sneakers"}"#,
     )
     .unwrap();
+    // The file still migrates: the old Look is a stylized character.
+    let migrated = read_character(&file).unwrap();
+    assert_eq!(migrated.base, axcenity_avatar::V1_BASE);
+    assert_eq!(migrated.name, "Old");
+    assert!(
+        migrated
+            .items
+            .iter()
+            .any(|worn| worn.id == "axcenity/hair-bob"),
+        "{:?}",
+        migrated.items
+    );
+
     let mut workspace = CharacterWorkspace::open_file(&folder, &file).unwrap();
     assert!(!workspace.dirty());
     let description = workspace.description().clone();
-    assert_eq!(description.base, axcenity_avatar::V1_BASE);
-    assert_eq!(
-        workspace.worn_in("hair").as_deref(),
-        Some("axcenity/hair-bob")
+    let library = workspace.library();
+    let mut default = applier::default_description(&library, DEFAULT_BASE);
+    default.name = "Old".to_owned();
+    assert_eq!(description, tidy(default, &library));
+    let notice = workspace.notice.clone().expect("the fallback is said");
+    assert!(
+        notice.contains("\"Old\"") && notice.contains(axcenity_avatar::V1_BASE),
+        "{notice}"
     );
-    assert_eq!(workspace.worn_in("outerwear"), None);
-    assert_eq!(workspace.parameter("build"), 0.4);
+    assert_eq!(workspace.worn_in("hair"), None);
     let worn = worn_models(&workspace);
     assert!(
-        worn.iter().any(|name| name.contains("Hair_Bob")),
+        worn[0].starts_with("assets/characters/human/HumanParts.glb#"),
         "{worn:?}"
     );
 
@@ -290,6 +349,7 @@ fn a_format_1_character_file_opens_on_the_stylized_body_and_saves_as_format_2() 
 
 #[test]
 fn the_workspace_dresses_the_preview_undoes_and_saves() {
+    const BRIEFS: &str = "axcenity/human-boxer-briefs";
     let folder = test_folder("workspace");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::shipped("female")).unwrap();
     // The humanoid's files are written for the preview.
@@ -300,8 +360,13 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
     );
     assert!(workspace.dirty(), "a new character isn't saved yet");
     let default_bottom = workspace.worn_in("underwear_bottom");
-    assert_eq!(default_bottom.as_deref(), Some("axcenity/realistic-briefs"));
-    assert!(workspace.worn_in("underwear_top").is_some());
+    assert_eq!(default_bottom.as_deref(), Some(BRIEFS));
+    assert_eq!(
+        workspace.worn_in("underwear_top").as_deref(),
+        Some("axcenity/human-bandeau")
+    );
+    let worn = workspace.worn().join(" ");
+    assert!(worn.contains("Bandeau"), "{worn}");
 
     let frame = workspace
         .base()
@@ -311,18 +376,19 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
         .clone();
     workspace.choose(&frame, 0.0);
     let worn = workspace.worn().join(" ");
-    assert!(worn.contains("Underwear_BoxerBriefs"), "{worn}");
-    assert!(!worn.contains("Underwear_Briefs"), "{worn}");
-    assert!(!worn.contains("Underwear_Bra"), "{worn}");
-    // Only items that fit this body are offered.
+    assert!(worn.contains("BoxerBriefs"), "{worn}");
+    assert!(!worn.contains("Bandeau"), "{worn}");
+    // Only items that fit this body, in the slot asked for, are offered.
+    let library = workspace.library();
     let bottoms = workspace.items_for("underwear_bottom");
+    assert!(bottoms.iter().any(|(id, _)| id == BRIEFS));
+    for (id, _) in &bottoms {
+        let item = library.item(id).unwrap();
+        assert_eq!(item.slot, "underwear_bottom", "{id}");
+        assert!(item.bases.iter().any(|base| base == DEFAULT_BASE), "{id}");
+    }
     assert!(
-        bottoms
-            .iter()
-            .any(|(id, _)| id == "axcenity/realistic-briefs")
-    );
-    assert!(
-        !bottoms.iter().any(|(id, _)| id == "axcenity/briefs"),
+        !bottoms.iter().any(|(id, _)| id == "makehuman/cargo-pants"),
         "{bottoms:?}"
     );
 
@@ -333,18 +399,15 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
     workspace.set_parameter(&fat, 0.5, true);
     workspace.undo();
     assert_eq!(workspace.parameter("fat"), 0.0);
-    assert_eq!(
-        workspace.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-boxer-briefs")
-    );
+    assert_eq!(workspace.parameter("frame"), 0.0);
+    assert_eq!(workspace.worn_in("underwear_top"), None);
     workspace.undo();
+    assert_eq!(workspace.parameter("frame"), 1.0);
     assert!(workspace.worn_in("underwear_top").is_some());
     assert!(!workspace.can_undo());
     workspace.redo();
-    assert_eq!(
-        workspace.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-boxer-briefs")
-    );
+    assert_eq!(workspace.parameter("frame"), 0.0);
+    assert_eq!(workspace.worn_in("underwear_top"), None);
     workspace.choose(&frame, 1.0);
 
     workspace.edit(|description| description.name = "Test Hero".to_owned());
@@ -369,9 +432,13 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
     // Reset is the body's default character, keeping the name, and undoable.
     workspace.reset();
     assert_eq!(
-        workspace.worn_in("underwear_bottom").as_deref(),
-        Some("axcenity/realistic-boxer-briefs"),
+        workspace.worn_in("underwear_top"),
+        None,
         "the default character is Male"
+    );
+    assert_eq!(
+        workspace.worn_in("underwear_bottom").as_deref(),
+        Some(BRIEFS)
     );
     assert_eq!(workspace.parameter("frame"), 0.0);
     assert_eq!(workspace.description().name, "Test Hero");
@@ -381,11 +448,11 @@ fn the_workspace_dresses_the_preview_undoes_and_saves() {
 }
 
 /// Every new character the studio offers (New's families and presets,
-/// the start page's cards) is sound and on its family's body: realistic
-/// first, its first choice the realistic default character; the stylized
-/// family, which has no presets, offers its default character.
+/// the start page's cards) is sound and on its family's body: the engine
+/// ships one family, the human base, whose first choice is its default
+/// character.
 #[test]
-fn every_new_character_choice_is_sound_on_both_families() {
+fn every_new_character_choice_is_sound() {
     let folder = test_folder("workspace-new-choices");
     let workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let library = workspace.library();
@@ -395,9 +462,13 @@ fn every_new_character_choice_is_sound_on_both_families() {
         .filter(|(_, _, start)| start.is_none())
         .map(|(label, _, _)| label.as_str())
         .collect();
-    assert_eq!(headings, ["Realistic", "Human", "Stylized"]);
+    assert_eq!(headings, ["Human"]);
     let starts: Vec<&Start> = choices.iter().filter_map(|(_, _, s)| s.as_ref()).collect();
-    assert_eq!(starts[0], &Start::shipped("male"));
+    assert_eq!(
+        starts,
+        [&Start::shipped("male"), &Start::shipped("female")],
+        "the family's character presets, its default character first"
+    );
     assert_eq!(
         workspace.starting(starts[0]),
         tidy(
@@ -406,9 +477,6 @@ fn every_new_character_choice_is_sound_on_both_families() {
         ),
         "the first is the default character"
     );
-    // The stylized family's presets (data since wave 3), its default
-    // character first.
-    assert!(starts.contains(&&Start::Preset("axcenity/stylized-masculine".to_owned())));
 
     for start in starts {
         let made = workspace.starting(start);
@@ -429,12 +497,18 @@ fn every_new_character_choice_is_sound_on_both_families() {
 }
 
 #[test]
-fn the_workspace_draws_every_category_on_both_bodies_without_a_gpu() {
+fn the_workspace_draws_every_category_on_both_body_types_without_a_gpu() {
     let folder = test_folder("workspace-ui");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
     let ctx = theme::test_context();
-    for base in [DEFAULT_BASE, HUMAN_BASE, axcenity_avatar::V1_BASE] {
-        workspace.set_base(base);
+    let frame = workspace
+        .base()
+        .unwrap()
+        .parameter("frame")
+        .unwrap()
+        .clone();
+    for body_type in [1.0, 0.0] {
+        workspace.choose(&frame, body_type);
         for level in selection::Level::ALL {
             workspace.selection.level = level;
             for category in Category::ALL {
@@ -447,11 +521,10 @@ fn the_workspace_draws_every_category_on_both_bodies_without_a_gpu() {
             }
         }
     }
-    // With `AXCENITY_SNAPSHOTS`, the whole workspace on the realistic body,
+    // With `AXCENITY_SNAPSHOTS`, the whole workspace on the human body,
     // drawn for real, on the Body and Face pages (every page:
     // `shell_tests::every_page_is_drawn_with_its_controls`).
     if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
-        workspace.set_base(DEFAULT_BASE);
         workspace.selection.level = selection::Level::Detailed;
         for category in [Category::Body, Category::Face] {
             workspace.pick_category(category);
@@ -513,11 +586,14 @@ fn a_character_file_applied_in_a_game_matches_the_workspaces_preview() {
     use axcenity_render::glam::Vec3;
     let folder = test_folder("workspace-agrees");
     let mut workspace =
-        CharacterWorkspace::open_new(&folder, &Start::shipped("athletic-male")).unwrap();
+        CharacterWorkspace::open_new(&folder, &Start::shipped("body-athletic")).unwrap();
+    assert_eq!(workspace.parameter("muscle"), 0.65, "the Athletic build");
     workspace.edit(|description| {
         description.name = "Agrees".to_owned();
         description.parameters.insert("fat".to_owned(), 0.6);
-        description.parameters.insert("nose_length".to_owned(), 0.5);
+        description
+            .parameters
+            .insert("nose_scale_vert".to_owned(), 0.5);
     });
     let path = workspace.save().unwrap();
 
@@ -596,10 +672,10 @@ fn a_character_file_applied_in_a_game_matches_the_workspaces_preview() {
 
 /// The preview as Character Studio draws it (its camera, stage lighting and
 /// backdrop, the applied character idling), rendered offscreen for the
-/// realistic body on both frames and the stylized one. With
-/// `AXCENITY_SNAPSHOTS` naming a folder, each is saved there to look at.
+/// human body on both body types and dressed. With `AXCENITY_SNAPSHOTS`
+/// naming a folder, each is saved there to look at.
 #[test]
-fn the_preview_draws_the_realistic_character() {
+fn the_preview_draws_the_human_character() {
     use axcenity_render::TextureRenderer;
     let instance = axcenity_render::adapters::instance();
     let Some((device, queue)) =
@@ -617,15 +693,20 @@ fn the_preview_draws_the_realistic_character() {
     let (width, height) = (640, 720);
     let mut renderer = TextureRenderer::new(&device, &queue, width, height);
     let mut frames = Vec::new();
-    for (name, start) in [
-        ("realistic", Start::default()),
-        ("realistic-feminine", Start::shipped("female")),
+    for (name, start, outfit) in [
+        ("human", Start::default(), None),
+        ("human-female", Start::shipped("female"), None),
         (
-            "stylized",
-            Start::Family(axcenity_avatar::V1_BASE.to_owned()),
+            "human-dressed",
+            Start::default(),
+            Some("makehuman/male-casualsuit01"),
         ),
     ] {
         let mut workspace = CharacterWorkspace::open_new(&folder, &start).unwrap();
+        if let Some(outfit) = outfit {
+            workspace.wear("top", Some(outfit));
+            assert_eq!(workspace.worn_in("top").as_deref(), Some(outfit));
+        }
         for _ in 0..10 {
             workspace.step_by(1.0 / 30.0);
         }
@@ -676,9 +757,10 @@ fn the_preview_draws_the_realistic_character() {
         .zip(frames[2].1.chunks(4))
         .filter(|(a, b)| a[..3].iter().zip(&b[..3]).any(|(a, b)| a.abs_diff(*b) > 8))
         .count();
+    println!("dressed differs from undressed in {changed} pixels");
     assert!(
         changed > (width * height) as usize / 50,
-        "the two bodies look different"
+        "the dressed character looks different"
     );
     let _ = std::fs::remove_dir_all(&folder);
 }
@@ -690,7 +772,6 @@ fn the_preview_draws_the_realistic_character() {
 fn the_human_bases_skin_is_a_choice_on_the_skin_page() {
     let folder = test_folder("workspace-human-skin");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
-    workspace.set_base(HUMAN_BASE);
     assert_eq!(workspace.notice, None);
     workspace.apply(Intent::PickCategory(Category::SkinAndMakeup));
     let ctx = theme::test_context();
@@ -756,7 +837,6 @@ fn the_human_bases_skin_is_a_choice_on_the_skin_page() {
 fn the_human_bases_hairstyles_are_on_the_hair_page_and_can_be_worn() {
     let folder = test_folder("workspace-human-hair");
     let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
-    workspace.set_base(HUMAN_BASE);
     workspace.apply(Intent::PickCategory(Category::Hair));
     let ctx = theme::test_context();
     let mut drawn = Vec::new();

@@ -1,5 +1,5 @@
-//! Refinement R2a (ADR-0041): what a frame costs with N realistic
-//! characters of distinct descriptions, each wearing its identity live
+//! Refinement R2a (ADR-0041): what a frame costs with N characters of
+//! the human base with distinct descriptions, each wearing its identity live
 //! (the base meshes, shape weights and bone changes on every pose) and,
 //! for comparison, baked (`gameplay::description::bake`: one derived model
 //! per part per character, what every character was before R2a). Ignored
@@ -9,8 +9,10 @@
 //! cargo test -p axcenity-player --release -- --ignored bench_distinct_characters --nocapture --test-threads 1
 //! ```
 //!
-//! The numbers are in
-//! `docs/development/character-studio/refinement/r2/r2a-live-identity.md`.
+//! The numbers in
+//! `docs/development/character-studio/refinement/r2/r2a-live-identity.md`
+//! are the retired realistic base's; nothing was measured again on the
+//! human base (ADR-0050).
 
 use std::collections::BTreeSet;
 
@@ -24,7 +26,7 @@ use super::bench_tests::{camera, run};
 use super::character_capture::{Stage, repository_library};
 use super::*;
 
-/// `count` realistic characters in a grid, each with its own randomized
+/// `count` characters in a grid, each with its own randomized
 /// description, idling; baked when `baked`.
 fn distinct_characters(count: usize, baked: bool) {
     let name = format!(
@@ -34,7 +36,7 @@ fn distinct_characters(count: usize, baked: bool) {
     let stage =
         Stage::new(&format!("bench-{count}-{baked}"), &repository_library()).expect("the stage");
     let shipped = library(&stage.assets);
-    let default = default_description(&shipped, "axcenity/realistic");
+    let default = default_description(&shipped, axcenity_avatar::DEFAULT_BASE);
     let mut world = World::new();
     let workspace = world.workspace();
     let mut identities = BTreeSet::new();

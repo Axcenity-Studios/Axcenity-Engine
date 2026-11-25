@@ -1,4 +1,4 @@
-//! What a parameter's choices wear (the realistic body's underwear, which
+//! What a parameter's choices wear (the human body's underwear, which
 //! follows Male or Female): always on. Character Studio has no control to
 //! take it off, and [`crate::resolve`] and the Character Runtime put it on
 //! a description that leaves it out, so a script can't take it off either.

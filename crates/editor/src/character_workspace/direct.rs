@@ -95,6 +95,12 @@ const HOLLOW: f32 = 0.01;
 /// the whole muzzle, the jaw's shift the lower face). It's left out of the
 /// tint.
 const BROAD: f32 = 4.0;
+/// A face feature whose shapes light more than this many times the skin
+/// the features usually do (their median) is a whole part of the head (the
+/// face's shape, the neck), not a place on it: it keeps all of its skin and
+/// takes none from the features inside it, which are what is picked there
+/// (the smallest lit feature under the pointer).
+const WHOLE: f32 = 5.0;
 /// Two drives of one handle whose screen lines are closer than this
 /// (degrees) can't share a drag: the second gives way.
 const APART: f32 = 25.0;
@@ -488,12 +494,30 @@ fn tint_weights(
 /// stronger, a feature's fades, and its edge runs where the two are
 /// equal. The eyes' shapes move the brows and the upper cheek too, but the
 /// brows' and the cheeks' shapes move them more. Smoothed once more after,
-/// so that shared edge runs smoothly too.
+/// so that shared edge runs smoothly too. A feature that is a whole part
+/// of the head ([`WHOLE`]) shares with none: against it every smaller
+/// feature sat at exactly the edge's weight wherever both were full, and
+/// was hardly lit or picked (the human base's nose, eyes and cheeks under
+/// its face shape, found 2026-11-25).
 fn compete(model: &Model, mut features: Vec<PreparedFeature>) -> Vec<PreparedFeature> {
     let before: Vec<Option<Vec<Vec<f32>>>> = features
         .iter()
         .map(|feature| feature.shaped.then(|| feature.weights.clone()))
         .collect();
+    // The skin each lights before sharing (the file's units, squared).
+    let lit: Vec<f32> = before
+        .iter()
+        .map(|weights| {
+            weights
+                .as_ref()
+                .map_or(0.0, |weights| lit_area(model, weights))
+        })
+        .collect();
+    let mut usual: Vec<f32> = lit.iter().copied().filter(|area| *area > 0.0).collect();
+    usual.sort_by(f32::total_cmp);
+    let usual = usual.get(usual.len() / 2).copied().unwrap_or(0.0);
+    let whole = |feature: usize| lit[feature] > WHOLE * usual;
+    let rivals = |a: usize, b: usize| !whole(a) && !whole(b);
     for (index, feature) in features.iter_mut().enumerate() {
         if !feature.shaped {
             continue;
@@ -503,7 +527,7 @@ fn compete(model: &Model, mut features: Vec<PreparedFeature>) -> Vec<PreparedFea
                 let other = before
                     .iter()
                     .enumerate()
-                    .filter(|(other, _)| *other != index)
+                    .filter(|(other, _)| *other != index && rivals(index, *other))
                     .filter_map(|(_, weights)| weights.as_ref()?.get(primitive)?.get(corner))
                     .fold(0.0_f32, |most, weight| most.max(*weight));
                 // EDGE where the two are equal, full a quarter above.
@@ -515,6 +539,33 @@ fn compete(model: &Model, mut features: Vec<PreparedFeature>) -> Vec<PreparedFea
         }
     }
     features
+}
+
+/// The area of `model`'s triangles whose corners all have at least
+/// [`EDGE`] of `weights` (a weight a corner of each primitive).
+fn lit_area(model: &Model, weights: &[Vec<f32>]) -> f32 {
+    model
+        .primitives
+        .iter()
+        .zip(weights)
+        .map(|(primitive, weights)| {
+            let lit = |corner: u32| weights.get(corner as usize).is_some_and(|w| *w >= EDGE);
+            let at = |corner: u32| {
+                primitive
+                    .positions
+                    .get(corner as usize)
+                    .map_or(Vec3::ZERO, |p| Vec3::from(*p))
+            };
+            primitive
+                .indices
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .filter(|triangle| triangle.iter().all(|corner| lit(*corner)))
+                .map(|&[a, b, c]| (at(b) - at(a)).cross(at(c) - at(a)).length() / 2.0)
+                .sum::<f32>()
+        })
+        .sum()
 }
 
 /// Takes the tint off the skin inside a hollow: a corner whose normal
@@ -2151,16 +2202,31 @@ impl CharacterWorkspace {
             {
                 return Some(feature);
             }
-            let skin = axcenity_scene::ray_model(model, posed, transform, ray)?;
             let per_metre = axcenity_scene::fitted_per_metre(model).unwrap_or(1.0)
                 * transform.transform_vector3(Vec3::X).length();
             // Through what the description wears the skin is found much
             // farther back than through the base's own parts (an eyeball).
             let through = if item { THROUGH_WORN } else { THROUGH };
-            if skin.distance - first.hit.distance > through * per_metre {
-                return None;
+            let skin = axcenity_scene::ray_model(model, posed, transform, ray)
+                .filter(|skin| skin.distance - first.hit.distance <= through * per_metre);
+            match skin {
+                Some(skin) => skin,
+                // A part of the base with no skin close behind it (an
+                // eyeball in an open socket) is its own place at rest:
+                // the feature whose anchors that is nearest.
+                None if !item => {
+                    // Each model is fitted to its own box: through the
+                    // part's file space into the body's fitted one.
+                    let at = first.hit.at_rest(&first.model)?;
+                    let part_fit = first.model.rig.as_ref()?.fit;
+                    let body_fit = model.rig.as_ref()?.fit;
+                    let at = body_fit.transform_point3(part_fit.inverse().transform_point3(at));
+                    return prepared
+                        .feature_by_anchor(at, None)
+                        .map(|feature| feature.id.clone());
+                }
+                None => return None,
             }
-            skin
         };
         prepared
             .feature_hit(&hit, model)

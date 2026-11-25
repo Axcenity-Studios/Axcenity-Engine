@@ -3860,7 +3860,7 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     (
         ClassName::HumanoidDescription,
         "Base",
-        "The ID of its base model in the project's character library, such as `axcenity/stylized`. The methods keep it the same as the `base` in Data; with Data empty, the description is this base model's default character (of `axcenity/stylized` when this is empty too).",
+        "The ID of its base model in the project's character library, such as `axcenity/human`. The methods keep it the same as the `base` in Data; with Data empty, the description is this base model's default character (of the library's default base, `axcenity/human`, when this is empty too).",
     ),
     (
         ClassName::HumanoidDescription,

@@ -192,16 +192,29 @@ mod tests {
         );
         assert!(start.iter().any(|text| text == "Debug"), "{start:?}");
 
-        // The Athletic preset, from the start page: the realistic body.
-        app.open_character_workspace(Some(Start::shipped("athletic-male")), None);
+        // The Female preset, from the start page: the human base's female
+        // body, in the underwear that body type wears.
+        app.open_character_workspace(Some(Start::shipped("female")), None);
         let workspace = app.character_workspace.as_ref().expect("opened");
         assert_eq!(
             workspace.description().base,
             crate::character_workspace::DEFAULT_BASE
         );
-        assert_eq!(workspace.description().parameters.get("muscle"), Some(&0.7));
+        assert_eq!(workspace.description().parameters.get("frame"), Some(&1.0));
+        let worn: Vec<&str> = workspace
+            .description()
+            .items
+            .iter()
+            .map(|worn| worn.id.as_str())
+            .collect();
+        assert_eq!(
+            worn,
+            ["axcenity/human-boxer-briefs", "axcenity/human-bandeau"]
+        );
         assert_eq!(app.title(), "New Character* - Character Studio");
         let drawn = frame(&mut app, &ctx);
+        // The pages, and the Body page it opens on: "Athletic" is one of
+        // the human base's body presets there.
         for text in ["Customize", "Presets", "Face", "Clothing", "Athletic"] {
             let found = drawn
                 .iter()

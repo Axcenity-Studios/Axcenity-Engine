@@ -22,6 +22,7 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 
 | Item | PR | Area | Headline (Measured) | Machine |
 |---|---|---|---|---|
+| Character Studio's tiles previewed off the interface's thread | 2026-11-25 | Editor, Character Studio | A tile's first preview on the Clothing page 24–147 ms (median 44) → none for a tile crossed or scrolled past; a rested tile's first preview 79 → 47 ms with a renderer (hairstyle 133 → 22 ms), debug build | Desktop under Fedora |
 | Editor open without a frozen first frame | #290 | Editor startup | Abandoned Farmhouse first open (debug, lavapipe): first editor frame after the load 8 s → 1.5 s; the rest goes to the GPU behind a counted loading screen | Container |
 | Collaborate packing and the world load | C11 | Collaborate, project | S10k join message 953 → 82 KiB; `project::load` of S10k 5.66 → 0.19 s | Container |
 | Streaming world: only what changed | Phase 80 (unified plan) | Network, ownership | Server with 1 player: Network send 16.7 → 2.0 ms, frame 21.9 → 4.2 ms | Container |
@@ -58,6 +59,22 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | Culling, LOD | graphics Ph. 12–13 | Render | Edge views draw only what's seen; foliage cull distances | Desktop |
 
 ## Entries
+
+### Character Studio's tile previews (2026-11-25)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | Paul's Character Studio review of 2026-11-25 ("noticeable lag when scrolling through or viewing clothing models") |
+| **Evidence** | Measured (the interface's thread, in a test); not measured in the running editor |
+| **Problem** | Scrolling the Clothing page, or moving the pointer across it, stalled the frame once per tile |
+| **Root cause** | A tile under the pointer was previewed at once: the character wearing it was applied to the preview, which read the garment's model (1 to 15 MB of glTF with 15 to 81 blend shapes) with `Assets::model_blocking` on the interface's thread, then made the body's copy with its hidden skin and uploaded both. With the wheel turning, each tile that came under the pointer did so. Besides: each change to the character queued a picture for every tile of the page behind the ones already queued (nothing took a stale request back), and every finished picture was read from its PNG and decoded on the interface's thread, four a frame |
+| **Solution** | The panel says which tile the pointer is over; the workspace asks the loader's thread for what that tile would show (`Assets::request_model`) and the preview starts only once the pointer has rested there 0.15 s, with the wheel still, and the models are in. A picture no longer wanted is dropped from the picture thread's queue, and a finished one comes back with its pixels |
+| **Affected components** | `crates/editor/src/character_workspace/browser.rs`, `panel/browser.rs`, `shell.rs`, `thumbnails.rs` |
+| **Before → after** | A tile's first preview, 49 garments: 24–147 ms each, median 44, 2.9 s in all (CPU only), or 48–212 ms, median 79, 4.8 s with a renderer drawing 830 by 780 → nothing for a tile not rested on; a rested tile 41–104 ms, median 47 (the read, 2.35 s for the 49, on the loader's thread). Ten hairstyles: median 133 → 22 ms. A second preview of the same tile: 12 ms and 4 ms, unchanged. A still frame of the page: 1.25 ms, unchanged. A tile's picture: 14 ms once its models are loaded (55 tiles: 0.8 s on the picture thread) |
+| **Method** | `cargo test -p axcenity-editor -- --ignored browser_costs --nocapture` (`character_workspace/timing_tests.rs`): the studio driven through its intents on the shipped library, each tile hovered in turn, the frame's work timed on the interface's thread with a `TextureRenderer` drawing and reading back each frame. A **debug** build, as `cargo run` makes the editor (the `avatar`, `assets`, `anim`, `scene` and `render` crates are optimized in it); one run each |
+| **Hardware** | Desktop under Fedora (Ryzen 9 9950X3D, radv): see [Hardware notes](Hardware-Notes.md); the Desktop's Windows numbers are not comparable |
+| **Trade-offs** | A preview starts 0.15 s after the pointer stops, not at once. What is left at a first preview is on the interface's thread still: the body's copy with its hidden skin (one per outfit that hides something) and the uploads |
+| **Detail** | `docs/editor/character-studio.md`, "A click wears, a hover previews" |
 
 ### Collaborate on S10k and the world load (2026-11-12)
 

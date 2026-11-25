@@ -1,23 +1,22 @@
-//! The default game character (refinement R10, OPEN-22; plan section 0,
-//! decision 7: both families are selectable, the realistic one the
-//! default).
+//! The default game character (refinement R10, OPEN-22; since the
+//! consolidation of 2026-11-25 the engine has one family, the human base).
 //!
-//! A new project, and Insert > Character in any project, get both of the
-//! engine's character families in their library: the stylized package
-//! built into the engine ([`add_character_library`]) and the packages the
-//! engine ships beside it (`assets/characters/`, found by
-//! [`shipped_character_library`]; the realistic body's model is too big
-//! to build into the program). The default character is then the
-//! realistic one: the default humanoid's Model ([`default_character`])
-//! with a description kept in its Humanoid ([`described_character`]),
-//! which the Character Runtime applies wherever the world is loaded
+//! A new project, and Insert > Character in any project, get the human
+//! base in their library, copied from the packages the engine ships
+//! (`assets/characters/`, found by [`shipped_character_library`]: the
+//! body's model is too big to build into the program) with what the
+//! default character wears and nothing else of the wardrobe. The default
+//! character is the default humanoid's Model ([`default_character`]) with
+//! a description kept in its Humanoid ([`described_character`]), which the
+//! Character Runtime applies wherever the world is loaded
 //! (`gameplay::description::DescriptionSync`), in the editor's edit mode
 //! too. Without the shipped packages (a program run away from its files)
-//! the default character stays the stylized one.
+//! the default character is the default humanoid's own model, the same
+//! body in its underwear, with no description to change it by.
 //!
 //! A project's own files are never written over: an older project keeps
-//! its `Character` prefab (its players stay what they were) and only
-//! gains the families it lacked.
+//! its `Character` prefab (its players stay what they were) and its
+//! library's own packages.
 
 use std::path::{Path, PathBuf};
 
@@ -27,8 +26,17 @@ use axcenity_core::{ClassName, InstanceId, Value, Vector3};
 use super::default_humanoid::write_missing;
 use super::*;
 
-/// The base model of the default game character: the realistic family.
-pub const DEFAULT_GAME_BASE: &str = "axcenity/realistic";
+/// The base model of the default game character: the human base.
+pub const DEFAULT_GAME_BASE: &str = axcenity_avatar::DEFAULT_BASE;
+
+/// What the default game character wears over its base's default items,
+/// where the library has them: MakeHuman's shirt and jeans, its brown
+/// shoes and a short hairstyle.
+pub const DEFAULT_GAME_OUTFIT: [&str; 3] = [
+    "makehuman/male-casualsuit01",
+    "makehuman/shoes01",
+    "makehuman/hair-short02",
+];
 
 /// The name of the description kept in a described character's Humanoid.
 pub const KEPT_DESCRIPTION: &str = "HumanoidDescription";
@@ -52,36 +60,50 @@ pub fn shipped_character_library() -> Option<PathBuf> {
         .find(|folder| folder.join("catalogue.json").is_file())
 }
 
-/// Gives `project` both character families: the built-in stylized
-/// package, then the packages in `shipped` (see
-/// [`add_character_packages`]: a project's own files and IDs are kept).
-/// Returns the project's library as it is now.
-pub fn add_both_character_libraries(
+/// Gives `project` the default game character's family from the library
+/// in `shipped`: the human base and what the default character wears
+/// ([`add_character_packages_for`]: a project's own files and IDs are
+/// kept). Returns the project's library as it is now.
+pub fn add_game_character_library(
     project: &Path,
     shipped: Option<&Path>,
 ) -> Result<Library, SaveError> {
-    add_character_library(project)?;
     if let Some(shipped) = shipped {
-        add_character_packages(project, shipped)?;
+        let (library, _, _) = Library::read(shipped);
+        if let Some(description) = game_character_description(&library) {
+            add_character_packages_for(project, shipped, &[&description])?;
+        }
     }
     Ok(Library::read(&project.join(LIBRARY_FOLDER)).0)
 }
 
-/// The default game character's description: the realistic family's
-/// default character (its default items, every parameter at its
-/// default), named `Character`. `None` when `library` hasn't the family.
+/// The default game character's description: the human base's default
+/// character (its default items, every parameter at its default) in
+/// [`DEFAULT_GAME_OUTFIT`], named `Character`. `None` when `library`
+/// hasn't the base.
 pub fn game_character_description(library: &Library) -> Option<Description> {
     let base = library.base(DEFAULT_GAME_BASE)?;
     let mut description = Description::new("Character", DEFAULT_GAME_BASE);
-    description.items = base.defaults.items.iter().map(WornItem::new).collect();
+    description.items = base
+        .defaults
+        .items
+        .iter()
+        .map(String::as_str)
+        .chain(
+            DEFAULT_GAME_OUTFIT
+                .into_iter()
+                .filter(|id| library.item(id).is_some()),
+        )
+        .map(WornItem::new)
+        .collect();
     Some(description)
 }
 
 /// The default character ([`default_character`]) wearing `description`:
 /// a HumanoidDescription named [`KEPT_DESCRIPTION`] inside its Humanoid
 /// holds it (`Base` and `Data`), which the Character Runtime applies
-/// where the world is loaded. Until then its `Body` is the stylized
-/// model's.
+/// where the world is loaded. Until then its `Body` is the default
+/// humanoid's model.
 pub fn described_character(
     world: &mut World,
     position: Vector3,
@@ -108,18 +130,19 @@ pub fn described_character(
 }
 
 /// Writes the default humanoid's files into `project` (see
-/// [`add_default_humanoid`]) with both character families
-/// ([`add_both_character_libraries`]), and a `Character` prefab of the
-/// default game character: the realistic one when the library has it,
-/// else the stylized one. Files already there are kept, so an older
-/// project's prefab stays as it is. Returns the prefab's path.
+/// [`add_default_humanoid`]) with the human base from `shipped`
+/// ([`add_game_character_library`]), and a `Character` prefab of the
+/// default game character: the described one when the library has the
+/// base, else the default humanoid as it is. Files already there are
+/// kept, so an older project's prefab stays as it is. Returns the
+/// prefab's path.
 pub fn add_default_game_character(
     project: &Path,
     shipped: Option<&Path>,
 ) -> Result<&'static str, SaveError> {
-    let library = add_both_character_libraries(project, shipped)?;
+    let library = add_game_character_library(project, shipped)?;
     // The prefab first: `add_default_humanoid` keeps a file already there,
-    // so it writes the stylized one only when the realistic one isn't.
+    // so it writes the bare one only when the described one isn't.
     if let Some(description) = game_character_description(&library) {
         let mut world = World::new();
         let character = described_character(&mut world, Vector3::default(), &description);
@@ -183,20 +206,31 @@ mod tests {
     #[test]
     fn the_engines_library_is_found_from_a_test() {
         let found = shipped_character_library().expect("found beside the test program");
-        assert!(found.join("realistic").is_dir(), "{}", found.display());
+        assert!(found.join("human").is_dir(), "{}", found.display());
     }
 
-    /// OPEN-22: a new project has both families, and its players are the
-    /// realistic character (decision 7).
+    /// A new project has the human base and what its players wear, not
+    /// the whole wardrobe, and its players are that character.
     #[test]
-    fn a_new_project_gets_both_families_and_the_realistic_default_character() {
+    fn a_new_project_gets_the_human_base_and_the_default_characters_clothes() {
         let parent = temp("new-project");
-        let folder = create_project_from(&parent, "Realistic Game", Template::Baseplate).unwrap();
+        let folder = create_project_from(&parent, "Human Game", Template::Baseplate).unwrap();
         let (library, _, problems) = Library::read(&folder.join(LIBRARY_FOLDER));
         assert!(problems.is_empty(), "{problems:?}");
-        assert!(library.base(axcenity_avatar::V1_BASE).is_some(), "stylized");
-        assert!(library.base(DEFAULT_GAME_BASE).is_some(), "realistic");
+        assert_eq!(library.bases.len(), 1);
+        assert!(library.base(DEFAULT_GAME_BASE).is_some(), "human");
         assert!(library.validate().is_empty(), "{:?}", library.validate());
+        for item in DEFAULT_GAME_OUTFIT {
+            assert!(library.item(item).is_some(), "{item}");
+        }
+        let (whole, _, _) = Library::read(&shipped());
+        assert!(
+            library.items.len() < whole.items.len() / 4,
+            "{} of {} items",
+            library.items.len(),
+            whole.items.len()
+        );
+        assert!(library.presets.is_empty());
 
         let (world, character) = prefab(&folder);
         assert_eq!(
@@ -207,7 +241,14 @@ mod tests {
         let data = world.get(kept).unwrap().property("Data").unwrap();
         let description = Description::from_json(data.as_str().unwrap()).unwrap();
         assert_eq!(description.base, DEFAULT_GAME_BASE);
-        assert!(description.validate(&library).is_empty());
+        assert!(
+            description.validate(&library).is_empty(),
+            "{:?}",
+            description.validate(&library)
+        );
+        for item in DEFAULT_GAME_OUTFIT {
+            assert!(description.items.iter().any(|worn| worn.id == item));
+        }
         // Still the default character underneath: its controller, Health,
         // Animator and sockets.
         for name in [
@@ -222,11 +263,9 @@ mod tests {
     }
 
     #[test]
-    fn without_the_engines_library_the_default_character_stays_stylized() {
+    fn without_the_engines_library_the_default_character_is_the_bare_humanoid() {
         let folder = temp("no-shipped");
         add_default_game_character(&folder, None).unwrap();
-        let (library, _, _) = Library::read(&folder.join(LIBRARY_FOLDER));
-        assert!(library.base(DEFAULT_GAME_BASE).is_none());
         let (world, character) = prefab(&folder);
         assert_eq!(base_kept(&world, character), None);
         let body = world.find_first_child(character, "Body").unwrap();
@@ -238,18 +277,22 @@ mod tests {
     }
 
     /// An older project keeps its players' prefab and its library's own
-    /// entries, and gains the realistic family.
+    /// entries, and gains the human base.
     #[test]
-    fn an_older_project_keeps_its_prefab_and_gains_the_realistic_family() {
+    fn an_older_project_keeps_its_prefab_and_gains_the_human_base() {
         let folder = temp("older");
-        add_default_humanoid(&folder).unwrap();
+        add_default_game_character(&folder, None).unwrap();
         let prefab_file = folder.join(DEFAULT_CHARACTER_PREFAB_PATH);
         let old = fs::read_to_string(&prefab_file).unwrap();
+        // A package of its own, as an older project has the stylized one.
+        let own = folder.join(LIBRARY_FOLDER).join("own/Own.base.json");
+        fs::create_dir_all(own.parent().unwrap()).unwrap();
+        fs::write(&own, "{}").unwrap();
+
         add_default_game_character(&folder, Some(&shipped())).unwrap();
         assert_eq!(fs::read_to_string(&prefab_file).unwrap(), old);
-        let (library, _, problems) = Library::read(&folder.join(LIBRARY_FOLDER));
-        assert!(problems.is_empty(), "{problems:?}");
-        assert!(library.base(axcenity_avatar::V1_BASE).is_some());
+        assert_eq!(fs::read_to_string(&own).unwrap(), "{}");
+        let (library, _, _) = Library::read(&folder.join(LIBRARY_FOLDER));
         assert!(library.base(DEFAULT_GAME_BASE).is_some());
         let _ = fs::remove_dir_all(&folder);
     }
@@ -257,11 +300,12 @@ mod tests {
     #[test]
     fn a_described_character_keeps_its_description_in_its_humanoid() {
         let (library, _, _) = Library::read(&shipped());
-        let description = game_character_description(&library).expect("realistic");
+        let description = game_character_description(&library).expect("human");
         assert_eq!(description.name, "Character");
         let base = library.base(DEFAULT_GAME_BASE).unwrap();
-        let defaults: Vec<WornItem> = base.defaults.items.iter().map(WornItem::new).collect();
-        assert_eq!(description.items, defaults);
+        for item in &base.defaults.items {
+            assert!(description.items.iter().any(|worn| &worn.id == item));
+        }
         let mut world = World::new();
         let character = described_character(&mut world, Vector3::default(), &description);
         let kept = kept_description(&world, character).expect("kept");

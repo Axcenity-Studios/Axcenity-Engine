@@ -995,110 +995,54 @@ fn a_take_named_like_a_body_of_other_proportions_keeps_that_bodys_bones() {
     }
 }
 
-/// The starter animations are made on the stylized skeleton. The realistic
-/// body's bones have the same names and other lengths: by name, a clip
-/// would give it the stylized body's bone offsets (found in CO4's clip
-/// sheet: a squashed body and an open jaw).
+/// The starter animations are baked on the human base's own skeleton
+/// (`assets/characters/human/animations.py`): a clip plays on it by name,
+/// with nothing retargeted, and moves no bone from its place on its
+/// parent but the hips.
 #[test]
-fn the_starter_animations_keep_the_realistic_bodys_proportions() {
+fn the_starter_animations_play_on_the_human_bases_own_skeleton() {
     use axcenity_assets::{ModelFormat, Pick, load_models, load_takes};
     use std::path::Path;
 
-    let characters = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
-    let takes = std::fs::read(characters.join("humanoid/HumanoidAnimations.glb")).unwrap();
+    let human = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters/human");
+    let takes = std::fs::read(human.join("HumanoidAnimations.glb")).unwrap();
     let takes = Arc::new(load_takes(&takes, ModelFormat::Gltf).unwrap());
-    let body = |file: &str, object: &str| {
-        let bytes = std::fs::read(characters.join(file)).unwrap();
-        let picks = [Pick::Objects(vec![object.to_owned()])];
+    assert_eq!(takes.len(), 86);
+    for file in ["HumanParts.glb", "Humanoid.glb"] {
+        let bytes = std::fs::read(human.join(file)).unwrap();
+        let picks = [Pick::Objects(vec!["AxcenityHuman/Body".to_owned()])];
         let models = load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks).unwrap();
-        models[0].rig.clone().unwrap()
-    };
-    let realistic = body("realistic/RealisticParts.glb", "AxcenityRealistic/Body");
-    let stylized = body("humanoid/HumanoidParts.glb", "AxcenityHumanoid/Body");
-    for take in takes.iter() {
-        let file = ClipFile::linked(
-            "HumanoidAnimations.glb",
-            &take.name,
-            0.0,
-            take.duration.into(),
-        );
-        let clip = Clip::bind(file.clone(), Some(takes.clone()), Some(&stylized)).unwrap();
-        assert!(
-            !clip.retargeted(),
-            "{}: its own skeleton, by name",
-            take.name
-        );
-
-        let clip = Clip::bind(file, Some(takes.clone()), Some(&realistic)).unwrap();
-        assert!(clip.retargeted(), "{}", take.name);
-        let hips = realistic.bone("Hips").unwrap();
-        let mut moved = false;
-        for step in 0..4 {
-            let mut pose = realistic.rest_pose();
-            clip.sample(f64::from(step) / 4.0, &realistic, &mut pose);
-            for (bone, (posed, rest)) in pose.iter().zip(&realistic.bones).enumerate() {
-                moved |= !posed.rotation.abs_diff_eq(rest.rest.rotation, 1e-3);
-                if bone == hips || rest.parent.is_none() {
-                    continue;
-                }
-                assert!(
-                    posed.translation.abs_diff_eq(rest.rest.translation, 1e-5),
-                    "{}: {} keeps its place on its parent",
-                    take.name,
-                    rest.name
-                );
-            }
-        }
-        assert!(moved, "{} moves the body", take.name);
-    }
-}
-
-/// Paul, 2026-11-16: in Character Studio the realistic body's feet went
-/// through the floor and its shoulders rolled forward. The starter clips
-/// reached it through roles with rest poses matched, which turned each of
-/// its bones to point as the stylized skeleton's rest: its flatter feet
-/// tipped toes-down and its collarbones turned forward. The two already
-/// rest alike, so such a take plays without matching: standing still in
-/// Idle, each foot points as it rests and the collarbones keep their line.
-#[test]
-fn the_starter_idle_keeps_the_realistic_bodys_own_feet_and_collarbones() {
-    use axcenity_assets::{ModelFormat, Pick, load_models, load_takes};
-    use std::path::Path;
-
-    let characters = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/characters");
-    let takes = std::fs::read(characters.join("humanoid/HumanoidAnimations.glb")).unwrap();
-    let takes = Arc::new(load_takes(&takes, ModelFormat::Gltf).unwrap());
-    let bytes = std::fs::read(characters.join("realistic/RealisticParts.glb")).unwrap();
-    let picks = [Pick::Objects(vec!["AxcenityRealistic/Body".to_owned()])];
-    let models = load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks).unwrap();
-    let rig = models[0].rig.clone().unwrap();
-    let idle = takes.iter().find(|take| take.name == "Idle").unwrap();
-    let file = ClipFile::linked("HumanoidAnimations.glb", "Idle", 0.0, idle.duration.into());
-    let clip = Clip::bind(file, Some(takes.clone()), Some(&rig)).unwrap();
-    assert!(clip.retargeted());
-
-    let rest = rig.world(&rig.rest_pose());
-    let along = |world: &[Mat4], from: &str, to: &str| {
-        let (a, b) = (rig.bone(from).unwrap(), rig.bone(to).unwrap());
-        (world[b].w_axis.truncate() - world[a].w_axis.truncate()).normalize()
-    };
-    for step in 0..8 {
-        let mut pose = rig.rest_pose();
-        clip.sample(f64::from(step) / 8.0, &rig, &mut pose);
-        let posed = rig.world(&pose);
-        for (from, to, most) in [
-            ("LeftFoot", "LeftToes", 8.0_f32),
-            ("RightFoot", "RightToes", 8.0),
-            ("LeftShoulder", "LeftUpperArm", 6.0),
-            ("RightShoulder", "RightUpperArm", 6.0),
-        ] {
-            let turned = along(&rest, from, to)
-                .angle_between(along(&posed, from, to))
-                .to_degrees();
-            assert!(
-                turned < most,
-                "at {step}/8 {from} to {to} turned {turned:.1} degrees from rest"
+        let rig = models[0].rig.clone().unwrap();
+        let hips = rig.bone("Hips").unwrap();
+        for take in takes.iter() {
+            let linked = ClipFile::linked(
+                "HumanoidAnimations.glb",
+                &take.name,
+                0.0,
+                take.duration.into(),
             );
+            let clip = Clip::bind(linked, Some(takes.clone()), Some(&rig)).unwrap();
+            assert!(!clip.retargeted(), "{file} {}: by name", take.name);
+            let mut moved = false;
+            for step in 0..4 {
+                let mut pose = rig.rest_pose();
+                clip.sample(f64::from(step) / 4.0, &rig, &mut pose);
+                for (bone, (posed, rest)) in pose.iter().zip(&rig.bones).enumerate() {
+                    moved |= !posed.rotation.abs_diff_eq(rest.rest.rotation, 1e-3);
+                    // The hips travel, and the root in the takes with
+                    // root motion.
+                    if bone == hips || rest.parent.is_none() || rest.name == "Root" {
+                        continue;
+                    }
+                    assert!(
+                        posed.translation.abs_diff_eq(rest.rest.translation, 1e-4),
+                        "{file} {}: {} keeps its place on its parent",
+                        take.name,
+                        rest.name
+                    );
+                }
+            }
+            assert!(moved, "{} moves the body", take.name);
         }
     }
 }

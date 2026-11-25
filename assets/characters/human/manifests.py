@@ -56,8 +56,10 @@ SLOTS = [
     # Every hairstyle is still a draft (`hair.py`), and Randomize draws no
     # draft unless the slot says so: without this a random character is bald.
     {"id": "hair", "label": "Hairstyle", "category": "hair", "empty_label": "Bald", "random_drafts": True},
-    {"id": "underwear_top", "label": "Underwear top", "category": "clothing"},
-    {"id": "underwear_bottom", "label": "Underwear", "category": "clothing"},
+    # The cut underwear isn't drawn while a top or a bottom is worn over it
+    # (`Slot::hidden_by`): it would show round a smaller garment's edges.
+    {"id": "underwear_top", "label": "Underwear top", "category": "clothing", "hidden_by": ["top"]},
+    {"id": "underwear_bottom", "label": "Underwear", "category": "clothing", "hidden_by": ["bottom"]},
     {"id": "top", "label": "Top", "category": "clothing"},
     {"id": "outerwear", "label": "Outerwear", "category": "clothing"},
     {"id": "bottom", "label": "Bottoms", "category": "clothing"},
@@ -82,6 +84,8 @@ PROPORTIONS = [
     ("waist_width", "Waist width", "WaistWidth", (0.8, 1.175), "detailed", "How wide the waist is."),
     ("hip_width", "Hip width", "HipWidth", (0.85, 1.15), "detailed", "How wide the hips are."),
     ("head_size", "Head size", "HeadSize", (0.9, 1.1), "detailed", "How large the head is for the body."),
+    ("hand_size", "Hand size", "HandSize", (0.85, 1.15), "advanced", "How large the hands are for the body."),
+    ("foot_size", "Foot size", "FootSize", (0.9, 1.15), "advanced", "How large the feet are for the body."),
 ]
 MATERIAL_SHADING = {"Skin": "skin", "Eyes": "standard", "Teeth": "standard", "Tongue": "standard",
                     "Brows": "hair", "Lashes": "hair"}
@@ -135,6 +139,11 @@ def base_manifest(data):
     frame = {
         "id": "frame", "label": "Body type", "group": "frame", "range": [0, 1], "level": "quick",
         "about": "The body type the character is built on: male or female.",
+        # A slider under the two choices for a frame between them (Paul,
+        # 2026-11-25: "Restore the ability to adjust character frame
+        # options"): every shape of the frame is driven across the whole
+        # range, the garments' copies with them.
+        "between": "Masculine to feminine",
         "shapes": [{"shape": "Frame_Feminine"}],
         "bones": [{"bone": bone, "offset": offset} for bone, offset in sorted(data["frame_bones"].items())],
         "choices": [{"value": 0, "label": "Male", "items": MALE_WEARS},
@@ -195,8 +204,8 @@ def base_manifest(data):
         "format_version": 1,
         "id": BASE_ID,
         "label": "Human",
-        # Its own family while the realistic base it replaces still ships
-        # (ADR-0047): benchmarks and presets are named by family.
+        # The engine's one family (ADR-0050): benchmarks and presets are
+        # named by family.
         "family": "human",
         "model": {"file": PARTS_FILE, "body": f"{ARMATURE}/Body", "parts": parts, "regions_map": REGIONS_MAP},
         "skeleton": {"convention": "humanoid", "height": 1.75, "pose": "a-pose-45",

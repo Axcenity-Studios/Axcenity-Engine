@@ -150,7 +150,7 @@ fn the_name_field_can_be_emptied_and_renames_once_when_left() {
 
 /// Audit D-06: the Face view aims at the head as it's posed, so a tall
 /// character's face is framed higher than a short one's; on the default
-/// character it's where the fixed view was.
+/// character it's about where the fixed view is.
 #[test]
 fn the_face_view_aims_at_the_head_of_a_tall_or_short_character() {
     let folder = test_folder("shell-face-view");
@@ -160,9 +160,11 @@ fn the_face_view_aims_at_the_head_of_a_tall_or_short_character() {
     let default = workspace.orbit.target.y;
     let fixed = ViewPreset::Face.orbit().target.y;
     println!("face view target: {default} (the fixed view's: {fixed})");
+    // The fixed view looks at 0.89 of the character's height (4.45
+    // studs); the human base's head bone idles at 4.453.
     assert!((default - fixed).abs() < 0.05, "{default} against {fixed}");
     let mut targets = Vec::new();
-    for height in [0.85, 1.15] {
+    for height in [0.82, 1.13] {
         workspace.apply(Intent::SetParameter {
             id: "height".into(),
             value: height,
@@ -264,7 +266,7 @@ fn an_expression_is_previewed_on_the_face_and_never_saved() {
 
     // A slider applied meanwhile keeps the expression on the face.
     workspace.apply(Intent::SetParameter {
-        id: "nose_length".into(),
+        id: "nose_scale_vert".into(),
         value: 0.3,
         gesture: Gesture::Commit,
     });
@@ -286,7 +288,7 @@ fn an_expression_is_previewed_on_the_face_and_never_saved() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
-/// Every page draws on the realistic body at every level and shows its
+/// Every page draws on the human body at every level and shows its
 /// own controls by name (the drawing test before this asserted no text).
 /// With `AXCENITY_SNAPSHOTS` naming a folder, each page is also saved
 /// there drawn for real at 1440 by 900.
@@ -310,7 +312,7 @@ fn every_page_is_drawn_with_its_controls() {
         (
             Category::Body,
             Level::Quick,
-            &["Body type", "Male", "Athletic", "Custom", "Family", "Quick"],
+            &["Body type", "Male", "Athletic", "Custom", "Quick"],
         ),
         (
             Category::Body,
@@ -326,20 +328,19 @@ fn every_page_is_drawn_with_its_controls() {
             ],
         ),
         (
-            // Hands and feet have only advanced sliders, so Advanced adds
-            // them to the navigation (the sliders themselves are below the
-            // fold here; panel::tests holds the rows).
+            // The human body has no advanced sliders: Advanced shows what
+            // Detailed does.
             Category::Body,
             Level::Advanced,
-            &["Proportions", "Hands", "Feet"],
+            &["Advanced", "Frame", "Build", "Proportions", "Hip width"],
         ),
         (
             Category::Face,
             Level::Detailed,
             &["Eyes", "Nose", "Ears", "Symmetry"],
         ),
-        // The realistic short crop (R6) is a draft: with nothing else on
-        // the page it is listed without asking, marked.
+        // Every hairstyle of the human base is a draft: with nothing else
+        // on the page they are listed without asking, marked.
         (
             Category::Hair,
             Level::Detailed,
@@ -363,7 +364,7 @@ fn every_page_is_drawn_with_its_controls() {
         (
             Category::Accessories,
             Level::Detailed,
-            &["No accessories yet"],
+            &["Headwear", "None", "Fedora"],
         ),
         (
             Category::Expressions,
@@ -401,8 +402,12 @@ fn every_page_is_drawn_with_its_controls() {
     workspace.apply(Intent::PickCategory(Category::Face));
     workspace.apply(Intent::PickLevel(Level::Quick));
     let quick = draw(&mut workspace);
-    // Nose length is a quick control (the manifest's `level`); the bridge isn't.
-    assert!(!quick.iter().any(|t| t.contains("Nose bridge")));
+    // The nose has quick controls (the manifest's `level`), so it is
+    // listed; the bridge's hump isn't one, and the forehead, which has
+    // none, is left out.
+    assert!(quick.iter().any(|t| t.ends_with("  Nose")), "{quick:?}");
+    assert!(!quick.iter().any(|t| t.contains("Bridge hump")));
+    assert!(!quick.iter().any(|t| t.contains("Forehead")), "{quick:?}");
     assert!(
         quick.iter().any(|t| t.contains("Detailed level")),
         "{quick:?}"
@@ -410,7 +415,7 @@ fn every_page_is_drawn_with_its_controls() {
     // A change hidden at the level is said, with a way to it.
     workspace.apply(Intent::PickLevel(Level::Detailed));
     workspace.apply(Intent::SetParameter {
-        id: "jaw_shift".into(),
+        id: "nose_septumangle".into(),
         value: 0.4,
         gesture: Gesture::Commit,
     });
@@ -462,7 +467,7 @@ fn every_page_is_drawn_with_its_controls() {
         workspace.apply(Intent::PickCategory(Category::Face));
         workspace.apply(Intent::PickFeature(Some("eyes".into())));
         workspace.apply(Intent::SetParameter {
-            id: "eye_size_left".into(),
+            id: "eyes_scale_left".into(),
             value: 0.4,
             gesture: Gesture::Commit,
         });
@@ -484,7 +489,7 @@ fn every_page_is_drawn_with_its_controls() {
         });
         workspace.apply(Intent::PickCategory(Category::Face));
         workspace.apply(Intent::PickLevel(Level::Quick));
-        workspace.apply(Intent::SearchControls("jaw".into()));
+        workspace.apply(Intent::SearchControls("mouth".into()));
         snap(&mut workspace, &snapshots, "face-search", 3);
         workspace.apply(Intent::SearchControls(String::new()));
         workspace.apply(Intent::PickLevel(Level::Detailed));
@@ -512,15 +517,15 @@ fn every_page_is_drawn_with_its_controls() {
         snap(&mut workspace, &snapshots, "compare-side-by-side-light", 3);
         workspace.apply(Intent::SideBySide(false));
         workspace.apply(Intent::SetBackdrop(backdrop));
-        // The stylized family's Body and Face pages.
-        workspace.apply(Intent::New(Start::Family(axcenity_avatar::V1_BASE.into())));
+        // A female character's Body and Face pages.
+        workspace.apply(Intent::New(Start::shipped("female")));
         workspace.answer(Some(false));
-        snap(&mut workspace, &snapshots, "body-stylized", 3);
+        snap(&mut workspace, &snapshots, "body-female", 3);
         workspace.apply(Intent::PickCategory(Category::Face));
-        snap(&mut workspace, &snapshots, "face-stylized", 3);
+        snap(&mut workspace, &snapshots, "face-female", 3);
         // Unsaved work left by a crash is offered on the next open.
         workspace.apply(Intent::SetParameter {
-            id: "nose_width".into(),
+            id: "nose_scale_horiz".into(),
             value: 0.5,
             gesture: Gesture::Commit,
         });
@@ -927,26 +932,27 @@ fn search_controls_finds_a_slider_in_every_feature_at_every_level() {
     let drawn = draw(&mut workspace);
     assert!(drawn.iter().any(|t| t == "Search controls"), "{drawn:?}");
     assert!(row(&drawn, "Nose length").is_some());
-    assert!(row(&drawn, "Jaw to one side").is_none(), "{drawn:?}");
+    assert!(row(&drawn, "Mouth depth").is_none(), "{drawn:?}");
     assert!(row(&drawn, "Eye size").is_none(), "{drawn:?}");
 
-    // "jaw" finds the jaw's controls: another feature's, at every level.
-    // A row above the level shown says its level after its label; one of
-    // the level shown (the jaw's width is a Quick control) says nothing.
-    workspace.apply(Intent::SearchControls("jaw".into()));
+    // "mouth" finds the mouth's controls: another feature's, at every
+    // level. A row above the level shown says its level after its label;
+    // one of the level shown (the mouth's width is a Quick control) says
+    // nothing.
+    workspace.apply(Intent::SearchControls("mouth".into()));
     let drawn = draw(&mut workspace);
     assert_eq!(
-        row(&drawn, "Jaw to one side").as_deref(),
+        row(&drawn, "Mouth depth").as_deref(),
         Some("Advanced"),
         "{drawn:?}"
     );
     assert_eq!(
-        row(&drawn, "Jaw angle").as_deref(),
+        row(&drawn, "Mouth height").as_deref(),
         Some("Detailed"),
         "{drawn:?}"
     );
     assert_eq!(
-        row(&drawn, "Jaw width").as_deref(),
+        row(&drawn, "Mouth width").as_deref(),
         Some("0.00"),
         "{drawn:?}"
     );
@@ -958,11 +964,11 @@ fn search_controls_finds_a_slider_in_every_feature_at_every_level() {
     assert_eq!(workspace.selection.level, Level::Quick);
     // What it finds is a row like any other: it sets the value.
     workspace.apply(Intent::SetParameter {
-        id: "jaw_shift".into(),
+        id: "lips_scale_depth".into(),
         value: 0.25,
         gesture: Gesture::Commit,
     });
-    assert_eq!(workspace.parameter("jaw_shift"), 0.25);
+    assert_eq!(workspace.parameter("lips_scale_depth"), 0.25);
     workspace.apply(Intent::Undo);
 
     // Every word typed must match; the ID and what a control does (its
@@ -971,7 +977,7 @@ fn search_controls_finds_a_slider_in_every_feature_at_every_level() {
     let drawn = draw(&mut workspace);
     assert!(row(&drawn, "Nose length").is_some(), "{drawn:?}");
     assert!(row(&drawn, "Nose width").is_none(), "{drawn:?}");
-    workspace.apply(Intent::SearchControls("eye_size".into()));
+    workspace.apply(Intent::SearchControls("eyes_scale".into()));
     let drawn = draw(&mut workspace);
     assert!(row(&drawn, "Eye size").is_some(), "the ID: {drawn:?}");
     // Nothing matches: the page says so.
@@ -985,10 +991,10 @@ fn search_controls_finds_a_slider_in_every_feature_at_every_level() {
     workspace.apply(Intent::SearchControls(String::new()));
     let drawn = draw(&mut workspace);
     assert!(row(&drawn, "Nose length").is_some());
-    assert!(row(&drawn, "Jaw to one side").is_none(), "{drawn:?}");
+    assert!(row(&drawn, "Mouth depth").is_none(), "{drawn:?}");
 
     // Editor state: never an undo step, never the character.
-    workspace.apply(Intent::SearchControls("jaw".into()));
+    workspace.apply(Intent::SearchControls("mouth".into()));
     assert_eq!(*workspace.description(), before);
     assert!(!workspace.can_undo());
     // It belonged to the page it was typed on.
@@ -1003,7 +1009,7 @@ fn search_controls_finds_a_slider_in_every_feature_at_every_level() {
     assert!(row(&drawn, "Waist width").is_some(), "{drawn:?}");
     assert!(!drawn.iter().any(|t| t == "START FROM"), "{drawn:?}");
     assert!(row(&drawn, "Height").is_none(), "{drawn:?}");
-    // The Skin and Makeup page's values and layers are searched too.
+    // The Skin and Makeup page's values are searched too.
     workspace.apply(Intent::PickCategory(Category::SkinAndMakeup));
     workspace.apply(Intent::SearchControls("melanin".into()));
     let drawn = draw(&mut workspace);
@@ -1026,6 +1032,14 @@ pub(super) fn snap(
     // Each snapshot makes its own GPU device; the editor has one.
     workspace.canvas = Canvas::default();
     workspace.other_canvas = Canvas::default();
+    // And its own egui context: a tile's picture loaded in another one's
+    // is some other texture here (tiles showed each other's pictures).
+    workspace.item_pictures.clear();
+    workspace.preset_pictures.clear();
+    workspace.pictures = thumbnails::Thumbnails::default();
+    workspace
+        .pictures
+        .set_folder(Some(workspace.folder.clone()));
     crate::snapshot::snapshot_rendered(
         &snapshots.join(format!("character-studio-page-{name}.png")),
         egui::vec2(1440.0, 900.0),

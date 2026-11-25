@@ -1,12 +1,13 @@
 //! Pose and motion in the preview (refinement R9): Still, Idle, Walk (the
-//! Walk take at its own speed, in place), Run and the gestures; preview
-//! only, expressions on top, the camera keeping a moving character framed.
+//! Walk take at its own speed, in place), Run and the gestures, each eased
+//! into from the one before; preview only, expressions on top, the camera
+//! keeping a moving character framed.
 
 use axcenity_core::Value;
 use axcenity_render::glam::Vec3;
 
 use super::intent::{Gesture, Intent};
-use super::motion::{GESTURES, Motion, PREVIEW_CLIPS_FOLDER};
+use super::motion::{BLEND, GESTURES, Motion, PREVIEW_CLIPS_FOLDER, PREVIEW_MACHINE};
 use super::*;
 use crate::character_studio::test_folder;
 
@@ -37,20 +38,31 @@ fn state_machine(workspace: &CharacterWorkspace) -> String {
         .to_owned()
 }
 
-/// The preview's clip file, read.
+/// The preview's state machine file, read.
+fn preview_machine(workspace: &CharacterWorkspace) -> axcenity_anim::StateMachineFile {
+    let text = std::fs::read_to_string(workspace.folder().join(PREVIEW_MACHINE)).unwrap();
+    axcenity_anim::StateMachineFile::from_json(&text).unwrap()
+}
+
+/// The clip file the preview's state for the motion shown plays, read.
 fn preview_clip(workspace: &CharacterWorkspace) -> axcenity_anim::ClipFile {
-    let animation = workspace.motion_animation().expect("a take plays");
-    let path = workspace
-        .world
-        .get(animation)
-        .unwrap()
-        .property("Clip")
-        .and_then(Value::as_str)
-        .unwrap()
-        .to_owned();
+    let machine = preview_machine(workspace);
+    let state = machine
+        .state(workspace.motion.label())
+        .expect("a state for the motion");
+    assert_eq!(state.speed, 1.0, "at its own speed");
+    assert!(state.returns.is_none(), "over and over");
+    let axcenity_anim::Motion::Clip(path) = &state.motion else {
+        panic!("{:?}", state.motion);
+    };
     assert!(path.starts_with(PREVIEW_CLIPS_FOLDER), "{path}");
-    let text = std::fs::read_to_string(workspace.folder().join(&path)).unwrap();
+    let text = std::fs::read_to_string(workspace.folder().join(path)).unwrap();
     axcenity_anim::ClipFile::from_json(&text).unwrap()
+}
+
+/// The state the preview's Animator plays.
+fn playing(workspace: &CharacterWorkspace) -> String {
+    workspace.motion_state().expect("a state plays").state
 }
 
 /// The bones' positions, model space, as posed.
@@ -77,7 +89,11 @@ fn walk_plays_the_walk_take_at_its_own_speed_in_place() {
     let idle = bones(&workspace);
     workspace.apply(Intent::PreviewMotion(Motion::Walk));
     assert_eq!(workspace.motion, Motion::Walk);
-    assert_eq!(state_machine(&workspace), "", "the take plays alone");
+    assert_eq!(
+        state_machine(&workspace),
+        PREVIEW_MACHINE,
+        "the preview's own state machine plays it"
+    );
 
     // The Walk take, whole, over its own length: its own speed.
     let clip = preview_clip(&workspace);
@@ -87,17 +103,10 @@ fn walk_plays_the_walk_take_at_its_own_speed_in_place() {
         link.source,
         axcenity_project::DEFAULT_HUMANOID_ANIMATIONS_PATH
     );
-    assert!((clip.duration - 1.0667).abs() < 0.01, "{}", clip.duration);
+    // The library's walk: 40 frames (ADR-0049; the keyed one was 32).
+    assert!((clip.duration - 1.3333).abs() < 0.01, "{}", clip.duration);
     assert_eq!((link.start, link.end), (0.0, clip.duration));
     assert!(clip.looping);
-    let animation = workspace.motion_animation().unwrap();
-    let speed = workspace
-        .world
-        .get(animation)
-        .unwrap()
-        .property("Speed")
-        .and_then(Value::as_number);
-    assert_eq!(speed, Some(1.0));
     // The game's Walk state still plays the Run take (the controller's
     // WalkSpeed is a jog): the true walk is the studio's preview only.
     let game_walk = std::fs::read_to_string(folder.join(format!(
@@ -108,11 +117,10 @@ fn walk_plays_the_walk_take_at_its_own_speed_in_place() {
     assert!(game_walk.contains("\"take\": \"Run\""), "{game_walk}");
 
     run_for(&mut workspace, 0.4);
-    let time = workspace
-        .world
-        .property_animation(animation)
-        .map(|state| state.time)
-        .unwrap();
+    let state = workspace.motion_state().unwrap();
+    assert_eq!(state.state, "Walk");
+    assert!((state.duration - clip.duration).abs() < 1e-6);
+    let time = state.progress * state.duration;
     assert!((time - 0.4).abs() < 0.05, "a second a second: {time}");
     let walking = bones(&workspace);
     assert!(
@@ -151,7 +159,7 @@ fn still_idle_run_and_the_gestures_each_pose_the_preview() {
     // Still: the rest pose, nothing playing; it holds.
     workspace.apply(Intent::PreviewMotion(Motion::Still));
     assert_eq!(state_machine(&workspace), "");
-    assert!(workspace.motion_animation().is_none());
+    assert!(workspace.motion_state().is_none());
     run_for(&mut workspace, 0.3);
     let still = bones(&workspace);
     run_for(&mut workspace, 0.5);
@@ -163,6 +171,7 @@ fn still_idle_run_and_the_gestures_each_pose_the_preview() {
     workspace.apply(Intent::PreviewMotion(Motion::Run));
     assert_eq!(preview_clip(&workspace).link.unwrap().take, "Run");
     run_for(&mut workspace, 0.3);
+    assert_eq!(playing(&workspace), "Run");
     assert!(largest_move(&still, &bones(&workspace)) > 0.05, "it runs");
 
     // Every gesture the default character has.
@@ -171,12 +180,13 @@ fn still_idle_run_and_the_gestures_each_pose_the_preview() {
         workspace.apply(Intent::PreviewMotion(Motion::Gesture(name.into())));
         assert_eq!(preview_clip(&workspace).link.unwrap().take, name);
         run_for(&mut workspace, 0.5);
+        assert_eq!(playing(&workspace), name);
         assert!(
             largest_move(&still, &bones(&workspace)) > 0.02,
             "{name} moves"
         );
     }
-    // One Animation of the preview's own, however many were picked.
+    // The state machine plays them all: nothing is added to the body.
     let animations = workspace
         .world
         .get(body(&workspace))
@@ -187,15 +197,123 @@ fn still_idle_run_and_the_gestures_each_pose_the_preview() {
             workspace.world.get(**child).unwrap().class() == axcenity_core::ClassName::Animation
         })
         .count();
-    assert_eq!(animations, 1);
+    assert_eq!(animations, 0);
 
-    // Idle again: the state machine plays, the take is gone.
+    // Idle again: the preview's Idle state, the default character's own
+    // Idle clip.
     workspace.apply(Intent::PreviewMotion(Motion::Idle));
-    assert!(workspace.motion_animation().is_none());
+    run_for(&mut workspace, 0.1);
+    assert_eq!(state_machine(&workspace), PREVIEW_MACHINE);
+    assert_eq!(playing(&workspace), "Idle");
+    let idle = preview_machine(&workspace);
     assert_eq!(
-        state_machine(&workspace),
-        axcenity_project::DEFAULT_HUMANOID_STATE_MACHINE_PATH
+        idle.state("Idle").unwrap().motion,
+        axcenity_anim::Motion::Clip(format!(
+            "{}/Idle.anim.json",
+            axcenity_project::DEFAULT_HUMANOID_CLIPS_FOLDER
+        ))
     );
+    assert_eq!(idle.default_state, "Idle");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// One motion eases into the next: no bone jumps at the moment a motion
+/// is picked, the blend takes [`BLEND`] seconds, and the body is then in
+/// the new motion alone. (Each take played alone before 2026-11-25, and
+/// the body snapped from one to the next.)
+#[test]
+fn a_motion_eases_into_the_next() {
+    let folder = test_folder("motion-blend");
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    run_for(&mut workspace, 0.5);
+    // The most a bone moves in a frame of the run itself, to judge by.
+    workspace.apply(Intent::PreviewMotion(Motion::Run));
+    run_for(&mut workspace, 1.0);
+    let mut stride: f32 = 0.0;
+    let mut before = bones(&workspace);
+    for _ in 0..30 {
+        workspace.advance(FRAME);
+        let now = bones(&workspace);
+        stride = stride.max(largest_move(&before, &now));
+        before = now;
+    }
+    for (from, to) in [
+        (Motion::Idle, Motion::Walk),
+        (Motion::Walk, Motion::Run),
+        (Motion::Run, Motion::Gesture("Dance".into())),
+        (
+            Motion::Gesture("Dance".into()),
+            Motion::Gesture("Yes".into()),
+        ),
+        (Motion::Gesture("Yes".into()), Motion::Idle),
+    ] {
+        workspace.apply(Intent::PreviewMotion(from.clone()));
+        run_for(&mut workspace, 1.0);
+        assert!(workspace.motion_state().unwrap().fade.is_none());
+        let before = bones(&workspace);
+        workspace.apply(Intent::PreviewMotion(to.clone()));
+        workspace.advance(FRAME);
+        let state = workspace.motion_state().unwrap();
+        assert_eq!(state.state, to.label());
+        let fade = state.fade.expect("it blends");
+        assert_eq!(fade.from, from.label());
+        assert_eq!(fade.seconds, BLEND);
+        assert!(fade.weight > 0.0 && fade.weight < 0.5, "{}", fade.weight);
+        // The first frame of the change moves no bone further than a
+        // frame and a half of the run does: nothing snaps.
+        let jump = largest_move(&before, &bones(&workspace));
+        assert!(
+            jump < stride * 1.5,
+            "{from:?} to {to:?}: a bone moves {jump} in the first frame (the run's own stride: {stride})"
+        );
+        run_for(&mut workspace, BLEND + 0.1);
+        let state = workspace.motion_state().unwrap();
+        assert_eq!(state.state, to.label());
+        assert!(state.fade.is_none(), "{from:?} to {to:?} has arrived");
+    }
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+/// The studio's folder may hold the humanoid's files of an earlier build
+/// (they were written once and kept): the workspace puts this build's in
+/// their place, so every motion plays the take it names. Seen on
+/// 2026-11-25: a folder from the 21st still held the keyed animation file,
+/// which has no `IdleTalking`, `Yes` or `No` and other takes under the
+/// names `Walk`, `Run`, `Dance` and `Interact`.
+#[test]
+fn an_earlier_builds_animation_file_in_the_folder_is_replaced() {
+    let folder = test_folder("motion-stale");
+    for path in [
+        axcenity_project::DEFAULT_HUMANOID_ANIMATIONS_PATH,
+        axcenity_project::DEFAULT_HUMANOID_STATE_MACHINE_PATH,
+        "assets/animations/Humanoid/Idle.anim.json",
+        "assets/animations/Humanoid/Preview/Yes.anim.json",
+    ] {
+        let file = folder.join(path);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(file, "an earlier build's").unwrap();
+    }
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::default()).unwrap();
+    assert_eq!(
+        std::fs::read(folder.join(axcenity_project::DEFAULT_HUMANOID_ANIMATIONS_PATH)).unwrap(),
+        axcenity_project::DEFAULT_HUMANOID_ANIMATIONS
+    );
+    workspace.apply(Intent::PreviewMotion(Motion::Still));
+    run_for(&mut workspace, 0.2);
+    let still = bones(&workspace);
+    for motion in Motion::all() {
+        if motion == Motion::Still {
+            continue;
+        }
+        workspace.apply(Intent::PreviewMotion(motion.clone()));
+        run_for(&mut workspace, 0.6);
+        assert!(workspace.notice.is_none(), "{:?}", workspace.notice);
+        assert_eq!(playing(&workspace), motion.label());
+        assert!(
+            largest_move(&still, &bones(&workspace)) > 0.02,
+            "{motion:?} poses the body"
+        );
+    }
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -228,8 +346,8 @@ fn a_motion_is_never_saved_or_undone() {
         gesture: Gesture::Commit,
     });
     run_for(&mut workspace, 0.2);
-    assert!(workspace.motion_animation().is_some());
-    assert_eq!(state_machine(&workspace), "");
+    assert_eq!(playing(&workspace), "Walk");
+    assert_eq!(state_machine(&workspace), PREVIEW_MACHINE);
     workspace.apply(Intent::Save);
     let text = std::fs::read_to_string(workspace.file().unwrap()).unwrap();
     for word in ["Walk", "motion", "Preview", "anim"] {
@@ -244,15 +362,18 @@ fn a_motion_is_never_saved_or_undone() {
     // the held version beside it moves too.
     workspace.apply(Intent::Capture);
     workspace.apply(Intent::SideBySide(true));
+    run_for(&mut workspace, 0.2);
     let other = applier::body_of(&workspace.world, workspace.other.unwrap()).unwrap();
     let plays = workspace
-        .world
-        .get(other)
-        .unwrap()
-        .children()
-        .iter()
-        .any(|child| workspace.world.get(*child).unwrap().name() == motion::PREVIEW_MOTION);
-    assert!(plays, "side by side, both walk");
+        .animators
+        .inspect(&workspace.world, other)
+        .and_then(|view| view.machine)
+        .map(|machine| (machine.path, machine.state));
+    assert_eq!(
+        plays,
+        Some((PREVIEW_MACHINE.to_owned(), "Walk".to_owned())),
+        "side by side, both walk"
+    );
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -279,7 +400,7 @@ fn an_expression_shows_on_top_of_a_walk() {
         "it smiles while walking: {walking} -> {}",
         weights(&workspace)
     );
-    assert!(workspace.motion_animation().is_some(), "and still walks");
+    assert_eq!(playing(&workspace), "Walk", "and still walks");
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -309,7 +430,7 @@ fn the_camera_keeps_framing_a_moving_character() {
     run_for(&mut workspace, 0.5);
     let resting = in_picture(&workspace);
     let framed = workspace.orbit;
-    for motion in [Motion::Run, Motion::Gesture("Cheer".into())] {
+    for motion in [Motion::Run, Motion::Gesture("Dance".into())] {
         workspace.apply(Intent::PreviewMotion(motion.clone()));
         run_for(&mut workspace, 1.0);
         // Over two seconds: where the head sits on average (the camera
@@ -326,13 +447,18 @@ fn the_camera_keeps_framing_a_moving_character() {
             resting.length(),
             mean.length()
         );
+        // (Where the view framed it at rest: the Face view aims at the
+        // face, above the head's joint.)
         assert!(
-            mean.length() < 0.1,
-            "{motion:?}: on average the head is near the middle ({:.3})",
-            mean.length()
+            (mean - resting).length() < 0.1,
+            "{motion:?}: on average the head is where it was framed ({:.3} from it)",
+            (mean - resting).length()
         );
+        // The library's sprint leans and bobs more than the keyed run
+        // did: the head comes half of the way to the edge at worst
+        // (0.49, measured 2026-11-25 on the human base; ADR-0049).
         assert!(
-            worst < 0.35,
+            worst < 0.6,
             "{motion:?}: and never near the edge ({worst:.3})"
         );
 
@@ -382,8 +508,8 @@ fn pose_and_motion_are_on_the_expressions_page_and_the_bottom_bar() {
         "Still",
         "Walk",
         "Run",
-        "Wave",
-        "Shrug",
+        "Yes",
+        "Interact",
         "Happy",
     ] {
         assert!(

@@ -1,0 +1,58 @@
+{
+  "format_version": 1,
+  "id": "makehuman/shoes03",
+  "label": "Black shoes, black socks",
+  "kind": "garment",
+  "slot": "shoes",
+  "layer": 1,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/human"
+  ],
+  "model": {
+    "file": "Shoes03.glb",
+    "object": "AxcenityHuman/Shoes03"
+  },
+  "cover_map": "Shoes03.cover.png",
+  "materials": [
+    {
+      "name": "Shoes03",
+      "shading": "standard"
+    }
+  ],
+  "fit": {
+    "method": "shapes",
+    "follows": [
+      "Feminine_Age_Old",
+      "Feminine_Fat_Down",
+      "Feminine_Fat_Up",
+      "Feminine_Muscle_Down_Fat_Down",
+      "Feminine_Muscle_Down_Fat_Up",
+      "Feminine_Muscle_Up",
+      "Feminine_Muscle_Up_Fat_Down",
+      "Feminine_Muscle_Up_Fat_Up",
+      "Frame_Feminine",
+      "Masculine_Age_Old",
+      "Masculine_Fat_Down",
+      "Masculine_Fat_Up",
+      "Masculine_Muscle_Down",
+      "Masculine_Muscle_Down_Fat_Down",
+      "Masculine_Muscle_Down_Fat_Up",
+      "Masculine_Muscle_Up",
+      "Masculine_Muscle_Up_Fat_Down",
+      "Masculine_Muscle_Up_Fat_Up"
+    ]
+  },
+  "tags": [
+    "makehuman",
+    "shoes",
+    "unisex"
+  ],
+  "thumbnail": "Shoes03.png",
+  "source": {
+    "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+    "licence": "CC0-1.0",
+    "url": "http://www.makehumancommunity.org"
+  },
+  "quality": "draft"
+}

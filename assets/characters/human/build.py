@@ -17,8 +17,8 @@ controls, give it MPFB's default rig and weights, load the face's parts
 (eyes, teeth, tongue, brows, lashes), sample the body at every corner of
 the controls the base offers (`SHAPES`), turn everything from MakeHuman's
 rest pose to the engine's 45 degree A-pose (`mh.Repose`), stand it
-1.75 m tall, put it on the Axcenity Humanoid skeleton (the stylized
-package's bones and rolls, so every clip plays), and export
+1.75 m tall, put it on the Axcenity Humanoid skeleton (`rig.py`'s bones
+and rolls), and export
 `HumanParts.glb` with the base model manifest (`manifests.py`).
 
 Units are metres, Blender Z up, the character faces -Y (glTF +Z after
@@ -26,7 +26,6 @@ export).
 """
 
 import argparse
-import importlib.util
 import json
 import os
 import sys
@@ -41,6 +40,7 @@ from mathutils import Vector  # noqa: E402
 import face  # noqa: E402
 import manifests  # noqa: E402
 import mh  # noqa: E402
+import rig  # noqa: E402
 import skins  # noqa: E402
 import underwear  # noqa: E402
 
@@ -48,7 +48,6 @@ ARMATURE = "AxcenityHuman"
 PARTS_FILE = "HumanParts.glb"
 DATA_FILE = "Human.build.json"
 HEIGHT = 1.75
-STYLIZED = os.path.join(os.path.dirname(HERE), "humanoid")
 SIDES = (("Left", 1, "L"), ("Right", -1, "R"))
 FINGERS = (("Thumb", 1), ("Index", 2), ("Middle", 3), ("Ring", 4), ("Little", 5))
 SEGMENTS = ("Proximal", "Intermediate", "Distal")
@@ -114,27 +113,6 @@ def _shapes():
 SHAPES = _shapes()
 # A shape that moves no corner this far (metres) isn't written.
 LEAST = 0.00005
-
-
-def stylized_rig():
-    """The stylized humanoid's `rig` module, loaded with its own `common`
-    (the two packages share bones and rolls, so they can't drift apart)."""
-    saved = sys.modules.get("common")
-
-    def load(module, alias):
-        spec = importlib.util.spec_from_file_location(alias, os.path.join(STYLIZED, module + ".py"))
-        made = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(made)
-        return made
-
-    try:
-        sys.modules["common"] = load("common", "stylized_common")
-        return load("rig", "stylized_rig")
-    finally:
-        if saved is not None:
-            sys.modules["common"] = saved
-        else:
-            sys.modules.pop("common", None)
 
 
 def key_of(settings):
@@ -263,8 +241,7 @@ def head_moves(joints, theirs):
 
 
 def build_armature(joints):
-    """The stylized humanoid's armature for `joints`, plus the twist bones."""
-    rig = stylized_rig()
+    """The Humanoid skeleton (`rig.py`) for `joints`, plus the twist bones."""
     armature = rig.build_armature(joints, ARMATURE)
     bpy.ops.object.select_all(action="DESELECT")
     armature.select_set(True)

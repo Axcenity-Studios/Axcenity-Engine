@@ -39,10 +39,9 @@ use axcenity_avatar::fit::Surface;
 use axcenity_avatar::{Description, WornItem};
 use axcenity_render::glam::Vec3;
 
-use super::character_capture::{HeldPose, Stage, Stance, repository_library, stage_world};
+use super::character_capture::{Stage, Stance, repository_library, stage_world};
 use super::fit_gate_tests::{
-    Posed, TEE, benchmarks, gate_library, hem_corners, hidden_triangles, holes, undressed, worn,
-    worn_in,
+    Posed, benchmarks, hem_corners, hidden_triangles, holes, undressed, worn, worn_in,
 };
 
 /// How much more a garment corner may jolt in a frame (its second
@@ -551,35 +550,6 @@ fn foot_cover(body: &Posed, shoe: &Posed) -> Vec<bool> {
         .collect()
 }
 
-/// The footwear check on `description` (wearing its shoes) in `stance`:
-/// see the module's notes. One report per shoe part.
-pub(crate) fn footwear(
-    assets: &Assets,
-    description: &Description,
-    stance: Stance,
-) -> Vec<FootReport> {
-    let (body_rest, garments_rest) = worn(assets, description, Stance::Rest);
-    let (body, garments) = if stance == Stance::Rest {
-        (body_rest.clone(), garments_rest.clone())
-    } else {
-        worn(assets, description, stance)
-    };
-    let pose = match stance {
-        Stance::Rest => "rest".to_owned(),
-        Stance::Held(pose) => format!("{pose:?}"),
-        Stance::Clip { name, frames } => format!("{name}@{frames}"),
-        Stance::Idle => "idle".to_owned(),
-    };
-    garments_rest
-        .iter()
-        .zip(&garments)
-        .filter(|(g, _)| g.name.starts_with("Shoes_"))
-        .map(|(shoe_rest, shoe)| {
-            foot_report(&description.name, &pose, &body_rest, shoe_rest, &body, shoe)
-        })
-        .collect()
-}
-
 /// The footwear check of one shoe: `body_rest` and `shoe_rest` at rest,
 /// `body` and `shoe` in the pose named `pose` (`rest` for rest itself).
 fn foot_report(
@@ -644,40 +614,33 @@ fn foot_report(
     report
 }
 
-/// The realistic cast (both frames) in the test tee over the underwear.
-fn realistic_cast() -> Vec<Description> {
-    super::fit_gate_tests::bodies()
-        .into_iter()
-        .filter(|d| d.name.contains("-cast-"))
-        .map(|mut d| {
-            d.items.push(WornItem::new(TEE));
-            d
-        })
-        .collect()
-}
-
-/// The stylized cast in the tee, cargo pants and sneakers, each with a
-/// hairstyle (a different one for each body, in turn).
-fn stylized_cast() -> Vec<Description> {
+/// The human cast (both frames) in MakeHuman's shirt and jeans with shoes,
+/// as the fit gate dresses it, each with a hairstyle (a different one for
+/// each body, in turn).
+fn human_cast() -> Vec<Description> {
     let hair = [
-        "axcenity/hair-bob",
-        "axcenity/hair-buzz",
-        "axcenity/hair-crop",
-        "axcenity/hair-long",
-        "axcenity/hair-ponytail",
-        "axcenity/hair-swept",
+        "makehuman/hair-afro01",
+        "makehuman/hair-bob01",
+        "makehuman/hair-bob02",
+        "makehuman/hair-braid01",
+        "makehuman/hair-long01",
+        "makehuman/hair-ponytail01",
+        "makehuman/hair-short01",
+        "makehuman/hair-short02",
+        "makehuman/hair-short03",
+        "makehuman/hair-short04",
     ];
-    benchmarks("stylized-")
+    benchmarks("human-")
         .into_iter()
         .filter(|d| d.name.contains("-cast-"))
         .enumerate()
         .map(|(k, mut d)| {
-            for id in [
-                "axcenity/tee",
-                "axcenity/cargo-pants",
-                "axcenity/sneakers",
-                hair[k % hair.len()],
-            ] {
+            let outfit = if d.name.contains("-feminine-") {
+                ["makehuman/female-casualsuit01", "makehuman/shoes04"]
+            } else {
+                ["makehuman/male-casualsuit01", "makehuman/shoes01"]
+            };
+            for id in [outfit[0], outfit[1], hair[k % hair.len()]] {
                 if !d.items.iter().any(|worn| worn.id == id) {
                     d.items.push(WornItem::new(id));
                 }
@@ -688,13 +651,14 @@ fn stylized_cast() -> Vec<Description> {
 }
 
 /// A clip's frames for the checks: one stride of the walk and the run
-/// from their start (the clip played alone holds its last frame from
-/// about frame 44 on), and a second of the idle.
+/// from their start (the clip played alone holds its last frame at its
+/// end: the walk, which is the library's jog, at frame 56, the run, its
+/// sprint, at frame 40; ADR-0049), and a second of the idle.
 fn frames_of(clip: &str) -> Range<u32> {
     match clip {
         "Idle" => 2..62,
-        "Run" => 2..35,
-        _ => 2..44,
+        "Run" => 2..40,
+        _ => 2..56,
     }
 }
 
@@ -747,152 +711,74 @@ pub(super) fn check_motion(
 // not accepted behaviour. Lower them as the items improve; never raise
 // one. The underwear has none: it moves with the skin in every clip.
 
-/// The test tee's armpit, where the cloth bridging the arm and the side
-/// carries large copies of the swing correctives (the posed fit's
-/// following), jolts as the arm swings through hanging.
-///
-/// Since the tee has a cover map (ADR-0045), a few hidden corners of the
-/// side under the arm (4 to 45 on the masculine cast) have no cloth over
-/// them as the arm swings back: the same bridging cloth.
-const WALK_RECORDS: [Record; 2] = [
-    Record {
-        what: "TestTee pop",
-        case: "Walk",
-        most: 0.0041,
-    },
+// What the motion checks find on the human base's draft
+// items (MakeHuman's clothes and hair, first measured 2026-11-25 with the
+// starter animations baked on its own skeleton), as records of open
+// defects: each fails past its record, and when it is no longer found.
+//
+// "holes" is the fit gate's "hidden skin showing" over a clip's frames:
+// skin the outfits' own files hide (MakeHuman's `delete_verts`, their
+// cover maps) that their cloth doesn't cover, at the men's collar and at
+// the ankles and insteps between the jeans and the shoes (the gate's
+// record: 34.5 mm at rest, 48.6 mm in the stride). In 4K captures of the
+// idle, the walk and the run from the front, three-quarter and back no
+// gap shows there (2026-11-25). The ponytail swings 2 cm past the head
+// in a stride.
+//
+// Measured again the same day when the collarbones were turned against
+// the chest instead of the world (`mocap.SWUNG`, the motion review;
+// ADR-0049, decision 5: a record follows the motion). The idle's holes
+// 44.6 to 51.7 mm: the men's shirt, about nine hidden corners behind the
+// right armpit (seven of the twelve men are past the old record), where
+// the old bake squared the shoulders to the room while the chest stood
+// turned in the library's stance. The run's 49.4 to 46.0 mm; the walk's
+// is as it was.
+const HUMAN_IDLE_RECORDS: [Record; 1] = [Record {
+    what: "holes",
+    case: "Idle",
+    most: 0.0517,
+}];
+const HUMAN_WALK_RECORDS: [Record; 2] = [
     Record {
         what: "holes",
         case: "Walk",
-        most: 0.0135,
+        most: 0.0496,
+    },
+    Record {
+        what: "HairPonytail01 pop",
+        case: "Walk",
+        most: 0.0209,
     },
 ];
-const RUN_RECORDS: [Record; 2] = [
-    Record {
-        what: "TestTee pop",
-        case: "Run",
-        most: 0.0117,
-    },
+const HUMAN_RUN_RECORDS: [Record; 2] = [
     Record {
         what: "holes",
         case: "Run",
-        most: 0.0128,
-    },
-];
-/// The stylized cargo pants between the legs (the bridge under the
-/// crotch) jolt past the thighs as a stride turns; four of the six
-/// stylized hairstyles (bob, long, ponytail, swept) have corners up to
-/// 11 mm inside the head, still or moving (the cards' roots).
-const STYLIZED_WALK_RECORDS: [Record; 2] = [
-    Record {
-        what: "Pants_Cargo pop",
-        case: "Walk",
-        most: 0.0056,
+        most: 0.0460,
     },
     Record {
-        what: "hair",
-        case: "Walk",
-        most: 0.0114,
-    },
-];
-const STYLIZED_RUN_RECORDS: [Record; 2] = [
-    Record {
-        what: "Pants_Cargo pop",
+        what: "HairPonytail01 pop",
         case: "Run",
-        most: 0.0032,
-    },
-    Record {
-        what: "hair",
-        case: "Run",
-        most: 0.0112,
-    },
-];
-/// The stylized sneakers: in the walk's stride a few corners of the foot
-/// (1 to 4) come out of the shoe by up to 18 mm; at rest the tread is not
-/// flat (from 3.6 mm under the floor to 4.1 mm over it, up to 8.4 mm from
-/// end to end on some bodies).
-const SNEAKER_RECORDS: [Record; 2] = [
-    Record {
-        what: "Shoes_Sneakers through",
-        case: "Walk@18",
-        most: 0.0183,
-    },
-    Record {
-        what: "Shoes_Sneakers tread",
-        case: "rest",
-        most: 0.0084,
+        most: 0.0163,
     },
 ];
 
 #[test]
-fn realistic_garments_stay_steady_in_the_idle() {
-    let stage = Stage::new("motion-realistic-idle", gate_library()).expect("the stage");
-    check_motion(&stage, &realistic_cast(), "Idle", &[]);
+fn human_garments_and_hair_stay_steady_in_the_idle() {
+    let stage = Stage::new("motion-human-idle", &repository_library()).expect("the stage");
+    check_motion(&stage, &human_cast(), "Idle", &HUMAN_IDLE_RECORDS);
 }
 
 #[test]
-fn realistic_garments_stay_steady_in_the_walk() {
-    let stage = Stage::new("motion-realistic-walk", gate_library()).expect("the stage");
-    check_motion(&stage, &realistic_cast(), "Walk", &WALK_RECORDS);
+fn human_garments_and_hair_stay_steady_in_the_walk() {
+    let stage = Stage::new("motion-human-walk", &repository_library()).expect("the stage");
+    check_motion(&stage, &human_cast(), "Walk", &HUMAN_WALK_RECORDS);
 }
 
 #[test]
-fn realistic_garments_stay_steady_in_the_run() {
-    let stage = Stage::new("motion-realistic-run", gate_library()).expect("the stage");
-    check_motion(&stage, &realistic_cast(), "Run", &RUN_RECORDS);
-}
-
-#[test]
-fn stylized_garments_and_hair_stay_steady_in_the_walk() {
-    let stage = Stage::new("motion-stylized-walk", &repository_library()).expect("the stage");
-    check_motion(&stage, &stylized_cast(), "Walk", &STYLIZED_WALK_RECORDS);
-}
-
-#[test]
-fn stylized_garments_and_hair_stay_steady_in_the_run() {
-    let stage = Stage::new("motion-stylized-run", &repository_library()).expect("the stage");
-    check_motion(&stage, &stylized_cast(), "Run", &STYLIZED_RUN_RECORDS);
-}
-
-/// The stylized sneakers on the stylized cast: no foot through the sole
-/// or the upper at rest or in the held poses that move the legs, and the
-/// tread flat on the floor at rest.
-#[test]
-fn the_stylized_sneakers_hold_the_feet() {
-    let stage = Stage::new("footwear-stylized", &repository_library()).expect("the stage");
-    let mut problems = Vec::new();
-    for description in stylized_cast() {
-        for stance in [
-            Stance::Rest,
-            Stance::Held(HeldPose::KneesBent),
-            Stance::Clip {
-                name: "Walk",
-                frames: 18,
-            },
-        ] {
-            let reports = footwear(&stage.assets, &description, stance);
-            assert!(!reports.is_empty(), "{}: no shoes", description.name);
-            for report in &reports {
-                println!(
-                    "{} {} {}: {} covered, {} out ({:.2} mm), tread {:.2} to {:.2} mm",
-                    report.character,
-                    report.pose,
-                    report.shoe,
-                    report.covered,
-                    report.through,
-                    report.through_most * 1000.0,
-                    report.tread_low * 1000.0,
-                    report.tread_high * 1000.0
-                );
-                problems.extend(report.problems());
-            }
-        }
-    }
-    let left = unrecorded(&problems, &SNEAKER_RECORDS);
-    assert!(left.is_empty(), "{left:#?}");
-    // The recorded defects are still found: a check that stopped finding
-    // them would pass any shoe.
-    let old = stale(&problems, &SNEAKER_RECORDS);
-    assert!(old.is_empty(), "{old:#?}");
+fn human_garments_and_hair_stay_steady_in_the_run() {
+    let stage = Stage::new("motion-human-run", &repository_library()).expect("the stage");
+    check_motion(&stage, &human_cast(), "Run", &HUMAN_RUN_RECORDS);
 }
 
 /// The checks catch what they are for: a garment corner moved 1 cm for

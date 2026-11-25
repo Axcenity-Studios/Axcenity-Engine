@@ -1,9 +1,10 @@
 //! Pose-driven corrective shapes (Character Studio overhaul, CO5): blend
 //! shapes a body leans on as a bone turns, which put back what skinning
-//! loses at a joint. The realistic base body has ten, for its shoulders
-//! (`assets/characters/realistic/correctives.py` makes them and states the
-//! rule in `Realistic.build.json`): raised, level, lowered, and the hanging
-//! arm swung forward and back as a walk swings it.
+//! loses at a joint. The realistic base body had ten, for its shoulders:
+//! raised, level, lowered, and the hanging arm swung forward and back as a
+//! walk swings it. That base was retired (ADR-0050) and the human base has
+//! none yet, so no shipped body leans on these rules now; a body that
+//! carries shapes of these names does.
 //!
 //! **The rule.** A shape's weight is how far its bone has turned from rest
 //! about an axis, from 0 at `start` degrees to 1 at `full` and beyond. The
@@ -33,7 +34,7 @@ use crate::twist::twist_angle;
 /// is full).
 pub type Rule = (&'static str, &'static str, [f32; 3], f32, f32);
 
-/// The realistic body's corrective shapes: the shoulder's cap, held as the
+/// The corrective shapes of a body built as the realistic one was: the shoulder's cap, held as the
 /// arm is raised to level (45° up from its rest, which is 45° below
 /// level) and on to 150° from hanging, and as it is lowered to hang (35°
 /// down from rest: about the raise axis reversed, so the rule's form is
@@ -235,9 +236,9 @@ mod tests {
 
     fn shipped(object: &str) -> Model {
         let file = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../assets/characters/realistic/RealisticParts.glb");
+            .join("../../assets/characters/human/HumanParts.glb");
         let bytes = std::fs::read(file).unwrap();
-        let picks = [Pick::Objects(vec![format!("AxcenityRealistic/{object}")])];
+        let picks = [Pick::Objects(vec![format!("AxcenityHuman/{object}")])];
         load_models(&bytes, Path::new("."), ModelFormat::Gltf, &picks)
             .unwrap()
             .remove(0)
@@ -282,231 +283,6 @@ mod tests {
         // Swung and raised: only the raise counts.
         let both = Quat::from_axis_angle(other, 0.5) * turned(rest, AXIS, 22.5);
         assert!((weight(rest, both, AXIS, 0.0, 45.0) - 0.5).abs() < 0.02);
-    }
-
-    /// The constants are the rules the realistic body's build wrote beside
-    /// its shapes.
-    #[test]
-    fn the_rules_are_the_ones_the_build_states() {
-        let file = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../assets/characters/realistic/Realistic.build.json");
-        let data: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
-        let built = data["correctives"].as_array().unwrap();
-        assert_eq!(built.len(), CORRECTIVES.len());
-        for rule in built {
-            let shape = rule["shape"].as_str().unwrap();
-            let ours = CORRECTIVES
-                .iter()
-                .find(|ours| ours.0 == shape)
-                .unwrap_or_else(|| panic!("no rule for {shape}"));
-            assert!(shape.starts_with(PREFIX));
-            assert_eq!(ours.1, rule["bone"].as_str().unwrap(), "{shape}");
-            let number = |value: &serde_json::Value| value.as_f64().unwrap() as f32;
-            for k in 0..3 {
-                assert!(
-                    (ours.2[k] - number(&rule["axis"][k])).abs() < 1e-4,
-                    "{shape}"
-                );
-            }
-            assert_eq!(ours.3, number(&rule["angles"][0]), "{shape}");
-            assert_eq!(ours.4, number(&rule["angles"][1]), "{shape}");
-        }
-    }
-
-    /// Every rule is found on the shipped body.
-    #[test]
-    fn the_shipped_body_has_every_corrective() {
-        let model = shipped("Body");
-        let rig = model.rig.clone().unwrap();
-        let found = Correctives::detect(&model, &rig);
-        assert_eq!(found.0.len(), CORRECTIVES.len());
-        for rule in &found.0 {
-            let name = &model.morph_targets[rule.morph].name;
-            assert!(name.starts_with(PREFIX), "{name}");
-            assert!(rig.bones[rule.bone].name.ends_with("UpperArm"));
-        }
-    }
-
-    /// An arm lowered from the A-pose to hang, as the starter Idle holds
-    /// it, leans on its side's Lowered shape and on none of the raising
-    /// ones; half way down, half; and the skin moves with it.
-    #[test]
-    fn a_lowered_arm_leans_on_its_lowered_corrective_only() {
-        let model = shipped("Body");
-        let rig = model.rig.clone().unwrap();
-        let arm = rig.bone("LeftUpperArm").unwrap();
-        let rest = rig.bones[arm].rest.rotation;
-        let lowered_axis = -AXIS;
-        let weights_at = |degrees: f32| {
-            let mut pose = rig.rest_pose();
-            pose[arm].rotation = turned(rest, lowered_axis, degrees);
-            let posed =
-                crate::animators::skinned_for_test(&model, &rig, &mut pose, &mut []).unwrap();
-            let plain = model.pose_shaped(&pose, &[]).unwrap();
-            let of = |name: &str| {
-                let index = model
-                    .morph_targets
-                    .iter()
-                    .position(|target| target.name == name)
-                    .unwrap();
-                posed.morph_weights()[index]
-            };
-            let (a, b) = (posed.primitive(&model, 0, 0), plain.primitive(&model, 0, 0));
-            let moved = a
-                .positions
-                .iter()
-                .zip(&b.positions)
-                .map(|(p, q)| Vec3::from(*p).distance(Vec3::from(*q)))
-                .fold(0.0_f32, f32::max);
-            (
-                of("Corrective_Shoulder_Lowered_Left"),
-                of("Corrective_Shoulder_Lowered_Right"),
-                of("Corrective_Shoulder_Level_Left"),
-                of("Corrective_Shoulder_Raised_Left"),
-                moved,
-            )
-        };
-        let (lowered, right, level, raised, moved) = weights_at(35.0);
-        assert!((lowered - 1.0).abs() < 1e-3, "{lowered}");
-        assert_eq!((right, level, raised), (0.0, 0.0, 0.0));
-        assert!(moved > 0.005, "the cap moves {moved} m");
-        assert!((weights_at(17.5).0 - 0.5).abs() < 0.02);
-        assert_eq!(weights_at(0.0).0, 0.0);
-    }
-
-    /// An arm hanging as the walk holds it (lowered from the A-pose) and
-    /// swung back, as the walk swings it, leans on its side's Back shape
-    /// as well as its Lowered one, and on neither Forward shape nor the
-    /// other side's; swung forward, on Forward; half way, half. The skin
-    /// moves with them (the fold a linearly skinned swing makes where the
-    /// arm meets the chest or the back, put right: `correctives.py`).
-    #[test]
-    fn a_swung_arm_leans_on_its_swing_correctives() {
-        let model = shipped("Body");
-        let rig = model.rig.clone().unwrap();
-        let arm = rig.bone("LeftUpperArm").unwrap();
-        let elbow = rig.bone("LeftLowerArm").unwrap();
-        let rest = rig.bones[arm].rest.rotation;
-        let rule = |name: &str| {
-            *CORRECTIVES
-                .iter()
-                .find(|rule| rule.0 == name)
-                .unwrap_or_else(|| panic!("no rule for {name}"))
-        };
-        let back = rule("Corrective_Shoulder_Back_Left");
-        let forward = rule("Corrective_Shoulder_Forward_Left");
-        assert_eq!((back.1, forward.1), ("LeftUpperArm", "LeftUpperArm"));
-        // One swing, two ways: the axes are opposite, and across the
-        // lowering axis (so a swing doesn't change how far it is lowered).
-        let axis = Vec3::from(back.2).normalize();
-        assert!(axis.dot(Vec3::from(forward.2).normalize()) < -0.999);
-        assert!(axis.dot(AXIS.normalize()).abs() < 0.05, "{axis}");
-        let hang = turned(rest, -AXIS, 35.0);
-        let lean_at = |swing_axis: Vec3, degrees: f32| {
-            let mut pose = rig.rest_pose();
-            pose[arm].rotation = turned(hang, swing_axis, degrees);
-            let world = rig.world(&pose);
-            let elbow_z = world[elbow].w_axis.z;
-            let posed =
-                crate::animators::skinned_for_test(&model, &rig, &mut pose, &mut []).unwrap();
-            let plain = model.pose_shaped(&pose, &[]).unwrap();
-            let of = |name: &str| {
-                let index = model
-                    .morph_targets
-                    .iter()
-                    .position(|target| target.name == name)
-                    .unwrap();
-                posed.morph_weights()[index]
-            };
-            let (a, b) = (posed.primitive(&model, 0, 0), plain.primitive(&model, 0, 0));
-            let moved = a
-                .positions
-                .iter()
-                .zip(&b.positions)
-                .map(|(p, q)| Vec3::from(*p).distance(Vec3::from(*q)))
-                .fold(0.0_f32, f32::max);
-            let weights = [
-                "Corrective_Shoulder_Back_Left",
-                "Corrective_Shoulder_Forward_Left",
-                "Corrective_Shoulder_Back_Right",
-                "Corrective_Shoulder_Forward_Right",
-                "Corrective_Shoulder_Lowered_Left",
-            ]
-            .map(of);
-            (weights, elbow_z, moved)
-        };
-        let (_, hanging_z, _) = lean_at(axis, 0.0);
-        // Back is back: the elbow goes behind (the model faces +Z).
-        let ([b, f, br, fr, lowered], z, moved) = lean_at(axis, back.4);
-        assert!(
-            z < hanging_z - 0.05,
-            "the elbow at {z}, hanging {hanging_z}"
-        );
-        assert!((b - 1.0).abs() < 1e-3, "{b}");
-        assert_eq!((f, br, fr), (0.0, 0.0, 0.0));
-        assert!(lowered > 0.99, "{lowered}");
-        assert!(moved > 0.003, "the armpit moves {moved} m");
-        assert!((lean_at(axis, back.4 / 2.0).0[0] - 0.5).abs() < 0.02);
-        let ([b, f, _, fr, _], z, moved) = lean_at(-axis, forward.4);
-        assert!(
-            z > hanging_z + 0.05,
-            "the elbow at {z}, hanging {hanging_z}"
-        );
-        assert!((f - 1.0).abs() < 1e-3, "{f}");
-        assert_eq!((b, fr), (0.0, 0.0));
-        assert!(moved > 0.003, "the armpit moves {moved} m");
-    }
-
-    /// The pose path leans the shipped body on its shapes: the left arm
-    /// raised overhead brings both of the left shoulder's in and neither
-    /// of the right's, and the skin moves with them, on the body and on
-    /// both of its simpler copies (levels of detail 1 and 2).
-    #[test]
-    fn the_pose_path_leans_the_shipped_body_on_its_correctives() {
-        let model = shipped("Body");
-        let rig = model.rig.clone().unwrap();
-        let arm = rig.bone("LeftUpperArm").unwrap();
-        let mut pose = rig.rest_pose();
-        pose[arm].rotation = turned(rig.bones[arm].rest.rotation, AXIS, 105.0);
-        let plain = model.pose_shaped(&pose, &[]).unwrap();
-        let posed = crate::animators::skinned_for_test(&model, &rig, &mut pose, &mut []).unwrap();
-        let weight_of = |name: &str| {
-            let index = model
-                .morph_targets
-                .iter()
-                .position(|target| target.name == name)
-                .unwrap();
-            posed.morph_weights()[index]
-        };
-        assert!((weight_of("Corrective_Shoulder_Level_Left") - 1.0).abs() < 1e-3);
-        assert!((weight_of("Corrective_Shoulder_Raised_Left") - 1.0).abs() < 1e-3);
-        assert_eq!(weight_of("Corrective_Shoulder_Level_Right"), 0.0);
-        assert_eq!(weight_of("Corrective_Shoulder_Raised_Right"), 0.0);
-        assert_eq!(weight_of("Corrective_Shoulder_Lowered_Left"), 0.0);
-        // Nothing else was leaned on.
-        let others: f32 = model
-            .morph_targets
-            .iter()
-            .zip(posed.morph_weights())
-            .filter(|(target, _)| !target.name.starts_with(PREFIX))
-            .map(|(_, weight)| weight.abs())
-            .sum();
-        assert_eq!(others, 0.0);
-        assert_eq!(model.primitives[0].lods.len(), 2);
-        for level in 0..3 {
-            let (a, b) = (
-                posed.primitive(&model, 0, level),
-                plain.primitive(&model, 0, level),
-            );
-            let far = a
-                .positions
-                .iter()
-                .zip(&b.positions)
-                .map(|(p, q)| Vec3::from(*p).distance(Vec3::from(*q)))
-                .fold(0.0_f32, f32::max);
-            assert!(far > 0.01, "level {level}: the shoulder's skin moved {far}");
-        }
     }
 
     #[test]

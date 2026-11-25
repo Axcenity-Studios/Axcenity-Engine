@@ -1,21 +1,26 @@
 //! Pose and motion in the preview (refinement R9, brief §10 "Animation
-//! preview"): **Still** (the rest pose, the A-pose), **Idle** (the default
-//! character's state machine, which the preview has always played),
-//! **Walk**, **Run** and the default character's gestures (Wave, Point,
-//! Cheer, Clap, Shrug). Like an expression, it is editor state: it never
-//! enters the description, undo or a saved file, and an expression still
-//! shows on top of it.
+//! preview"): **Still** (the rest pose, the A-pose), **Idle**, **Walk**,
+//! **Run** and gestures from the starter animations (talking, a thumbs
+//! up, a shake of the head, a dance, reaching out). Like an expression,
+//! it is editor state: it never enters the description, undo or a saved
+//! file, and an expression still shows on top of it.
 //!
-//! A take plays as the capture tool plays a clip: the Animator's state
-//! machine is cleared and an Animation of the preview's own, looped, plays
-//! the take alone. **Walk is the Walk take at its own speed** (1.07 s a
-//! cycle), in place: the game's Walk state plays the Run take faster,
-//! because the controller's default `WalkSpeed` (16 studs/s, 5.6 m/s) is a
-//! jog (decided at the R1 merge), so the true walk is only seen here. Run
-//! is the Run take at its own speed. The takes are in place (their hips
-//! end where they start), so the character stays on its floor.
+//! The preview's Animator plays a state machine of the preview's own
+//! ([`PREVIEW_MACHINE`], written into the workspace's folder): a state for
+//! Idle (the default character's Idle clip) and one for each take, each
+//! looped at its own speed. Picking a motion asks the Animator for its
+//! state with a blend of [`BLEND`] seconds, as a game's Humanoid does, so
+//! the body **eases from one motion into the next** where it used to
+//! snap. Still clears the state machine: the rest pose is a reference, and
+//! it shows at once. **Walk is the Walk take at its own speed** (the
+//! library's walk, 1.33 s a cycle), in place: the game's Walk state plays
+//! the Run take faster, because the controller's default `WalkSpeed` (16
+//! studs/s, 5.6 m/s) is a jog (decided at the R1 merge), so the true walk
+//! is only seen here. Run is the Run take (the library's jog) at its own
+//! speed. The takes are in place (their hips end where they start), so
+//! the character stays on its floor.
 //!
-//! The clips are written once into the workspace's folder
+//! The clips are written into the workspace's folder
 //! ([`PREVIEW_CLIPS_FOLDER`]), each linked to its take in the default
 //! humanoid's animation file. While a take plays, the camera follows the
 //! head ([`CharacterWorkspace::follow_motion`]), smoothed so a step's bob
@@ -25,21 +30,28 @@
 use std::path::Path;
 use std::sync::OnceLock;
 
-use axcenity_core::{ClassName, InstanceId, Value, World};
+use axcenity_core::{InstanceId, Value, World};
 use axcenity_gameplay::description as applier;
 #[cfg(test)]
 use axcenity_render::glam::Vec3;
 
 use super::CharacterWorkspace;
 
-/// The default character's gestures, as named by its takes.
-pub const GESTURES: [&str; 5] = ["Wave", "Point", "Cheer", "Clap", "Shrug"];
+/// The gestures the preview offers, as named by the starter animations'
+/// takes (Quaternius's library): talking, a thumbs up (the library's
+/// `Yes`), a shake of the head, a dance and reaching out to something.
+pub const GESTURES: [&str; 5] = ["IdleTalking", "Yes", "No", "Dance", "Interact"];
 
 /// Where the preview's clips are written, in the workspace's folder.
 pub const PREVIEW_CLIPS_FOLDER: &str = "assets/animations/Humanoid/Preview";
 
-/// The name of the Animation the preview adds to play a take.
-pub const PREVIEW_MOTION: &str = "Studio Motion Preview";
+/// The preview's state machine, in the workspace's folder: Idle and a
+/// state for each take the preview offers, named as [`Motion::label`].
+pub const PREVIEW_MACHINE: &str = "assets/animations/Humanoid/Preview/Preview.statemachine.json";
+
+/// How long one motion takes to ease into the next, in seconds: the
+/// blend a game's Animator gives a state change it isn't told one for.
+pub const BLEND: f64 = axcenity_anim::DEFAULT_BLEND;
 
 /// A close view (the face) follows the head up and down too.
 const CLOSE: f32 = 6.0;
@@ -91,7 +103,17 @@ impl Motion {
             Motion::Idle => "Standing, breathing and shifting a little".to_owned(),
             Motion::Walk => "A walk at its own pace, in place (a preview only)".to_owned(),
             Motion::Run => "A run at its own pace, in place (a preview only)".to_owned(),
-            Motion::Gesture(name) => format!("{name}, over and over (a preview only)"),
+            Motion::Gesture(name) => {
+                let what = match name.as_str() {
+                    "IdleTalking" => "Talking with the hands",
+                    "Yes" => "A thumbs up",
+                    "No" => "A shake of the head",
+                    "Dance" => "A dance",
+                    "Interact" => "Reaching out to something",
+                    other => other,
+                };
+                format!("{what}, over and over (a preview only)")
+            }
         }
     }
 
@@ -145,62 +167,105 @@ pub fn preview_clip(take: &str) -> Option<String> {
     Some(clip.to_json())
 }
 
-/// Writes the preview's clip of `take` into `folder` when it isn't there
-/// as it should be; returns its path in the folder.
-fn write_clip(folder: &Path, take: &str) -> Result<String, String> {
-    let text = preview_clip(take)
-        .ok_or_else(|| format!("The default character has no \"{take}\" animation."))?;
-    let path = format!("{PREVIEW_CLIPS_FOLDER}/{take}.anim.json");
-    let file = folder.join(&path);
-    if std::fs::read_to_string(&file).ok().as_deref() != Some(text.as_str()) {
-        file.parent()
-            .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| std::fs::write(&file, text))
-            .map_err(|err| format!("Could not write the {take} preview: {err}"))?;
+/// The preview's state machine as a file's text: Idle (the default
+/// character's own Idle clip) and each take's preview clip, every state
+/// looped at its own speed and reached only by asking for it.
+pub fn preview_machine() -> String {
+    use axcenity_anim::{Motion as Plays, StateDef, StateMachineFile};
+    let states = Motion::all()
+        .into_iter()
+        .filter(|motion| *motion != Motion::Still)
+        .enumerate()
+        .map(|(index, motion)| {
+            let clip = match motion.take() {
+                Some(take) => format!("{PREVIEW_CLIPS_FOLDER}/{take}.anim.json"),
+                None => format!(
+                    "{}/Idle.anim.json",
+                    axcenity_project::DEFAULT_HUMANOID_CLIPS_FOLDER
+                ),
+            };
+            StateDef::new(
+                motion.label(),
+                Plays::Clip(clip),
+                [index as f32 * 180.0, 0.0],
+            )
+        })
+        .collect();
+    StateMachineFile {
+        default_state: Motion::Idle.label().to_owned(),
+        states,
+        ..StateMachineFile::default()
     }
-    Ok(path)
+    .to_json()
 }
 
-/// Poses `body` for `motion`: its Animator's state machine on for Idle,
-/// off otherwise, and the preview's Animation playing `clip` (or gone).
-fn pose_body(world: &mut World, body: InstanceId, idle: bool, clip: Option<&str>) {
-    if let Some(animator) = world.find_first_child(body, "Animator") {
-        let machine = if idle {
-            axcenity_project::DEFAULT_HUMANOID_STATE_MACHINE_PATH
-        } else {
-            ""
-        };
-        let _ = world.set_property(animator, "StateMachine", Value::String(machine.to_owned()));
+/// Writes `text` to `path` in `folder` unless the file there holds it.
+fn write_file(folder: &Path, path: &str, text: &str) -> std::io::Result<()> {
+    let file = folder.join(path);
+    if std::fs::read_to_string(&file).ok().as_deref() == Some(text) {
+        return Ok(());
     }
-    let existing = world.get(body).and_then(|body| {
-        body.children().iter().copied().find(|child| {
-            world.get(*child).is_some_and(|child| {
-                child.class() == ClassName::Animation && child.name() == PREVIEW_MOTION
-            })
-        })
-    });
-    let Some(clip) = clip else {
-        if let Some(animation) = existing {
-            let _ = world.destroy(animation);
-        }
+    file.parent().map_or(Ok(()), std::fs::create_dir_all)?;
+    std::fs::write(&file, text)
+}
+
+/// Writes the preview's state machine and the clip of every take it plays
+/// into `folder`, where they aren't there as they should be.
+fn write_preview(folder: &Path) -> Result<(), String> {
+    for motion in Motion::all() {
+        let Some(take) = motion.take() else {
+            continue;
+        };
+        let text = preview_clip(take)
+            .ok_or_else(|| format!("The default character has no \"{take}\" animation."))?;
+        write_file(
+            folder,
+            &format!("{PREVIEW_CLIPS_FOLDER}/{take}.anim.json"),
+            &text,
+        )
+        .map_err(|err| format!("Could not write the {take} preview: {err}"))?;
+    }
+    write_file(folder, PREVIEW_MACHINE, &preview_machine())
+        .map_err(|err| format!("Could not write the motion preview: {err}"))
+}
+
+/// The state machine `body`'s Animator plays, by its path.
+fn machine_of(world: &World, body: InstanceId) -> Option<(InstanceId, String)> {
+    let animator = world.find_first_child(body, "Animator")?;
+    let path = world
+        .get(animator)?
+        .property("StateMachine")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    Some((animator, path))
+}
+
+/// The state machine `motion` plays on: the preview's, or none for Still.
+fn machine_for(motion: &Motion) -> &'static str {
+    if *motion == Motion::Still {
+        ""
+    } else {
+        PREVIEW_MACHINE
+    }
+}
+
+/// Poses `body` for `motion`: Still clears its Animator's state machine;
+/// anything else plays the preview's, eased into that motion's state over
+/// `blend` seconds.
+fn pose_body(world: &mut World, body: InstanceId, motion: &Motion, blend: f64) {
+    let Some((animator, playing)) = machine_of(world, body) else {
         return;
     };
-    let animation = match existing {
-        Some(animation) => animation,
-        None => {
-            let Ok(animation) = world.create(ClassName::Animation) else {
-                return;
-            };
-            let _ = world.set_name(animation, PREVIEW_MOTION);
-            let _ = world.set_parent(animation, Some(body));
-            animation
-        }
-    };
-    let _ = world.set_property(animation, "Clip", Value::String(clip.to_owned()));
-    let _ = world.set_property(animation, "Looped", Value::Bool(true));
-    let _ = world.set_property(animation, "Speed", Value::Number(1.0));
-    if let Some(state) = world.property_animation_mut(animation) {
-        state.play = true;
+    let machine = machine_for(motion);
+    if playing != machine {
+        let _ = world.set_property(animator, "StateMachine", Value::String(machine.to_owned()));
+    }
+    if let Some(live) = world.animator_mut(animator) {
+        live.play = (!machine.is_empty()).then(|| axcenity_core::PlayRequest {
+            state: motion.label().to_owned(),
+            blend: Some(blend),
+        });
     }
 }
 
@@ -208,62 +273,100 @@ impl CharacterWorkspace {
     /// Plays `motion` on the preview (and on the held version beside it):
     /// editor state, never in the description or undo.
     pub fn preview_motion(&mut self, motion: Motion) {
-        let clip = match motion.take() {
-            Some(take) => match write_clip(&self.folder, take) {
-                Ok(path) => Some(path),
-                Err(error) => {
-                    self.notice = Some(error);
-                    return;
-                }
-            },
-            None => None,
-        };
+        if motion != Motion::Still
+            && !self.preview_written
+            && let Err(error) = write_preview(&self.folder)
+        {
+            self.notice = Some(error);
+            return;
+        }
+        self.preview_written |= motion != Motion::Still;
         let was_moving = self.motion.moves();
         self.motion = motion;
-        self.preview_clip = clip;
-        self.pose_previews();
+        self.pose_previews(BLEND);
         // The camera follows from where the head is now, as framed: a take
         // that leans the body (a run) moves the head at once, and the
-        // camera catches up with it.
-        self.follow = self.motion.moves().then(|| self.head()).flatten();
+        // camera catches up with it. From one take to the next it keeps
+        // the point it was following: the head is a bob away from that
+        // point, and starting again from the head would leave the view
+        // off the framing by that much for as long as takes play.
+        self.follow = match (self.motion.moves(), was_moving, self.follow) {
+            (true, true, Some(following)) => Some(following),
+            (true, ..) => self.head(),
+            (false, ..) => None,
+        };
         // Back to the view's own framing once nothing moves, after the
         // next frame has posed the body (the Face view aims at the head).
         self.reframe = was_moving && !self.motion.moves();
     }
 
-    /// Poses the main preview and the one beside it for the motion shown.
-    pub(super) fn pose_previews(&mut self) {
-        let idle = self.motion == Motion::Idle;
-        let bodies: Vec<InstanceId> = [self.character, self.other]
+    /// The bodies the preview shows: the character's and the one beside it.
+    fn preview_bodies(&self) -> Vec<InstanceId> {
+        [self.character, self.other]
             .into_iter()
             .flatten()
             .filter_map(|character| applier::body_of(&self.world, character))
-            .collect();
-        for body in bodies {
-            pose_body(&mut self.world, body, idle, self.preview_clip.as_deref());
+            .collect()
+    }
+
+    /// Poses the main preview and the one beside it for the motion shown,
+    /// both from its start (so the two move together), eased in over
+    /// `blend` seconds.
+    pub(super) fn pose_previews(&mut self, blend: f64) {
+        for body in self.preview_bodies() {
+            pose_body(&mut self.world, body, &self.motion, blend);
         }
     }
 
-    /// The preview's Animation playing a take, if one plays (tests).
-    #[cfg(test)]
-    pub(super) fn motion_animation(&self) -> Option<InstanceId> {
-        let body = applier::body_of(&self.world, self.character?)?;
-        self.world
-            .get(body)?
-            .children()
-            .iter()
-            .copied()
-            .find(|child| {
-                self.world
-                    .get(*child)
-                    .is_some_and(|child| child.name() == PREVIEW_MOTION)
+    /// Puts a body that isn't playing the motion shown onto it, at once: a
+    /// character built since the motion was picked (a new world, a new
+    /// one beside it) starts on the default character's own state machine.
+    /// Idle on that one is left alone: it is the same Idle, and nothing
+    /// is written into the folder before a motion is first picked.
+    fn keep_previews_posed(&mut self) {
+        let machine = machine_for(&self.motion);
+        let own = axcenity_project::DEFAULT_HUMANOID_STATE_MACHINE_PATH;
+        let stray: Vec<InstanceId> = self
+            .preview_bodies()
+            .into_iter()
+            .filter(|body| {
+                machine_of(&self.world, *body).is_some_and(|(_, playing)| {
+                    playing != machine && !(self.motion == Motion::Idle && playing == own)
+                })
             })
+            .collect();
+        if stray.is_empty() {
+            return;
+        }
+        // The motion may have come with the workspace (kept from the one
+        // before it) and not through `preview_motion`: its files are
+        // wanted all the same.
+        if !machine.is_empty() && !self.preview_written {
+            if let Err(error) = write_preview(&self.folder) {
+                self.notice = Some(error);
+                return;
+            }
+            self.preview_written = true;
+        }
+        for body in stray {
+            pose_body(&mut self.world, body, &self.motion, 0.0);
+        }
+    }
+
+    /// What the preview's Animator plays: its state machine, the state, how
+    /// far through it and the blend that is bringing it there, if a state
+    /// machine plays (tests).
+    #[cfg(test)]
+    pub(super) fn motion_state(&self) -> Option<axcenity_anim::MachineView> {
+        let body = applier::body_of(&self.world, self.character?)?;
+        self.animators.inspect(&self.world, body)?.machine
     }
 
     /// Keeps the camera on a moving character: the orbit's target moves
     /// with the head, smoothed over about a sixth of a second. A close
     /// view follows it whole; a far one only across the floor.
     pub(super) fn follow_motion(&mut self, seconds: f64) {
+        self.keep_previews_posed();
         if !self.motion.moves() {
             self.follow = None;
             if std::mem::take(&mut self.reframe)

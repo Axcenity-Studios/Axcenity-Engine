@@ -1578,19 +1578,11 @@ mod fit_gate_tests;
 #[cfg(test)]
 mod garment_checks;
 #[cfg(test)]
-mod hair_tests;
-#[cfg(test)]
 mod handle_tests;
 #[cfg(test)]
 mod live_identity_bench_tests;
 #[cfg(test)]
-mod makeup_tests;
-#[cfg(test)]
 mod profile_tests;
-#[cfg(test)]
-mod skin_value_tests;
-#[cfg(test)]
-mod wardrobe_tests;
 
 #[cfg(test)]
 mod gpu_particles_tests;

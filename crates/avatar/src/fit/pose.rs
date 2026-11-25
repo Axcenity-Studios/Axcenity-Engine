@@ -29,7 +29,7 @@ pub struct FitPose {
 }
 
 /// What the runtime does to a finished pose before it skins with it: on
-/// the realistic body, turning the twist and helper bones that follow the
+/// a body that has them, turning the twist and helper bones that follow the
 /// limbs (`axcenity_anim::twist::drive`, which `avatar` can't call: it has
 /// no animation code). The fit's poses turn only the limbs; with this they
 /// are the runtime's.
@@ -38,11 +38,11 @@ pub type FinishPose = fn(&Rig, &mut Vec<BoneTransform>);
 /// A corrective shape's rule, as `anim::correctives` drives it at run
 /// time: (shape, bone, axis in the space of the bone's parent at rest,
 /// degrees at which it starts, degrees at which it is full). The same
-/// numbers as `anim`'s `CORRECTIVES` and the realistic build data's
-/// `correctives` (a test holds them to the build data).
+/// numbers as `anim`'s `CORRECTIVES` (made for the realistic base, which
+/// ADR-0050 retired: no shipped body has these shapes now).
 pub type CorrectiveRule = (&'static str, &'static str, [f32; 3], f32, f32);
 
-/// The realistic body's corrective rules (its shoulders: raised, level,
+/// The corrective rules the realistic body was built for (its shoulders: raised, level,
 /// lowered, and the hanging arm swung forward and back).
 pub const CORRECTIVE_RULES: [CorrectiveRule; 10] = [
     (

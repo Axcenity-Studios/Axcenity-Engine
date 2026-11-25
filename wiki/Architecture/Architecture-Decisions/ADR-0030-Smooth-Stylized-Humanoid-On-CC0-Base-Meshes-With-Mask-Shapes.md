@@ -7,8 +7,8 @@ date: 2026-11-14
 supersedes:
 superseded_by: ADR-0032 (art direction), ADR-0035 (clothing masks)
 affects: [assets, project, anim, editor]
-source: [assets/characters/humanoid/build.py, assets/characters/humanoid/bodyshapes.py, crates/project/src/default_humanoid.rs]
-docs: [docs/research/character-studio.md, docs/research/default-humanoid.md, assets/characters/humanoid/README.md]
+source: [crates/project/src/default_humanoid.rs]
+docs: [docs/research/character-studio.md, docs/research/default-humanoid.md]
 tags: [adr, characters, assets]
 ---
 
@@ -49,6 +49,10 @@ The default humanoid is built by script on Blender Studio's CC0 stylized base me
 - Frame and eye identity shapes also move bones; the engine must apply the offsets in `Humanoid.customization.json` (Character Studio CS3) before those shapes are usable on their own.
 - A part's shapes (clothes following the frame and build) need the character's weights on every part, not only the body (CS3).
 - Revisit if an artist-made character replaces the generated one (the file names and shape names are the contract), or if overdraw under clothes shows in profiles.
+
+## Notes
+
+- **2026-11-25 ([ADR-0050](ADR-0050-The-Engine-Ships-One-Character-Family-MakeHumans-Body-With-Quaterniuss-Animations.md)).** The stylized package this ADR describes (`assets/characters/humanoid/`: its build scripts, `Humanoid.customization.json` and `HumanoidParts.glb`) was removed from the repository, with the realistic package; the repository's history keeps both. The default humanoid's model is now the human base's default body (`assets/characters/human/Humanoid.glb`), and `HUMANOID_PARTS` and `modular_character` named below no longer exist. What stays is the mechanism: one skinned body on the humanoid bone names (the human base's manifest keeps `skeleton.convention: humanoid`) with shapes driven by parameters.
 
 ## Implementation references
 

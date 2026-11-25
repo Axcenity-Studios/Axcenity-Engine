@@ -1,0 +1,19 @@
+{
+  "format_version": 2,
+  "parameters": [],
+  "default_state": "Dance",
+  "states": [
+    {
+      "name": "Dance",
+      "motion": {
+        "clip": "assets/animations/Humanoid/Dance.anim.json"
+      },
+      "speed": 1.0,
+      "position": [
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "transitions": []
+}

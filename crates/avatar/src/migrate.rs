@@ -10,8 +10,14 @@ use serde::Deserialize;
 
 use crate::{Description, FormatError, WornItem};
 
-/// The base model every format 1 character was on.
+/// The base model every format 1 character was on: the stylized humanoid,
+/// which the engine shipped until 2026-11-25. A project made before then
+/// has the package in its own library, so its characters still resolve.
 pub const V1_BASE: &str = "axcenity/stylized";
+
+/// The base model the engine ships and a new character is on: the human
+/// base (MakeHuman's body, ADR-0047).
+pub const DEFAULT_BASE: &str = "axcenity/human";
 
 /// Format 1's part names (objects of `HumanoidParts.glb`) and the items
 /// they became.

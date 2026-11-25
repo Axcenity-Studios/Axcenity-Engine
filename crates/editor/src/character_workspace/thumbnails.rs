@@ -22,7 +22,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
 use axcenity_avatar::{Description, Library, PresetKind};
@@ -296,12 +296,13 @@ impl Painter {
     }
 
     /// Draws `job`'s picture and writes it, removing older pictures of the
-    /// same thing.
-    pub fn paint_to(&mut self, job: &Job) -> Result<(), String> {
+    /// same thing. Returns its pixels (rows of RGBA, [`PICTURE_SIZE`]), so
+    /// whoever asked needn't read the file back.
+    pub fn paint_to(&mut self, job: &Job) -> Result<Vec<u8>, String> {
         let pixels = self.paint(&job.subject);
         write_png(&job.out, PICTURE_SIZE, &pixels)?;
         prune(&job.out);
-        Ok(())
+        Ok(pixels)
     }
 }
 
@@ -322,8 +323,13 @@ fn write_png(path: &Path, (width, height): (u32, u32), pixels: &[u8]) -> Result<
     std::fs::rename(&partial, path).map_err(|err| err.to_string())
 }
 
-/// What the thread sends back: the picture written, or why not.
-type Done = (PathBuf, Result<(), String>);
+/// What the thread sends back: the picture written (its pixels), or why
+/// not.
+type Done = (PathBuf, Result<Vec<u8>, String>);
+
+/// Pictures asked for and then no longer wanted (the character changed
+/// again before they were drawn): the thread skips them.
+type Dropped = Arc<Mutex<HashSet<PathBuf>>>;
 
 struct Worker {
     jobs: mpsc::Sender<Job>,
@@ -342,6 +348,8 @@ pub struct Thumbnails {
     /// given them (a thread that ended without drawing one gets it again
     /// once; then it's given up on).
     pending: HashMap<PathBuf, (Job, u32)>,
+    /// Pictures the thread was given and should skip ([`Thumbnails::drop_request`]).
+    dropped: Dropped,
     failed: HashSet<PathBuf>,
     textures: HashMap<PathBuf, egui::TextureHandle>,
 }
@@ -376,6 +384,19 @@ impl Thumbnails {
         self.send(job);
     }
 
+    /// Takes back the request for the picture at `out` if it isn't drawn
+    /// yet: nothing shows it any more. Without this, each change to the
+    /// character left a page's worth of pictures queued behind the ones
+    /// wanted now, all drawn on the GPU the viewport uses.
+    pub fn drop_request(&mut self, out: &Path) {
+        if self.pending.remove(out).is_some() {
+            self.dropped
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .insert(out.to_owned());
+        }
+    }
+
     /// Gives `job` to the thread, starting one if there's none.
     fn send(&mut self, job: Job) {
         if let Some(worker) = &self.worker
@@ -400,9 +421,14 @@ impl Thumbnails {
         let (jobs, take) = mpsc::channel::<Job>();
         let (give, done) = mpsc::channel::<Done>();
         let repaint = self.repaint.clone();
+        // A new thread starts with only what is pending: nothing to skip.
+        let dropped = Dropped::default();
+        self.dropped = dropped.clone();
         let spawned = std::thread::Builder::new()
             .name("character pictures".into())
-            .spawn(move || draw_pictures(&folder, &device, &queue, &take, &give, repaint));
+            .spawn(move || {
+                draw_pictures(&folder, &device, &queue, &take, &give, &dropped, repaint)
+            });
         let Ok(thread) = spawned else {
             return;
         };
@@ -423,9 +449,25 @@ impl Thumbnails {
             while let Ok((out, result)) = worker.done.try_recv() {
                 self.pending.remove(&out);
                 self.textures.remove(&out);
-                if let Err(error) = result {
-                    log::warn!("could not draw {}: {error}", out.display());
-                    self.failed.insert(out);
+                match result {
+                    // The pixels come with it: the file isn't read back and
+                    // decoded on the interface's thread.
+                    Ok(pixels) => {
+                        let (width, height) = PICTURE_SIZE;
+                        let size = [width as usize, height as usize];
+                        if pixels.len() == size[0] * size[1] * 4 {
+                            let texture = ctx.load_texture(
+                                out.to_string_lossy(),
+                                egui::ColorImage::from_rgba_unmultiplied(size, &pixels),
+                                egui::TextureOptions::LINEAR,
+                            );
+                            self.textures.insert(out, texture);
+                        }
+                    }
+                    Err(error) => {
+                        log::warn!("could not draw {}: {error}", out.display());
+                        self.failed.insert(out);
+                    }
                 }
             }
         }
@@ -540,11 +582,12 @@ impl CharacterWorkspace {
                 continue;
             }
             self.pictures.request(subject, out.clone());
-            // The old picture stays until the new one is there.
-            let old = self
-                .item_pictures
-                .remove(&id)
-                .and_then(|(_, texture)| texture);
+            // The old picture stays until the new one is there; one asked
+            // for and not drawn yet is no longer wanted.
+            let old = self.item_pictures.remove(&id).and_then(|(was, texture)| {
+                self.pictures.drop_request(&was);
+                texture
+            });
             self.item_pictures.insert(id, (out, old));
         }
         for (out, texture) in self.item_pictures.values_mut() {
@@ -576,10 +619,19 @@ fn draw_pictures(
     queue: &wgpu::Queue,
     jobs: &mpsc::Receiver<Job>,
     done: &mpsc::Sender<Done>,
+    dropped: &Dropped,
     repaint: Option<egui::Context>,
 ) {
     let mut painter: Option<Painter> = None;
     while let Ok(job) = jobs.recv_timeout(IDLE) {
+        // Asked for, then taken back before its turn came.
+        if dropped
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&job.out)
+        {
+            continue;
+        }
         let result = match &mut painter {
             Some(painter) => Ok(painter),
             None => Painter::new(folder, device, queue).map(|made| painter.insert(made)),

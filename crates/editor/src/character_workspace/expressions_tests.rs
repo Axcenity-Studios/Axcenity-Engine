@@ -30,6 +30,15 @@ fn weights(workspace: &CharacterWorkspace) -> Vec<f32> {
     workspace.poses()[&body(workspace)].morph_weights().to_vec()
 }
 
+/// The preview body's joints as posed, each matrix's numbers in a row.
+fn joints(workspace: &CharacterWorkspace) -> Vec<f32> {
+    workspace.poses()[&body(workspace)]
+        .joints()
+        .iter()
+        .flat_map(|joint| joint.to_cols_array())
+        .collect()
+}
+
 fn largest_difference(a: &[f32], b: &[f32]) -> f32 {
     a.iter()
         .zip(b)
@@ -123,21 +132,32 @@ fn face_controls_move_the_face_over_the_expression_and_neutral_resets_them() {
     workspace.apply(Intent::PreviewMotion(Motion::Still));
     run_for(&mut workspace, 0.5);
     let neutral = weights(&workspace);
+    let closed = joints(&workspace);
 
+    // The human base's jaw is a bone: Jaw_Open turns it and moves no shape.
     workspace.apply(Intent::PreviewFaceControl {
         name: "Jaw_Open".into(),
         value: Some(0.6),
     });
     assert_eq!(workspace.face_value("Jaw_Open"), 0.6);
     run_for(&mut workspace, 0.5);
-    let open = weights(&workspace);
     assert!(
-        largest_difference(&neutral, &open) > 0.3,
-        "the jaw opens the mouth's shapes"
+        largest_difference(&closed, &joints(&workspace)) > 0.01,
+        "the jaw opens: its bone turns"
     );
     assert!(
         preview_face(&workspace).is_some(),
         "a control alone is shown through the preview's face"
+    );
+    // A control with a shape moves the shape: Mouth_Open parts the lips.
+    workspace.apply(Intent::PreviewFaceControl {
+        name: "Mouth_Open".into(),
+        value: Some(0.6),
+    });
+    run_for(&mut workspace, 0.5);
+    assert!(
+        largest_difference(&neutral, &weights(&workspace)) > 0.3,
+        "the mouth opens its shapes"
     );
 
     // An expression starts the sliders from its own values.
@@ -177,6 +197,10 @@ fn face_controls_move_the_face_over_the_expression_and_neutral_resets_them() {
     assert!(
         largest_difference(&neutral, &weights(&workspace)) < 0.02,
         "Neutral puts the face back at rest"
+    );
+    assert!(
+        largest_difference(&closed, &joints(&workspace)) < 0.02,
+        "and closes the jaw"
     );
     // Leaving the page takes the controls off too.
     workspace.apply(Intent::PreviewFaceControl {

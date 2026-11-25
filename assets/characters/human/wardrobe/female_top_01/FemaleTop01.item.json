@@ -1,0 +1,70 @@
+{
+  "format_version": 1,
+  "id": "makehuman/female-top-01",
+  "label": "Bra top",
+  "kind": "garment",
+  "slot": "top",
+  "layer": 0,
+  "tier": "built_in",
+  "bases": [
+    "axcenity/human"
+  ],
+  "model": {
+    "file": "FemaleTop01.glb",
+    "object": "AxcenityHuman/FemaleTop01"
+  },
+  "cover_map": "FemaleTop01.cover.png",
+  "materials": [
+    {
+      "name": "FemaleTop01",
+      "shading": "standard"
+    }
+  ],
+  "fit": {
+    "method": "shapes",
+    "follows": [
+      "Face_Measure_Neck_Circ_Incr",
+      "Face_Neck_Scale_Depth_Decr",
+      "Face_Neck_Scale_Depth_Incr",
+      "Face_Neck_Scale_Horiz_Decr",
+      "Face_Neck_Scale_Horiz_Incr",
+      "Face_Neck_Scale_Vert_Decr",
+      "Face_Neck_Trans_Backward",
+      "Face_Neck_Trans_Down",
+      "Face_Neck_Trans_Forward",
+      "Face_Neck_Trans_In",
+      "Face_Neck_Trans_Out",
+      "Feminine_Age_Old",
+      "Feminine_Fat_Down",
+      "Feminine_Fat_Up",
+      "Feminine_Muscle_Down",
+      "Feminine_Muscle_Down_Fat_Down",
+      "Feminine_Muscle_Down_Fat_Up",
+      "Feminine_Muscle_Up",
+      "Feminine_Muscle_Up_Fat_Down",
+      "Feminine_Muscle_Up_Fat_Up",
+      "Frame_Feminine",
+      "Masculine_Age_Old",
+      "Masculine_Fat_Down",
+      "Masculine_Fat_Up",
+      "Masculine_Muscle_Down",
+      "Masculine_Muscle_Down_Fat_Down",
+      "Masculine_Muscle_Down_Fat_Up",
+      "Masculine_Muscle_Up",
+      "Masculine_Muscle_Up_Fat_Down",
+      "Masculine_Muscle_Up_Fat_Up"
+    ]
+  },
+  "tags": [
+    "female",
+    "feminine",
+    "makehuman"
+  ],
+  "thumbnail": "FemaleTop01.png",
+  "source": {
+    "author": "wolgade",
+    "licence": "CC0-1.0",
+    "url": "http://www.makehumancommunity.org/node/339"
+  },
+  "quality": "draft"
+}

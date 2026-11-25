@@ -16,6 +16,19 @@
    "shapes": 121
   },
   {
+   "id": "makehuman/hair-bob01",
+   "label": "Bob",
+   "name": "bob01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 5203,
+   "faces": 4237,
+   "shapes": 63
+  },
+  {
    "id": "makehuman/hair-bob02",
    "label": "Blunt bob with a fringe",
    "name": "bob02",
@@ -27,6 +40,19 @@
    "corners": 1653,
    "faces": 1124,
    "shapes": 243
+  },
+  {
+   "id": "makehuman/hair-braid01",
+   "label": "Braid01",
+   "name": "Braid01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 4493,
+   "faces": 2759,
+   "shapes": 68
   },
   {
    "id": "makehuman/hair-long01",
@@ -42,6 +68,32 @@
    "shapes": 68
   },
   {
+   "id": "makehuman/hair-ponytail01",
+   "label": "Ponytail",
+   "name": "ponytail01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 3718,
+   "faces": 2676,
+   "shapes": 124
+  },
+  {
+   "id": "makehuman/hair-short01",
+   "label": "Short crop",
+   "name": "short01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 2984,
+   "faces": 1839,
+   "shapes": 124
+  },
+  {
    "id": "makehuman/hair-short02",
    "label": "Short and tousled",
    "name": "short02",
@@ -53,6 +105,19 @@
    "corners": 1755,
    "faces": 1672,
    "shapes": 148
+  },
+  {
+   "id": "makehuman/hair-short03",
+   "label": "Short, swept to the side",
+   "name": "short03",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "hair",
+   "corners": 1011,
+   "faces": 961,
+   "shapes": 190
   },
   {
    "id": "makehuman/hair-short04",

@@ -180,7 +180,7 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
 /// Every value at its neutral setting changes nothing, and a part with no
 /// values is drawn as authored. The rest (`pupil_size`, `limbal_ring`,
 /// `iris_depth`) wait for the renderer's Eye model. On a material its file
-/// doesn't mark hair (the realistic brows and lashes, today), Hair's
+/// doesn't mark hair, Hair's
 /// `melanin` and `redness` take the skin's curve.
 pub(crate) fn modulate(material: &mut Material, instance: &Instance, name: &str) {
     let value = |value: &str| instance.attribute(&material_value_attribute(name, value));

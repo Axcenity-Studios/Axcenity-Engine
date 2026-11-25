@@ -197,7 +197,7 @@ mod tests {
     use super::*;
 
     fn named(name: &str) -> Description {
-        Description::new(name, "axcenity/realistic")
+        Description::new(name, crate::character_workspace::DEFAULT_BASE)
     }
 
     #[test]

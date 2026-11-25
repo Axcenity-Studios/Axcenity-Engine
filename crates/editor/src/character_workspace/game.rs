@@ -87,7 +87,8 @@ fn has_humanoid(world: &World, character: InstanceId) -> bool {
 }
 
 /// Whether `body` draws one of the engine's character models: the default
-/// humanoid (whole or its parts file) or a model of the character library.
+/// humanoid, a model of the character library, or the parts file of the
+/// stylized humanoid an older project has.
 fn engine_body(world: &World, body: InstanceId) -> bool {
     let mesh = world
         .get(body)
@@ -95,12 +96,12 @@ fn engine_body(world: &World, body: InstanceId) -> bool {
         .and_then(Value::as_str)
         .unwrap_or_default();
     mesh == axcenity_project::DEFAULT_HUMANOID_MODEL_PATH
-        || mesh.starts_with(axcenity_project::DEFAULT_HUMANOID_PARTS_PATH)
+        || mesh.starts_with("assets/models/Humanoid/HumanoidParts.glb")
         || mesh.starts_with(&format!("{}/", axcenity_avatar::LIBRARY_FOLDER))
 }
 
 /// The description `character` (see [`editable_character`]) has, read
-/// against `library` (the project's): the kept one, or the stylized
+/// against `library` (the project's): the kept one, or the library's
 /// default character for one made before descriptions, named after the
 /// character.
 pub fn game_description(
@@ -111,7 +112,7 @@ pub fn game_description(
     match applier::applied_instance(world, character) {
         Some(kept) => applier::description_of(world, kept, library),
         None => {
-            let mut description = applier::default_description(library, axcenity_avatar::V1_BASE);
+            let mut description = applier::default_description(library, library.default_base());
             description.name = world
                 .get(character)
                 .map_or("Character", |instance| instance.name())

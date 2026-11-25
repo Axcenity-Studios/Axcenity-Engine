@@ -73,25 +73,25 @@ mod user_templates;
 
 pub use character_library::{
     CHARACTER_LIBRARY_PATH, add_character_library, add_character_packages,
-    built_in_character_library,
+    add_character_packages_for,
 };
 pub use collision_groups::{
     COLLISION_GROUPS_FILE, parse_collision_groups, save_collision_groups, write_collision_groups,
 };
 pub use default_humanoid::{
     DEFAULT_CHARACTER_PREFAB_PATH, DEFAULT_HUMANOID_ANIMATIONS, DEFAULT_HUMANOID_ANIMATIONS_PATH,
-    DEFAULT_HUMANOID_CLIPS_FOLDER, DEFAULT_HUMANOID_CUSTOMIZATION, DEFAULT_HUMANOID_MODEL,
-    DEFAULT_HUMANOID_MODEL_PATH, DEFAULT_HUMANOID_PARTS, DEFAULT_HUMANOID_PARTS_PATH,
-    DEFAULT_HUMANOID_STATE_MACHINE_PATH, HUMANOID_PARTS, HUMANOID_SOCKETS, ROOT_PART_SIZE,
-    STUDS_PER_METRE, add_default_humanoid, add_humanoid_parts, default_character,
-    default_humanoid_animation_files, humanoid_part, humanoid_part_mesh_id, modular_character,
+    DEFAULT_HUMANOID_CLIPS_FOLDER, DEFAULT_HUMANOID_MODEL, DEFAULT_HUMANOID_MODEL_PATH,
+    DEFAULT_HUMANOID_STATE_MACHINE_PATH, HUMANOID_SOCKETS, ROOT_PART_SIZE, STUDS_PER_METRE,
+    add_default_humanoid, default_character, default_humanoid_animation_files,
+    refresh_default_humanoid,
 };
 pub use default_sky::{
     DEFAULT_SKY, DEFAULT_SKY_CLOCK_TIME, DEFAULT_SKY_LATITUDE, DEFAULT_SKY_PATH, add_default_sky,
 };
 pub use game_character::{
-    DEFAULT_GAME_BASE, KEPT_DESCRIPTION, add_both_character_libraries, add_default_game_character,
-    described_character, game_character_description, shipped_character_library,
+    DEFAULT_GAME_BASE, DEFAULT_GAME_OUTFIT, KEPT_DESCRIPTION, add_default_game_character,
+    add_game_character_library, described_character, game_character_description,
+    shipped_character_library,
 };
 pub use input_map::{INPUT_FILE, load_input_map, parse_input_map, save_input_map, write_input_map};
 pub use recovery::{

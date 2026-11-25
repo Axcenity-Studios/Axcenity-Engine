@@ -7,7 +7,7 @@ use super::thumbnails::{self, Painter, Subject, Thumbnails};
 use super::*;
 use crate::character_studio::test_folder;
 
-/// Saves a character named `name` on the realistic body in `folder`.
+/// Saves a character named `name` on the human body in `folder`.
 fn save(folder: &Path, name: &str, frame: f32) -> PathBuf {
     let mut description = Description::new(name, DEFAULT_BASE);
     description.parameters.insert("frame".into(), frame);
@@ -70,26 +70,31 @@ fn opening_and_saving_put_a_character_first_in_recent() {
 #[test]
 fn the_overview_names_the_body_type_hair_and_what_it_wears() {
     let folder = test_folder("overview");
-    let workspace = CharacterWorkspace::open_new(&folder, &Start::shipped("female")).unwrap();
+    let mut workspace = CharacterWorkspace::open_new(&folder, &Start::shipped("female")).unwrap();
     let library = workspace.library();
     let female = shelf::overview(workspace.description(), &library);
-    assert_eq!(female.body, "Female · Realistic", "{female:?}");
-    assert!(female.look.starts_with("Bald · "), "{female:?}");
-    assert!(female.look.contains("Sports bra"), "{female:?}");
+    // The base's choices (the body type, the skin), then its label.
+    assert_eq!(female.body, "Female · Caucasian · Human", "{female:?}");
+    assert_eq!(female.look, "Bald · Boxer briefs, Bandeau top");
 
-    let athletic = library
-        .preset("axcenity/realistic-athletic-male")
-        .unwrap()
-        .clone();
+    // A build on the default character: what it sets is counted.
+    let mut athletic = applier::default_description(&library, DEFAULT_BASE);
+    let preset = library.preset("axcenity/human-body-athletic").unwrap();
+    axcenity_avatar::apply_preset(&mut athletic, preset, &library).unwrap();
     let athletic = shelf::overview(&athletic, &library);
-    assert_eq!(athletic.body, "Male · Realistic · 2 values set");
-    assert!(athletic.look.contains("Boxer briefs"), "{athletic:?}");
+    assert_eq!(athletic.body, "Male · Caucasian · Human · 2 values set");
+    assert_eq!(athletic.look, "Bald · Boxer briefs");
 
-    // The stylized default character wears its hair and clothes.
-    let stylized = applier::default_description(&library, axcenity_avatar::V1_BASE);
-    let stylized = shelf::overview(&stylized, &library);
-    assert!(stylized.body.contains("Stylized"), "{stylized:?}");
-    assert!(!stylized.look.starts_with("Bald"), "{stylized:?}");
+    // A character with a hairstyle and clothes names them.
+    workspace.wear("hair", Some("makehuman/hair-bob02"));
+    workspace.wear("bottom", Some("makehuman/cargo-pants"));
+    let dressed = shelf::overview(workspace.description(), &library);
+    assert_eq!(dressed.body, female.body);
+    assert!(
+        dressed.look.starts_with("Blunt bob with a fringe · "),
+        "{dressed:?}"
+    );
+    assert!(dressed.look.contains("Cargo pants"), "{dressed:?}");
     let _ = std::fs::remove_dir_all(&folder);
 }
 
@@ -258,28 +263,28 @@ fn a_pictures_key_follows_the_file_and_presets_have_their_own() {
     );
     // Presets are addressed by ID, and keyed by the character drawn and
     // its framing.
-    let shown = Description::new("Round", DEFAULT_BASE);
+    let shown = Description::new("Soft", DEFAULT_BASE);
     let whole = thumbnails::preset_picture(
         &folder,
-        "axcenity/realistic-face-round",
+        "axcenity/human-face-soft",
         &Subject::Character(shown.clone()),
     );
     let face = thumbnails::preset_picture(
         &folder,
-        "axcenity/realistic-face-round",
+        "axcenity/human-face-soft",
         &Subject::Face(shown.clone()),
     );
     assert!(!whole.starts_with(one.parent().unwrap()));
     assert_ne!(whole, face, "the framing is in the key");
     let name = whole.file_name().unwrap().to_string_lossy().into_owned();
-    assert!(name.starts_with("axcenity-realistic-face-round."), "{name}");
+    assert!(name.starts_with("axcenity-human-face-soft."), "{name}");
     let mut other = shown;
     other.parameters.insert("fat".into(), 0.5);
     assert_ne!(
         whole,
         thumbnails::preset_picture(
             &folder,
-            "axcenity/realistic-face-round",
+            "axcenity/human-face-soft",
             &Subject::Character(other)
         )
     );
@@ -348,7 +353,7 @@ fn pictures_are_drawn_cached_and_drawn_again_when_the_file_changes() {
 
     // A preset, and a different body, look different.
     let library = shelf::library_for(&folder);
-    let male = library.preset("axcenity/realistic-male").unwrap();
+    let male = library.preset("axcenity/human-male").unwrap();
     let mut shown = applier::default_description(&library, DEFAULT_BASE);
     axcenity_avatar::apply_preset(&mut shown, male, &library).unwrap();
     let preset = painter.paint(&Subject::Character(shown));
@@ -382,14 +387,10 @@ fn pictures_are_drawn_cached_and_drawn_again_when_the_file_changes() {
     pictures.set_folder(Some(folder.clone()));
     pictures.set_gpu(&device, &queue);
     pictures.poll(&ctx);
-    let athletic = library
-        .preset("axcenity/realistic-athletic-female")
-        .unwrap()
-        .clone();
-    let athletic = Subject::Character(athletic);
-    let preset_out =
-        thumbnails::preset_picture(&folder, "axcenity/realistic-athletic-female", &athletic);
-    pictures.request(athletic.clone(), preset_out.clone());
+    let female = library.preset("axcenity/human-female").unwrap().clone();
+    let female = Subject::Character(female);
+    let preset_out = thumbnails::preset_picture(&folder, "axcenity/human-female", &female);
+    pictures.request(female.clone(), preset_out.clone());
     assert!(pictures.pending(&preset_out));
     let started = Instant::now();
     while pictures.pending(&preset_out) {
@@ -405,7 +406,7 @@ fn pictures_are_drawn_cached_and_drawn_again_when_the_file_changes() {
         assert!(pictures.texture(&ctx, &preset_out).is_some());
     });
     // Asking again for a picture that's there draws nothing.
-    pictures.request(athletic, preset_out.clone());
+    pictures.request(female, preset_out.clone());
     assert!(!pictures.pending(&preset_out));
     let _ = std::fs::remove_dir_all(&folder);
 }

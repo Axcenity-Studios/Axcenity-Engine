@@ -13,7 +13,7 @@ A model file says it: a glTF material whose `extras` hold `"axcenity_shading": "
 | mesh tangents | MikkTSpace | The direction the highlight stretches along is the texture's U, turned by the rotation |
 | everything else | glTF's metallic-roughness material, as Standard reads it | Base colour, normal, roughness, occlusion maps |
 
-`assets` reads both extensions' factors from the file's JSON for every material (`material_extensions`; the `gltf` crate drops extensions it doesn't know). A Standard material ignores them, so the realistic body's underwear, which already writes `KHR_materials_sheen`, draws as before until its file marks it cloth.
+`assets` reads both extensions' factors from the file's JSON for every material (`material_extensions`; the `gltf` crate drops extensions it doesn't know). A Standard material ignores them, so a file that writes `KHR_materials_sheen` draws as before until it marks its material cloth.
 
 **Suggested looks** (starting points for the first garments; the content's own measurements win): cotton jersey sheen 0.15 to 0.25 grey, roughness 0.6; denim 0.1, 0.7; fleece and velvet 0.5 to 1.0 of the base colour's hue, 0.3 to 0.5; satin and silk sheen 0.1, with anisotropy 0.5 to 0.8 along the weave and a low base roughness (0.25 to 0.35).
 

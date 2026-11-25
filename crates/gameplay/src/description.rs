@@ -181,7 +181,7 @@ pub fn description_of(
     }
     let base = text("Base");
     let base = if base.is_empty() {
-        axcenity_avatar::V1_BASE
+        library.default_base()
     } else {
         base
     };
@@ -235,7 +235,7 @@ pub fn apply_description(
     let library = library(assets);
     let body = body_of(world, character)
         .ok_or("the character has no skinned body: a MeshPart named `Body` inside its Model")?;
-    // What a parameter's choices wear (the realistic body's underwear) is
+    // What a parameter's choices wear (the human body's underwear) is
     // always on, and the kept description says so.
     let mut dressed = description.clone();
     axcenity_avatar::wear_choices(&mut dressed, &library);

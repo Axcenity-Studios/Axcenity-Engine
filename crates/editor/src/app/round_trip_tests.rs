@@ -1,8 +1,8 @@
 //! Refinement R10 in the Game Editor: the round trip to Character Studio
 //! and back (insert, edit, return, play), a described character shown in
-//! edit mode (OPEN-21), the realistic body as the default game character
-//! with both families in every project (OPEN-22), and the studio's keys
-//! inside the editor.
+//! edit mode (OPEN-21), the human base's character as the default game
+//! character with its base in the project's library (OPEN-22), and the
+//! studio's keys inside the editor.
 
 use std::path::{Path, PathBuf};
 
@@ -16,7 +16,8 @@ use super::*;
 use crate::character_workspace::{Gesture, Intent};
 use crate::prefab_menu::PrefabAction;
 
-const REALISTIC: &str = "axcenity/realistic";
+/// The one base the engine ships: the human base.
+const HUMAN: &str = axcenity_project::DEFAULT_GAME_BASE;
 
 /// A new Baseplate project in a folder of its own, and a studio folder.
 fn new_project(name: &str) -> (PathBuf, PathBuf, PathBuf) {
@@ -97,26 +98,44 @@ fn key(key: egui::Key, modifiers: egui::Modifiers) -> Vec<egui::Event> {
     ]
 }
 
-/// OPEN-22: Insert > Character in a new project is the realistic
-/// character (decision 7), with both families in the project's library,
-/// and it shows at once: applied as it's inserted, one undo step.
+/// OPEN-22: Insert > Character in a new project is the human base's
+/// character in what the default game character wears, with that base and
+/// those items (and nothing else) in the project's library, and it shows
+/// at once: applied as it's inserted, one undo step.
 #[test]
-fn insert_character_places_the_realistic_character_with_both_families() {
+fn insert_character_places_the_human_character_with_its_base_in_the_library() {
     let (parent, folder, studio) = new_project("insert");
     let mut app = open(&folder, &studio);
     let character = inserted(&mut app, Insertable::Character, None);
     assert_eq!(app.history.undo_label(), Some("Insert Character"));
     let description = kept(&app.world, character).expect("a described character");
-    assert_eq!(description.base, REALISTIC);
+    assert_eq!(description.base, HUMAN);
     let body = applier::body_of(&app.world, character).unwrap();
     assert!(
         mesh_id(&app.world, body).starts_with(LIBRARY_FOLDER),
-        "the realistic body is drawn: {}",
+        "the human body is drawn: {}",
         mesh_id(&app.world, body)
     );
-    let (library, _, _) = Library::read(&folder.join(LIBRARY_FOLDER));
-    assert!(library.base(REALISTIC).is_some());
-    assert!(library.base(axcenity_avatar::V1_BASE).is_some());
+    let (library, _, problems) = Library::read(&folder.join(LIBRARY_FOLDER));
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(
+        library.bases.keys().collect::<Vec<_>>(),
+        [HUMAN],
+        "the one base the engine ships"
+    );
+    // It wears the default game character's outfit, and the project's
+    // library has every item it wears.
+    for item in axcenity_project::DEFAULT_GAME_OUTFIT {
+        assert!(
+            description.items.iter().any(|worn| worn.id == item),
+            "{item}"
+        );
+    }
+    for worn in &description.items {
+        assert!(library.item(&worn.id).is_some(), "{}", worn.id);
+    }
+    let problems = description.validate(&library);
+    assert!(problems.is_empty(), "{problems:?}");
     // Undo takes the whole character away.
     app.undo();
     assert!(app.world.get(character).and_then(|c| c.parent()).is_none());
@@ -124,11 +143,11 @@ fn insert_character_places_the_realistic_character_with_both_families() {
     let _ = std::fs::remove_dir_all(parent);
 }
 
-/// OPEN-22: an older project (a stylized library and a stylized starter
-/// character) keeps its players' prefab and its characters, and gains the
-/// realistic family when a character is inserted.
+/// OPEN-22: an older project (a starter character made before
+/// descriptions, and no character library) keeps its players' prefab and
+/// its characters, and gains the human base when a character is inserted.
 #[test]
-fn an_older_project_keeps_its_characters_and_gains_the_realistic_family() {
+fn an_older_project_keeps_its_characters_and_gains_the_human_base() {
     let parent =
         std::env::temp_dir().join(format!("axcenity-round-trip-older-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&parent);
@@ -137,6 +156,10 @@ fn an_older_project_keeps_its_characters_and_gains_the_realistic_family() {
     axcenity_project::add_default_humanoid(&folder).unwrap();
     let prefab = folder.join(axcenity_project::DEFAULT_CHARACTER_PREFAB_PATH);
     let old_prefab = std::fs::read_to_string(&prefab).unwrap();
+    assert!(
+        !folder.join(LIBRARY_FOLDER).exists(),
+        "no character library before a character is inserted"
+    );
     let mut app = open(&folder, &parent);
     let old = app
         .world
@@ -144,7 +167,7 @@ fn an_older_project_keeps_its_characters_and_gains_the_realistic_family() {
         .unwrap();
     let old_tree = super::tests::describe(&app.world, old);
     let new = inserted(&mut app, Insertable::Character, None);
-    assert_eq!(kept(&app.world, new).unwrap().base, REALISTIC);
+    assert_eq!(kept(&app.world, new).unwrap().base, HUMAN);
     assert_eq!(
         super::tests::describe(&app.world, old),
         old_tree,
@@ -152,15 +175,16 @@ fn an_older_project_keeps_its_characters_and_gains_the_realistic_family() {
     );
     assert_eq!(std::fs::read_to_string(&prefab).unwrap(), old_prefab);
     let (library, _, _) = Library::read(&folder.join(LIBRARY_FOLDER));
-    assert!(library.base(REALISTIC).is_some());
-    assert!(library.base(axcenity_avatar::V1_BASE).is_some());
+    assert!(library.base(HUMAN).is_some());
     drop(app);
     let _ = std::fs::remove_dir_all(&folder);
     let _ = std::fs::remove_dir_all(parent);
 }
 
 /// R10's Done-when: insert, edit in Character Studio, return, play. The
-/// edit comes back as one undo step, and the played character wears it.
+/// edit comes back as one undo step, the project's library gains what the
+/// edited character names (a hat of the studio's library, and no more of
+/// its wardrobe), and the played character wears it.
 #[test]
 fn insert_edit_in_character_studio_return_and_play_wears_the_edit() {
     let (parent, folder, studio) = new_project("insert-edit-play");
@@ -185,14 +209,26 @@ fn insert_edit_in_character_studio_return_and_play_wears_the_edit() {
     assert!(!drawn.iter().any(|t| t == "Debug"), "no Game Editor menus");
     let workspace = app.character_workspace.as_mut().expect("the studio opened");
     assert_eq!(workspace.game().map(|g| g.character), Some(character));
-    assert_eq!(workspace.description().base, REALISTIC);
+    assert_eq!(workspace.description().base, HUMAN);
     assert!(!workspace.dirty(), "nothing changed yet");
     workspace.apply(Intent::SetParameter {
         id: "fat".into(),
         value: 0.8,
         gesture: Gesture::Commit,
     });
+    // A hat too: the studio's library has it, the project's only what
+    // the default game character wears.
+    const HAT: &str = "makehuman/fedora";
+    const NOT_WORN: &str = "makehuman/cargo-pants";
+    let (before, _, _) = Library::read(&folder.join(LIBRARY_FOLDER));
+    assert!(before.item(HAT).is_none() && before.item(NOT_WORN).is_none());
+    assert!(workspace.library().item(NOT_WORN).is_some());
+    workspace.apply(Intent::Wear {
+        slot: "headwear".into(),
+        item: Some(HAT.into()),
+    });
     let edited = workspace.description().clone();
+    assert!(edited.items.iter().any(|worn| worn.id == HAT));
     assert!(app.title().contains("Character Studio"), "{}", app.title());
 
     // Done: back in the Game Editor, the edit applied as one step.
@@ -201,6 +237,15 @@ fn insert_edit_in_character_studio_return_and_play_wears_the_edit() {
     let now = kept(&app.world, character).unwrap();
     assert_eq!(now.parameters.get("fat"), Some(&0.8));
     assert_eq!(now.base, edited.base);
+    assert!(now.items.iter().any(|worn| worn.id == HAT));
+    // The project's library has what the character names now, not the
+    // studio's whole wardrobe.
+    let (library, _, problems) = Library::read(&folder.join(LIBRARY_FOLDER));
+    assert!(problems.is_empty(), "{problems:?}");
+    assert!(library.item(HAT).is_some(), "the hat came with the edit");
+    assert!(library.item(NOT_WORN).is_none(), "only what is worn");
+    let problems = now.validate(&library);
+    assert!(problems.is_empty(), "{problems:?}");
     assert_eq!(app.history.undo_labels().len(), steps + 1);
     assert_eq!(
         app.history.undo_label(),
@@ -235,6 +280,26 @@ fn insert_edit_in_character_studio_return_and_play_wears_the_edit() {
     assert!(
         posed.is_some_and(|p| p.is_morphed()),
         "the body is posed with its shapes"
+    );
+    // The hat is on the played body, drawing a model the project has.
+    let hat = game
+        .get(body)
+        .unwrap()
+        .children()
+        .iter()
+        .copied()
+        .find(|part| {
+            game.get(*part)
+                .and_then(|part| part.attribute(applier::DESCRIPTION_PART))
+                .and_then(Value::as_str)
+                == Some(HAT)
+        })
+        .expect("the played character wears the hat");
+    let model = mesh_id(game, hat);
+    assert!(model.starts_with(LIBRARY_FOLDER), "{model}");
+    assert!(
+        app.assets.model_blocking(&model).is_some(),
+        "the hat's model loads from the project: {model}"
     );
     app.stop();
     drop(app);
@@ -272,11 +337,12 @@ fn cancel_leaves_the_game_character_as_it_was() {
     let _ = std::fs::remove_dir_all(parent);
 }
 
-/// A character made before descriptions (the stylized default humanoid)
-/// opens on the stylized family, and an imported character isn't offered.
+/// A character made before descriptions (the default humanoid, with no
+/// kept description) opens on the library's default base, the human base,
+/// and an imported character isn't offered.
 #[test]
-fn a_character_without_a_description_opens_on_the_stylized_family() {
-    let (parent, folder, studio) = new_project("stylized");
+fn a_character_without_a_description_opens_on_the_default_base() {
+    let (parent, folder, studio) = new_project("no-description");
     let mut app = open(&folder, &studio);
     let character = axcenity_project::default_character(&mut app.world, Default::default());
     let workspace = app.world.workspace();
@@ -288,7 +354,7 @@ fn a_character_without_a_description_opens_on_the_stylized_family() {
     );
     app.edit_in_character_studio(character).unwrap();
     let workspace = app.character_workspace.as_ref().unwrap();
-    assert_eq!(workspace.description().base, axcenity_avatar::V1_BASE);
+    assert_eq!(workspace.description().base, HUMAN);
     assert_eq!(workspace.description().name, "Character");
     app.finish_character_round_trip(false);
 
@@ -605,8 +671,8 @@ fn edit_mode_draws_the_described_character() {
     let _ = std::fs::remove_dir_all(parent);
 }
 
-/// A copy of the project's `Character` prefab (the realistic described
-/// character every new project's StarterCharacter names), placed as the
+/// A copy of the project's `Character` prefab (the described character on
+/// the human base every new project's StarterCharacter names), placed as the
 /// asset browser places it: one undo step. Returns the copy's root.
 fn placed_character_prefab(app: &mut EditorApp) -> InstanceId {
     let workspace = app.world.workspace();
@@ -620,7 +686,7 @@ fn placed_character_prefab(app: &mut EditorApp) -> InstanceId {
 
 /// Edit frames until the described characters' models are loaded and
 /// they're posed (tests load models at once; a frame applies first, so the
-/// realistic body's model is named only after it).
+/// described body's model is named only after it).
 fn settle(app: &mut EditorApp, character: InstanceId) {
     for _ in 0..3 {
         load_models(app, character);
@@ -721,8 +787,8 @@ fn a_placed_described_prefab_copy_has_no_overrides_from_edit_mode() {
 }
 
 /// OPEN-21 after Revert all: the copy goes back to its prefab, and edit
-/// mode still shows the description (it used to stay on the stylized base
-/// mesh for the rest of the session).
+/// mode still shows the description (it used to stay on the default
+/// humanoid's own mesh for the rest of the session).
 #[test]
 fn revert_all_on_a_placed_described_copy_keeps_it_shown() {
     let (parent, folder, studio) = new_project("prefab-revert");

@@ -2,6 +2,32 @@
  "mpfb": "2.0.18",
  "taken": [
   {
+   "id": "makehuman/fedora",
+   "label": "Fedora",
+   "name": "fedora",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "headwear",
+   "corners": 634,
+   "shapes": 81,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/fedora-cocked",
+   "label": "Fedora cocked",
+   "name": "fedora_cocked",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "headwear",
+   "corners": 634,
+   "shapes": 90,
+   "hidden_faces": 0
+  },
+  {
    "id": "makehuman/female-casualsuit01",
    "label": "T-shirt and jeans",
    "name": "female_casualsuit01",
@@ -13,6 +39,45 @@
    "corners": 2197,
    "shapes": 75,
    "hidden_faces": 2688
+  },
+  {
+   "id": "makehuman/female-casualsuit02",
+   "label": "Female casualsuit02",
+   "name": "female_casualsuit02",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 2876,
+   "shapes": 75,
+   "hidden_faces": 1686
+  },
+  {
+   "id": "makehuman/female-elegantsuit01",
+   "label": "Female elegantsuit01",
+   "name": "female_elegantsuit01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 2205,
+   "shapes": 75,
+   "hidden_faces": 2505
+  },
+  {
+   "id": "makehuman/female-sportsuit01",
+   "label": "Female sportsuit01",
+   "name": "female_sportsuit01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 1797,
+   "shapes": 75,
+   "hidden_faces": 1932
   },
   {
    "id": "makehuman/male-casualsuit01",
@@ -28,6 +93,97 @@
    "hidden_faces": 3364
   },
   {
+   "id": "makehuman/male-casualsuit02",
+   "label": "Male casualsuit02",
+   "name": "male_casualsuit02",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 2136,
+   "shapes": 75,
+   "hidden_faces": 3206
+  },
+  {
+   "id": "makehuman/male-casualsuit03",
+   "label": "Male casualsuit03",
+   "name": "male_casualsuit03",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 2499,
+   "shapes": 75,
+   "hidden_faces": 3206
+  },
+  {
+   "id": "makehuman/male-casualsuit04",
+   "label": "Male casualsuit04",
+   "name": "male_casualsuit04",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 1696,
+   "shapes": 75,
+   "hidden_faces": 2486
+  },
+  {
+   "id": "makehuman/male-casualsuit05",
+   "label": "Male casualsuit05",
+   "name": "male_casualsuit05",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 3195,
+   "shapes": 75,
+   "hidden_faces": 3206
+  },
+  {
+   "id": "makehuman/male-casualsuit06",
+   "label": "Male casualsuit06",
+   "name": "male_casualsuit06",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 3708,
+   "shapes": 75,
+   "hidden_faces": 2486
+  },
+  {
+   "id": "makehuman/male-elegantsuit01",
+   "label": "Male elegantsuit01",
+   "name": "male_elegantsuit01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 7613,
+   "shapes": 75,
+   "hidden_faces": 3374
+  },
+  {
+   "id": "makehuman/male-worksuit01",
+   "label": "Male worksuit01",
+   "name": "male_worksuit01",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "top",
+   "corners": 3763,
+   "shapes": 81,
+   "hidden_faces": 2810
+  },
+  {
    "id": "makehuman/shoes01",
    "label": "Brown leather shoes",
    "name": "shoes01",
@@ -37,6 +193,32 @@
    "pack": "makehuman_system_assets",
    "slot": "shoes",
    "corners": 1722,
+   "shapes": 18,
+   "hidden_faces": 2264
+  },
+  {
+   "id": "makehuman/shoes02",
+   "label": "Shoes02",
+   "name": "shoes02",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "shoes",
+   "corners": 1594,
+   "shapes": 18,
+   "hidden_faces": 2264
+  },
+  {
+   "id": "makehuman/shoes03",
+   "label": "Shoes03",
+   "name": "shoes03",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "shoes",
+   "corners": 2222,
    "shapes": 18,
    "hidden_faces": 2264
   },
@@ -52,7 +234,617 @@
    "corners": 1722,
    "shapes": 18,
    "hidden_faces": 2264
+  },
+  {
+   "id": "makehuman/shoes05",
+   "label": "Shoes05",
+   "name": "shoes05",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "shoes",
+   "corners": 1594,
+   "shapes": 18,
+   "hidden_faces": 2264
+  },
+  {
+   "id": "makehuman/shoes06",
+   "label": "Shoes06",
+   "name": "shoes06",
+   "licence": "CC0",
+   "author": "The MakeHuman team (Data Collection AB, Joel Palmius, Jonas Hauquier)",
+   "url": "http://www.makehumancommunity.org",
+   "pack": "makehuman_system_assets",
+   "slot": "shoes",
+   "corners": 1594,
+   "shapes": 18,
+   "hidden_faces": 2264
+  },
+  {
+   "id": "makehuman/armsleeve-fishnet-large",
+   "label": "Armsleeve fishnet large",
+   "name": "armsleeve_fishnet_large",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/305",
+   "pack": "underwear01",
+   "slot": "gloves",
+   "corners": 384,
+   "shapes": 52,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/armsleeve-fishnet-medium",
+   "label": "Armsleeve fishnet medium",
+   "name": "armsleeve_fishnet_medium",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/304",
+   "pack": "underwear01",
+   "slot": "gloves",
+   "corners": 384,
+   "shapes": 52,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/armsleeve-fishnet-small",
+   "label": "Armsleeve fishnet small",
+   "name": "armsleeve_fishnet_small",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/303",
+   "pack": "underwear01",
+   "slot": "gloves",
+   "corners": 384,
+   "shapes": 52,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/armsleeve-white-l",
+   "label": "Armsleeve white l",
+   "name": "armsleeve_white_l",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/302",
+   "pack": "underwear01",
+   "slot": "gloves",
+   "corners": 384,
+   "shapes": 52,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/armsleeve-white-m",
+   "label": "Armsleeve white m",
+   "name": "armsleeve_white_m",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/301",
+   "pack": "underwear01",
+   "slot": "gloves",
+   "corners": 384,
+   "shapes": 52,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/armsleeve-white-s",
+   "label": "Armsleeve white s",
+   "name": "armsleeve_white_s",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/300",
+   "pack": "underwear01",
+   "slot": "gloves",
+   "corners": 384,
+   "shapes": 52,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/stockings-fishnet-large",
+   "label": "Stockings fishnet large",
+   "name": "stockings_fishnet_large",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/296",
+   "pack": "underwear01",
+   "slot": "legwear",
+   "corners": 1064,
+   "shapes": 59,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/stockings-fishnet-medium",
+   "label": "Stockings fishnet medium",
+   "name": "stockings_fishnet_medium",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/295",
+   "pack": "underwear01",
+   "slot": "legwear",
+   "corners": 1064,
+   "shapes": 59,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/stockings-fishnet-small",
+   "label": "Stockings fishnet small",
+   "name": "stockings_fishnet_small",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/294",
+   "pack": "underwear01",
+   "slot": "legwear",
+   "corners": 1064,
+   "shapes": 59,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/stockings-white-l",
+   "label": "Stockings white l",
+   "name": "stockings_white_l",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/299",
+   "pack": "underwear01",
+   "slot": "legwear",
+   "corners": 1064,
+   "shapes": 59,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/stockings-white-m",
+   "label": "Stockings white m",
+   "name": "stockings_white_m",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/298",
+   "pack": "underwear01",
+   "slot": "legwear",
+   "corners": 1064,
+   "shapes": 59,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/stockings-white-s",
+   "label": "Stockings white s",
+   "name": "stockings_white_s",
+   "licence": "CC0",
+   "author": "V0rT3X",
+   "url": "http://www.makehumancommunity.org/node/297",
+   "pack": "underwear01",
+   "slot": "legwear",
+   "corners": 1064,
+   "shapes": 59,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/female-panties-01",
+   "label": "Female panties 01",
+   "name": "female_panties_01",
+   "licence": "CC0",
+   "author": "wolgade",
+   "url": "http://www.makehumancommunity.org/node/338",
+   "pack": "underwear01",
+   "slot": "underwear_bottom",
+   "corners": 809,
+   "shapes": 19,
+   "hidden_faces": 8
+  },
+  {
+   "id": "makehuman/female-top-01",
+   "label": "Female top 01",
+   "name": "female_top_01",
+   "licence": "CC0",
+   "author": "wolgade",
+   "url": "http://www.makehumancommunity.org/node/339",
+   "pack": "underwear01",
+   "slot": "underwear_top",
+   "corners": 1167,
+   "shapes": 30,
+   "hidden_faces": 296
+  },
+  {
+   "id": "makehuman/crudehighsocks",
+   "label": "Crudehighsocks",
+   "name": "CrudeHighSocks",
+   "licence": "CC0",
+   "author": "Joel Palmius",
+   "url": "http://www.makehumancommunity.org/node/25",
+   "pack": "underwear04",
+   "slot": "legwear",
+   "corners": 360,
+   "shapes": 61,
+   "hidden_faces": 2408
+  },
+  {
+   "id": "makehuman/crudelowsocks",
+   "label": "Crudelowsocks",
+   "name": "CrudeLowSocks",
+   "licence": "CC0",
+   "author": "Joel Palmius",
+   "url": "http://www.makehumancommunity.org/node/32",
+   "pack": "underwear04",
+   "slot": "legwear",
+   "corners": 260,
+   "shapes": 60,
+   "hidden_faces": 2184
+  },
+  {
+   "id": "makehuman/sockslacefrill",
+   "label": "Sockslacefrill",
+   "name": "SocksLaceFrill",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1078",
+   "pack": "underwear04",
+   "slot": "legwear",
+   "corners": 668,
+   "shapes": 15,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/leg-warmer-socks",
+   "label": "Leg warmer socks",
+   "name": "Leg_Warmer_Socks",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1092",
+   "pack": "underwear04",
+   "slot": "legwear",
+   "corners": 3926,
+   "shapes": 63,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/crude-male-shirt",
+   "label": "Crude male shirt",
+   "name": "crude_male_shirt",
+   "licence": "CC0",
+   "author": "Elvaerwyn",
+   "url": "http://www.makehumancommunity.org/node/1416",
+   "pack": "shirts01",
+   "slot": "top",
+   "corners": 1095,
+   "shapes": 60,
+   "hidden_faces": 770
+  },
+  {
+   "id": "makehuman/crudefemaletshirt",
+   "label": "Crudefemaletshirt",
+   "name": "CrudeFemaleTshirt",
+   "licence": "CC0",
+   "author": "Joel Palmius",
+   "url": "http://www.makehumancommunity.org/node/894",
+   "pack": "shirts01",
+   "slot": "top",
+   "corners": 1095,
+   "shapes": 72,
+   "hidden_faces": 1397
+  },
+  {
+   "id": "makehuman/polo-t-shirt",
+   "label": "Polo t shirt",
+   "name": "Polo t-shirt",
+   "licence": "CC0",
+   "author": "namuhekam",
+   "url": "http://www.makehumancommunity.org/node/2909",
+   "pack": "shirts01",
+   "slot": "top",
+   "corners": 2189,
+   "shapes": 55,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/t-shirt-basic-tucked",
+   "label": "T shirt basic tucked",
+   "name": "T-shirt_basic_tucked",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1203",
+   "pack": "shirts01",
+   "slot": "top",
+   "corners": 1391,
+   "shapes": 77,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/bodice-style-top",
+   "label": "Bodice style top",
+   "name": "Bodice_style_top",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1667",
+   "pack": "shirts01",
+   "slot": "top",
+   "corners": 1017,
+   "shapes": 60,
+   "hidden_faces": 758
+  },
+  {
+   "id": "makehuman/camisole-top",
+   "label": "Camisole top",
+   "name": "Camisole_Top",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1726",
+   "pack": "shirts01",
+   "slot": "underwear_top",
+   "corners": 4224,
+   "shapes": 71,
+   "hidden_faces": 852
+  },
+  {
+   "id": "makehuman/sweater-fisherman",
+   "label": "Sweater fisherman",
+   "name": "Sweater_Fisherman",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1187",
+   "pack": "shirts01",
+   "slot": "top",
+   "corners": 2126,
+   "shapes": 81,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/tank-keyhole-neck",
+   "label": "Tank keyhole neck",
+   "name": "Tank_Keyhole_Neck",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1606",
+   "pack": "shirts01",
+   "slot": "top",
+   "corners": 726,
+   "shapes": 33,
+   "hidden_faces": 816
+  },
+  {
+   "id": "makehuman/turtleneck-halter",
+   "label": "Turtleneck halter",
+   "name": "Turtleneck_Halter",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1642",
+   "pack": "shirts01",
+   "slot": "top",
+   "corners": 2875,
+   "shapes": 71,
+   "hidden_faces": 862
+  },
+  {
+   "id": "makehuman/cargo-pants",
+   "label": "Cargo pants",
+   "name": "cargo_pants",
+   "licence": "CC0",
+   "author": "Cortu",
+   "url": "http://www.makehumancommunity.org/node/2798",
+   "pack": "pants01",
+   "slot": "bottom",
+   "corners": 211,
+   "shapes": 68,
+   "hidden_faces": 0
+  },
+  {
+   "id": "makehuman/jean-shorts",
+   "label": "Jean shorts",
+   "name": "jean_shorts",
+   "licence": "CC0",
+   "author": "Cortu",
+   "url": "http://www.makehumancommunity.org/node/2800",
+   "pack": "pants01",
+   "slot": "bottom",
+   "corners": 285,
+   "shapes": 60,
+   "hidden_faces": 207
+  },
+  {
+   "id": "makehuman/pants-harem",
+   "label": "Pants harem",
+   "name": "Pants_Harem",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1728",
+   "pack": "pants01",
+   "slot": "bottom",
+   "corners": 5527,
+   "shapes": 64,
+   "hidden_faces": 1232
+  },
+  {
+   "id": "makehuman/pants-wool",
+   "label": "Pants wool",
+   "name": "Pants_Wool",
+   "licence": "CC0",
+   "author": "MargaretToigo",
+   "url": "http://www.makehumancommunity.org/node/1194",
+   "pack": "pants01",
+   "slot": "bottom",
+   "corners": 1372,
+   "shapes": 68,
+   "hidden_faces": 0
   }
  ],
- "left_out": []
+ "left_out": [
+  {
+   "file": "clothes/kwnet_at_pantyhose01/kwnet_at_pantyhose01.mhclo",
+   "reason": "its file header says AGPL3"
+  },
+  {
+   "file": "clothes/marco_105_armsleeve02/marco_105_armsleeve02.mhclo",
+   "reason": "its file header says AGPL3"
+  },
+  {
+   "file": "clothes/marco_105_stocking01/marco_105_stocking01.mhclo",
+   "reason": "its file header says AGPL3"
+  },
+  {
+   "file": "clothes/marco_105_stocking02/marco_105_stocking02.mhclo",
+   "reason": "its file header says AGPL3"
+  },
+  {
+   "file": "clothes/punkduck_strappy_lace_thong/punkduck_strappy_lace_thong.mhclo",
+   "reason": "its file header says CC-BY, its pack CC0"
+  },
+  {
+   "file": "clothes/jaldmic_stockings/jaldmic_stockings.mhclo",
+   "reason": "its file header says AGPL3"
+  },
+  {
+   "file": "clothes/punkduck_bandeau_bra/punkduck_bandeau_bra.mhclo",
+   "reason": "its file header says AGPL3"
+  },
+  {
+   "file": "clothes/punkduck_string_4/punkduck_string_4.mhclo",
+   "reason": "its file header says AGPL3"
+  },
+  {
+   "file": "clothes/joepal_plain_bra/joepal_plain_bra.mhclo",
+   "reason": "its file header says CC0, its pack CC-BY"
+  },
+  {
+   "file": "clothes/skalldyrssuppe_tube_top_funky_colors/skalldyrssuppe_tube_top_funky_colors.mhclo",
+   "reason": "its file header says AGPL3"
+  },
+  {
+   "file": "mh_bowginch_elv1",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "mhbow_braelv1",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "elvs_bootyshorts2a",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "scallopundies",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "f_bikini_01",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "babydoll",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "bandbikinibra",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "bandbikinislip",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "bikinibra2",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "bikinislip2",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "brazbikinibra",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "brazbikinislip",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "frenchbra",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "string3",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "fr_stockings",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "suspender-belt",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "fr_thong",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "frill-bikini-bottom",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "frill-bikini-top",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "sport-bra01",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "sport-briefs01",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "string2",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "string5",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "teddy",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "transparent_bra",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "all_tiedup_kini1",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "elv_bandeu_gathered_top1",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "minibowcamisole",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "elv_microshorts1",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "vintagesuit1_50selv",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "f_one-piece_swimsuit_01",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "straplessbodysuit",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "romper",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "onepiecebikini01",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  },
+  {
+   "file": "shapewear",
+   "reason": "its licence is CC-BY (the item's own: CC-BY-4.0), not CC0"
+  }
+ ]
 }

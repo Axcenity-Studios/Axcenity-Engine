@@ -1,5 +1,5 @@
 //! The panel's and the navigation's choices of what to show, against the
-//! realistic body's manifest.
+//! human base's manifest.
 
 use std::sync::Arc;
 
@@ -14,7 +14,7 @@ use super::materials::{DRAWN_TODAY, value_label};
 use super::parameters::{found, hidden_changes, matches, rows};
 use crate::character_studio::test_folder;
 
-fn realistic() -> (Arc<Library>, BaseManifest) {
+fn human() -> (Arc<Library>, BaseManifest) {
     let shipped = find_character_library().expect("the repository's library");
     let (library, _, problems) = Library::read(&shipped);
     assert!(problems.is_empty(), "{problems:?}");
@@ -28,70 +28,66 @@ fn ids(shown: &[super::parameters::Shown]) -> Vec<String> {
 
 #[test]
 fn the_level_filters_rows_and_symmetry_merges_only_equal_pairs() {
-    let (_, base) = realistic();
+    let (_, base) = human();
     let mut description = Description::new("x", DEFAULT_BASE);
     let eyes = |description: &Description, level, symmetry| {
         rows(&base, description, "eyes", level, None, symmetry)
     };
-    // Detailed with Symmetry: one row per pair, the depth (advanced) left out.
+    // Detailed with Symmetry: one row per pair, the lid gaps and the other
+    // advanced controls left out.
     let shown = eyes(&description, Level::Detailed, true);
     assert!(shown.iter().all(|row| row.mirrored));
     assert_eq!(
         ids(&shown),
         [
-            "eye_height_left",
-            "eye_spacing_left",
-            "eye_size_left",
-            "eye_tilt_left",
-            // R4's eye controls.
-            "eye_corner_left",
-            "upper_lid_fold_left",
-            "lower_lid_left",
-            // The finer face controls (2026-11-24); the openness and the
-            // upper lid's fullness are advanced.
-            "inner_corner_fold_left",
-            "under_eye_left"
+            // Quick.
+            "eyes_scale_left",
+            "eyes_trans_in_out_left",
+            // Detailed.
+            "eyes_trans_down_up_left",
+            "eyes_height2_left",
+            "eyes_corner1_down_up_left",
+            "eyes_corner2_down_up_left",
+            "eyes_eyefold_down_up_left",
+            "eyes_eyefold_concave_convex_left",
+            "eyes_epicanthus_in_out_left",
+            "eyes_bag_left"
         ]
     );
-    // Advanced adds the depth; Symmetry off shows both sides.
-    assert!(ids(&eyes(&description, Level::Advanced, true)).contains(&"eye_depth_left".into()));
-    assert_eq!(eyes(&description, Level::Detailed, false).len(), 18);
+    // Advanced adds the inner lid gap; Symmetry off shows both sides.
+    assert!(ids(&eyes(&description, Level::Advanced, true)).contains(&"eyes_height1_left".into()));
+    assert_eq!(eyes(&description, Level::Detailed, false).len(), 20);
     // Audit D-11: a pair whose sides differ shows both, even with Symmetry.
-    description.parameters.insert("eye_size_left".into(), 0.3);
+    description.parameters.insert("eyes_scale_left".into(), 0.3);
     let shown = eyes(&description, Level::Detailed, true);
     let sizes: Vec<_> = shown
         .iter()
-        .filter(|row| row.parameter.id.starts_with("eye_size"))
+        .filter(|row| row.parameter.id.starts_with("eyes_scale"))
         .map(|row| (row.parameter.id.as_str(), row.mirrored))
         .collect();
-    assert_eq!(sizes, [("eye_size_left", false), ("eye_size_right", false)]);
-    // Quick shows the manifest's quick controls: the body type and the
-    // whole body's build, not the regions.
+    assert_eq!(
+        sizes,
+        [("eyes_scale_left", false), ("eyes_scale_right", false)]
+    );
+    // Quick shows the manifest's quick controls: the body type, the whole
+    // body's build and its height, not the other proportions.
     let frame = rows(&base, &description, "frame", Level::Quick, None, true);
     assert_eq!(ids(&frame), ["frame"]);
     let build = rows(&base, &description, "build", Level::Quick, None, true);
-    assert_eq!(ids(&build), ["muscle", "fat"]);
-    assert!(
-        rows(
-            &base,
-            &description,
-            "build_regions",
-            Level::Quick,
-            None,
-            true
-        )
-        .is_empty()
-    );
-    assert!(
-        !rows(
-            &base,
-            &description,
-            "build_regions",
-            Level::Detailed,
-            None,
-            true
-        )
-        .is_empty()
+    assert_eq!(ids(&build), ["muscle", "fat", "age"]);
+    let proportions = |level| ids(&rows(&base, &description, "proportions", level, None, true));
+    assert_eq!(proportions(Level::Quick), ["height"]);
+    assert_eq!(
+        proportions(Level::Detailed),
+        [
+            "height",
+            "leg_length",
+            "arm_length",
+            "shoulder_width",
+            "waist_width",
+            "hip_width",
+            "head_size"
+        ]
     );
     // A feature filters to its own group.
     assert!(
@@ -112,50 +108,62 @@ fn the_level_filters_rows_and_symmetry_merges_only_equal_pairs() {
 /// as one row is found by either side.
 #[test]
 fn a_search_finds_a_groups_rows_at_every_level_by_label_id_or_about() {
-    let (_, base) = realistic();
+    let (_, base) = human();
     let mut description = Description::new("x", DEFAULT_BASE);
-    // (Of the jaw's first five parameters: the manifest may have more.)
-    let jaw = |description: &Description, search: &str, symmetry| {
-        let mut ids = ids(&found(&base, description, "jaw", search, symmetry));
+    // (Of three of the ears' pairs: the manifest has more.)
+    let ears = |description: &Description, search: &str, symmetry| {
+        let mut ids = ids(&found(&base, description, "ears", search, symmetry));
         ids.retain(|id| {
             [
-                "jaw_width_left",
-                "jaw_width_right",
-                "jaw_angle_left",
-                "jaw_angle_right",
-                "jaw_shift",
+                "ears_scale_left",
+                "ears_scale_right",
+                "ears_scale_vert_left",
+                "ears_scale_vert_right",
+                "ears_flap_left",
+                "ears_flap_right",
             ]
             .contains(&id.as_str())
         });
         ids
     };
-    // The jaw's rows at every level: its width is Quick, its angle
-    // Detailed, its shift Advanced. With Symmetry a pair is one row.
+    // The ears' rows at every level: their size is Quick, their height
+    // Detailed, their rim Advanced. With Symmetry a pair is one row.
     assert_eq!(
-        jaw(&description, "jaw", true),
-        ["jaw_width_left", "jaw_angle_left", "jaw_shift"]
+        ears(&description, "ear", true),
+        ["ears_scale_left", "ears_scale_vert_left", "ears_flap_left"]
     );
-    assert_eq!(jaw(&description, "jaw", false).len(), 5, "both sides");
+    assert_eq!(ears(&description, "ear", false).len(), 6, "both sides");
     // Every word must be there; capitals don't matter.
-    assert_eq!(jaw(&description, "JAW angle", true), ["jaw_angle_left"]);
-    assert!(jaw(&description, "jaw nostril", true).is_empty());
-    // The ID is searched, and the side a merged row doesn't show.
-    assert_eq!(jaw(&description, "jaw_shift", true), ["jaw_shift"]);
     assert_eq!(
-        jaw(&description, "right jaw width", true),
-        ["jaw_width_left"],
+        ears(&description, "EAR height", true),
+        ["ears_scale_vert_left"]
+    );
+    assert!(ears(&description, "ear nostril", true).is_empty());
+    // The ID is searched, and the side a merged row doesn't show.
+    assert_eq!(ears(&description, "ears_flap", true), ["ears_flap_left"]);
+    assert_eq!(
+        ears(&description, "right ear size", true),
+        ["ears_scale_left"],
         "the pair's one row"
     );
     // A pair whose sides differ shows both: only the side asked for.
-    description.parameters.insert("jaw_width_left".into(), 0.3);
+    description.parameters.insert("ears_scale_left".into(), 0.3);
     assert_eq!(
-        jaw(&description, "right jaw width", true),
-        ["jaw_width_right"]
+        ears(&description, "right ear size", true),
+        ["ears_scale_right"]
     );
-    // Another group has its own: the eyes' depth is an Advanced control.
-    assert!(found(&base, &description, "nose", "jaw", true).is_empty());
+    // Another group has its own: the nose's rows have no side, and its
+    // width is found at every level (the nose's is Quick, the tip's
+    // Detailed, the upper bridge's Advanced); the eyes' inner lid gap is an
+    // Advanced control.
+    assert!(found(&base, &description, "nose", "ear", true).is_empty());
+    let widths = ids(&found(&base, &description, "nose", "width", true));
+    for id in ["nose_scale_horiz", "nose_point_width", "nose_width1"] {
+        assert!(widths.contains(&id.to_owned()), "{id} in {widths:?}");
+    }
     assert!(
-        ids(&found(&base, &description, "eyes", "depth", true)).contains(&"eye_depth_left".into())
+        ids(&found(&base, &description, "eyes", "lid gap", true))
+            .contains(&"eyes_height1_left".into())
     );
     // What a control does (its `about`) is searched too.
     let told = base
@@ -199,16 +207,17 @@ fn tiles_are_as_many_across_as_fit_the_panel() {
 
 #[test]
 fn a_change_hidden_by_the_level_is_counted_with_the_level_that_shows_it() {
-    let (_, base) = realistic();
+    let (_, base) = human();
     let mut description = Description::new("x", DEFAULT_BASE);
     let face = axcenity_avatar::Category::Face;
     assert_eq!(
         hidden_changes(&base, &description, face, Level::Detailed),
         None
     );
-    // An advanced slider and a detailed one (nose_length is quick: always shown).
-    description.parameters.insert("jaw_shift".into(), 0.4);
-    description.parameters.insert("nose_tip".into(), 0.4);
+    // An advanced slider and a detailed one (a quick one, such as
+    // nose_scale_vert, is always shown).
+    description.parameters.insert("nose_width1".into(), 0.4);
+    description.parameters.insert("nose_hump".into(), 0.4);
     assert_eq!(
         hidden_changes(&base, &description, face, Level::Detailed),
         Some((1, Level::Advanced))
@@ -225,7 +234,7 @@ fn a_change_hidden_by_the_level_is_counted_with_the_level_that_shows_it() {
 
 #[test]
 fn the_navigation_is_in_the_briefs_order_with_features_from_detailed() {
-    let (_, base) = realistic();
+    let (_, base) = human();
     let labels: Vec<&str> = Category::ALL.iter().map(|c| nav::label(*c)).collect();
     assert_eq!(
         labels,
@@ -241,49 +250,39 @@ fn the_navigation_is_in_the_briefs_order_with_features_from_detailed() {
         ]
     );
     let mut description = Description::new("x", DEFAULT_BASE);
-    description.parameters.insert("nose_length".into(), 0.4);
-    description.parameters.insert("nose_tip".into(), 0.2);
+    description.parameters.insert("nose_scale_vert".into(), 0.4);
+    description.parameters.insert("nose_hump".into(), 0.2);
     let face = nav::features(&base, &description, Category::Face, Level::Detailed);
     let face_ids: Vec<&str> = face.iter().map(|f| f.id.as_str()).collect();
     assert_eq!(
         face_ids,
         [
             "face_shape",
-            "eyes",
+            "forehead",
             "brows",
+            "eyes",
             "nose",
             "cheeks",
-            "jaw",
-            "chin",
             "lips",
-            "forehead",
-            "ears"
+            "chin",
+            "ears",
+            "neck"
         ]
     );
     assert_eq!(face.iter().find(|f| f.id == "nose").unwrap().changed, 2);
     assert!(nav::features(&base, &description, Category::Face, Level::Quick).is_empty());
     assert!(nav::features(&base, &description, Category::Hair, Level::Advanced).is_empty());
-    // The body's features are its regions (the manifest's `features`),
-    // listed from Detailed; hands and feet have only advanced sliders.
+    // The human base's manifest has no features for the body, so the
+    // Body page lists its groups, from Detailed.
     let body = |level| -> Vec<String> {
         nav::features(&base, &description, Category::Body, level)
             .into_iter()
             .map(|f| f.id)
             .collect()
     };
-    let detailed = body(Level::Detailed);
-    for region in ["shoulders", "chest", "abdomen", "waist", "hips", "thighs"] {
-        assert!(
-            detailed.contains(&region.to_owned()),
-            "{region} in {detailed:?}"
-        );
-    }
-    assert!(
-        !detailed.contains(&"build_regions".to_owned()),
-        "groups aren't features"
-    );
-    assert!(!detailed.contains(&"hands".to_owned()));
-    assert!(body(Level::Advanced).contains(&"hands".to_owned()));
+    assert_eq!(body(Level::Detailed), ["frame", "build", "proportions"]);
+    assert!(body(Level::Quick).is_empty());
+    assert_eq!(body(Level::Advanced), body(Level::Detailed));
     assert_eq!(nav::changed(&base, &description, Category::Face), 2);
     assert_eq!(nav::changed(&base, &description, Category::Body), 0);
 }
@@ -321,10 +320,8 @@ fn reset_offers_everything_the_category_and_the_picked_feature() {
 
 #[test]
 fn the_skin_page_offers_the_skin_models_values_and_says_which_are_drawn() {
-    let (_, base) = realistic();
-    let skin = base
-        .material("Skin")
-        .expect("the realistic body's skin slot");
+    let (_, base) = human();
+    let skin = base.material("Skin").expect("the human base's skin slot");
     assert_eq!(skin.shading, axcenity_avatar::ShadingModel::Skin);
     let names: Vec<&str> = skin.shading.values().iter().map(|v| v.name).collect();
     assert!(

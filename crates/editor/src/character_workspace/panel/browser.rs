@@ -1,12 +1,14 @@
 //! The Hair and Clothing pages as browsers (R6 CO25, R7 CO26; brief §7.1,
 //! §8.2): a search field with a "Filters" menu beside it (the kind,
-//! "Recolourable", "Fits this body", favourites and who a garment is cut
-//! for; the button says how many are changed), the page's slots as one row
-//! of categories, the worn items folded to a line each (`worn.rs`), a row
+//! "Recolourable", "Fits this body" and favourites; the button says how
+//! many are changed), who the items are made for as a row of its own
+//! (the character's body type's, the other's, or all), the page's slots
+//! as one row of categories, the worn items folded to a line each (`worn.rs`), a row
 //! of the items worn last and picture tiles of the character wearing each
-//! item, as many across as fit the panel. Hovering a tile shows it on the
-//! character without wearing it; a click wears it as one undo step, and a
-//! click on the worn tile takes it off. What is listed is `browser::list`;
+//! item, as many across as fit the panel. Resting the pointer on a tile
+//! (`browser::REST`) shows it on the character without wearing it, once
+//! its models are loaded in the background; a click wears it as one undo
+//! step, and a click on the worn tile takes it off. What is listed is `browser::list`;
 //! this only draws it and returns intents.
 
 use axcenity_avatar::{BaseManifest, Library};
@@ -32,6 +34,8 @@ struct Tile<'a> {
     /// The item is worn (the "nothing" tile: nothing is worn there).
     worn: bool,
     favourite: Option<bool>,
+    /// The body type it is made for, when that isn't the character's.
+    made_for: Option<&'a str>,
     /// The tile previewed on the character (the pointer is on it).
     trying: bool,
     /// What a click on it wears (`None`: nothing in its slot), when a
@@ -129,6 +133,47 @@ pub(super) fn page(
         intents.extend(set(&|f| f.search = search.clone()));
     }
 
+    // Who the items are made for: this body type's (with the unisex
+    // ones), the other's, or everything. Lit on the character's own until
+    // another is picked, so it follows a change of body type.
+    let labels = browser::cut_labels(base);
+    let feminine = browser::feminine_body(description, base);
+    if (listing.cuts || online) && feminine.is_some() {
+        let mut shown = filters.cut.shown(feminine);
+        let options = [
+            (Cut::Masculine, Some(icons::GENDER_MALE), labels.0.as_str()),
+            (Cut::Feminine, Some(icons::GENDER_FEMALE), labels.1.as_str()),
+            (Cut::All, None, "All"),
+        ];
+        let what = match shelf {
+            Shelf::Hair => "Hairstyles",
+            Shelf::Clothing => "Clothes",
+        };
+        let tips = [
+            format!(
+                "{what} made for the {} body, and unisex ones",
+                labels.0.to_lowercase()
+            ),
+            format!(
+                "{what} made for the {} body, and unisex ones",
+                labels.1.to_lowercase()
+            ),
+            format!(
+                "Every one, whoever it is made for ({} last)",
+                match feminine {
+                    Some(true) => format!("the {} ones", labels.0.to_lowercase()),
+                    _ => format!("the {} ones", labels.1.to_lowercase()),
+                }
+            ),
+        ];
+        let tips: Vec<&str> = tips.iter().map(String::as_str).collect();
+        if widgets::segmented_tips(ui, &mut shown, &options, &tips).0 {
+            let cut = Cut::picked(shown, feminine);
+            intents.extend(set(&|f| f.cut = cut));
+        }
+        ui.add_space(2.0);
+    }
+
     // The page's slots, as categories.
     if listing.slots.len() > 1 {
         ui.horizontal_wrapped(|ui| {
@@ -216,7 +261,7 @@ pub(super) fn page(
         let tiles: Vec<Tile> = listing
             .recent
             .iter()
-            .map(|entry| item_tile(entry, state))
+            .map(|entry| item_tile(entry, state, &labels))
             .collect();
         intents.extend(grid(ui, workspace, "recent", &tiles, &mut hovered));
         ui.add_space(4.0);
@@ -275,6 +320,7 @@ pub(super) fn page(
                 label: none,
                 picture: none_picture(&slot.id),
                 draft: false,
+                made_for: None,
                 worn: !worn_here,
                 favourite: None,
                 // Nothing to take off where nothing is worn.
@@ -286,40 +332,78 @@ pub(super) fn page(
                 },
             });
         }
-        tiles.extend(entries.iter().map(|entry| item_tile(entry, state)));
+        tiles.extend(entries.iter().map(|entry| item_tile(entry, state, &labels)));
         intents.extend(grid(ui, workspace, &slot.id, &tiles, &mut hovered));
         ui.add_space(4.0);
     }
+    // The tile under the pointer: said when it changes, so what it would
+    // show is loaded in the background while the pointer rests there.
+    if hovered != state.over {
+        intents.push(Intent::Browse(Browse::Over(hovered.clone())));
+    }
+    // It is previewed once the pointer has rested on it, without the page
+    // scrolling, and its models are in: a tile crossed on the way to
+    // another, or scrolled past, is never shown on the character.
+    let (now, scrolled, moved) = ui.input(|input| {
+        (
+            input.time,
+            input.smooth_scroll_delta != egui::Vec2::ZERO
+                || input
+                    .raw
+                    .events
+                    .iter()
+                    .any(|event| matches!(event, egui::Event::MouseWheel { .. })),
+            input.pointer.delta() != egui::Vec2::ZERO,
+        )
+    });
+    let rest = egui::Id::new("browser tile the pointer rests on");
+    let since = ui.data_mut(|data| {
+        let kept: Option<(Option<Pick>, f64)> = data.get_temp(rest);
+        match kept {
+            Some((tile, since)) if tile == hovered && !scrolled => since,
+            _ => {
+                data.insert_temp(rest, (hovered.clone(), now));
+                now
+            }
+        }
+    });
+    let shown = match &hovered {
+        // The tile previewed stays so while the pointer is on it.
+        Some(_) if hovered == state.hovered => hovered.clone(),
+        Some(_) if now - since >= browser::REST && hovered == state.over && state.ready => {
+            hovered.clone()
+        }
+        Some(_) => {
+            ui.ctx().request_repaint();
+            None
+        }
+        None => None,
+    };
     // After Esc or a click the tiles can shift under a still pointer (the
     // worn items' lines change), so a muted tile waits for the pointer to
     // move.
-    let moved = ui.input(|input| input.pointer.delta() != egui::Vec2::ZERO);
-    if state.hover_changed(&hovered, moved) {
-        intents.push(Intent::Browse(Browse::Hover(hovered)));
+    if state.hover_changed(&hovered, &shown, moved) {
+        intents.push(Intent::Browse(Browse::Hover(shown)));
     }
 
     intents
 }
 
-/// How many of a page's filters (the "Filters" menu's: not the search or
-/// the category) differ from what the page opens with. `online`: the
-/// wardrobe's page, which only the cut narrows.
-fn filters_changed(filters: &Filters, online: bool) -> usize {
+/// How many of a page's filters (the "Filters" menu's: not the search,
+/// the category or who the items are made for, which have rows of their
+/// own) differ from what the page opens with.
+fn filters_changed(filters: &Filters) -> usize {
     let default = Filters::default();
-    let cut = usize::from(filters.cut != default.cut);
-    if online {
-        return cut;
-    }
-    cut + usize::from(filters.kind.is_some())
+    usize::from(filters.kind.is_some())
         + usize::from(filters.recolourable != default.recolourable)
         + usize::from(filters.fits != default.fits)
         + usize::from(filters.favourites != default.favourites)
 }
 
 /// The "Filters" menu beside the search field: "Recolourable", "Fits this
-/// body", favourites, the kind (one of the listed items' tags) and who a
-/// garment is cut for. Its button says how many are changed; the menu
-/// stays open while they're picked.
+/// body", favourites and the kind (one of the listed items' tags). Its
+/// button says how many are changed; the menu stays open while they're
+/// picked. The online wardrobe has none of them, so no menu.
 fn filters_menu(
     ui: &mut egui::Ui,
     shelf: Shelf,
@@ -327,11 +411,14 @@ fn filters_menu(
     listing: &Listing,
     online: bool,
 ) -> Vec<Intent> {
+    if online {
+        return Vec::new();
+    }
     use egui::containers::menu;
     let palette = theme::palette(ui.ctx());
     let mut intents = Vec::new();
     let mut changed = filters.clone();
-    let count = filters_changed(filters, online);
+    let count = filters_changed(filters);
     let label = if count == 0 {
         "Filters".to_owned()
     } else {
@@ -359,17 +446,6 @@ fn filters_menu(
                     format!("{} Favourites", theme::filled_icons::STAR),
                 )
                 .on_hover_text("Only your favourites");
-            }
-            // Whose clothes: the character's frame's, one frame's, or all.
-            if listing.cuts || online {
-                if !online {
-                    ui.add_space(4.0);
-                }
-                widgets::section_label(ui, "Cut for");
-                for cut in Cut::ALL {
-                    ui.radio_value(&mut changed.cut, cut, cut.label())
-                        .on_hover_text(cut.about());
-                }
             }
             if !online && !listing.kinds.is_empty() {
                 ui.add_space(4.0);
@@ -400,6 +476,7 @@ fn filters_menu(
                     changed = Filters {
                         search: changed.search.clone(),
                         slot: changed.slot.clone(),
+                        cut: changed.cut,
                         ..default
                     };
                 }
@@ -418,8 +495,16 @@ fn filters_menu(
     intents
 }
 
-/// A tile for `entry`.
-fn item_tile<'a>(entry: &'a Entry, state: &Browser) -> Tile<'a> {
+/// A tile for `entry`; `labels` are the body types' names
+/// (`browser::cut_labels`).
+fn item_tile<'a>(entry: &'a Entry, state: &Browser, labels: &'a (String, String)) -> Tile<'a> {
+    let made_for = entry.other_cut.map(|feminine| {
+        if feminine {
+            labels.1.as_str()
+        } else {
+            labels.0.as_str()
+        }
+    });
     let pick = Pick {
         slot: entry.item.slot.clone(),
         item: Some(entry.item.id.clone()),
@@ -433,6 +518,20 @@ fn item_tile<'a>(entry: &'a Entry, state: &Browser) -> Tile<'a> {
             .unwrap_or_else(|| entry.item.label.clone()),
         entry.slot
     );
+    match (browser::cut_for(&entry.item.tags), made_for) {
+        (_, Some(body)) => tip.push_str(&format!(
+            "\nMade for the {} body, not this character's.",
+            body.to_lowercase()
+        )),
+        (Some(feminine), None) => tip.push_str(&format!(
+            "\nMade for the {} body.",
+            if feminine { &labels.1 } else { &labels.0 }.to_lowercase()
+        )),
+        (None, None) if entry.item.tags.iter().any(|tag| tag == "unisex") => {
+            tip.push_str("\nUnisex.");
+        }
+        (None, None) => {}
+    }
     if entry.draft {
         tip.push_str("\nA draft: it hasn't passed the quality checks yet.");
     }
@@ -456,6 +555,7 @@ fn item_tile<'a>(entry: &'a Entry, state: &Browser) -> Tile<'a> {
         label: &entry.item.label,
         picture: entry.item.id.clone(),
         draft: entry.draft,
+        made_for,
         worn: entry.worn,
         favourite: Some(entry.favourite),
         // A click wears it; a click on what is worn takes it off (one
@@ -584,6 +684,10 @@ fn draw_tile(
     };
     if tile.draft {
         badge("Draft", palette.elevated, palette.warning);
+    }
+    // Made for the other body type: said where both are listed.
+    if let Some(body) = tile.made_for {
+        badge(body, palette.elevated, palette.text_secondary);
     }
     // (The "nothing" tile of an empty slot is lit, not "worn".)
     if tile.worn && tile.pick.item.is_some() {

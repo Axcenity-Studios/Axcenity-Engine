@@ -241,7 +241,7 @@ pub(crate) struct FaceLayers {
 
 /// How much of the way to shut each control already takes an eye at 1,
 /// which a blink then leaves alone. A head made for the standard controls
-/// is built to these shares: they are the most the realistic head's
+/// is built to these shares: they are the most the retired realistic head's
 /// squint, raised cheek and lowered brow close its eye anywhere along
 /// the lids (the build measures them, `face.blink_shares` in its report).
 type BlinkYields = (&'static str, [(&'static str, f32); 4]);

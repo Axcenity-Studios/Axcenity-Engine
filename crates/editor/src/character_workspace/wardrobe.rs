@@ -16,7 +16,7 @@
 //!   or failed download leaves the library as it was and keeps the files
 //!   it finished, so asking again goes on from them.
 //! - **In the library** a garment sits where the pack says
-//!   (`realistic/imports/<name>/`), listed in `catalogue.json`. An item
+//!   (`human/imports/<name>/`, say), listed in `catalogue.json`. An item
 //!   never goes over the engine's own or a person's own: an ID the library
 //!   has at another path, or a folder that holds something else, refuses
 //!   it. Remove takes the folder and the entry out again.

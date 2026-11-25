@@ -1,14 +1,14 @@
 //! RA1, Paul's drag rule of 2026-11-18, driven with pointer and key events
 //! through the whole studio, as a person drives it: every numeric control
-//! (the body's and the face's slider rows, the skin's values, makeup and
-//! markings, and the handles on the character) takes the same 110 points
+//! (the body's and the face's slider rows, the skin's values and the
+//! handles on the character) takes the same 110 points
 //! of drag for its whole range, Shift a quarter as far, Ctrl twice; a drag
 //! or a typed value is one undo step; Esc takes a drag or a draft back;
 //! a typed value outside the range is kept to it and the row says so.
 
 use std::path::PathBuf;
 
-use axcenity_avatar::{ShadingModel, SkinLayer, ValueKind};
+use axcenity_avatar::{ShadingModel, ValueKind};
 use eframe::egui::{self, Pos2, Rect, Vec2, vec2};
 
 use super::intent::{Gesture, Intent};
@@ -20,7 +20,8 @@ use super::*;
 use crate::character_studio::test_folder;
 use crate::theme;
 
-/// The waist's width: a Body row (range 0.8 to 1.175, default 1).
+/// The waist's width: a Body row, one of the proportions (range 0.8 to
+/// 1.175, default 1).
 const WAIST: &str = "waist_width";
 const WAIST_RANGE: [f32; 2] = [0.8, 1.175];
 const CTRL: egui::Modifiers = egui::Modifiers {
@@ -66,14 +67,15 @@ impl Studio {
         }
     }
 
-    /// The Body page at Detailed, the waist picked: its rows alone.
+    /// The Body page at Detailed, the proportions picked: their rows
+    /// alone, the waist's among them.
     fn waist(name: &str, size: Vec2) -> Self {
         let mut studio = Self::new(name, size);
         studio.workspace.apply(Intent::PickCategory(Category::Body));
         studio.workspace.apply(Intent::PickLevel(Level::Detailed));
         studio
             .workspace
-            .apply(Intent::PickFeature(Some("waist".into())));
+            .apply(Intent::PickFeature(Some("proportions".into())));
         studio.settle();
         studio
     }
@@ -418,12 +420,14 @@ fn a_face_row_follows_the_same_rule() {
         .workspace
         .apply(Intent::PickFeature(Some("nose".into())));
     studio.settle();
-    let track = studio.track("nose_length");
+    // The nose's length: a Quick row.
+    const NOSE: &str = "nose_scale_vert";
+    let track = studio.track(NOSE);
     studio.drag(track.center(), vec2(22.0, 0.0));
-    let value = studio.value("nose_length");
+    let value = studio.value(NOSE);
     assert!(close(value, 0.4), "a fifth of -1 to 1: {value}");
-    studio.type_into("nose_length", "-0.25", egui::Key::Enter);
-    assert!(close(studio.value("nose_length"), -0.25));
+    studio.type_into(NOSE, "-0.25", egui::Key::Enter);
+    assert!(close(studio.value(NOSE), -0.25));
     assert_eq!(studio.undo_depth(), 2);
 }
 
@@ -463,26 +467,12 @@ fn the_expression_rows_follow_the_same_rule() {
     );
 }
 
-/// The Skin page's values and a makeup layer's sliders take the same drag.
+/// The Skin page's values take the same drag (the human base has no
+/// makeup or markings: its skin's values are the page's only sliders).
 #[test]
-fn skin_values_and_makeup_take_the_same_drag() {
-    // Tall, so the makeup section is on the screen without scrolling.
+fn skin_values_take_the_same_drag() {
+    // Tall, so the whole page is on the screen without scrolling.
     let mut studio = Studio::new("numeric-skin", vec2(1440.0, 2400.0));
-    let base = studio.workspace.base().unwrap();
-    let spec = base
-        .skin_layers
-        .iter()
-        .find(|layer| layer.id == "blush")
-        .unwrap()
-        .clone();
-    let mut blush = SkinLayer::from_spec(&spec);
-    blush.enabled = true;
-    studio.workspace.apply(Intent::SetSkinLayer {
-        id: "blush".into(),
-        marking: false,
-        to: Some(blush.clone()),
-        gesture: Gesture::Commit,
-    });
     studio
         .workspace
         .apply(Intent::PickCategory(Category::SkinAndMakeup));
@@ -511,15 +501,7 @@ fn skin_values_and_makeup_take_the_same_drag() {
         close(melanin, neutral + toward * (max - min) / 5.0),
         "melanin {melanin} from {neutral} in {min}..{max}"
     );
-
-    let track = studio.track("skin.blush.opacity");
-    studio.drag(track.center(), vec2(-22.0, 0.0));
-    let opacity = studio.workspace.skin_layer("blush").unwrap().opacity;
-    assert!(
-        close(opacity, blush.opacity - 0.2),
-        "{opacity} from {}",
-        blush.opacity
-    );
+    assert_eq!(studio.undo_depth(), 1, "one drag, one step");
 }
 
 /// The handles on the character take the same helper's 110 points for a
@@ -528,14 +510,19 @@ fn skin_values_and_makeup_take_the_same_drag() {
 /// live drive of every feature's handle, in its view.
 #[test]
 fn every_handle_takes_110_points_for_its_whole_range() {
-    const HANDLES: [(&str, &str, ViewPreset); 7] = [
-        ("nose", "nose_tip", ViewPreset::Face),
+    // A handle of each of the human base's ten features (all of the face:
+    // the base has no handles on the body).
+    const HANDLES: [(&str, &str, ViewPreset); 10] = [
+        ("face_shape", "head_width", ViewPreset::Face),
+        ("forehead", "forehead", ViewPreset::Face),
+        ("brows", "brow", ViewPreset::Face),
         ("eyes", "eye_left", ViewPreset::Face),
-        ("jaw", "jaw_right", ViewPreset::Face),
-        ("lips", "mouth_corner_left", ViewPreset::Face),
-        ("shoulders", "shoulder_left", ViewPreset::Front),
-        ("waist", "waist_left", ViewPreset::Front),
-        ("hips", "hip_left", ViewPreset::Front),
+        ("nose", "nose_tip", ViewPreset::Face),
+        ("cheeks", "cheekbone_left", ViewPreset::Face),
+        ("lips", "mouth_corner", ViewPreset::Face),
+        ("chin", "chin_tip", ViewPreset::Face),
+        ("ears", "ear_left", ViewPreset::Face),
+        ("neck", "neck_side", ViewPreset::Face),
     ];
     let mut studio = Studio::new("numeric-handles", vec2(1440.0, 900.0));
     let base = studio.workspace.base().unwrap();

@@ -83,7 +83,7 @@ impl PresetKind {
 /// A preset file's `preset` block.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PresetInfo {
-    /// Its ID in the library, such as `axcenity/realistic-face-round`.
+    /// Its ID in the library, such as `axcenity/human-face-broad`.
     pub id: String,
     pub kind: PresetKind,
     /// One sentence for the preset's card.
