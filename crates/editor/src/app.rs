@@ -123,7 +123,7 @@ mod welcome;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use axcenity_assets::Assets;
 use axcenity_blocks::{BlockScript, translate};
@@ -207,6 +207,9 @@ const STEADY_FRAME_SECONDS: f64 = 1.0;
 /// A frame this long after the last one, when none was asked for, means
 /// something woke an idle editor (see [`EditorApp::keep_frames_steady`]).
 const WAKE_GAP_SECONDS: f64 = 0.2;
+/// A frame the steady grid makes wait at least this long was ready early:
+/// the grid, not the scene, set when it's shown.
+const HELD_AT_LEAST: Duration = Duration::from_micros(500);
 pub struct EditorApp {
     /// The open project's Instances, or an empty world when none is open.
     world: World,
@@ -319,6 +322,9 @@ pub struct EditorApp {
     frame_pace: Option<(f64, bool)>,
     /// When the next steady frame is due to be presented (see [`EditorApp::pace_frame`]).
     next_present: Option<Instant>,
+    /// Whether a frame waits for the display to show the last one before
+    /// it starts (see [`EditorApp::pace_display`]).
+    display_pace: DisplayPace,
     /// The parts the viewport drag under way has moved, for Join Surfaces.
     dragged_parts: Vec<InstanceId>,
     /// The game, while Play is on. `world` stays as it was before Play.
@@ -1090,6 +1096,7 @@ impl EditorApp {
             last_active_at: None,
             frame_pace: None,
             next_present: None,
+            display_pace: DisplayPace::default(),
             dragged_parts: Vec::new(),
             play: None,
             play_settings: PlaySettings::default(),
@@ -1384,10 +1391,14 @@ impl eframe::App for EditorApp {
     /// the whole window.
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        let frame_started = Instant::now();
         self.run_native_menu_clicks(&ctx);
         self.frame(ui, frame.wgpu_render_state());
         // After the frame, so the menu bar shows what it changed.
         self.sync_native_menu(&ctx);
+        let cpu = frame_started.elapsed();
+        self.viewport_bar_state.note_editor_frame(cpu);
+        self.pace_display(&ctx, frame, frame_started, cpu);
         self.pace_frame();
         // Restart now, on the viewport's ray tracing badge.
         if self.viewport.take_restart_request() {
@@ -1512,6 +1523,69 @@ impl eframe::App for EditorApp {
     }
 }
 
+/// What [`EditorApp::pace_display`] keeps between frames.
+pub(crate) struct DisplayPace {
+    pacer: axcenity_render::FramePacer,
+    /// When the last frame started.
+    last_started: Option<Instant>,
+    /// How often the window's display refreshes, as last asked.
+    refresh: Option<Duration>,
+    frames: u64,
+    /// `AXCENITY_FRAME_CALLBACKS=on`: every frame waits for the display,
+    /// as upstream egui has it.
+    always_waits: bool,
+}
+
+impl DisplayPace {
+    /// The display is asked its rate every this many frames.
+    const ASK_EVERY: u64 = 120;
+    /// Asking whether a finished frame is finished takes microseconds:
+    /// less than this wasn't waiting for the GPU.
+    const WAITED: Duration = Duration::from_micros(300);
+
+    pub(crate) fn new(always_waits: bool) -> Self {
+        Self {
+            pacer: axcenity_render::FramePacer::default(),
+            last_started: None,
+            refresh: None,
+            frames: 0,
+            always_waits,
+        }
+    }
+}
+
+impl Default for DisplayPace {
+    fn default() -> Self {
+        Self::new(frames_always_wait_for_the_display(
+            std::env::var("AXCENITY_FRAME_CALLBACKS").ok().as_deref(),
+        ))
+    }
+}
+
+/// Whether every frame waits for the display to show the last one before
+/// it starts, as upstream egui has it, whatever the frames cost: only
+/// when `AXCENITY_FRAME_CALLBACKS` says `on` or `1`. There to compare the
+/// two, and as a way back should a compositor misbehave.
+pub(crate) fn frames_always_wait_for_the_display(value: Option<&str>) -> bool {
+    matches!(
+        value.map(str::trim).map(str::to_ascii_lowercase).as_deref(),
+        Some("on" | "1")
+    )
+}
+
+/// The refresh the editor's frames are compared with: the display's, or
+/// the steady frame rate's grid while frames are held to it and it's the
+/// slower of the two (a frame held to 60 Hz on a 240 Hz display hasn't
+/// missed anything).
+fn paced_refresh(display: Option<Duration>, steady_hz: u32, steady: bool) -> Option<Duration> {
+    let grid =
+        (steady && steady_hz > 0).then(|| Duration::from_secs_f64(1.0 / f64::from(steady_hz)));
+    match (display, grid) {
+        (Some(display), Some(grid)) => Some(display.max(grid)),
+        (display, grid) => display.or(grid),
+    }
+}
+
 /// When to present the frame built at `now`, and when the one after it is
 /// due, on a grid `interval` apart that `scheduled` is the next point of.
 /// A frame that's late by less than an interval goes out at once and the
@@ -1574,11 +1648,71 @@ impl EditorApp {
         let steady = self
             .last_active_at
             .is_some_and(|at| now - at < STEADY_FRAME_SECONDS)
-            || ((self.appearance.hold_refresh || start_moving) && focused);
+            || ((self.appearance.hold_refresh || start_moving) && focused)
+            // Timing the editor: frames come whether or not anything changed.
+            || viewport_bar::frame_log_on();
         self.frame_pace = Some((now, steady));
         if steady {
             ctx.request_repaint();
         }
+    }
+
+    /// Decides whether the next frame waits for the display to show this
+    /// one before it starts, which is how egui paces a window under
+    /// Wayland, or starts at once, while the GPU still draws this one
+    /// (`axcenity_render::FramePacer`). Waiting is right for a light
+    /// scene and costs a heavy one more than half its frame rate: Desert
+    /// Homestead with ray tracing was shown at 27 frames a second waiting
+    /// and 39 not, in a debug build (`docs/rendering/performance.md`,
+    /// "The CPU and the GPU took turns"). `started` and `cpu` are this
+    /// frame's start and its work on the CPU.
+    fn pace_display(
+        &mut self,
+        ctx: &egui::Context,
+        frame: &eframe::Frame,
+        started: Instant,
+        cpu: Duration,
+    ) {
+        let pace = &mut self.display_pace;
+        let interval = pace
+            .last_started
+            .replace(started)
+            .map(|last| started.saturating_duration_since(last));
+        let gpu_wait = self.viewport_bar_state.take_gpu_wait();
+        // The display's rate, asked for now and then: the window can move.
+        if pace.frames.is_multiple_of(DisplayPace::ASK_EVERY) {
+            pace.refresh = frame
+                .winit_window()
+                .and_then(|window| window.current_monitor())
+                .and_then(|monitor| monitor.refresh_rate_millihertz())
+                .filter(|millihertz| *millihertz > 0)
+                .map(|millihertz| Duration::from_secs_f64(1000.0 / f64::from(millihertz)));
+        }
+        pace.frames += 1;
+        // Only a frame the last one asked for says how fast frames come:
+        // one drawn after a rest, or on a timer, came when it was wanted.
+        if let Some(interval) = interval
+            && ctx.requested_repaint_last_pass()
+        {
+            let steady = self.frame_pace.is_some_and(|(_, steady)| steady);
+            pace.pacer.set_refresh(paced_refresh(
+                pace.refresh,
+                self.appearance.steady_hz,
+                steady,
+            ));
+            pace.pacer.frame(axcenity_render::PacedFrame {
+                interval,
+                cpu: cpu.saturating_sub(gpu_wait),
+                waited_for_gpu: gpu_wait >= DisplayPace::WAITED,
+            });
+        }
+        // A window without focus waits whatever its frames cost: it may
+        // be hidden, which under Wayland nothing else says
+        // (`FramePacer::waits_for_display_when`).
+        let focused = ctx.input(|input| input.viewport().focused != Some(false));
+        eframe::egui_wgpu::winit::set_pre_present_notify(
+            pace.always_waits || pace.pacer.waits_for_display_when(focused),
+        );
     }
 
     /// Steady frames come as fast as each is ready, so their lengths still
@@ -1590,14 +1724,28 @@ impl EditorApp {
     /// frame is built, just before eframe presents it.
     fn pace_frame(&mut self) {
         let steady = self.frame_pace.is_some_and(|(_, steady)| steady);
-        if !steady || self.appearance.steady_hz == 0 {
+        // Timing the editor (`AXCENITY_FRAME_LOG`) times the scene, not the grid.
+        if !steady || self.appearance.steady_hz == 0 || viewport_bar::frame_log_on() {
             self.next_present = None;
+            self.viewport_bar_state.note_pace(if steady {
+                viewport_bar::Pace::Free
+            } else {
+                viewport_bar::Pace::OnDemand
+            });
             return;
         }
         let interval =
             std::time::Duration::from_secs_f64(1.0 / f64::from(self.appearance.steady_hz));
-        let (due, next) = next_present(Instant::now(), self.next_present, interval);
+        let now = Instant::now();
+        let (due, next) = next_present(now, self.next_present, interval);
         self.next_present = Some(next);
+        // Ready early enough to be made to wait: the grid sets the rate.
+        let held = due.saturating_duration_since(now) > HELD_AT_LEAST;
+        self.viewport_bar_state.note_pace(if held {
+            viewport_bar::Pace::Held(self.appearance.steady_hz)
+        } else {
+            viewport_bar::Pace::Free
+        });
         wait_until(due);
     }
 

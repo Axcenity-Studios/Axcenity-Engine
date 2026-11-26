@@ -14,8 +14,8 @@
           "first_frame_ms": 281.753,
           "frame_ms": 11.043,
           "gpu_ms": 10.914,
-          "low_1pct_fps": 76.4,
-          "known": "Recorded after the owner's oaks' Bark materials were made one-sided (2026-11-11): about 0.6 ms faster than with double-sided bark, pictures the same. Copy the project again with --fresh after its assets change."
+          "known": "Recorded after the owner's oaks' Bark materials were made one-sided (2026-11-11): about 0.6 ms faster than with double-sided bark, pictures the same. Copy the project again with --fresh after its assets change.",
+          "low_1pct_fps": 76.4
         },
         "farmhouse-player": {
           "assets_ms": 1579.117,
@@ -55,6 +55,180 @@
         },
         "wet-patch-test": {
           "frame_ms": 0.025
+        }
+      }
+    },
+    "desktop-9950x3d-fedora": {
+      "about": "The Desktop's hardware (AMD Ryzen 9 9950X3D, 62 GB, AMD Radeon RX 9070 XT) under Fedora, GNOME 51 on Wayland, Mesa 26.2 (radv), a 240 Hz display. Pinned to the V-cache cores, which under Linux are CPUs 0-7 and 16-23 (taskset -c 0-7,16-23); as launched, without pinning, the still view's frame is about a third longer. Projects from AXCENITY_PROJECTS=~/Projects/Axcenity Projects. Only the homestead runs are recorded here: run with --only homestead.",
+      "commit": "a9370a3b + the uncommitted rendering audit of 2026-11-25 (third round: frames encoded in parts, one query a ray)",
+      "results": {
+        "homestead-still-rt-all": {
+          "assets_ms": 6102.768,
+          "bound": "GPU-bound",
+          "counts": {
+            "command buffers": 6,
+            "draw calls": 4345,
+            "items drawn": 15009,
+            "scene batches": 923,
+            "shadow casters": 9758,
+            "traced instances": 25193
+          },
+          "first_frame_ms": 5735.771,
+          "frame_ms": 10.894,
+          "gpu_ms": 10.277,
+          "low_1pct_fps": 86.0,
+          "shown_ms": 10.973,
+          "size": [
+            1996,
+            998
+          ]
+        },
+        "homestead-still-rt-shadows-ao": {
+          "assets_ms": 2585.081,
+          "bound": "GPU-bound",
+          "counts": {
+            "command buffers": 6,
+            "draw calls": 4345,
+            "items drawn": 15009,
+            "scene batches": 923,
+            "shadow casters": 9758,
+            "traced instances": 25193
+          },
+          "first_frame_ms": 2204.459,
+          "frame_ms": 10.309,
+          "gpu_ms": 10.003,
+          "low_1pct_fps": 91.6,
+          "shown_ms": 10.382,
+          "size": [
+            1996,
+            998
+          ]
+        },
+        "homestead-still-ultra": {
+          "assets_ms": 2423.146,
+          "bound": "GPU-bound",
+          "counts": {
+            "command buffers": 6,
+            "draw calls": 4345,
+            "items drawn": 15009,
+            "scene batches": 923,
+            "shadow casters": 9758,
+            "traced instances": 0
+          },
+          "first_frame_ms": 2039.192,
+          "frame_ms": 5.508,
+          "gpu_ms": 5.025,
+          "low_1pct_fps": 150.3,
+          "shown_ms": 5.571,
+          "size": [
+            1996,
+            998
+          ]
+        },
+        "homestead-still-ultra-gi": {
+          "assets_ms": 2406.393,
+          "bound": "GPU-bound",
+          "counts": {
+            "command buffers": 6,
+            "draw calls": 4345,
+            "items drawn": 15009,
+            "scene batches": 923,
+            "shadow casters": 9758,
+            "traced instances": 0
+          },
+          "first_frame_ms": 2028.636,
+          "frame_ms": 5.538,
+          "gpu_ms": 5.053,
+          "low_1pct_fps": 149.7,
+          "shown_ms": 5.6,
+          "size": [
+            1996,
+            998
+          ]
+        },
+        "homestead-tour-rt-all": {
+          "assets_ms": 6138.655,
+          "bound": "GPU-bound",
+          "counts": {
+            "command buffers": 6,
+            "draw calls": 3766,
+            "items drawn": 10960,
+            "scene batches": 923,
+            "shadow casters": 5031,
+            "traced instances": 16536
+          },
+          "first_frame_ms": 5763.22,
+          "frame_ms": 12.548,
+          "gpu_ms": 12.473,
+          "low_1pct_fps": 54.3,
+          "shown_ms": 12.605,
+          "size": [
+            1996,
+            998
+          ]
+        },
+        "homestead-tour-rt-shadows-ao": {
+          "assets_ms": 2534.026,
+          "bound": "GPU-bound",
+          "counts": {
+            "command buffers": 6,
+            "draw calls": 3766,
+            "items drawn": 10960,
+            "scene batches": 923,
+            "shadow casters": 5031,
+            "traced instances": 16536
+          },
+          "first_frame_ms": 2171.978,
+          "frame_ms": 12.465,
+          "gpu_ms": 12.214,
+          "low_1pct_fps": 51.2,
+          "shown_ms": 12.524,
+          "size": [
+            1996,
+            998
+          ]
+        },
+        "homestead-tour-ultra": {
+          "assets_ms": 2355.185,
+          "bound": "GPU-bound",
+          "counts": {
+            "command buffers": 6,
+            "draw calls": 3766,
+            "items drawn": 10960,
+            "scene batches": 923,
+            "shadow casters": 5031,
+            "traced instances": 0
+          },
+          "first_frame_ms": 1975.336,
+          "frame_ms": 6.898,
+          "gpu_ms": 6.804,
+          "low_1pct_fps": 79.0,
+          "shown_ms": 6.958,
+          "size": [
+            1996,
+            998
+          ]
+        },
+        "homestead-tour-ultra-gi": {
+          "assets_ms": 2339.902,
+          "bound": "GPU-bound",
+          "counts": {
+            "command buffers": 6,
+            "draw calls": 3766,
+            "items drawn": 10960,
+            "scene batches": 923,
+            "shadow casters": 5031,
+            "traced instances": 0
+          },
+          "first_frame_ms": 1966.015,
+          "frame_ms": 6.931,
+          "gpu_ms": 6.854,
+          "low_1pct_fps": 78.6,
+          "shown_ms": 6.992,
+          "size": [
+            1996,
+            998
+          ]
         }
       }
     }
@@ -392,6 +566,104 @@
       "host": "server",
       "name": "s10k-server-8-players",
       "scene": "s10k"
+    },
+    {
+      "about": "Desert Homestead (the owner's project; rendering/performance.md, 'Regression benchmarks'): its 91-second tour, an auto-playing Sequence, from the start: 60 warm-up and 600 measured frames at the bench's 1/60 s are its first 11 seconds. The four homestead-tour runs draw it at the owner's editor settings (Ultra, TAA, 1996 x 998, his viewport) with no ray tracing, with real-time GI, with ray traced shadows and ambient occlusion at High, and with ray traced reflections as well. The owner's targets for them are 120, 90, 90 and 60 frames a second (100 for this project).",
+      "args": [
+        "--size",
+        "1996x998",
+        "--graphics",
+        "benchmarks/features/owner-ultra.json"
+      ],
+      "frames": 600,
+      "host": "player",
+      "name": "homestead-tour-ultra",
+      "scene": "project:Desert Homestead"
+    },
+    {
+      "args": [
+        "--size",
+        "1996x998",
+        "--graphics",
+        "benchmarks/features/owner-ultra-gi.json"
+      ],
+      "frames": 600,
+      "host": "player",
+      "name": "homestead-tour-ultra-gi",
+      "scene": "project:Desert Homestead"
+    },
+    {
+      "args": [
+        "--size",
+        "1996x998",
+        "--graphics",
+        "benchmarks/features/owner-rt-shadows-ao.json"
+      ],
+      "frames": 600,
+      "host": "player",
+      "name": "homestead-tour-rt-shadows-ao",
+      "scene": "project:Desert Homestead"
+    },
+    {
+      "args": [
+        "--size",
+        "1996x998",
+        "--graphics",
+        "benchmarks/features/owner-rt-all.json"
+      ],
+      "frames": 600,
+      "host": "player",
+      "name": "homestead-tour-rt-all",
+      "scene": "project:Desert Homestead"
+    },
+    {
+      "about": "The same project standing still (a still: scene: no scripts, the tour not playing), from the camera the world starts with: a heavier view than the tour's (about 14,000 items drawn and 23,000 in the ray traced scene), where the frame's thread is the limit.",
+      "args": [
+        "--size",
+        "1996x998",
+        "--graphics",
+        "benchmarks/features/owner-ultra.json"
+      ],
+      "frames": 600,
+      "host": "player",
+      "name": "homestead-still-ultra",
+      "scene": "still:Desert Homestead"
+    },
+    {
+      "args": [
+        "--size",
+        "1996x998",
+        "--graphics",
+        "benchmarks/features/owner-ultra-gi.json"
+      ],
+      "frames": 600,
+      "host": "player",
+      "name": "homestead-still-ultra-gi",
+      "scene": "still:Desert Homestead"
+    },
+    {
+      "args": [
+        "--size",
+        "1996x998",
+        "--graphics",
+        "benchmarks/features/owner-rt-shadows-ao.json"
+      ],
+      "frames": 600,
+      "host": "player",
+      "name": "homestead-still-rt-shadows-ao",
+      "scene": "still:Desert Homestead"
+    },
+    {
+      "args": [
+        "--size",
+        "1996x998",
+        "--graphics",
+        "benchmarks/features/owner-rt-all.json"
+      ],
+      "frames": 600,
+      "host": "player",
+      "name": "homestead-still-rt-all",
+      "scene": "still:Desert Homestead"
     }
   ],
   "tolerance": {

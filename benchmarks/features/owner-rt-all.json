@@ -1,0 +1,15 @@
+{
+  "quality": "Ultra",
+  "shadow_quality": "Ultra",
+  "shadow_distance": 300.0,
+  "render_scale": 1.0,
+  "texture_budget": 8192,
+  "anti_aliasing": "Taa",
+  "reflection_quality": "Ultra",
+  "contact_shadows": true,
+  "realtime_gi": true,
+  "ray_tracing": true,
+  "ray_traced_shadows": "High",
+  "ray_traced_ambient_occlusion": "High",
+  "ray_traced_reflections": "High"
+}

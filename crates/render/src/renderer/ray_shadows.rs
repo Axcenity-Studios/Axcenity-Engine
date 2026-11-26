@@ -158,6 +158,8 @@ pub(super) fn traced_start(light: &crate::draw_list::Light) -> f32 {
 /// The pass's pipelines and buffers, at one scene size.
 pub(super) struct RayShadows {
     layout: wgpu::BindGroupLayout,
+    /// What the smoothing passes bind: [`smoothing_entries`].
+    smoothing_layout: wgpu::BindGroupLayout,
     trace: wgpu::ComputePipeline,
     blur_across: wgpu::ComputePipeline,
     blur_down: wgpu::ComputePipeline,
@@ -192,84 +194,34 @@ impl RayShadows {
         device: &wgpu::Device,
         (size, Shape { soft, lamps, air }): ((u32, u32), Shape),
     ) -> Self {
-        let texture = |binding, sample_type| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Texture {
-                sample_type,
-                view_dimension: wgpu::TextureViewDimension::D2,
-                multisampled: false,
-            },
-            count: None,
-        };
-        let buffer = |binding, ty| wgpu::BindGroupLayoutEntry {
-            binding,
-            visibility: wgpu::ShaderStages::COMPUTE,
-            ty: wgpu::BindingType::Buffer {
-                ty,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        };
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("ray traced shadows"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::AccelerationStructure {
-                        vertex_return: false,
-                    },
-                    count: None,
-                },
-                texture(1, wgpu::TextureSampleType::Depth),
-                texture(2, wgpu::TextureSampleType::Float { filterable: false }),
-                buffer(3, wgpu::BufferBindingType::Uniform),
-                buffer(4, wgpu::BufferBindingType::Storage { read_only: true }),
-                buffer(5, wgpu::BufferBindingType::Storage { read_only: false }),
-                // Cut-outs' holes (ray_cut_outs.rs).
-                buffer(6, wgpu::BufferBindingType::Storage { read_only: true }),
-                buffer(7, wgpu::BufferBindingType::Storage { read_only: true }),
-                wgpu::BindGroupLayoutEntry {
-                    binding: 8,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2Array,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 9,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // Lamps (LE1): the frame's lights, their tiles, and the
-                // lamps' half of the mask.
-                buffer(10, wgpu::BufferBindingType::Storage { read_only: true }),
-                buffer(11, wgpu::BufferBindingType::Storage { read_only: true }),
-                buffer(12, wgpu::BufferBindingType::Storage { read_only: false }),
-                // The volumetric fog's air (LE3): its part of the mask.
-                buffer(13, wgpu::BufferBindingType::Storage { read_only: false }),
-            ],
+            entries: &tracing_entries(),
+        });
+        let smoothing_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("ray traced shadows (smoothing)"),
+            entries: &smoothing_entries(),
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("ray traced shadows"),
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
+        let smoothing_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("ray traced shadows (smoothing)"),
+                bind_group_layouts: &[Some(&smoothing_layout)],
+                immediate_size: 0,
+            });
         let shader = super::gpu::shader_module(
             device,
             "ray traced shadows",
             include_str!("../ray_shadows.wgsl"),
         );
-        let pipeline = |entry| {
+        let pipeline = |entry, layout: &wgpu::PipelineLayout| {
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                 label: Some(entry),
-                layout: Some(&pipeline_layout),
+                layout: Some(layout),
                 module: &shader,
                 entry_point: Some(entry),
                 compilation_options: Default::default(),
@@ -295,11 +247,12 @@ impl RayShadows {
             mapped_at_creation: false,
         });
         Self {
-            trace: pipeline("cs_trace"),
-            blur_across: pipeline("cs_blur_across"),
-            blur_down: pipeline("cs_blur_down"),
-            air: pipeline("cs_air"),
+            trace: pipeline("cs_trace", &pipeline_layout),
+            blur_across: pipeline("cs_blur_across", &smoothing_pipeline_layout),
+            blur_down: pipeline("cs_blur_down", &smoothing_pipeline_layout),
+            air: pipeline("cs_air", &pipeline_layout),
             layout,
+            smoothing_layout,
             uniform,
             size,
             soft,
@@ -458,36 +411,158 @@ impl RayShadows {
                 ],
             })
         };
-        let steps: Vec<(&wgpu::ComputePipeline, wgpu::BindGroup)> = match &self.soft_buffers {
-            None => vec![(&self.trace, group(&self.nothing, self.sun_mask()))],
-            Some([rays, across]) => vec![
-                (&self.trace, group(&self.nothing, rays.as_entire_binding())),
-                (&self.blur_across, group(rays, across.as_entire_binding())),
-                (&self.blur_down, group(across, self.sun_mask())),
-            ],
+        // What a smoothing pass binds: the prepass, the settings, and what
+        // it reads and writes. Not the ray traced scene: wgpu checks every
+        // instance of a scene each time a pass binds it (two passes fewer
+        // took 0.5 ms off Desert Homestead's submit).
+        let smoothing = |source: &wgpu::Buffer, destination: wgpu::BindingResource| {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("ray traced shadows (smoothing)"),
+                layout: &self.smoothing_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&prepass.depth_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&prepass.normal_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: self.uniform.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: source.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 5,
+                        resource: destination,
+                    },
+                ],
+            })
         };
         let groups = (self.size.0.div_ceil(8), self.size.1.div_ceil(8));
-        for (pipeline, bind_group) in &steps {
+        // The rays: the sun's from every pixel, then the air's from every
+        // cell of the fog's grid, in one pass that binds the scene once.
+        {
+            let traced = match &self.soft_buffers {
+                None => group(&self.nothing, self.sun_mask()),
+                Some([rays, _]) => group(&self.nothing, rays.as_entire_binding()),
+            };
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("ray traced shadows"),
                 timestamp_writes: None,
             });
-            pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, bind_group, &[]);
+            pass.set_pipeline(&self.trace);
+            pass.set_bind_group(0, &traced, &[]);
             pass.dispatch_workgroups(groups.0, groups.1, 1);
+            if self.air_offset.is_some() {
+                pass.set_pipeline(&self.air);
+                let [x, y, z] = AIR_GRID;
+                pass.dispatch_workgroups(x.div_ceil(4), y.div_ceil(4), z.div_ceil(4));
+            }
         }
-        // The air's sunlight, a cell of the fog's grid per thread.
-        if self.air_offset.is_some() {
-            let group = group(&self.nothing, self.sun_mask());
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("ray traced shadows (air)"),
-                timestamp_writes: None,
-            });
-            pass.set_pipeline(&self.air);
-            pass.set_bind_group(0, &group, &[]);
-            let [x, y, z] = AIR_GRID;
-            pass.dispatch_workgroups(x.div_ceil(4), y.div_ceil(4), z.div_ceil(4));
+        // Soft shadows' rays smoothed across, then down into the mask.
+        if let Some([rays, across]) = &self.soft_buffers {
+            let steps = [
+                (
+                    &self.blur_across,
+                    smoothing(rays, across.as_entire_binding()),
+                ),
+                (&self.blur_down, smoothing(across, self.sun_mask())),
+            ];
+            for (pipeline, bind_group) in &steps {
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some("ray traced shadows (smoothing)"),
+                    timestamp_writes: None,
+                });
+                pass.set_pipeline(pipeline);
+                pass.set_bind_group(0, bind_group, &[]);
+                pass.dispatch_workgroups(groups.0, groups.1, 1);
+            }
         }
+    }
+}
+
+/// The bindings of the passes that trace (`cs_trace`, `cs_air`), in
+/// ray_shadows.wgsl's order.
+fn tracing_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
+    let mut entries = vec![wgpu::BindGroupLayoutEntry {
+        binding: 0,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::AccelerationStructure {
+            vertex_return: false,
+        },
+        count: None,
+    }];
+    entries.extend(smoothing_entries());
+    entries.extend([
+        // Cut-outs' holes (ray_cut_outs.rs).
+        buffer_entry(6, wgpu::BufferBindingType::Storage { read_only: true }),
+        buffer_entry(7, wgpu::BufferBindingType::Storage { read_only: true }),
+        wgpu::BindGroupLayoutEntry {
+            binding: 8,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2Array,
+                multisampled: false,
+            },
+            count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+            binding: 9,
+            visibility: wgpu::ShaderStages::COMPUTE,
+            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+            count: None,
+        },
+        // Lamps (LE1): the frame's lights, their tiles, and the lamps'
+        // half of the mask.
+        buffer_entry(10, wgpu::BufferBindingType::Storage { read_only: true }),
+        buffer_entry(11, wgpu::BufferBindingType::Storage { read_only: true }),
+        buffer_entry(12, wgpu::BufferBindingType::Storage { read_only: false }),
+        // The volumetric fog's air (LE3): its part of the mask.
+        buffer_entry(13, wgpu::BufferBindingType::Storage { read_only: false }),
+    ]);
+    entries
+}
+
+/// The bindings of the passes that smooth soft shadows (`cs_blur_across`,
+/// `cs_blur_down`), which every pass has: the prepass's depth and normals,
+/// the settings, and what a pass reads and writes. They leave the ray
+/// traced scene out, which those passes never read.
+fn smoothing_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
+    let texture = |binding, sample_type| wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Texture {
+            sample_type,
+            view_dimension: wgpu::TextureViewDimension::D2,
+            multisampled: false,
+        },
+        count: None,
+    };
+    vec![
+        texture(1, wgpu::TextureSampleType::Depth),
+        texture(2, wgpu::TextureSampleType::Float { filterable: false }),
+        buffer_entry(3, wgpu::BufferBindingType::Uniform),
+        buffer_entry(4, wgpu::BufferBindingType::Storage { read_only: true }),
+        buffer_entry(5, wgpu::BufferBindingType::Storage { read_only: false }),
+    ]
+}
+
+fn buffer_entry(binding: u32, ty: wgpu::BufferBindingType) -> wgpu::BindGroupLayoutEntry {
+    wgpu::BindGroupLayoutEntry {
+        binding,
+        visibility: wgpu::ShaderStages::COMPUTE,
+        ty: wgpu::BindingType::Buffer {
+            ty,
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        },
+        count: None,
     }
 }
 
@@ -553,4 +628,32 @@ pub(super) fn stand_in(device: &wgpu::Device) -> wgpu::Buffer {
         usage: wgpu::BufferUsages::STORAGE,
         mapped_at_creation: false,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn binds_the_scene(entries: &[wgpu::BindGroupLayoutEntry]) -> bool {
+        entries
+            .iter()
+            .any(|entry| matches!(entry.ty, wgpu::BindingType::AccelerationStructure { .. }))
+    }
+
+    #[test]
+    fn only_the_passes_that_trace_bind_the_ray_traced_scene() {
+        // wgpu walks every instance of a scene for each pass that binds
+        // it, so the two smoothing passes mustn't.
+        assert!(binds_the_scene(&tracing_entries()));
+        assert!(!binds_the_scene(&smoothing_entries()));
+        // What smoothing binds, the tracing passes bind at the same
+        // places: one shader module declares them all.
+        let tracing = tracing_entries();
+        for entry in smoothing_entries() {
+            assert!(tracing.contains(&entry), "binding {}", entry.binding);
+        }
+        let mut bindings: Vec<u32> = tracing.iter().map(|entry| entry.binding).collect();
+        bindings.sort_unstable();
+        assert_eq!(bindings, (0..=13).collect::<Vec<u32>>());
+    }
 }

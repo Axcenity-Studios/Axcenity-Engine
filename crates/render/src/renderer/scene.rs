@@ -212,9 +212,11 @@ impl ScenePipeline {
         let settings = GraphicsSettings::default();
         let graphics = settings.effective(&capabilities);
         let samples = graphics.anti_aliasing.samples();
+        let cloud_trace = cloud_trace::CloudTrace::new(&device);
         let (sky_pipeline, item_pipelines, outline_pipeline, prefill_pipelines) = scene_pipelines(
             &device,
             [&frame_layout, &material_layout, &skinning.layout],
+            cloud_trace.sky_layout(),
             samples,
         );
         let water = water::WaterPass::new(
@@ -323,6 +325,7 @@ impl ScenePipeline {
             water,
             water_frame_bind_group: None,
             cloud_drift: Default::default(),
+            cloud_trace,
             frame_entries,
             sun_disc: true,
             sky_band0: glam::Vec3::ZERO,
@@ -387,11 +390,18 @@ impl ScenePipeline {
             terrain,
             frame: 0,
             gpu_timer,
+            latency: None,
+            cpu_times: [Duration::ZERO; CpuSection::COUNT],
+            one_frame_ahead: false,
+            frame_in_parts: encoders::in_parts_by_default(),
+            last_frame: None,
+            gpu_wait: Duration::ZERO,
             time_gpu: true,
             counts: FrameCounts::default(),
             frozen_view: None,
             culling_bounds: Vec::new(),
             lods: LodStates::default(),
+            clusters: clusters::Clusters::default(),
             ray_scene: None,
             posing_generation: posing.generation,
             posing,
@@ -524,6 +534,7 @@ impl ScenePipeline {
                     &self.material_layout,
                     &self.skinning.layout,
                 ],
+                self.cloud_trace.sky_layout(),
                 samples,
             );
             self.edge_pipeline =
@@ -610,7 +621,9 @@ impl ScenePipeline {
                 &self.targets_alive,
             );
             self.history.valid = false;
-            // The frame bindings held the old occlusion texture.
+            // The frame bindings held the old occlusion texture, and so did
+            // the traced clouds'.
+            self.cloud_trace.forget_target();
             self.bind_frame();
         }
     }
@@ -624,6 +637,7 @@ impl ScenePipeline {
         aspect: f32,
         viewport_size: (u32, u32),
     ) -> Result<()> {
+        let mut cpu = cpu_timer::CpuTimer::start();
         // Screen-space outlines keep the prepass's targets alive while the
         // world has them.
         // So does depth of field, with a target of its own, and motion blur,
@@ -862,6 +876,16 @@ impl ScenePipeline {
         let drift = self.cloud_drift.advance(&list.clouds, list.time);
         frame_uniform.clouds =
             clouds::CloudsRaw::new(&list.clouds, drift, self.graphics.cloud_quality);
+        self.cloud_trace.plan(
+            (&self.device, &self.queue),
+            &mut frame_uniform,
+            drift.map(f64::from),
+            self.frame_targets.size,
+            self.frame_targets
+                .occlusion
+                .as_ref()
+                .map(|occlusion| &occlusion.depth_view),
+        );
         let (probes, probe_count) = self.probes.uniform();
         frame_uniform.probes = probes;
         frame_uniform.reflection_probes[0] = probe_count;
@@ -1133,6 +1157,7 @@ impl ScenePipeline {
             .grading
             .prepare(&self.device, &self.queue, list.grading.as_ref());
 
+        cpu.lap(CpuSection::Setup);
         self.frame += 1;
         // Each item's level of detail, which decides the meshes uploaded.
         // Everything the frame's views can see, or everything while a
@@ -1161,13 +1186,26 @@ impl ScenePipeline {
         });
         let Resolved {
             draws,
+            clusters: groups,
             culled: past_cull_distance,
             submitted: items_submitted,
         } = self.lods.resolve(list, self.frame, reach.as_ref());
+        // What each group of items is was worked out when it first came
+        // into a view. The clusters are taken out of the pipeline while
+        // the frame reads them, so its other borrows can stay (a frame
+        // that fails loses them, and the next works them out again).
+        let mut clusters = std::mem::take(&mut self.clusters);
+        if self.frame.is_multiple_of(60) {
+            clusters.forget_unused(self.frame);
+        }
+        let groups = clusters.of(&groups, self.frame);
+        cpu.lap(CpuSection::Lods);
         // Each draw's material binding, worked out once for the uploads
         // and the plan: it reads every map setting of the item.
-        let uses = FrameUses::of(&draws);
+        let uses = FrameUses::of(&draws, &groups);
+        cpu.lap(CpuSection::Materials);
         self.upload_new(list, &draws, &uses);
+        cpu.lap(CpuSection::Uploads);
         // What the camera can see, or the frozen view's while it's set.
         let camera = self.frozen_view.as_ref().unwrap_or(&list.camera);
         let camera_view = Frustum::of(camera_view_projection(camera, aspect));
@@ -1194,6 +1232,7 @@ impl ScenePipeline {
             )
         };
         self.culling_bounds = seen;
+        cpu.lap(CpuSection::Plan);
         // Shadow maps cost memory, so one exists only while shadows are on,
         // at the size the graphics settings give.
         let map_size = shadows_drawn(list.shadows, &self.graphics).map(|(_, size)| size);
@@ -1223,6 +1262,7 @@ impl ScenePipeline {
         }
         self.casters_planned = casters.iter().map(Vec::len).sum();
         let mut view_casters = casters_in_views(&casters, &shadow_view_list);
+        cpu.lap(CpuSection::Casters);
         // Water reflecting the screen traces rays too, with the GPU (LE5).
         let water_rays = water_mode.traces_rays(&self.graphics);
         let traces_rays = self.traces_rays(
@@ -1252,6 +1292,7 @@ impl ScenePipeline {
             self.temporal
                 .bind_previous(&self.device, self.posing.previous());
         }
+        cpu.lap(CpuSection::Posing);
         // What moved since last frame, for the motion vectors.
         let moved = self.frame_targets.temporal.as_ref().map(|_| {
             let posing = &self.posing;
@@ -1277,6 +1318,7 @@ impl ScenePipeline {
             );
             moved
         });
+        cpu.lap(CpuSection::Motion);
 
         let mut instance_count = instances.iter().map(Vec::len).sum::<usize>() as u32;
         let mut pieces: Vec<&[InstanceRaw]> = instances.iter().map(Vec::as_slice).collect();
@@ -1298,6 +1340,7 @@ impl ScenePipeline {
         }
         self.ensure_instance_capacity(instance_count as usize);
         write_pieces(&self.queue, &self.instance_buffer, &pieces);
+        cpu.lap(CpuSection::Instances);
         for font in &list.fonts {
             if self.loaded_fonts.insert(font.path.clone()) {
                 self.font_system
@@ -1468,11 +1511,10 @@ impl ScenePipeline {
             self.bind_frame();
         }
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("frame"),
-            });
+        // The frame's commands, in parts that are encoded side by side
+        // (renderer/encoders.rs): a part ends before each run of passes
+        // with many draw calls.
+        let mut encoder = encoders::FrameEncoders::new(&self.device, self.frame_in_parts);
         // Times this frame unless the last measurement is still being read.
         let timed = match &mut self.gpu_timer {
             Some(timer) if self.time_gpu => timer.collect(&self.device),
@@ -1484,6 +1526,12 @@ impl ScenePipeline {
                 timer.mark(encoder, pass);
             }
         };
+        // A stamp between a pass's draws, where what is drawn changes.
+        let stamp_part = |pass: &mut wgpu::RenderPass<'_>, within, started| {
+            if let Some(timer) = timer {
+                timer.part(pass, within, started);
+            }
+        };
         // First, every animated item morphed and skinned once (CO8).
         mark(&mut encoder, FramePass::CharacterPosing);
         let posed_any = {
@@ -1493,6 +1541,7 @@ impl ScenePipeline {
         };
         mark(&mut encoder, FramePass::AccelerationStructures);
         let path_traced = self.path_traced();
+        cpu.lap(CpuSection::Interface);
         let tracing = ray_tracing::prepare_scene(
             &mut self.ray_scene,
             (
@@ -1504,7 +1553,10 @@ impl ScenePipeline {
             (
                 traces_rays,
                 self.frame,
-                glam::Vec3::from_slice(&frame_uniform.camera_position[..3]),
+                (
+                    glam::Vec3::from_slice(&frame_uniform.camera_position[..3]),
+                    ray_sway::Sight::of(view_proj, self.frame_targets.size.1),
+                ),
                 self.graphics.ray_tracing_distance,
                 ray_gi_batch.is_some()
                     || water_rays
@@ -1512,8 +1564,9 @@ impl ScenePipeline {
                     || ray_reflection_uniform.is_some(),
                 frame_uniform.clock,
             ),
-            (&draws, &self.posing),
+            (&draws, &groups, &self.posing),
         );
+        cpu.lap(CpuSection::RayScene);
         // Without ray queries, GI's rays walk a scene built in software.
         if ray_gi_batch.is_some() && self.graphics.ray_traced_gi_in_software {
             let soft = self
@@ -1620,6 +1673,10 @@ impl ScenePipeline {
                 }
             }
             let (mut view_casters, mut view_triangles) = (0u32, 0u64);
+            // Each view with enough casters is a part of its own.
+            if casters.len() >= encoders::WORTH_A_PART {
+                encoder.part("shadow view");
+            }
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("shadow view"),
                 color_attachments: &[],
@@ -1686,6 +1743,7 @@ impl ScenePipeline {
             timer.mark_cascade(&mut encoder, SHADOW_CASCADES);
         }
         let frame_bind_group = &self.frame_bind_group;
+        encoder.part("prepass");
         mark(&mut encoder, FramePass::Prepass);
         let mut motion_draws = 0;
 
@@ -1717,13 +1775,19 @@ impl ScenePipeline {
                 });
                 pass.set_bind_group(0, &self.prepass_frame_bind_group, &[]);
                 pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+                let mut drawing = None;
                 for batch in batches.iter().filter(|batch| !batch.transparent) {
+                    if drawing != Some(batch.part) {
+                        drawing = Some(batch.part);
+                        stamp_part(&mut pass, PartPass::Prepass, drawing);
+                    }
                     let Some(mesh) = self.bind_batch(&mut pass, batch, BatchPass::Prepass) else {
                         continue;
                     };
                     count(mesh, &batch.instances);
                     pass.draw_indexed(0..mesh.drawn_indices(snow_caps), 0, batch.instances.clone());
                 }
+                stamp_part(&mut pass, PartPass::Prepass, None);
             }
             // The motion vectors, from what the prepass drew.
             if let (Some(targets), Some(moved)) = (&self.frame_targets.temporal, &moved) {
@@ -1845,6 +1909,10 @@ impl ScenePipeline {
         if let Some(particles) = &self.gpu_particles {
             particles.run(&mut encoder);
         }
+        // The sky's clouds, for the scene's sky pass to lay over its sky.
+        mark(&mut encoder, FramePass::Clouds);
+        self.cloud_trace.draw(&mut encoder);
+        encoder.part("scene");
         mark(&mut encoder, FramePass::Scene);
         let emitter_draws = self
             .gpu_particles
@@ -1877,9 +1945,14 @@ impl ScenePipeline {
         let mut drawn = (0, 0);
         // The depth fill's draw calls, triangles and corners.
         let mut depth_fill = (0, 0, 0);
-        let mut draw_batches = |pass: &mut wgpu::RenderPass<'_>, batches: &[Batch]| {
+        let mut draw_batches = |pass: &mut wgpu::RenderPass<'_>, batches: &[Batch], solid: bool| {
             let mut water_bound = false;
+            let mut drawing = None;
             for batch in batches {
+                if solid && drawing != Some(batch.part) {
+                    drawing = Some(batch.part);
+                    stamp_part(pass, PartPass::Scene, drawing);
+                }
                 if batch.water != water_bound {
                     water_bound = batch.water;
                     let group = if water_bound {
@@ -1931,6 +2004,9 @@ impl ScenePipeline {
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             // The cut-out surfaces' depth first, so they're lit only once
             // per pixel, and what's behind them not at all.
+            if solid.iter().any(|batch| batch.prefilled) {
+                stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::CutOutDepth));
+            }
             for batch in solid.iter().filter(|batch| batch.prefilled) {
                 let Some(mesh) = self.bind_batch(&mut pass, batch, BatchPass::DepthFill) else {
                     continue;
@@ -1941,9 +2017,12 @@ impl ScenePipeline {
                 depth_fill.2 += u64::from(mesh.vertex_count) * instances;
                 pass.draw_indexed(0..mesh.drawn_indices(snow_caps), 0, batch.instances.clone());
             }
-            draw_batches(&mut pass, solid);
+            draw_batches(&mut pass, solid, true);
+            stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::Sky));
             pass.set_pipeline(&self.sky_pipeline);
+            pass.set_bind_group(2, self.cloud_trace.sky_group(), &[]);
             pass.draw(0..3, 0..1);
+            stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::Decals));
             // Projected decals over the solid scene (the sky's pixels are
             // left alone by the prepass's depth).
             self.decal_pass.draw(&mut pass, &decal_draws);
@@ -1959,10 +2038,13 @@ impl ScenePipeline {
                 pass.set_bind_group(0, frame_bind_group, &[]);
             }
             if !copied {
-                draw_batches(&mut pass, see_through);
+                stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::SeeThrough));
+                draw_batches(&mut pass, see_through, false);
                 // Last, over everything, but hidden behind solid items.
+                stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::Sprites));
                 self.sprites.draw(&mut pass, &sprite_draws, &emitter_draws);
             }
+            stamp_part(&mut pass, PartPass::Scene, None);
         }
         if copied {
             let targets = &self.frame_targets;
@@ -1978,8 +2060,11 @@ impl ScenePipeline {
             let mut pass = begin_scene_pass(&mut encoder, targets, true, false);
             pass.set_bind_group(0, frame_bind_group, &[]);
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            draw_batches(&mut pass, see_through);
+            stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::SeeThrough));
+            draw_batches(&mut pass, see_through, false);
+            stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::Sprites));
             self.sprites.draw(&mut pass, &sprite_draws, &emitter_draws);
+            stamp_part(&mut pass, PartPass::Scene, None);
         }
         (counts.items_drawn, counts.batches) = drawn;
         counts.draw_calls += motion_draws + depth_fill.0 + decal_draws.len() as u32;
@@ -2159,7 +2244,17 @@ impl ScenePipeline {
         if let Some(timer) = timer {
             timer.end(&mut encoder);
         }
-        self.queue.submit([encoder.finish()]);
+        cpu.lap(CpuSection::Passes);
+        let commands = encoder.finish();
+        counts.command_buffers = commands.len() as u32;
+        cpu.lap(CpuSection::Encode);
+        let submitted = self.queue.submit(commands);
+        if let Some(latency) = &mut self.latency {
+            latency.submitted(&self.queue);
+        }
+        cpu.lap(CpuSection::Submit);
+        self.wait_for_frame_before(submitted);
+        cpu.skip();
         if timed && let Some(timer) = &mut self.gpu_timer {
             let shadows = self.shadow_map.is_some()
                 || self.spot_shadow_map.is_some()
@@ -2177,6 +2272,7 @@ impl ScenePipeline {
                     ray_reflections_drawn,
                     self.volumetric_fog.is_some(),
                     self.gpu_particles.is_some(),
+                    self.cloud_trace.traced(),
                     true,
                     true,
                     turned.drawn || ui_drawn,
@@ -2207,6 +2303,9 @@ impl ScenePipeline {
             None => self.history.reset(),
         }
         self.forget_undrawn();
+        self.clusters = clusters;
+        cpu.lap(CpuSection::After);
+        self.cpu_times = cpu.times();
         Ok(())
     }
 
@@ -2611,6 +2710,55 @@ impl ScenePipeline {
         )
     }
 
+    /// Times each frame from its start ([`Self::frame_started`]) to the
+    /// GPU finishing it, while `on` (renderer/latency.rs).
+    pub(super) fn watch_latency(&mut self, on: bool) {
+        match (on, &self.latency) {
+            (true, None) => self.latency = Some(latency::LatencyWatch::new(&self.device)),
+            (false, Some(_)) => self.latency = None,
+            _ => {}
+        }
+    }
+
+    /// The next frame drawn started at `at`, for the latency watch.
+    pub(super) fn frame_started(&mut self, at: std::time::Instant) {
+        if let Some(latency) = &mut self.latency {
+            latency.frame_started(at);
+        }
+    }
+
+    /// The watched frames' times since last asked.
+    pub(super) fn take_latencies(&self) -> Vec<Duration> {
+        self.latency.as_ref().map(|l| l.take()).unwrap_or_default()
+    }
+
+    /// Notes this frame's submission and, one frame ahead
+    /// (`TextureRenderer::set_one_frame_ahead`), waits for the frame
+    /// before it to finish on the GPU. The GPU then always has this frame
+    /// to go on with and never a third behind it: a host that starts each
+    /// frame as the last one is handed over is one frame of GPU work from
+    /// the picture, however many the swapchain would queue (four, measured
+    /// on radv at 3840 × 2160).
+    fn wait_for_frame_before(&mut self, submitted: wgpu::SubmissionIndex) {
+        /// A GPU that takes longer than this for a frame has stopped.
+        const LONGEST: Duration = Duration::from_secs(2);
+        self.gpu_wait = Duration::ZERO;
+        let before = self.last_frame.replace(submitted);
+        if !self.one_frame_ahead {
+            return;
+        }
+        let Some(before) = before else {
+            return;
+        };
+        let waiting = std::time::Instant::now();
+        // A timeout or a lost device shows up on the next submit.
+        let _ = self.device.poll(wgpu::PollType::Wait {
+            submission_index: Some(before),
+            timeout: Some(LONGEST),
+        });
+        self.gpu_wait = waiting.elapsed();
+    }
+
     pub(super) fn stats(&self) -> RenderStats {
         let counts = self.counts;
         let shadow_bytes = self.shadow_map.as_ref().map_or(0, |map| map.bytes)
@@ -2631,7 +2779,10 @@ impl ScenePipeline {
         ];
         let (surface_shaders, broken_shaders) = self.surface_shaders.counts();
         RenderStats {
+            gpu_wait: self.gpu_wait,
+            cpu_times: self.cpu_times,
             draw_calls: counts.draw_calls,
+            command_buffers: counts.command_buffers,
             triangles: counts.triangles,
             vertices: counts.vertices,
             gpu_time: self
@@ -2656,6 +2807,11 @@ impl ScenePipeline {
                 .as_ref()
                 .filter(|_| self.time_gpu)
                 .map_or([None; FramePass::COUNT], gpu_timer::GpuTimer::last_passes),
+            part_times: self
+                .gpu_timer
+                .as_ref()
+                .filter(|_| self.time_gpu)
+                .map_or_else(Default::default, gpu_timer::GpuTimer::last_parts),
             items_submitted: counts.items_submitted,
             items_drawn: counts.items_drawn,
             batches: counts.batches,
@@ -2687,6 +2843,7 @@ impl ScenePipeline {
             texture_bytes_wanted: self.texture_bytes_wanted(),
             freed_for_budget: self.freed_for_budget,
             target_bytes: self.frame_targets.bytes
+                + self.cloud_trace.bytes()
                 + shadow_bytes
                 + sheet_bytes
                 + self.environment.bytes()
@@ -3404,6 +3561,7 @@ fn begin_scene_pass<'a>(
 fn scene_pipelines(
     device: &wgpu::Device,
     layouts: [&wgpu::BindGroupLayout; 3],
+    clouds_layout: &wgpu::BindGroupLayout,
     samples: u32,
 ) -> (
     wgpu::RenderPipeline,
@@ -3455,7 +3613,7 @@ fn scene_pipelines(
         lit,
         lit_double,
     ] = gpu::in_parallel([
-        &|| create_sky_pipeline(device, frame_layout, samples),
+        &|| create_sky_pipeline(device, frame_layout, clouds_layout, samples),
         &|| pipeline(false, false),
         &|| pipeline(true, false),
         &|| pipeline(false, true),

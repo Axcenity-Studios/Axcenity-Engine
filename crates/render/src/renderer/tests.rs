@@ -22,10 +22,13 @@ mod decals;
 mod environment_maps;
 mod fog;
 mod foliage_shadow_bench;
+mod frame_parts;
 mod frame_planning;
+mod frames_ahead;
 mod frustum_culling;
 mod gpu_particles;
 mod grid;
+mod grouped_items;
 mod hair;
 mod lens;
 mod level_of_detail;
@@ -117,7 +120,7 @@ fn ui_label(position: [f32; 2], size: [f32; 2]) -> UiDrawItem {
 }
 
 /// A list seen from the origin.
-fn list_of(items: Vec<DrawItem>) -> DrawList {
+pub(super) fn list_of(items: Vec<DrawItem>) -> DrawList {
     DrawList {
         sky: Sky {
             top_color: [0.0; 3],
@@ -201,6 +204,7 @@ fn batch(mesh: MeshKey, transparent: bool, instances: Range<u32>) -> Batch {
         shader: None,
         water: false,
         outline: false,
+        part: crate::DrawnPart::Items,
         instances,
     }
 }
@@ -215,8 +219,11 @@ fn plan(list: &DrawList) -> DrawPlan {
 /// level of detail on a first frame, with each mesh's box from `bounds`.
 fn plan_with(list: &DrawList, bounds: impl Fn(MeshKey) -> Bounds + Sync) -> DrawPlan {
     let view = Frustum::of(view_projection(list, 1.0));
-    let draws = LodStates::default().resolve(list, 1, None).draws;
-    let uses = FrameUses::of(&draws);
+    let resolved = LodStates::default().resolve(list, 1, None);
+    let mut clusters = clusters::Clusters::default();
+    let groups = clusters.of(&resolved.clusters, 1);
+    let draws = resolved.draws;
+    let uses = FrameUses::of(&draws, &groups);
     plan_draws(list, &draws, &uses, &view, |mesh, _| bounds(mesh), None)
 }
 
@@ -1060,6 +1067,101 @@ fn stats_count_items_batches_and_gpu_bytes_by_kind() {
     }
 }
 
+/// With stamps between draws, the prepass's and the scene pass's time is
+/// also given by what was drawn, and only for what was.
+#[test]
+fn stats_time_the_prepass_and_the_scene_by_what_is_drawn() {
+    use crate::{DrawnPart, PartPass};
+    let instance = crate::adapters::instance();
+    let Ok(adapter) = pollster::block_on(crate::adapters::adapter(&instance, None)) else {
+        return;
+    };
+    let wanted = wgpu::Features::TIMESTAMP_QUERY | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES;
+    if !adapter.features().contains(wanted) {
+        eprintln!("skipped: the adapter has no timestamps inside passes");
+        return;
+    }
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        required_features: wanted,
+        ..Default::default()
+    }))
+    .unwrap();
+    let mut renderer = TextureRenderer::new(&device, &queue, 64, 32);
+    renderer.set_graphics(&with_occlusion(crate::AmbientOcclusion::High));
+    let draw = |renderer: &mut TextureRenderer, list: &DrawList| {
+        for _ in 0..10 {
+            renderer.render(list).unwrap();
+            device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+        }
+        renderer.stats()
+    };
+
+    // A block, and nothing scattered: items and the sky.
+    let mut list = list_of(vec![big_block()]);
+    let stats = draw(&mut renderer, &list);
+    for (pass, part, expected) in [
+        (PartPass::Prepass, DrawnPart::Items, true),
+        (PartPass::Prepass, DrawnPart::Scattered, false),
+        (PartPass::Prepass, DrawnPart::Terrain, false),
+        (PartPass::Prepass, DrawnPart::Sky, false),
+        (PartPass::Scene, DrawnPart::Items, true),
+        (PartPass::Scene, DrawnPart::Scattered, false),
+        (PartPass::Scene, DrawnPart::CutOutDepth, false),
+        (PartPass::Scene, DrawnPart::Sky, true),
+        (PartPass::Scene, DrawnPart::Decals, true),
+        (PartPass::Scene, DrawnPart::SeeThrough, true),
+        (PartPass::Scene, DrawnPart::Sprites, true),
+    ] {
+        assert_eq!(
+            stats.part_time(pass, part).is_some(),
+            expected,
+            "{pass:?}, {part:?}"
+        );
+    }
+    // The parts are within their pass.
+    for (pass, whole) in [
+        (PartPass::Prepass, FramePass::Prepass),
+        (PartPass::Scene, FramePass::Scene),
+    ] {
+        let parts: Duration = stats.part_times[pass as usize].iter().flatten().sum();
+        assert!(
+            parts <= stats.pass_time(whole).unwrap(),
+            "{pass:?}: {stats:?}"
+        );
+    }
+
+    // The same block with a cull distance is a scattered item.
+    list.items[0].cull_distance = 500.0;
+    let stats = draw(&mut renderer, &list);
+    assert!(
+        stats
+            .part_time(PartPass::Scene, DrawnPart::Scattered)
+            .is_some()
+    );
+    assert!(stats.part_time(PartPass::Scene, DrawnPart::Items).is_none());
+    assert!(
+        stats
+            .part_time(PartPass::Prepass, DrawnPart::Scattered)
+            .is_some()
+    );
+
+    // A device that can't stamp inside a pass times the passes whole.
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        required_features: wgpu::Features::TIMESTAMP_QUERY,
+        ..Default::default()
+    }))
+    .unwrap();
+    let mut renderer = TextureRenderer::new(&device, &queue, 64, 32);
+    renderer.set_graphics(&with_occlusion(crate::AmbientOcclusion::High));
+    for _ in 0..10 {
+        renderer.render(&list).unwrap();
+        device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+    }
+    let stats = renderer.stats();
+    assert!(stats.pass_time(FramePass::Scene).is_some());
+    assert_eq!(stats.part_times, crate::PartTimes::default());
+}
+
 /// With timestamps, each pass a frame draws gets a time, and the passes it
 /// skips don't.
 #[test]
@@ -1103,11 +1205,36 @@ fn stats_time_each_pass_the_frame_draws() {
                 | FramePass::Ui
                 | FramePass::VolumetricFog
                 | FramePass::Particles
+                // No clouds in this sky.
+                | FramePass::Clouds
         );
         assert_eq!(stats.pass_time(pass).is_some(), expected, "{pass:?}");
     }
     let passes: Duration = stats.pass_times.iter().flatten().sum();
     assert!(passes <= stats.gpu_time.unwrap(), "{stats:?}");
+    // Clouds that step through their layer are traced in a pass of their
+    // own, which is timed; the sky pass's own (a flat sheet) are not.
+    list.clouds = crate::Clouds {
+        cover: 0.5,
+        ..Default::default()
+    };
+    assert!(
+        draw(&mut renderer, &list)
+            .pass_time(FramePass::Clouds)
+            .is_some()
+    );
+    renderer.set_graphics(&GraphicsSettings {
+        cloud_quality: Some(crate::CloudQuality::Low),
+        ..with_occlusion(crate::AmbientOcclusion::High)
+    });
+    assert!(
+        draw(&mut renderer, &list)
+            .pass_time(FramePass::Clouds)
+            .is_none()
+    );
+    list.clouds = Default::default();
+    renderer.set_graphics(&with_occlusion(crate::AmbientOcclusion::High));
+    let stats = draw(&mut renderer, &list);
     // Each cascade the preset draws is timed within the shadow pass, and
     // counts what it drew.
     let cascades = renderer
@@ -1348,6 +1475,55 @@ impl TextureSource for Weights {
     fn rgba(&self) -> &[u8] {
         &self.1
     }
+}
+
+#[test]
+fn a_terrains_chunks_share_one_working_out_of_their_layers_key() {
+    use terrain::{LastArrays, terrain_key, terrain_key_with};
+    let layers_of = |id, color| {
+        Arc::new(crate::TerrainLayers {
+            id,
+            key: id,
+            layers: vec![crate::TerrainLayer {
+                color,
+                base_color_texture: Some(Arc::new(Weights(100 + id, [9; 4]))),
+                ..terrain::tests::layer()
+            }],
+            view: crate::TerrainView::Shaded,
+            height_range: [0.0, 1.0],
+            grid_origin: [0.0, 0.0],
+            grid_cell: [1.0, 1.0],
+        })
+    };
+    let chunk = |layers: &Arc<crate::TerrainLayers>, key| crate::TerrainSurface {
+        layers: layers.clone(),
+        weights: [
+            Arc::new(Weights(key, [0; 4])),
+            Arc::new(Weights(key + 1, [0; 4])),
+        ],
+    };
+    let (sand, rock) = (layers_of(1, [1.0, 0.9, 0.6]), layers_of(2, [0.4; 3]));
+    // Chunk after chunk, as a frame asks: two terrains' chunks, then the
+    // first terrain's again. Each key is what it is asked alone.
+    let chunks = [
+        chunk(&sand, 10),
+        chunk(&sand, 20),
+        chunk(&rock, 30),
+        chunk(&rock, 40),
+        chunk(&sand, 50),
+    ];
+    let mut last = LastArrays::default();
+    for surface in &chunks {
+        assert_eq!(terrain_key_with(surface, &mut last), terrain_key(surface));
+    }
+    assert_ne!(terrain_key(&chunks[0])[1], terrain_key(&chunks[2])[1]);
+    // What it kept is the layers themselves, so nothing else can turn up
+    // at their address while it's compared with.
+    let weak = Arc::downgrade(&sand);
+    drop((chunks, sand));
+    assert!(weak.upgrade().is_some());
+    drop(last);
+    assert!(weak.upgrade().is_none());
 }
 
 #[test]

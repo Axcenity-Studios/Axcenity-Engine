@@ -2558,3 +2558,28 @@ RunService.Heartbeat:Connect(spin)
     assert_eq!(app.tabs.active_path(), Some("scripts/slow.server.lua"));
     let _ = std::fs::remove_dir_all(folder);
 }
+
+#[test]
+fn frames_are_compared_with_the_slower_of_the_display_and_the_steady_grid() {
+    let hz = |rate: f64| Duration::from_secs_f64(1.0 / rate);
+    // Held to 60 Hz on a 240 Hz display, a frame every 16.7 ms is on time.
+    assert_eq!(paced_refresh(Some(hz(240.0)), 60, true), Some(hz(60.0)));
+    // Not held (nobody is working, or the steady rate is off): the display's.
+    assert_eq!(paced_refresh(Some(hz(240.0)), 60, false), Some(hz(240.0)));
+    assert_eq!(paced_refresh(Some(hz(240.0)), 0, true), Some(hz(240.0)));
+    // A grid faster than the display can't be shown: the display's.
+    assert_eq!(paced_refresh(Some(hz(60.0)), 144, true), Some(hz(60.0)));
+    // A display that doesn't say its rate.
+    assert_eq!(paced_refresh(None, 60, true), Some(hz(60.0)));
+    assert_eq!(paced_refresh(None, 60, false), None);
+}
+
+#[test]
+fn every_frame_waits_for_the_display_only_when_asked() {
+    assert!(!frames_always_wait_for_the_display(None));
+    assert!(!frames_always_wait_for_the_display(Some("off")));
+    assert!(!frames_always_wait_for_the_display(Some("")));
+    assert!(frames_always_wait_for_the_display(Some("on")));
+    assert!(frames_always_wait_for_the_display(Some(" ON ")));
+    assert!(frames_always_wait_for_the_display(Some("1")));
+}

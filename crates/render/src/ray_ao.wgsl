@@ -88,18 +88,33 @@ fn view_position(uv: vec2<f32>, depth: f32) -> vec3<f32> {
 // `near` is how near a cut-out may be and not count (`cut_out_near`).
 const AO_TIGHT: f32 = 1.35;
 fn hidden_along(origin: vec3<f32>, direction: vec3<f32>, radius: f32, near: f32) -> f32 {
-    let nearest = min(
-        nearest_hit(origin, direction, MASK_SOLID, 0.0, radius),
-        nearest_hit(origin, direction, MASK_CUT_OUTS, min(near, radius), radius));
+    let nearest = nearest_hit(origin, direction, min(near, radius), radius);
     // Nearness counts more than in proportion, so the shade gathers tight
     // in the contact under a bucket or a tyre and thins quickly away from it.
     return pow(1.0 - nearest / radius, AO_TIGHT);
 }
 
-// How far along the ray from `origin` the nearest item of `mask` is,
-// between `near` and `radius` (`radius` for nothing).
-fn nearest_hit(origin: vec3<f32>, direction: vec3<f32>, mask: u32, near: f32, radius: f32) -> f32 {
-    let hit = trace_through_holes(RayDesc(0u, mask, near, radius, origin, direction));
+// How far along the ray from `origin` the nearest thing is, within
+// `radius` (`radius` for nothing): a solid item anywhere along it, or a
+// cut-out further off than `near` where its texture isn't cut out.
+//
+// One query finds the nearest of both. A solid item's triangles are
+// committed as they come (its BLAS is opaque); a cut-out's come as
+// candidates (its BLAS isn't) and are confirmed here, past `near` only.
+// Until 2026-11-25 this was two queries a ray, the solid items' and the
+// cut-outs', and the nearer of their answers.
+fn nearest_hit(origin: vec3<f32>, direction: vec3<f32>, near: f32, radius: f32) -> f32 {
+    var query: ray_query;
+    rayQueryInitialize(&query, ray_scene, RayDesc(
+        0u, MASK_SOLID | MASK_CUT_OUTS, 0.0, radius, origin, direction));
+    while rayQueryProceed(&query) {
+        let candidate = rayQueryGetCandidateIntersection(&query);
+        if candidate.kind == RAY_QUERY_INTERSECTION_TRIANGLE && candidate.t > near
+            && cut_out_covers(candidate) {
+            rayQueryConfirmIntersection(&query);
+        }
+    }
+    let hit = rayQueryGetCommittedIntersection(&query);
     if hit.kind == RAY_QUERY_INTERSECTION_NONE {
         return radius;
     }

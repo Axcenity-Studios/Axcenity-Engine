@@ -342,6 +342,109 @@ fn a_swaying_plants_ray_traced_shadow_moves_with_it() {
     );
 }
 
+/// Swaying plants are bent into BLASes they share (two of one mesh in one
+/// dispatch, one of another), and each one's ray traced shadow still moves
+/// with it, where it stands.
+#[test]
+fn swaying_plants_bent_together_each_cast_their_own_moving_shadow() {
+    let Some((device, queue)) = ray_test_device() else {
+        eprintln!("skipped: no graphics adapter with ray queries on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    renderer.set_graphics(&crate::GraphicsSettings {
+        shadow_quality: Some(crate::ShadowQuality::Off),
+        ray_traced_shadows: Some(crate::RayTracedShadows::Low),
+        ..crate::GraphicsSettings::preset(crate::Quality::Ultra)
+    });
+    // Three plants in a row across the view, the last a cylinder.
+    const ACROSS: [f32; 3] = [-9.0, 0.0, 9.0];
+    let plants = |wind| {
+        let mut list = plant_and_its_shadow(true, wind);
+        for (index, x) in ACROSS.into_iter().enumerate().skip(1) {
+            let mut another = plant(true);
+            another.transform.w_axis.x = x;
+            if index == 2 {
+                another.shape = Shape::Cylinder;
+            }
+            list.items.push(another);
+        }
+        list.items[1].transform.w_axis.x = ACROSS[0];
+        list
+    };
+    // Each plant's shadow's mean column, among the columns around it.
+    let mut shadow_columns = |wind| {
+        let list = plants(wind);
+        let lit = pixel_on(&mut renderer, &list, Vec3::new(4.5, 0.0, -1.0))[0];
+        let pixels = renderer.read_pixels();
+        let columns = ACROSS.map(|x| {
+            let rows = (
+                on_screen(&list, Vec3::new(x, 0.0, -7.8)).y,
+                on_screen(&list, Vec3::new(x, 0.0, -6.0)).y,
+            );
+            let around = (
+                on_screen(&list, Vec3::new(x - 4.0, 0.0, -7.0)).x,
+                on_screen(&list, Vec3::new(x + 4.0, 0.0, -7.0)).x,
+            );
+            let (mut sum, mut total) = (0.0, 0.0);
+            for y in rows.0.round() as usize..rows.1.round() as usize {
+                for column in around.0.round() as usize..around.1.round() as usize {
+                    let shade =
+                        f32::from(lit.saturating_sub(pixels[(y * SIZE as usize + column) * 4]));
+                    sum += column as f32 * shade;
+                    total += shade;
+                }
+            }
+            assert!(total > 0.0, "the plant at {x} casts a ray traced shadow");
+            sum / total
+        });
+        (list, columns, renderer.stats().ray_tracing)
+    };
+    let (list, still, stats) = shadow_columns(Vec3::ZERO);
+    assert_eq!((stats.bent, stats.instances), (0, 4), "{stats:?}");
+    let (_, swayed, stats) = shadow_columns(Vec3::new(40.0, 0.0, 0.0));
+    assert_eq!(
+        (stats.bent, stats.instances),
+        (3, 4),
+        "all three are bent, and still an item each: {stats:?}"
+    );
+    for ((x, still), swayed) in ACROSS.into_iter().zip(still).zip(swayed) {
+        let studs = (swayed - still) / pixels_per_stud(&list, Vec3::new(x, 0.0, -7.0));
+        assert!(
+            studs > 0.5,
+            "the shadow of the plant at {x} moved {studs} studs with it"
+        );
+    }
+}
+
+/// A plant whose sway is too slight to show at its distance isn't bent for
+/// rays: they see it at rest.
+#[test]
+fn a_plant_whose_sway_is_under_a_pixel_is_traced_at_rest() {
+    let Some((device, queue)) = ray_test_device() else {
+        eprintln!("skipped: no graphics adapter with ray queries on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    renderer.set_graphics(&crate::GraphicsSettings {
+        shadow_quality: Some(crate::ShadowQuality::Off),
+        ray_traced_shadows: Some(crate::RayTracedShadows::Low),
+        ..crate::GraphicsSettings::preset(crate::Quality::Ultra)
+    });
+    let gale = Vec3::new(40.0, 0.0, 0.0);
+    let mut bent_with = |strength: f32| {
+        let mut list = plant_and_its_shadow(true, gale);
+        list.items[1].sway.as_mut().unwrap().strength = strength;
+        renderer.render(&list).unwrap();
+        renderer.stats().ray_tracing.bent
+    };
+    // About 30 studs away, a stud is about 4.5 pixels: a full sway is 2.3
+    // studs, a hundredth of it a tenth of a pixel.
+    assert_eq!(bent_with(1.0), 1);
+    assert_eq!(bent_with(0.01), 0);
+    assert_eq!(bent_with(1.0), 1);
+}
+
 #[test]
 fn what_hangs_swings_at_its_foot_and_stays_where_it_hangs_from() {
     let Some((device, queue)) = test_device() else {

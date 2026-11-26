@@ -63,7 +63,15 @@ pub(super) struct Draw<'a> {
     /// False for the copy fading out of a switch: only the level coming in
     /// casts a shadow.
     pub(super) casts_shadow: bool,
+    /// Which of the frame's groups the item is in ([`Resolved::clusters`]),
+    /// or [`NO_CLUSTER`] for one of the list's own items.
+    pub(super) cluster: u32,
+    /// Its place among its group's items.
+    pub(super) at: u32,
 }
+
+/// [`Draw::cluster`] of an item in no group.
+pub(super) const NO_CLUSTER: u32 = u32::MAX;
 
 impl<'a> Draw<'a> {
     fn of(item: &'a DrawItem) -> Self {
@@ -73,6 +81,8 @@ impl<'a> Draw<'a> {
             level: None,
             fade: OPAQUE,
             casts_shadow: item.casts_shadow,
+            cluster: NO_CLUSTER,
+            at: 0,
         }
     }
 
@@ -152,7 +162,12 @@ pub(super) struct LodStates {
 
 /// What [`LodStates::resolve`] gives a frame.
 pub(super) struct Resolved<'a> {
+    /// The list's own items' draws first, then each kept group's
+    /// together, in [`Resolved::clusters`]' order.
     pub(super) draws: Vec<Draw<'a>>,
+    /// The groups whose items were checked one by one: what
+    /// [`Draw::cluster`] counts.
+    pub(super) clusters: Vec<&'a ItemChunk>,
     /// Items past their cull distance, which aren't drawn at all.
     pub(super) culled: u32,
     /// Every item the list holds, in its groups too.
@@ -220,11 +235,13 @@ impl LodStates {
                 in_kept += count;
             }
         }
+        let own_parts = parts.len();
         parts.extend(map_each(&kept, worth_sharing(in_kept), |chunk| {
             let chunk: &'a ItemChunk = chunk;
             let mut part = Part::default();
             part.draws.reserve(chunk.items.len());
-            for item in chunk.items.iter() {
+            for (at, item) in chunk.items.iter().enumerate() {
+                let drawn = part.draws.len();
                 if let Some(reach) = reach {
                     let (center, radius) = item.resting_ball();
                     let swayed = radius + item.sway.map_or(0.0, |sway| sway.reach());
@@ -234,15 +251,26 @@ impl LodStates {
                     }
                 }
                 resolve_item(states, item, camera, frame, forced, &mut part);
+                // One draw, or two while it changes its level of detail.
+                for draw in &mut part.draws[drawn..] {
+                    draw.at = at as u32;
+                }
             }
             part
         }));
         let mut resolved = Resolved {
             draws: Vec::with_capacity(parts.iter().map(|part| part.draws.len()).sum()),
+            clusters: kept,
             culled: groups_culled,
             submitted: groups_submitted,
         };
-        for part in parts {
+        for (index, mut part) in parts.into_iter().enumerate() {
+            // A group's part is its cluster: they come in the same order.
+            if let Some(cluster) = index.checked_sub(own_parts) {
+                for draw in &mut part.draws {
+                    draw.cluster = cluster as u32;
+                }
+            }
             resolved.draws.extend(part.draws);
             resolved.culled += part.culled;
             resolved.submitted += part.submitted;

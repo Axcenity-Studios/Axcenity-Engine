@@ -18,11 +18,16 @@ use crate::draw_list::{
 };
 use crate::graphics::{AmbientOcclusion, EffectiveGraphics, ShadowMapSize, ShadowQuality};
 
+use super::clusters::{BUILT_IN, Cluster};
 use super::culling::{Bounds, CullingBounds, Frustum, ShadowView, Sphere};
-use super::lod::{Draw, OPAQUE};
-use super::parallel::{map_each, map_indexes, map_parts, sort_unstable, worth_sharing};
+use super::gpu_timer::DrawnPart;
+use super::lod::{Draw, NO_CLUSTER, OPAQUE};
+use super::parallel::{
+    map_each, map_heavy_parts, map_indexes, map_parts, sort_unstable, worth_sharing,
+};
 use super::posing::PENDING;
 use super::skinning::JointRaw;
+use super::terrain::LastArrays;
 use super::{
     Batch, CASCADE_SPLIT_BLEND, CONTACT_SHADOW_LENGTH, CONTACT_SHADOW_THICKNESS, FAR_PLANE,
     FrameUniform, InstanceRaw, LIGHT_SCALE, LIGHTS_PER_TILE, LightRaw, MATERIAL_TEXTURES,
@@ -780,18 +785,30 @@ pub(super) struct FrameUses<'a> {
 }
 
 impl<'a> FrameUses<'a> {
-    /// Works out what `draws` use, on the CPU's threads.
-    pub(super) fn of(draws: &'a [Draw<'_>]) -> Self {
+    /// Works out what `draws` use. The list's own items' draws come first
+    /// and are shared among the CPU's threads; the draws of items in
+    /// groups follow them, and take their material from their group's
+    /// cluster (`clusters`, in [`Draw::cluster`]'s order), where it was
+    /// worked out once. Either way a material's place in
+    /// [`FrameUses::materials`] is where the draws first come to it.
+    pub(super) fn of(draws: &'a [Draw<'_>], clusters: &[&'a Cluster]) -> Self {
+        let own = draws.partition_point(|draw| draw.cluster == NO_CLUSTER);
+        let (own_draws, clustered) = draws.split_at(own);
         // A part's materials, each once, with the first draw of the part
         // to use it.
-        let parts = map_parts(draws, |draws| {
+        // A binding's key takes a few hundred nanoseconds to work out, so
+        // even the few hundred own items of a world that keeps its plants
+        // in groups are worth sharing (0.6 ms on one thread for Desert
+        // Homestead's 1,659).
+        let parts = map_heavy_parts(own_draws, (512, 128), |draws| {
             let mut distinct: Vec<(MaterialKey, u32)> = Vec::new();
             let mut indexes: FxHashMap<MaterialKey, u32> = FxHashMap::default();
             let mut material_of = Vec::with_capacity(draws.len());
             let mut seen_meshes: FxHashSet<*const ()> = FxHashSet::default();
             let mut meshes = Vec::new();
+            let mut last_arrays = LastArrays::default();
             for (at, draw) in draws.iter().enumerate() {
-                let key = material_key(draw.item);
+                let key = material_key_with(draw.item, &mut last_arrays);
                 let index = *indexes.entry(key).or_insert_with(|| {
                     distinct.push((key, at as u32));
                     (distinct.len() - 1) as u32
@@ -834,6 +851,62 @@ impl<'a> FrameUses<'a> {
                     .filter(|source| seen_meshes.insert(Arc::as_ptr(source).cast())),
             );
             start += len;
+        }
+        // Each cluster's materials are looked up in the frame's once, the
+        // first time a draw comes to one, and remembered here.
+        let first_of: Vec<usize> = clusters
+            .iter()
+            .scan(0, |next, cluster| {
+                let first = *next;
+                *next += cluster.materials.len();
+                Some(first)
+            })
+            .collect();
+        let known = clusters.iter().map(|c| c.materials.len()).sum();
+        let mut in_frame = vec![u32::MAX; known];
+        // Likewise each cluster's meshes: noted the first time a draw
+        // uses one, without reading the item.
+        let first_mesh_of: Vec<usize> = clusters
+            .iter()
+            .scan(0, |next, cluster| {
+                let first = *next;
+                *next += cluster.meshes.len();
+                Some(first)
+            })
+            .collect();
+        let mut mesh_noted = vec![false; clusters.iter().map(|c| c.meshes.len()).sum()];
+        for (at, draw) in clustered.iter().enumerate() {
+            let cluster = clusters[draw.cluster as usize];
+            let local = cluster.material_of[draw.at as usize] as usize;
+            let index = &mut in_frame[first_of[draw.cluster as usize] + local];
+            if *index == u32::MAX {
+                let key = cluster.materials[local];
+                *index = *indexes.entry(key).or_insert_with(|| {
+                    uses.materials.push(key);
+                    uses.first_draw.push((own + at) as u32);
+                    (uses.materials.len() - 1) as u32
+                });
+            }
+            uses.material_of.push(*index);
+            // A level of detail's mesh takes the item's own's place.
+            let source = match (draw.lod, cluster.mesh_of[draw.at as usize]) {
+                (Some(lod), _) => Some(lod),
+                (None, BUILT_IN) => None,
+                (None, local) => {
+                    let noted =
+                        &mut mesh_noted[first_mesh_of[draw.cluster as usize] + local as usize];
+                    if std::mem::replace(noted, true) {
+                        None
+                    } else {
+                        Some(&cluster.meshes[local as usize])
+                    }
+                }
+            };
+            if let Some(source) = source
+                && seen_meshes.insert(Arc::as_ptr(source).cast())
+            {
+                uses.meshes.push(source);
+            }
         }
         uses
     }
@@ -916,6 +989,7 @@ pub(super) fn plan_draws(
         let draw = &draws[index];
         let key = SortKey {
             band: distance_band(draw.item.transform.w_axis.truncate(), list.camera.position),
+            part: drawn_part(draw.item),
             mesh: draw.mesh(),
             material: uses.material_of[index],
             shader: shader_key(draw.item),
@@ -1124,6 +1198,7 @@ fn plan_part<'a>(
                                 && !water
                                 && key.shader.is_none()
                                 && item.material.terrain.is_none(),
+                            part: key.part,
                             instances: index..index + 1,
                         },
                     ));
@@ -1217,6 +1292,11 @@ struct SortKey {
     /// Drawn nearest first: what's hidden behind near items never reaches
     /// the (costly) surface shader. Equal distances batch together.
     band: u8,
+    /// Within a band: items, then what's scattered over the terrain, then
+    /// the terrain under them all, whose surface costs the most. It also
+    /// keeps each kind's draws together, so the GPU's time can be taken by
+    /// what is drawn with a stamp where the kind changes.
+    part: DrawnPart,
     mesh: MeshKey,
     /// Its material's index among the frame's distinct material keys.
     material: u32,
@@ -1226,6 +1306,18 @@ struct SortKey {
     casts_shadow: bool,
     /// Whether it has holes by its texture's alpha.
     cut_out: bool,
+}
+
+/// What `item` is, for the order solid items are drawn in and the GPU's
+/// time by what is drawn.
+fn drawn_part(item: &DrawItem) -> DrawnPart {
+    if item.material.terrain.is_some() {
+        DrawnPart::Terrain
+    } else if item.cull_distance > 0.0 {
+        DrawnPart::Scattered
+    } else {
+        DrawnPart::Items
+    }
 }
 
 /// Which distance band a point `from` the camera is in, the nearer the
@@ -1521,10 +1613,17 @@ fn outline_uniform(material: &Material) -> [f32; 4] {
 }
 
 /// The material binding an item is drawn with (see [`MaterialKey`]).
+#[cfg(test)]
 pub(super) fn material_key(item: &DrawItem) -> MaterialKey {
+    material_key_with(item, &mut LastArrays::default())
+}
+
+/// [`material_key`] for one item after another: a terrain chunk's key
+/// reuses what `last` kept of the chunk before it (`terrain::LastArrays`).
+pub(super) fn material_key_with(item: &DrawItem, last: &mut LastArrays) -> MaterialKey {
     if let Some(surface) = &item.material.terrain {
         return MaterialKey {
-            terrain: super::terrain::terrain_key(surface),
+            terrain: super::terrain::terrain_key_with(surface, last),
             ..MaterialKey::default()
         };
     }
@@ -1660,6 +1759,7 @@ pub(super) fn uv_matrix(material: &Material) -> [f32; 4] {
 }
 
 /// The GPU data for one item, or `None` if it can't be seen.
+#[cfg(test)]
 pub(super) fn instance_raw(item: &DrawItem) -> Option<InstanceRaw> {
     instance_raw_with(item, &mut LinearColors::default())
 }
@@ -1688,11 +1788,11 @@ impl LinearColors {
 
 /// [`instance_raw`], converting colors through `colors`.
 pub(super) fn instance_raw_with(item: &DrawItem, colors: &mut LinearColors) -> Option<InstanceRaw> {
-    let model3 = Mat3::from_mat4(item.transform);
-    // A shape squashed flat (size 0 on some axis) has no inverse, and can't be seen anyway.
-    if model3.determinant().abs() < 1e-12 {
+    // A shape squashed flat has no inverse, and can't be seen anyway.
+    if is_flat(item) {
         return None;
     }
+    let model3 = Mat3::from_mat4(item.transform);
     let material = &item.material;
     let base_color = LinearColors::convert(&mut colors.base, material.base_color);
     let emissive = LinearColors::convert(&mut colors.emissive, material.emissive);
@@ -1708,28 +1808,37 @@ pub(super) fn instance_raw_with(item: &DrawItem, colors: &mut LinearColors) -> O
             item.uv_tile,
         ],
         skin: [0, 0],
-        sway: {
-            let mut sway = match item.sway {
-                Some(sway) if !sway.is_still() => {
-                    // The flutter rides in the fraction of the decal role.
-                    [
-                        sway.base,
-                        1.0 / sway.height,
-                        sway.strength,
-                        sway.flutter.clamp(0.0, 0.95),
-                    ]
-                }
-                _ => [0.0; 4],
-            };
-            // `ROLE_CHARACTER` and `ROLE_DECAL` in shader.wgsl.
-            sway[3] += match item.decal_role {
-                DecalRole::Surface => 0.0,
-                DecalRole::Character => 1.0,
-                DecalRole::Decal => 2.0,
-            };
-            sway
-        },
+        sway: instance_sway(item),
     })
+}
+
+/// [`InstanceRaw::sway`] of `item`: how it sways, and its decal role.
+pub(super) fn instance_sway(item: &DrawItem) -> [f32; 4] {
+    let mut sway = match item.sway {
+        Some(sway) if !sway.is_still() => {
+            // The flutter rides in the fraction of the decal role.
+            [
+                sway.base,
+                1.0 / sway.height,
+                sway.strength,
+                sway.flutter.clamp(0.0, 0.95),
+            ]
+        }
+        _ => [0.0; 4],
+    };
+    // `ROLE_CHARACTER` and `ROLE_DECAL` in shader.wgsl.
+    sway[3] += match item.decal_role {
+        DecalRole::Surface => 0.0,
+        DecalRole::Character => 1.0,
+        DecalRole::Decal => 2.0,
+    };
+    sway
+}
+
+/// Whether `item` is squashed flat (size 0 on some axis): such a shape
+/// has no instance ([`instance_raw_with`]) and can't be seen.
+pub(super) fn is_flat(item: &DrawItem) -> bool {
+    Mat3::from_mat4(item.transform).determinant().abs() < 1e-12
 }
 
 /// Converts an sRGB color (as people pick it) to linear light (what shading

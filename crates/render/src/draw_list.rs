@@ -2009,6 +2009,13 @@ impl Sway {
         }
     }
 
+    /// The farthest a corner moves from where it rests, in studs, in a
+    /// level wind of `speed` studs a second: its lean and its flutter both
+    /// grow with the wind as `swayed` in shader.wgsl has them.
+    pub fn reach_in(&self, speed: f32) -> f32 {
+        self.reach() * (1.0 - (-speed.max(0.0) / SWAY_WIND).exp())
+    }
+
     /// Whether the item doesn't move at all.
     pub fn is_still(&self) -> bool {
         !(self.strength > 0.0 && self.height.abs() > 0.0 && self.base.is_finite())
@@ -2020,6 +2027,9 @@ impl Sway {
 /// shader.wgsl: its lean (at most `SWAY_LEAN`) times its gusts and flutter
 /// (at most 1.2 + 0.15).
 const SWAY_REACH: f32 = 0.25 * 1.35;
+/// The wind speed, in studs a second, at which a plant leans about two
+/// thirds of the most it can. Matches `SWAY_WIND` in sway.wgsl.
+const SWAY_WIND: f32 = 20.0;
 /// The farthest a corner shivers per stud of [`Sway::flutter`]. Matches
 /// `swayed` in shader.wgsl: two waves of at most 1 on each level axis and
 /// 0.6 of one upward, about 1.2 together.

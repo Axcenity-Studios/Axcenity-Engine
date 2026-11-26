@@ -1589,6 +1589,10 @@ impl Viewport {
         // What the camera turned away from stays on the GPU while it fits
         // the budgets: turning back shows it at once, not a few frames on.
         target.renderer.set_keep_undrawn(true);
+        // Its frames are shown: never more than one waiting behind the
+        // one the GPU draws, however early the next frame starts
+        // (`EditorApp::pace_display`).
+        target.renderer.set_one_frame_ahead(true);
         let render_started = Instant::now();
         // Blueprint textures are for building by: the game never shows them.
         assets.set_blueprint(
@@ -1653,10 +1657,12 @@ impl Viewport {
             ));
         }
         let shader_errors = target.renderer.take_shader_errors();
+        let stats = target.renderer.stats();
         let render = RenderCost {
-            cpu: render_started.elapsed(),
+            // Work, not the wait for an earlier frame on the GPU.
+            cpu: render_started.elapsed().saturating_sub(stats.gpu_wait),
             lights: draw_list.lights.len(),
-            stats: target.renderer.stats(),
+            stats,
         };
         let whole_texture = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
         ui.painter()
@@ -2086,7 +2092,43 @@ fn moving_parts(drag: Option<&Dragging>, world: &World) -> Vec<(u64, Vec3, Mat4)
 }
 
 fn start_camera() -> FlyCamera {
-    FlyCamera::looking_at(START_CAMERA_POSITION, Vec3::ZERO)
+    // `AXCENITY_START_CAMERA=x,y,z,x,y,z` (where from, then looking at
+    // where) starts a timed run from a chosen view (`docs/benchmarks.md`).
+    let asked = std::env::var("AXCENITY_START_CAMERA").ok();
+    match asked.as_deref().and_then(camera_from) {
+        Some((position, target)) => FlyCamera::looking_at(position, target),
+        None => FlyCamera::looking_at(START_CAMERA_POSITION, Vec3::ZERO),
+    }
+}
+
+/// A camera's place and what it looks at, from `x,y,z,x,y,z`.
+fn camera_from(text: &str) -> Option<(Vec3, Vec3)> {
+    let numbers: Vec<f32> = text
+        .split(',')
+        .map(|number| number.trim().parse().ok())
+        .collect::<Option<_>>()?;
+    let [px, py, pz, tx, ty, tz] = numbers[..] else {
+        return None;
+    };
+    let (position, target) = (Vec3::new(px, py, pz), Vec3::new(tx, ty, tz));
+    (position.is_finite() && target.is_finite() && position != target).then_some((position, target))
+}
+
+#[cfg(test)]
+mod start_camera_tests {
+    use super::*;
+
+    #[test]
+    fn a_start_camera_is_six_numbers_from_and_toward() {
+        assert_eq!(
+            camera_from("-20, 4.14,64.5,-19.37,4.08,63.73"),
+            Some((Vec3::new(-20.0, 4.14, 64.5), Vec3::new(-19.37, 4.08, 63.73)))
+        );
+        assert_eq!(camera_from("1,2,3"), None);
+        assert_eq!(camera_from("1,2,3,4,5,six"), None);
+        assert_eq!(camera_from("1,2,3,1,2,3"), None, "looking nowhere");
+        assert_eq!(camera_from("1,2,3,4,5,nan"), None);
+    }
 }
 
 /// Where a newly opened project's camera starts, as the renderer takes it.

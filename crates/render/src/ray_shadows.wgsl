@@ -158,7 +158,9 @@ fn pack_soft(visible: f32, blocker: f32) -> u32 {
 // three, by where it was hit, through the material's own scale, turn and
 // offset), and the alpha at them against the cutoff.
 fn cut_out_covers(hit: RayIntersection) -> bool {
-    let cut = cut_outs[hit.instance_custom_data];
+    // The item hit: its instance's first slot plus the geometry hit (swaying
+    // plants bent by the wind share an instance, renderer/ray_tracing.rs).
+    let cut = cut_outs[hit.instance_custom_data + hit.geometry_index];
     if cut.mesh.y == 0u {
         return true;
     }
@@ -171,21 +173,53 @@ fn cut_out_covers(hit: RayIntersection) -> bool {
     return alpha >= bitcast<f32>(cut.mesh.z);
 }
 
-// How far along the ray from `origin` an item of `mask` blocks it, from
-// `near` on, or 0 for nothing. Cut-outs' triangles come as candidates
-// (their BLAS isn't opaque) and block only where they aren't cut out.
-fn first_hit(origin: vec3<f32>, direction: vec3<f32>, mask: u32, near: f32, far: f32) -> f32 {
-    if far <= near {
-        return 0.0;
+// One ray from `origin` along `direction` (normalized), up to `far`:
+// whether a solid item blocks it, or a cut-out further off than
+// `cut_out_near_here` where its texture isn't cut out. x: how far along
+// the ray what the query found is (0 for nothing), y: 1 if that is a
+// cut-out.
+//
+// One query finds both kinds. A solid item's triangles are committed as
+// they come (its BLAS is opaque) and end the query; a cut-out's come as
+// candidates (its BLAS isn't) and are confirmed here. Until 2026-11-25
+// this was two queries a ray, the solid items' and then the cut-outs',
+// so every ray that reached the sun walked the scene twice.
+fn first_blocker(origin: vec3<f32>, direction: vec3<f32>, far: f32) -> vec2<f32> {
+    if far <= 0.0 {
+        return vec2<f32>(0.0);
     }
     var query: ray_query;
     rayQueryInitialize(&query, scene, RayDesc(
-        RAY_FLAG_TERMINATE_ON_FIRST_HIT, mask, near, far, origin, direction));
+        RAY_FLAG_TERMINATE_ON_FIRST_HIT, MASK_SOLID | MASK_CUT_OUT, 0.0, far, origin, direction));
+    var cut_out = 0.0;
     while rayQueryProceed(&query) {
         let candidate = rayQueryGetCandidateIntersection(&query);
-        if candidate.kind == RAY_QUERY_INTERSECTION_TRIANGLE && cut_out_covers(candidate) {
+        if candidate.kind == RAY_QUERY_INTERSECTION_TRIANGLE && candidate.t > cut_out_near_here
+            && cut_out_covers(candidate) {
             rayQueryConfirmIntersection(&query);
+            cut_out = 1.0;
         }
+    }
+    let hit = rayQueryGetCommittedIntersection(&query);
+    if hit.kind == RAY_QUERY_INTERSECTION_NONE {
+        return vec2<f32>(0.0);
+    }
+    return vec2<f32>(max(hit.t, 1e-3), cut_out);
+}
+
+// Whether anything blocks the ray from `origin` along `direction`
+// (normalized) within `far`.
+fn is_blocked(origin: vec3<f32>, direction: vec3<f32>, far: f32) -> bool {
+    return first_blocker(origin, direction, far).x > 0.0;
+}
+
+// How far along the ray from `origin` a solid item blocks it within
+// `far`, or 0 for none.
+fn solid_blocker(origin: vec3<f32>, direction: vec3<f32>, far: f32) -> f32 {
+    var query: ray_query;
+    rayQueryInitialize(&query, scene, RayDesc(
+        RAY_FLAG_TERMINATE_ON_FIRST_HIT, MASK_SOLID, 0.0, far, origin, direction));
+    while rayQueryProceed(&query) {
     }
     let hit = rayQueryGetCommittedIntersection(&query);
     if hit.kind == RAY_QUERY_INTERSECTION_NONE {
@@ -205,19 +239,18 @@ fn cut_out_near(origin: vec3<f32>, on_cut_out: bool) -> f32 {
     return min(CUT_OUT_NEAR_CLOSE + distance * CUT_OUT_NEAR_PER_STUD, CUT_OUT_NEAR);
 }
 
-// One ray from `origin` along `direction` (normalized), up to `far`: how
-// far to what blocks it, or 0.
-fn blocked_within(origin: vec3<f32>, direction: vec3<f32>, far: f32) -> f32 {
-    let solid = first_hit(origin, direction, MASK_SOLID, 0.0, far);
-    if solid > 0.0 {
-        return solid;
+// One ray toward the sun: how far to what blocks it, or 0, for a soft
+// shadow's edge (`blur_radius`). Where a solid item and a cut-out both
+// block the ray it is the solid item's distance, whichever the query met
+// first, so a second query asks for it only on rays a cut-out blocked.
+fn blocker_distance(origin: vec3<f32>, direction: vec3<f32>) -> f32 {
+    let far = rays.camera.w * 2.0;
+    let found = first_blocker(origin, direction, far);
+    if found.y == 0.0 {
+        return found.x;
     }
-    return first_hit(origin, direction, MASK_CUT_OUT, cut_out_near_here, far);
-}
-
-// One ray toward the sun: how far to what blocks it, or 0.
-fn blocked_at(origin: vec3<f32>, direction: vec3<f32>) -> f32 {
-    return blocked_within(origin, direction, rays.camera.w * 2.0);
+    let solid = solid_blocker(origin, direction, far);
+    return select(found.x, solid, solid > 0.0);
 }
 
 // How much of `light` reaches the surface at `point` (facing `normal`): 1
@@ -275,7 +308,7 @@ fn lamp_lit(light: Light, point: vec3<f32>, normal: vec3<f32>, distance: f32, tu
             continue;
         }
         let direction = toward / length_to;
-        if blocked_within(origin, direction, length_to - start) == 0.0 {
+        if !is_blocked(origin, direction, length_to - start) {
             lit += 1.0;
         }
     }
@@ -333,7 +366,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     // Off the surface, by more the further away it is as depth gets coarser.
     let origin = point.xyz + normal * (0.02 + distance * 0.002);
     if !soft {
-        let lit = select(0.0, 1.0, blocked_at(origin, sun) == 0.0);
+        let lit = select(0.0, 1.0, !is_blocked(origin, sun, rays.camera.w * 2.0));
         destination[index] = pack_mask(distance, lit);
         return;
     }
@@ -355,7 +388,7 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         let angle = turn + f32(i) * 2.3999632;
         let offset = sqrt(k) * radius * vec2<f32>(cos(angle), sin(angle));
         let direction = normalize(sun + right * offset.x + forward * offset.y);
-        let t = blocked_at(origin, direction);
+        let t = blocker_distance(origin, direction);
         if t == 0.0 {
             lit += 1.0;
         } else {
@@ -535,7 +568,7 @@ fn cs_air(@builtin(global_invocation_id) id: vec3<u32>) {
         let uv = (vec2<f32>(id.xy) + point.xy) / vec2<f32>(AIR_GRID.xy);
         let position = rays.camera.xyz + air_view_ray(uv) * mix(near, far, point.z);
         cut_out_near_here = cut_out_near(position, false);
-        if blocked_at(position, sun) == 0.0 {
+        if !is_blocked(position, sun, rays.camera.w * 2.0) {
             lit += 1.0;
         }
     }

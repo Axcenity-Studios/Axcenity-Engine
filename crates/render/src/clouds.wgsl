@@ -19,11 +19,13 @@ struct Clouds {
     shape: vec4<f32>,
     // rgb: the clouds' own color, w: 1 while they're drawn.
     color: vec4<f32>,
-    // xy: how far the wind has carried them along x and z, in studs.
+    // xy: how far the wind has carried them along x and z, in studs. zw:
+    // the middle of the traced clouds' texture of `cloud_sum`, in studs
+    // from where the wind has carried them.
     offset: vec4<f32>,
     // x: steps through the layer (0 for a flat sheet), y: steps from each
     // toward the sun (0 to judge it by the cloud above), z: 1 for fine
-    // detail.
+    // detail, w: 1 while the sky pass reads them traced (cloud_trace.wgsl).
     quality: vec4<f32>,
 }
 
@@ -90,13 +92,19 @@ const CLOUD_STRETCH: f32 = 1.25;
 // thicker middle, and full cover still has thin places in it.
 const CLOUD_EDGE: f32 = 0.42;
 
-// How much cloud there is above the level point `xz`: nothing at 0 and
-// below, filling the layer at 1, and above 1 more than fills it (the heavy
-// middle of an overcast, `cloud_belly`). Five octaves of noise, each turned
-// so their grids don't line up, the finer ones ridged into strands, cut at
-// a level set by the cover.
-fn cloud_fill(clouds: Clouds, xz: vec2<f32>) -> f32 {
-    let at = (xz - clouds.offset.xy) / CLOUD_SCALE;
+// How wide the square of `cloud_sum` the traced clouds keep in a texture
+// is, in studs (`FILL_SPAN` in renderer/cloud_trace.rs): the furthest a
+// ray is marched (`CLOUD_FAR` and `CLOUD_MARCH`) and its steps toward the
+// sun, with room to move before it's made again.
+const CLOUD_FILL_SPAN: f32 = 52428.8;
+
+// The clouds' shapes at `at` (a level point in the clouds' own sizes,
+// carried with them by the wind), mostly between 0.25 and 0.8: five
+// octaves of noise, each turned so their grids don't line up, the finer
+// ones ridged into strands. `cloud_fill` cuts it at a level set by the
+// cover. It is `cloud_fill`'s whole cost and depends on nothing but the
+// place, so the traced clouds read it from a texture.
+fn cloud_sum(at: vec2<f32>) -> f32 {
     // Drawn out one way.
     var p = vec2<f32>(0.8 * at.x + 0.6 * at.y, (0.8 * at.y - 0.6 * at.x) * CLOUD_STRETCH);
     // Pulled about by a slower noise, so no edge runs straight or round.
@@ -116,12 +124,23 @@ fn cloud_fill(clouds: Clouds, xz: vec2<f32>) -> f32 {
         p = turn * p * 2.13 + vec2<f32>(17.1, 3.7);
         amplitude *= 0.5;
     }
+    return sum / 0.96875;
+}
+
+// How much cloud there is where the shapes stand at `sum` (`cloud_sum`):
+// nothing at 0 and below, filling the layer at 1, and above 1 more than
+// fills it (the heavy middle of an overcast, `cloud_belly`).
+fn cloud_cut(clouds: Clouds, sum: f32) -> f32 {
     // The noise mostly lies between 0.25 and 0.8: no cover cuts above all
     // of it, full cover below (and then the thin places are thin cloud,
     // not holes).
     let cut = 0.86 - 0.95 * clouds.shape.x;
-    return (sum / 0.96875 - cut) / CLOUD_EDGE;
+    return (sum - cut) / CLOUD_EDGE;
 }
+
+// `cloud_fill(clouds, xz)`, how much cloud there is above the level point
+// `xz`, is `cloud_cut` of `cloud_sum` there: worked out in cloud_fill.wgsl,
+// read from a texture in cloud_trace.wgsl.
 
 // How thick the cloud `fill` makes is, from 0 (clear sky) to 1 (filling
 // the layer): mostly veil, thickening late.
@@ -280,8 +299,27 @@ fn clouded_sky(
     sky_around: vec3<f32>,
     jitter: f32,
 ) -> vec3<f32> {
+    let layer = cloud_layer(clouds, eye, dir, toward_sun, sun, sky_above, sky_around, jitter);
+    return sky * layer.a + layer.rgb;
+}
+
+// `clouded_sky` without the sky behind: the light the clouds add (rgb) and
+// the share of the sky behind them that shows through (a), so the sky is
+// `sky * a + rgb`. The traced clouds keep this, at half the frame's size,
+// and the sky pass lays it over its own sky.
+fn cloud_layer(
+    clouds: Clouds,
+    eye: vec3<f32>,
+    dir: vec3<f32>,
+    toward_sun: vec3<f32>,
+    sun: vec3<f32>,
+    sky_above: vec3<f32>,
+    sky_around: vec3<f32>,
+    jitter: f32,
+) -> vec4<f32> {
+    let clear = vec4<f32>(0.0, 0.0, 0.0, 1.0);
     if clouds.color.w == 0.0 {
-        return sky;
+        return clear;
     }
     let bottom = clouds.shape.z;
     let top = clouds.shape.w;
@@ -295,7 +333,7 @@ fn clouded_sky(
         let height = bottom + 0.25 * thickness;
         let t = (height - eye.y) / dir.y;
         if abs(dir.y) < 1e-4 || t <= 0.0 || t >= CLOUD_FAR {
-            return sky;
+            return clear;
         }
         let p = eye + dir * t;
         let fill = cloud_fill(clouds, p.xz);
@@ -305,7 +343,7 @@ fn clouded_sky(
         let through_sun = cloud_light_through(clouds.shape.y * cover * cover * thickness / max(toward_sun.y, 0.25));
         let light = color * (sun * phase * through_sun
             + mix(sky_around, sky_above, 0.5) * 0.75 * cloud_belly(fill));
-        return mix(sky, light, alpha);
+        return vec4<f32>(light * alpha, 1.0 - alpha);
     }
 
     // Where the ray is inside the layer.
@@ -313,7 +351,7 @@ fn clouded_sky(
     var far = 0.0;
     if abs(dir.y) < 1e-4 {
         if eye.y <= bottom || eye.y >= top {
-            return sky;
+            return clear;
         }
         far = CLOUD_FAR;
     } else {
@@ -324,7 +362,7 @@ fn clouded_sky(
     }
     far = min(far, near + CLOUD_MARCH);
     if far <= near {
-        return sky;
+        return clear;
     }
     let step = (far - near) / f32(steps);
     let light_steps = u32(clouds.quality.y);
@@ -352,5 +390,5 @@ fn clouded_sky(
     }
     // Far clouds fade into the sky behind them.
     let fade = 1.0 - smoothstep(0.25 * CLOUD_FAR, CLOUD_FAR, near);
-    return sky * mix(1.0, through, fade) + light * fade;
+    return vec4<f32>(light * fade, mix(1.0, through, fade));
 }

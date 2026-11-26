@@ -79,3 +79,4 @@ These can't be made identical and are reported next to the numbers:
 - `collect.py`: turns logs from every engine into one results table.
 - `run-all.ps1`: runs Axcenity, Godot, Unity and s&box three times each, pinned to CPUs 0-15, writes `logs/<engine>-<n>.log` and prints `collect.py`'s table (`-Runs 1` for a quick check; each engine's game must be built first, see the script's header). `Desktop\xb10k-run\run-all.cmd` on Paul's PC calls it.
 - `godot/`, `unity/`, `unreal/`, `sbox/`, `roblox/`: each engine's project or scripts, and how to run it.
+- `homestead/`: another comparison, of the renderers alone: the Desert Homestead scene rebuilt in Unity HDRP from what Axcenity draws, and both timed at the same views ([its README](homestead/README.md), [results](homestead/results.md)).

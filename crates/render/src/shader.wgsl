@@ -1085,6 +1085,12 @@ fn fs_motion(in: MotionOut) -> @location(0) vec4<f32> {
     return vec4<f32>((now - before) * vec2<f32>(0.5, -0.5), 0.0, 0.0);
 }
 
+// The sky's clouds as the traced clouds' passes left them, a texel for each
+// of the frame's pixels (rgb: the light they add, a: the share of the sky
+// behind that shows, or below 0 where they weren't traced), read only by
+// the sky pass (renderer/cloud_trace.rs).
+@group(2) @binding(0) var traced_clouds: texture_2d<f32>;
+
 // A full-screen triangle at the far plane, for drawing the sky.
 struct SkyOut {
     @builtin(position) clip_position: vec4<f32>,
@@ -1109,9 +1115,20 @@ fn fs_sky(in: SkyOut) -> @location(0) vec4<f32> {
     let spread = length(fwidth(dir));
     var sky = sky_radiance(dir, spread);
     if frame.clouds.color.w != 0.0 {
-        sky = clouded_sky(frame.clouds, frame.camera_position.xyz, dir, sky, frame.sun_direction.xyz,
-            frame.sun_radiance.rgb, frame.sky_top.rgb, frame.sky_horizon.rgb,
-            pixel_noise(in.clip_position.xy));
+        // Traced in passes of their own (renderer/cloud_trace.rs), which
+        // leave this pixel's clouds in a texture: unless it was left out
+        // there (an alpha below 0: a pixel the prepass covered and this
+        // pass didn't), and then they're worked out here as without tracing.
+        var layer = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+        if frame.clouds.quality.w != 0.0 {
+            layer = textureLoad(traced_clouds, vec2<i32>(in.clip_position.xy), 0);
+        }
+        if layer.a < 0.0 {
+            layer = cloud_layer(frame.clouds, frame.camera_position.xyz, dir, frame.sun_direction.xyz,
+                frame.sun_radiance.rgb, frame.sky_top.rgb, frame.sky_horizon.rgb,
+                pixel_noise(in.clip_position.xy));
+        }
+        sky = sky * layer.a + layer.rgb;
         sky += lightning_sky(frame.camera_position.xyz, dir);
     }
     return vec4<f32>(fogged_along(frame.fog, frame.camera_position.xyz, dir, FOG_SKY_DISTANCE, sky), 1.0);

@@ -96,6 +96,7 @@ const DEBUG_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),

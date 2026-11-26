@@ -154,7 +154,9 @@ fn wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
         let mut descriptor = base(adapter);
         // Cooked textures go up as BC7 where the GPU reads it.
         descriptor.required_features |= adapter.features()
-            & (wgpu::Features::TIMESTAMP_QUERY | wgpu::Features::TEXTURE_COMPRESSION_BC);
+            & (wgpu::Features::TIMESTAMP_QUERY
+                | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES
+                | wgpu::Features::TEXTURE_COMPRESSION_BC);
         // Hardware ray tracing, if Settings > Graphics turned it on and the
         // GPU has it (`axcenity_render::adapters::with_ray_queries`).
         axcenity_render::adapters::want_ray_tracing(app::settings::saved_ray_tracing());

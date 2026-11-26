@@ -14,6 +14,7 @@ fn gi_trace(origin: vec3<f32>, direction: vec3<f32>, t_max: f32, mask: u32, any_
     let flags = select(0u, RAY_FLAG_TERMINATE_ON_FIRST_HIT, any_hit);
     let t_min = select(0.0, 0.02, any_hit);
     let hit = trace_through_holes(RayDesc(flags, mask, t_min, t_max, origin, direction));
-    return GiHit(hit.kind != RAY_QUERY_INTERSECTION_NONE, hit.t, hit.instance_custom_data,
-        hit.front_face, -direction);
+    // The item hit: its instance's first slot plus the geometry hit.
+    return GiHit(hit.kind != RAY_QUERY_INTERSECTION_NONE, hit.t,
+        hit.instance_custom_data + hit.geometry_index, hit.front_face, -direction);
 }

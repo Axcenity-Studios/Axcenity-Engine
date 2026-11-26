@@ -283,20 +283,21 @@ impl PathTracer {
             self.traced = None;
         }
 
-        // Each slot's normals, copied for meshes new to the view.
-        let mut first_triangles = Vec::with_capacity(rays.slot_count());
-        for key in rays.slot_meshes() {
+        // Each slot's normals, copied for meshes new to the view, and how
+        // its item turns them.
+        let mut slots = Vec::with_capacity(rays.slot_count());
+        for (key, transform) in rays.slots() {
             let first = mesh(key).map_or(NO_NORMALS, |gpu| {
                 self.normals.add_mesh(device, encoder, key, gpu)
             });
-            first_triangles.push(first);
+            slots.push(slot_raw(transform, first));
         }
-        if first_triangles.len() > self.slot_capacity {
-            self.slot_capacity = first_triangles.len().next_power_of_two();
+        if slots.len() > self.slot_capacity {
+            self.slot_capacity = slots.len().next_power_of_two();
             self.slots = slot_buffer(device, self.slot_capacity);
         }
-        if !first_triangles.is_empty() {
-            queue.write_buffer(&self.slots, 0, bytemuck::cast_slice(&first_triangles));
+        if !slots.is_empty() {
+            queue.write_buffer(&self.slots, 0, bytemuck::cast_slice(&slots));
         }
 
         let now = Traced {
@@ -538,10 +539,34 @@ fn normal_buffer(device: &wgpu::Device, triangles: u32) -> wgpu::Buffer {
     })
 }
 
+/// A slot's item for the path tracer. Must match `PtSlot` in
+/// path_tracer.wgsl: the three columns of its world-to-object matrix as
+/// bits (which turn its mesh's normals into the world, dotted with them),
+/// with its mesh's first triangle among the copied normals after the first.
+type SlotRaw = [[u32; 4]; 3];
+
+/// The [`SlotRaw`] of an item at `transform` (the rows of its 3 by 4
+/// object-to-world matrix, as a TLAS instance takes it) whose mesh's
+/// normals start at triangle `first`.
+fn slot_raw(transform: [f32; 12], first: u32) -> SlotRaw {
+    let [a, b, c] = [0, 4, 8]
+        .map(|row| glam::Vec3::new(transform[row], transform[row + 1], transform[row + 2]));
+    let to_object = glam::Mat3::from_cols(a, b, c).transpose().inverse();
+    let column = |column: glam::Vec3, last: u32| {
+        let [x, y, z] = column.to_array().map(f32::to_bits);
+        [x, y, z, last]
+    };
+    [
+        column(to_object.x_axis, first),
+        column(to_object.y_axis, 0),
+        column(to_object.z_axis, 0),
+    ]
+}
+
 fn slot_buffer(device: &wgpu::Device, slots: usize) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("path traced slots"),
-        size: (slots * 4) as u64,
+        size: (slots * size_of::<SlotRaw>()) as u64,
         usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     })

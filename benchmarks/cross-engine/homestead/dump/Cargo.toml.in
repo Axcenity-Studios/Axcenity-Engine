@@ -1,0 +1,41 @@
+# Writes what the engine draws of a project (meshes with their levels of
+# detail, textures, materials, every item's place, the lights, and a
+# sequence's camera frame by frame) for another engine to rebuild.
+# dump.sh writes Cargo.toml from this into its build folder, with @ENGINE@
+# as the engine's folder, and copies the engine's Cargo.lock and
+# rust-toolchain.toml beside it.
+[package]
+name = "homestead-dump"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "homestead-dump"
+path = "@SOURCE@/main.rs"
+
+# Its own workspace, so the engine's workspace leaves it alone.
+[workspace]
+
+[dependencies]
+axcenity-render = { path = "@ENGINE@/crates/render" }
+axcenity-scene = { path = "@ENGINE@/crates/scene" }
+axcenity-project = { path = "@ENGINE@/crates/project" }
+axcenity-assets = { path = "@ENGINE@/crates/assets" }
+axcenity-anim = { path = "@ENGINE@/crates/anim" }
+axcenity-core = { path = "@ENGINE@/crates/core" }
+anyhow = "1"
+png = "0.18"
+serde_json = "1"
+
+# The engine patches rapier3d; a patch only applies from the workspace it is in.
+[patch.crates-io]
+rapier3d = { path = "@ENGINE@/vendor/rapier3d" }
+
+[profile.dev]
+opt-level = 2
+debug = false
+
+[profile.dev.package."*"]
+opt-level = 3
+debug = false

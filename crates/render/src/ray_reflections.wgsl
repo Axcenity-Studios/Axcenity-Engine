@@ -135,7 +135,8 @@ fn cs_trace_reflections(@builtin(global_invocation_id) id: vec3<u32>) {
     if hit.kind == RAY_QUERY_INTERSECTION_NONE {
         return;
     }
-    let surface = 2u * hit.instance_custom_data;
+    // The item hit: its instance's first slot plus the geometry hit.
+    let surface = 2u * (hit.instance_custom_data + hit.geometry_index);
     let color = reflection_surfaces[surface];
     // Inside something solid: leave it to the probes.
     if !hit.front_face && color.w < 0.5 {

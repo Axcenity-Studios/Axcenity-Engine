@@ -31,7 +31,8 @@ flowchart TB
     PRE --> AO[SSAO / contact shadows]
     AO --> VF[Volumetric fog froxels]
     VF --> GP[GPU particles compute]
-    GP --> SC["Scene: solids (cut-out depth fill),<br/>sky, terrain, water, see-through, outlines, decals, sprites"]
+    GP --> CL["Clouds: the sky's, traced at half size,<br/>then pixel by pixel where texels disagree"]
+    CL --> SC["Scene: solids (cut-out depth fill),<br/>sky, terrain, water, see-through, outlines, decals, sprites"]
     SC --> TMP[Motion vectors, TAA, motion blur]
     TMP --> DOF[Depth of field]
     DOF --> POST[Bloom, tone map, grading, lens, FXAA]
@@ -65,9 +66,15 @@ flowchart TB
 | `renderer/gpu.rs`, `uploads.rs`, `texture_budget.rs` | Uploads (CPU mips for RGBA), background uploads, budget |
 | `renderer/occlusion.rs`, `post.rs`, `temporal.rs`, `lens.rs`, `grading.rs`, `sun_rays.rs` | Prepass and SSAO, post, TAA, depth of field, grading, screen-space sun rays (`SunRaysEffect`) |
 | `renderer/gpu_timer.rs` | Per-pass GPU time (`FramePass`) |
+| `renderer/cloud_trace.rs`, `cloud_trace.wgsl` | The sky's clouds traced before the scene pass (2026-11-26): their shapes from a texture round the camera, half size where sky shows, then each pixel, worked out afresh where the half-size texels disagree; the sky pass reads the result (`docs/rendering/clouds.md`) |
 | `renderer/ray_ao.rs`, `ray_ao.wgsl` | Ray traced ambient occlusion (RT3): a half-size fragment pass blended into ambient occlusion's raw target before its blur |
 | `renderer/ray_shadows.rs`, `ray_shadows.wgsl` | Ray traced sun shadows (RT1): a compute pass from the prepass into a per-pixel mask (frame binding 17) that `sun_visibility` prefers to the cascades within reach |
 | `renderer/path_tracer.rs`, `path_tracer.wgsl` | The editor's Path Traced view: a reference picture, paths bounced through the ray traced scene and averaged while nothing changes |
+| `renderer/clusters.rs` | What never changes about each group of items (`DrawList::chunks`), kept by the address of the group's shared items: material bindings, meshes, places, what rays find. `Draw::cluster` and `Draw::at` name a draw's group and item (`docs/rendering/performance.md`, "Plants by the cluster") |
+| `renderer/encoders.rs` | `FrameEncoders`: the frame's commands recorded into several encoders (the shadow views with many casters, the prepass with the ray traced passes, the scene with what follows) and finished on the renderer's threads together, then submitted in order in one call. wgpu encodes a pass's draws in `finish`, so this is where 4.0 ms of the frame's thread went to 1.6 (`docs/rendering/performance.md`, "Encoding on several threads"); `AXCENITY_FRAME_ENCODERS=one` is the way back |
+| `renderer/cpu_timer.rs`, `renderer/latency.rs` | The frame's thread timed in fifteen sections (`CpuSection`, `RenderStats::cpu_times`), and a frame's start to its finished picture, for benchmarks |
+| `pacing.rs` | `FramePacer`: whether a host's next frame waits for the display to show the last one or starts while the GPU draws it; a renderer whose frames are shown is one frame ahead (`set_one_frame_ahead`, `ScenePipeline::wait_for_frame_before`) ([ADR-0052](../Architecture/Architecture-Decisions/ADR-0052-A-Frame-Starts-While-The-GPU-Draws-The-Last-When-Frames-Miss-The-Display.md)) |
+| `renderer/ray_sway.rs`, `ray_sway.wgsl` | Swaying plants in the ray traced scene: bent into one buffer each frame and built as geometries of shared BLASes (`docs/rendering/ray-tracing.md`) |
 | `renderer/ray_tracing.rs`, `ray_hits.wgsl` | Hardware ray tracing: BLAS per mesh, TLAS of nearby items, Ray Hits view ([ADR-0025](../Architecture/Architecture-Decisions/ADR-0025-Optional-Ray-Tracing-Through-Ray-Queries.md)) |
 | `*.wgsl` (24 files) | `shader.wgsl` (items), `lighting.wgsl`, `sky.wgsl`, `terrain.wgsl`, `water.wgsl`, `post.wgsl`, … |
 | `crates/render-types/src/graphics.rs` | `GraphicsSettings`, `Capabilities`, `EffectiveGraphics`, `Camera` (no GPU code) |

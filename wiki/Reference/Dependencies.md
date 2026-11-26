@@ -21,6 +21,7 @@ Third-party crates pinned in the root `Cargo.toml` `[workspace.dependencies]` (v
 | macOS menu bar | `muda` 0.21, `objc2` 0.6, `objc2-app-kit` 0.3, `objc2-foundation` 0.3 (macOS only) | editor | MIT/Apache (muda Apache-2.0 OR MIT) | The system menu bar and the title bar's double-click setting; versions are the ones rfd and winit already pull in |
 | Text | `glyphon` 0.12 | render | MIT/Apache/Zlib | cosmic-text shaping |
 | Math | `glam` 0.34 | everywhere | MIT/Apache | rapier uses `glamx`; several glam versions in the lock |
+| Editor UI's GPU painter | `egui-wgpu` 0.36.2 (with `eframe`), **patched** from `vendor/egui-wgpu` (`[patch.crates-io]`): a switch for winit's `pre_present_notify`, so the editor's next frame can start while the GPU draws the last ([ADR-0052](../Architecture/Architecture-Decisions/ADR-0052-A-Frame-Starts-While-The-GPU-Draws-The-Last-When-Frames-Miss-The-Display.md)); see `vendor/README.md` | editor | MIT/Apache | Re-copy with every egui upgrade |
 | Physics | `rapier3d` 0.36 (`parallel`), **patched** from `vendor/rapier3d` (`[patch.crates-io]`, PR #121) so pairs with a contact hook (Ice, Rubber) keep their contacts between steps; see `vendor/README.md` | physics | Apache | parry3d for shapes and decompositions |
 | Scripting | `mlua` 0.12 (`luau`, `luau-jit`), `luau0-src` **=0.22.0** | script | MIT | Pin moves with mlua; guarded by `luau_pin_tests.rs` |
 | Audio | `kira` 0.12, `mint` 0.5 | audio | MIT/Apache | cpal underneath (ALSA on Linux) |

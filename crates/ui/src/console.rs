@@ -679,6 +679,17 @@ fn panel_height(height: f32) -> f32 {
     (height * HEIGHT_SHARE).max(LINE_HEIGHT * 6.0).min(height)
 }
 
+/// Where the drawing's time went on the frame's thread in `stats`, section
+/// by section, by name, for `--bench`.
+pub fn drawing_times(
+    stats: &axcenity_render::RenderStats,
+) -> Vec<(&'static str, std::time::Duration)> {
+    axcenity_render::CpuSection::ALL
+        .into_iter()
+        .map(|section| (section.name(), stats.cpu_time(section)))
+        .collect()
+}
+
 /// Each pass the GPU timed in `stats`, by its name, for `--bench`.
 pub fn pass_times(
     stats: &axcenity_render::RenderStats,
@@ -686,6 +697,24 @@ pub fn pass_times(
     axcenity_render::FramePass::ALL
         .into_iter()
         .filter_map(|pass| Some((pass.label(), stats.pass_time(pass)?)))
+        .collect()
+}
+
+/// The depth prepass's and the scene pass's GPU time by what was drawn in
+/// `stats` (terrain, scattered items, other items, the sky), by name, for
+/// `--bench`. Empty where the GPU can't stamp inside a pass.
+pub fn part_times(
+    stats: &axcenity_render::RenderStats,
+) -> Vec<(&'static str, std::time::Duration)> {
+    axcenity_render::PartPass::ALL
+        .into_iter()
+        .flat_map(|pass| axcenity_render::DrawnPart::ALL.map(|part| (pass, part)))
+        .filter_map(|(pass, part)| {
+            Some((
+                axcenity_render::part_label(pass, part),
+                stats.part_time(pass, part)?,
+            ))
+        })
         .collect()
 }
 

@@ -5,7 +5,7 @@ How drawing is measured, and the baseline that optimizations (culling, LOD, GPU 
 ## What's measured
 
 - **`RenderStats`** (`TextureRenderer::stats`, `render/src/renderer.rs`), for the last frame: draw calls, triangles and vertices (the drawn meshes' corners, every instance counted; shadow views and the prepass included); items submitted (in the draw list), drawn (by the scene pass) and culled (outside the camera's view); shadow casters drawn into and culled from the shadow views (summed over views) and sprites culled (graphics Phase 12, see Frustum culling in [pipeline.md](pipeline.md)); batches (the scene pass's instanced draws, one per mesh and material); GPU bytes by kind: textures and meshes (counted at upload and when freed), render targets (`FrameTargets`, the shadow maps and the turned-text sheet, counted when made) and buffers; GPU particles; the LOD distribution (`lod_items`: items in view whose mesh has levels of detail, by the level drawn, one cross-fading counted at the level coming in; `LOD_LEVELS` is 3); surface shaders compiled and not compiling; and the GPU's time for the frame and for each pass (`pass_times`, `pass_time(FramePass)`).
-- **Per-pass GPU time** (`renderer/gpu_timer.rs`) needs `Features::TIMESTAMP_QUERY`, which the editor, the benchmarks and the player ask for where the adapter has it. The player times frames only while `Renderer::set_gpu_timing` is on: during `--bench`, and while its `fps` readout or the console's Stats tab is shown, so a game nobody is measuring pays nothing. `RenderStats::gpu_readings` counts the readings, so a reader that keeps every frame's time takes a reading once. An empty compute pass writes a timestamp before each `FramePass` (Acceleration structures, Shadows, Depth prepass, Ambient occlusion, Ray traced shadows, Volumetric fog, GPU particles, Scene, Post-processing, UI) and one after the last, so a part made of many render passes (three cascades, the bloom chain) is timed whole. A pass the frame didn't draw (no ray tracing, shadows, ambient occlusion, ray traced shadows or volumetric fog off, no GPU particles, no UI) is `None`. Inside the Shadows pass each of the sun's cascades is stamped too (`cascade_times`, with `cascade_casters` and `cascade_triangles`); passes with no dependency between them can overlap on the GPU, so treat a cascade's time as approximate. The readings come back a frame or two later without the CPU waiting.
+- **Per-pass GPU time** (`renderer/gpu_timer.rs`) needs `Features::TIMESTAMP_QUERY`, which the editor, the benchmarks and the player ask for where the adapter has it. The player times frames only while `Renderer::set_gpu_timing` is on: during `--bench`, and while its `fps` readout or the console's Stats tab is shown, so a game nobody is measuring pays nothing. `RenderStats::gpu_readings` counts the readings, so a reader that keeps every frame's time takes a reading once. An empty compute pass writes a timestamp before each `FramePass` (Acceleration structures, Shadows, Depth prepass, Ambient occlusion, Ray traced shadows, Volumetric fog, GPU particles, Clouds, Scene, Post-processing, UI) and one after the last, so a part made of many render passes (three cascades, the bloom chain) is timed whole. A pass the frame didn't draw (no ray tracing, shadows, ambient occlusion, ray traced shadows or volumetric fog off, no GPU particles, no UI) is `None`. Inside the Shadows pass each of the sun's cascades is stamped too (`cascade_times`, with `cascade_casters` and `cascade_triangles`); passes with no dependency between them can overlap on the GPU, so treat a cascade's time as approximate. The readings come back a frame or two later without the CPU waiting. **By what is drawn** (2026-11-26): the depth prepass and the scene pass are one render pass each, so within them the time is also taken per `DrawnPart` (`RenderStats::part_times`, `part_time`): `items` (models, parts, characters), `scattered items` (those with a `cull_distance`: a terrain's painted plants, stones and litter), `terrain`, and in the scene pass `cut-outs' depth`, `sky`, `decals, grid and outlines`, `see-through items` and `sprites`. A stamp is written between draws wherever the part changes (`GpuTimer::part`), which needs `Features::TIMESTAMP_QUERY_INSIDE_PASSES` as well (asked for with the other; without it the passes are timed whole). To keep that to a few dozen stamps a pass, solid items are sorted by distance band and then by part (`SortKey::part`, `drawn_part` in `renderer/lighting.rs`): items, scattered items, then the terrain under them. A part drawn in several runs (once a band) is their sum; a frame needing more than 512 stamps gives no part times. `--bench` prints them as "GPU within the prepass and the scene pass, by what is drawn" (`"gpu_parts"` in the JSON). `AXCENITY_NO_PART_TIMES` leaves the stamps out, to check they cost nothing.
 - **The editor's Profiler** (`editor/src/profiler.rs`) shows these while playing, in its **Graphics** tab (graphics Phase 37): **Frame** (CPU frame time with the peak, the viewport's CPU time to draw, GPU frame time), **GPU passes** (each pass's average time, "off" for one no recent frame drew, or one "not available on this GPU" line without timestamps), **Draws** (draw calls, batches, triangles, vertices), **Culling** (items drawn of submitted, items culled, shadow casters drawn and culled, sprites culled, GPU particles, lights), **Levels of detail** (Full detail, Level 1, Level 2), **GPU memory** by kind with a total, and **Shaders** (surface shaders compiled and not compiling, and the last 20 compile errors, which also go to the Output window). Times are averaged over the last 120 frames; counts are the newest frame's `RenderStats` as they are. Shader messages are kept across Plays, since each is reported once. The Game tab adds the **1% low** over those frames, and the Graphics tab **Limited by** (GPU-bound, CPU-bound or sync-bound, `core::bench::Bound`, where sync-bound in the editor usually means its own UI or the display).
 - **The Profiler's Memory tab** (roadmap G7; `editor/src/profiler.rs`, fed every 15 frames by `Session::memory`): **Process** (the editor process, the game's counted total, its peak this Play, and the GPU's share from `RenderStats`), a chart of the counted total over the last 240 samples (about a minute at 60 fps) with a line at the whole-game budget, **Budget** (each limit set, "used of limit", in the warning color when over), **Game, by kind** (Lua, Instances, Models, Textures, Sky and probes, Sounds, Physics; `core::memory::MemoryBreakdown`), **Since Play started** (each kind's change from the first sample and its peak) and the 12 heaviest **Instances by class**. History, peaks and changes start again at each Play and freeze at Stop. The budget is the project's (Settings > This project > Memory budget; `memory_budget` in `axcenity.json`, `project/src/memory_budget.rs`: `game_mb`, `lua_mb`, `textures_mb`, each optional, none by default, left out of the manifest when unset); the first time a Play goes over a limit, Output gets one warning naming it. The player doesn't check budgets.
 - **The `fps` readout** (player and editor Play, [developer-console.md](../developer-console.md)): `fps` shows frame rate, frame time, 1% low, CPU and GPU times and the bound in one line; `fps full` adds each frame step and the drawing's numbers (`axcenity_ui::render_lines`). Its cost wasn't measured on its own: the readout is a few UI quads and up to a dozen lines of text, and GPU timing is nine empty compute passes and a 72-byte readback every other frame, against frames of several milliseconds.
@@ -514,7 +514,7 @@ Paul's Desert Homestead (228 MeshParts, two terrains, 65,000 painted plants, an 
 
 **What is left**, at 2560 × 1440:
 
-- **The clouds' march** in the sky pass: 2.6 ms of the scene pass on High, 5.1 on Ultra (scene pass 10.4 → 7.8 and 13.4 → 8.3 without Clouds). It is stepped at full size for every pixel of sky, its noise worked out as it goes.
+- **The clouds' march** in the sky pass: 2.6 ms of the scene pass on High, 5.1 on Ultra (scene pass 10.4 → 7.8 and 13.4 → 8.3 without Clouds). It is stepped at full size for every pixel of sky, its noise worked out as it goes. Done on 2026-11-26: the sky's clouds are traced before the scene pass, at half size and then pixel by pixel where that isn't enough, with their shapes read from a texture ([clouds.md](clouds.md#the-traced-clouds)); 0.14 to 0.30 ms at 1920 × 1080 on Ultra, the same picture.
 - **The terrains with their 65,000 plants**: 4.9 ms of the scene pass on High and 4.6 ms of the CPU's Render step (5.7 → 1.2 without them), about 10,000 items and 3,500 draw calls a frame.
 - **A stall on a first sight**, 30–62 ms once on five of the tour's cuts: what is seen for the first time is uploaded in the frame that first draws it. Coming back to a view no longer stalls (next section).
 
@@ -539,6 +539,303 @@ Same machine and method as above (player `--bench 5500`, the whole tour, 2560 ×
 - **What the scene holds**, with nothing freed through the whole tour: 1,579 MiB of textures on Ultra (1,452 in 528 color textures; the rest mostly the terrains' layers and weights) and 174 MiB of meshes in 3,083 meshes (each level of detail is one). Both fit Ultra's budgets (2,048 and 1,024 MiB). On High the textures don't fit its 1,024 MiB: the least recently drawn lose their largest levels (the total stays at 1,018–1,020 MiB), so some are drawn below their full size, but the cuts cost the same: the timings match those with a 2,048 MiB budget.
 - **Memory stays in use.** Nothing leaves while it fits, so what a session has seen stays on the card up to the budgets.
 - **The budgets follow the card's memory** (added the same day, [settings.md](settings.md)): the runs above had the presets' fixed numbers. With a quarter of this card's 16 GB the player takes 4,096 MiB for textures and 2,048 MiB for meshes at every preset, so the scene's textures fit on High too. The whole tour again at the default settings (High): the cuts 30.4, 60.7, 38.9, 29.9, 58.4, 12.7 and 22.7 ms, the GPU's frame 13.3 ms at the median.
+
+## Swaying plants bent together (ray tracing, Desert Homestead)
+
+With every ray traced effect on, the editor drew Desert Homestead at 24 frames a second. Measured on 2026-11-25 on the Desktop under Fedora (radv, a 240 Hz display), release build, the player's `--bench` (300 frames) at `--size 1996x998` (the editor's viewport) with the editor's saved graphics settings through `--graphics` (Ultra, real-time GI, ray traced shadows, ambient occlusion and reflections at High, TAA), main at `a9370a3b` against the change; one run each, medians in milliseconds, not pinned.
+
+**Finding it.** Stack samples of the running editor's frame thread (`eu-stack`) put 11 of 18 working samples in `RayScene::prepare` and in wgpu's acceleration structure builds inside `CommandEncoder::finish`. The player with the same settings said how much: 12.8 ms of a 33 ms GPU frame in the Acceleration structures pass, every frame. The wind was blowing, and each swaying plant within the 400,000-triangle budget got a BLAS of its own, built again each frame: 4,118 of them here, about 100 triangles each (the budget was written for a few big trees: "about 1 ms"). Capping how many were bent showed the cost is by the plant, not the triangle:
+
+| Plants bent | Acceleration structures | Render step (the frame's thread) |
+|---|---|---|
+| 0 | 0.52 | 13.3 |
+| 1 (the TLAS of 16,000 items built each frame) | 0.78 | 13.4 |
+| 64 | 0.99 | 13.7 |
+| 512 | 2.17 | 15.9 |
+| 2,000 | 6.60 | 23.0 |
+| 4,118 (the budget) | 12.8 | 33.1 |
+
+About 3 µs of GPU time and 5 µs of the frame's thread a plant. A stand-alone probe (wgpu 30, 4,096 meshes of 100 triangles, all rebuilt in one call) confirmed that it is the BLAS that costs, and that geometries of one BLAS don't:
+
+| Geometries a BLAS | BLASes | GPU | Record, finish and submit |
+|---|---|---|---|
+| 1 | 4,096 | 12.65 | 7.29 |
+| 16 | 256 | 2.57 | 1.17 |
+| 64 | 64 | 1.95 | 0.82 |
+| 256 | 16 | 1.89 | 0.66 |
+| 4,096 | 1 | 1.58 | 0.62 |
+| One joined geometry | 1 | 1.49 | 0.02 |
+
+**Fix**, in three steps ([ray-tracing.md](ray-tracing.md), "Swaying plants"):
+
+1. **Bundles**: bent copies are geometries of shared BLASes, bent where they stand in the world, and a hit's item is its instance's first slot plus the geometry hit. Acceleration structures 12.8 → 2.5 ms; Render 33.8 → 24.0.
+2. **One buffer, one dispatch a mesh.** The frame's thread was still at 23.5 ms in the renderer's draw: 8.5 preparing the ray scene (a uniform written and a bind group set for each plant), 6.2 in `finish` (4,100 dispatches), 1.5 in `submit`. With every copy bent into one buffer by one dispatch a mesh (about 60): 3.2, 3.7 and 1.2 of 14.1.
+3. **By the square, and only what shows.** Rays traced slower against one BLAS a kind than against a BLAS a plant (ambient occlusion 3.8 → 5.0, ray traced shadows 5.4 → 6.8). Bundling by squares of the ground brought most of it back (16 bundles: 4.39 and 6.44; 100: 4.13 and 5.92; 280: 4.00 and 5.59, with the builds at 2.8, 3.2 and 3.6); `PREFER_FAST_TRACE` bundles traced as before but built 1.7 ms slower, no better in sum. Leaving out plants the wind moves less than a pixel bends 3,030 instead of 4,118 here (and reaches farther, to 345 studs, the budget no longer full): the GPU frame 24.5 → 23.8.
+
+| 1996 × 998, the editor's settings | Before | After |
+|---|---|---|
+| Render step (the frame's thread) | 33.8 | 14.3 |
+| GPU frame | 33.3 | 23.8 |
+| Acceleration structures | 12.82 | 2.48 |
+| Ambient occlusion (ray traced) | 3.79 | 4.15 |
+| Ray traced shadows | 5.45 | 5.87 |
+| Ray traced reflections | 0.37 | 0.42 |
+| Scene | 7.35 | 7.37 |
+| A frame as shown (whole runs of 200 and 800 frames timed) | 73.7, 75.9 and 88.7 (13 a second) | 41.7 (24 a second) |
+
+**The picture is the same.** `shoot_project` from three of the film's cameras at 1600 × 900, Ultra with every ray traced effect and TAA: the old build against itself differs by nothing, against the new by 0.004 to 0.006 of 255 a channel on average, no pixel by more than 23.
+
+**What is left** with ray tracing on:
+
+- **A frame as shown is the thread's frame plus the GPU's** (15.4 + 23.8 here, 41.7 as shown), as the fog section found for the player: the next frame starts when the compositor says the last was shown. With both this long it is the largest lever left, in the editor too.
+- **The GPU frame**: the scene pass 7.4, ray traced shadows 5.9, ambient occlusion 4.1, the builds 2.5.
+- **The frame's thread**: 14.1 ms in the renderer's draw, of which the ray scene's 16,000 items walked each frame are 3.2 to 3.6, `finish` 3.7 and `submit` 1.2.
+- **The editor itself wasn't timed** after the change, only sampled before it: these are the player's numbers at its viewport's size and settings, from the player's camera.
+
+## The CPU and the GPU took turns (frame pacing, Desert Homestead)
+
+Paul's report of 2026-11-25, after the section above: about 41 FPS in the viewport, 13 in the Profiler, and a card that didn't seem to be working. An audit of the whole frame followed, measured on the Desktop under Fedora (GNOME 51 on Wayland, Mesa 26.2 radv, a 240 Hz display): the release player's `--bench` at `--size 1996x998` with the editor's saved graphics settings (Ultra, real-time GI, ray traced shadows, ambient occlusion and reflections at High, TAA), the editor itself with `AXCENITY_FRAME_LOG=1` on a copy of the project, the card's sensors (`gpu_busy_percent`, the core clock and power under `hwmon`, the process's `drm-engine-gfx` time) sampled twice a second beside each run, and `eu-stack` samples of the frame's thread. Medians in milliseconds, one run each, not pinned. How to read the tools: [benchmarks.md](../benchmarks.md).
+
+**The two frame rates.** Neither was a frame rate as shown. The viewport bar worked its number out as `1000 / max(CPU, GPU)` from the viewport's own times: what a renderer whose CPU and GPU work fully overlap could reach, leaving out the rest of the editor's frame. The Profiler's is the time between game frames in Play, which is real. Timed for the first time, the debug editor showed Desert Homestead at **26.7 frames a second** (37.5 ms between frames: 25.8 ms of CPU, then 13.2 of GPU) where the bar's formula gave 43. The bar now shows the measured rate, with the work in its tooltip, and `--bench` prints `as shown` (it had said "FPS average 68, GPU-bound" for a run shown at 24).
+
+**The card was idle half of every frame.** With the frame shown every 40.8 ms the card was 59% busy, drawing 70 W of its 304, its core clock at 1,511 MHz; the frame's thread worked 15 of those 41 ms. The two never worked at once. Under Wayland, winit's `Window::pre_present_notify` holds the next `RedrawRequested` back until the compositor's frame callback, and the compositor can't show a frame before the GPU has finished it; the player called it each frame and egui-wgpu calls it for the editor. So each frame's CPU work started when the last frame's GPU work was done and shown. Idle for the CPU's turn, the card clocked down, which nearly doubled its own time.
+
+| Player, 1996 × 998, the editor's settings | Waiting for the display | Started early (`FramePacer`) |
+|---|---|---|
+| As shown | 24.5 a second (40.8 ms) | **67.0 a second** (14.9 ms) |
+| 1% low, as shown | 16.0 | 43.8 to 54.1 |
+| GPU frame | 24.24 | 13.40 |
+| Frame's thread (steps less waits) | 15.3 | 14.7 |
+| Card busy / core clock / power | 59% / 1,511 MHz / 70 W | 89% / 3,136 MHz / 280 W |
+| Ray traced shadows / ambient occlusion / reflections | 5.89 / 4.40 / 0.45 | 3.05 / 2.17 / 0.23 |
+| Scene / acceleration structures / shadow maps | 7.50 / 2.47 / 1.66 | 4.22 / 1.36 / 1.09 |
+| The same view in a 2560 × 1405 window (asked for 3840 × 2160, which GNOME gives as 2560 × 1405), as shown | 20.7 a second | 53.0 a second |
+
+| Editor, Desert Homestead, its own camera and default window | Waiting | Started early |
+|---|---|---|
+| Debug build (what Paul runs), as shown | 26.7 | **41.0** |
+| Release build, as shown | 26.7 | **46.7** |
+| The whole editor frame on the CPU, debug / release | 25.8 / 21.4 | 23.9 / 21.0 |
+
+**The fix** ([ADR-0052](../../wiki/Architecture/Architecture-Decisions/ADR-0052-A-Frame-Starts-While-The-GPU-Draws-The-Last-When-Frames-Miss-The-Display.md)): `axcenity_render::FramePacer` keeps the display's pacing while frames fit in a refresh (the lowest latency, and free then) and starts the next frame at once when they keep missing it; a renderer whose frames are shown is one frame ahead (`set_one_frame_ahead`), so starting early never queues more than one frame behind the one being drawn (in the larger window frames had queued as deep as the swapchain). The editor reaches the call through a switch in a vendored egui-wgpu (`vendor/README.md`). The picture is the same: no setting, shader or resolution changed.
+
+**A stall twice a second.** The `1% low` stayed at 22 after that. Every 30 frames the player read the process's memory for the F9 console (the editor every 15 in Play), and on Linux the `memory-stats` crate reads `/proc/self/smaps` for it: **24 ms** for this process's 2,249 mappings, on the frame's thread, in every game. `/proc/self/statm` has the number in 0.03 ms (the crate's `always_use_statm` feature). 1% low 22 to 27 → 52 to 54, average 62 → 66.6.
+
+**Where the frame goes now** (started early; the card's times at its full clock):
+
+| What | Frame's thread | GPU |
+|---|---|---|
+| The whole frame | 14.7 | 13.1 |
+| Ray tracing altogether (every effect off, same device) | 5.4 | 4.8 |
+| One effect off: shadows / ambient occlusion / reflections / real-time GI | 0.7 / 0.0 / 0.8 / 0.2 | 3.05 / 2.17 / 0.23 / (probes: not timed apart) |
+| Terrain foliage (16,000 items; the scene without it) | 9.7 | 4.3 |
+| The 228 MeshParts | 1.5 | 1.5 |
+| Clouds | 0.0 | 1.3 of the scene pass |
+| Point lights, fog volumes, post effects | under 0.3 each | under 0.2 each |
+
+The card's clock follows its load, so a run that leaves it idle part of the frame reads its passes longer: compare GPU pass times only between runs with the card busy, and trust the frame's thread and the rate as shown first.
+
+On the frame's thread (220 `eu-stack` samples of the release player): wgpu's `CommandEncoder::finish` 29% (encoding the render passes' draws 20%, the acceleration structure builds 6%), the ray scene's `prepare_scene` 19%, `Queue::submit` 10%, waiting for the planning threads 9%, `FrameUses::of` 6%, the terrain pass 4.5%, TAA's `History::moved` 3.6%. The editor's viewport spent 20.3 ms where the player's draw list and render took 14.2: that turned out to be the view, not the editor (next section).
+
+**What is left**, by size, with the targets they add up to (100 frames a second at these settings needs both sides at 10 ms):
+
+| Target | From → to | Lever |
+|---|---|---|
+| Foliage's cost on the frame's thread | 9.7 → 4 ms | Every plant is an item walked several times a frame (culling, levels of detail, motion history, the ray scene's instance). Clusters of plants with one bound each, their instances kept between frames |
+| Ray tracing's cost on the frame's thread | 5.4 → 2 ms | `RayScene::prepare` builds every table again from the draws each frame (16,000 items, several hash lookups each). Keep what didn't change; the TLAS is rebuilt each frame only because plants sway |
+| `CommandEncoder::finish` | 4.3 → 1.5 ms | wgpu encodes a pass's draws when its encoder is finished, on the calling thread: give the shadow, prepass and scene passes an encoder each and finish them on the render threads |
+| ~~The editor's viewport against the player's~~ | — | There is no editor-only cost: the same view costs the same in both (next section) |
+| ~~Shadow maps while ray traced shadows cover their distance~~ | — | Not redundant: leaves' light from behind and the fog read them at every distance (next section) |
+| Ray traced shadows and ambient occlusion | 5.2 → 3.5 ms GPU | Not started: measure rays a pixel actually traced before choosing |
+
+**Not measured**: the editor at Paul's own viewport size (its window opened at the default size here), Play in the editor (the game's steps are 0.3 ms in the player for this project), Windows, and input latency (worked out in the ADR, not timed).
+
+## Plants by the cluster, and the audit's second round (Desert Homestead)
+
+Paul's six questions of 2026-11-25 on the section above, answered the same day on the same machine and settings. Two views are measured from here on: **the tour** (the project's 91-second camera sequence, which the player's `--bench` flies: about 11,000 items in view) and **the still view** (the editor's start camera, from 12, 8, 16 toward the origin, with the tour stopped: at 1996 × 998, 15,009 items drawn in 4,345 draw calls, 13.4 million triangles, and 25,193 items in the ray traced scene), the heavier of the two and the one to optimize against. Both at 1996 × 998 with the editor's settings unless a row says otherwise.
+
+**Where the frame's thread goes, section by section.** `RenderStats::cpu_times` (`renderer/cpu_timer.rs`, `CpuSection`) times `ScenePipeline::draw` in fifteen sections on the thread that calls it. `--bench` prints them as "Drawing on the frame's thread, by section" and the editor's frame log as `drawing, ms:`, with the items drawn, the draw calls, the traced items and the viewport's size, so both hosts are read the same way.
+
+**1. The editor has no cost of its own.** The 6 ms between the editor's viewport and the player was the view. The player's `--bench` flies the tour; the editor stood at its start camera, and its window (opened at the default size) gave a viewport of 998 × 405. With the tour stopped and the player at that camera and size, both draw exactly 17,190 items in 4,780 draw calls, and every section agrees:
+
+| Section, ms | Editor (release) | Player, same view and size |
+|---|---|---|
+| Levels of detail | 0.62 | 0.62 |
+| Materials | 1.40 | 1.43 |
+| Culling and batches | 1.21 | 1.20 |
+| Motion history | 2.69 | 2.51 |
+| Ray traced scene | 5.05 | 4.85 |
+| Encoding (wgpu `finish`) | 4.09 | 4.05 |
+| Submit | 2.73 | 2.70 |
+| All fifteen | 20.3 | 20.25 |
+
+The rest of the editor's frame (its panels) is 0.7 ms on top in a release build and 2.7 in a debug one. `AXCENITY_START_CAMERA=x,y,z,x,y,z` starts the editor from a chosen view for such comparisons.
+
+**2. Plants by the cluster** (`renderer/clusters.rs`). The scene already hands the renderer its painted plants in groups (`DrawList::chunks`, one shared `Arc<[DrawItem]>` a square of ground, the same from frame to frame), and the renderer already passes over whole groups no view can see. What it didn't do is remember anything about a group: every pass worked each plant out again each frame, reading its 600-byte item. A `Cluster` is one group's items with what never changes about them kept in small arrays: each item's material binding (among the group's distinct ones), its mesh, where it stands, whether a skin poses it, and what rays need of it (holes, see-through, its surface's color and glow). It is found again by the address of the group's items and holds them, so the address can't come to mean other items; a group the scene builds again gets a new cluster. Each draw says which group and item it is (`Draw::cluster`, `Draw::at`). Three more things came out of the same timings:
+
+- **A terrain's chunks shared no work.** Each chunk's material key hashed all the terrain's layers' textures again (half a microsecond), twice a frame for each of 1,400 chunks: 1.7 ms. The key is now remembered for the layers it was worked out of (`terrain::LastArrays`).
+- **The motion history built a whole scene instance** (colors turned to linear light, a matrix inverted) for every swaying plant to read its place and sway from, hashed every plant's ID in a table that only holds the list's own items, and sorted 180-byte records by mesh. It now reads the two values, looks up only what can be there, and gathers by mesh.
+- **The list's own items** (1,659 here, the terrain's chunks among them) are shared among the threads again for their material keys: split off from the groups they had fallen under the size worth sharing.
+
+| The still view, frame's thread, ms | Before | After |
+|---|---|---|
+| Materials | 1.37 | 1.05 |
+| Uploads (the terrain pass's chunks) | 1.00 | 0.67 |
+| Motion history | 2.12 | 1.11 |
+| Ray traced scene | 4.58 | 4.04 |
+| All fifteen sections | 18.52 | 16.45 |
+| As shown | 51.0 a second | **57.0 a second** |
+| The tour, as played | 67.0 a second | **70.8 a second** |
+| Editor at its start camera, debug / release | 41.0 / 46.7 | **44.4 / 50.2** |
+
+**The picture is the same**: `shoot_project` from three cameras (the still view and two of the tour's) at 1600 × 900, Ultra with every ray traced effect and TAA, before against after: two pictures identical, the third within 4 of 255 at its worst pixel, which is what two runs of the same build differ by (6). A grouped list is also tested to plan, draw and ray trace exactly as the same items listed one by one (`tests/grouped_items.rs`: the pictures equal to the last bit).
+
+What a cluster doesn't hold yet, and what it would save, by the same timings: each item's bounds and scene instance (Culling and batches, 1.06 ms), and its place in the ray scene's tables (below).
+
+**3. The ray traced scene, and what must be done each frame.** Its 4.6 ms split, measured with timers inside `RayScene::prepare` (25,193 items wanted, 22,876 instances):
+
+| Part | ms before | after |
+|---|---|---|
+| Walking the draws: each item's mesh, reach, mask, holes and surface | 1.86 | 1.08 |
+| Recording the builds (wgpu checks every TLAS instance) | 0.87 | 0.88 |
+| The slot, cut-out and surface tables | 0.56 | 0.64 |
+| Choosing and bending the swaying plants | 0.47 | 0.53 |
+| Laying out slots and bundles | 0.29 | 0.29 |
+| Setting TLAS instances, BLAS lookups, bundles | 0.51 | 0.51 |
+
+The clusters took what was per material out of the walk. What is left is mostly not ours to keep between frames: while any plant sways, its bundle's BLAS is rebuilt, and wgpu has no refit, so the TLAS is built again each frame, and a wgpu TLAS build costs for **every instance** whether it changed or not: checked when the build is recorded (0.9 ms), tracked when the frame is submitted (in the editor at one view, Submit is 2.5 ms with ray tracing against 0.24 without) and uploaded. With one instance a still plant that is 22,876 instances. So the persistent data that would pay is fewer instances, not cached tables. Two ways, neither built: still plants bundled into BLASes by square of the ground as the bent ones are (their corners copied into world space once, by a rough estimate 40 MB of positions for this view, and a bundle to rebuild whenever one of its plants changes its level of detail), or two TLASes (still and swaying), which every ray would have to trace twice. The first wants its own measurement of trace speed and memory before it's chosen.
+
+**4. The shadow maps are not redundant.** With ray traced shadows on, the cascades are still read every frame (`lighting.wgsl`, `volumetric_fog.wgsl`):
+
+| Reader | Uses the traced result |
+|---|---|
+| Solid surfaces the prepass drew (`sun_visibility`) | Within 85% of the reach, blending into the cascades to the reach (here the reach is the shadow distance, 300 studs, so the far band always reads them) |
+| Leaves and thin cloth lit from behind (`through_thin` → `soft_sun_visibility`) | Never: always the cascades |
+| See-through surfaces and water | Never (not in the prepass) |
+| Volumetric fog's cells | Where a cell was traced and near; the cascades past that |
+| Any pixel whose depth doesn't match the traced mask (edges under MSAA, hashed hair) | Falls back to the cascades |
+
+Desert Homestead has the first four in its views (its plants' leaves, its fog boxes), so nothing was removed. The pass could be skipped only in a frame with no translucent material, no see-through item, no fog, no MSAA and a reach 18% past the shadow distance; Desert Homestead has no such frame, and that skip isn't built.
+
+**5. Hidden and unfocused windows.** Three things were found and fixed in the player, each by a tested rule (`player/src/window.rs` `next_frame`, `FramePacer::waits_for_display_when`):
+
+- **The event loop spun a core** whenever it waited: between frames while waiting for the display (the frame's thread was at 96% of a core doing 15 ms of work in 41; now 35%), and for as long as a window was minimized. It now sleeps until the redraw comes.
+- **A hidden game stopped, or drew for nobody.** Under Wayland a minimized window is never asked to draw: a light game stopped stepping altogether (its `--bench` never finished), and a heavy one, started early, drew at full load into a window nobody saw (256 W). Now a redraw unanswered for a quarter of a second means the window is hidden: the game steps 30 times a second without drawing (0.3% of a core, the GPU idle at 48 W) until the display asks again (a heavy scene minimized: 2% of a core and 56 W). A frame the window couldn't show (minimized on Windows, covered on macOS, where the redraw comes and the frame is skipped) spaces out the next the same way.
+- **A window without focus waits for the display** whatever its frames cost: a minimized or covered window never has focus, and nothing else under Wayland says it's hidden. A visible window without focus draws at the pace it had before frame pacing.
+
+Windows and macOS weren't run. What their sources say, and how to check a platform by hand: [benchmarks.md](../benchmarks.md#checking-frame-pacing-on-a-platform).
+
+**6. Input latency, measured.** `AXCENITY_BENCH_LATENCY=on` times each frame from its start (when the host reads input) to the GPU finishing its picture (`renderer/latency.rs`), which is the part the engine decides; the display adds up to one refresh after, the same either way. The tour as played (vertical sync on), medians and 95th percentiles in ms:
+
+| | As shown | Input to finished picture |
+|---|---|---|
+| 1996 × 998, waiting for the display (before) | 25.6 a second | 38.7 (40.7) |
+| 1996 × 998, paced | 70.6 a second | **27.6** (28.4) |
+| 1996 × 998, paced, no limit on frames ahead | 70.6 a second | 27.8 (29.1) |
+| 2560 × 1405 window, waiting for the display | 20.9 a second | 47.1 (49.7) |
+| 2560 × 1405 window, paced | 54.4 a second | **35.6** (38.9) |
+| 2560 × 1405 window, paced, no limit on frames ahead | 54.4 a second | 42.1 (47.3) |
+| A light scene (`samples/projects/part`), waiting / paced | 238.0 / 239.6 a second | 3.05 / 3.00 |
+
+Pacing shortens the way from input to picture by 11 ms in both heavy cases while more than doubling the frame rate. One frame ahead is worth 6.5 ms (8.4 at the 95th percentile) where the GPU is the slower side, at the same frame rate, and changes nothing where the CPU is. A light scene is paced by the display exactly as before.
+
+**The frame counters, again.** With ray tracing off Paul saw the viewport "lock at 60 FPS". It was: the editor holds frames to its steady frame rate while someone works (Settings > Accessibility, 60 Hz in his settings), and with ray tracing off a frame fits in that. Timed, the debug editor showed 60.0 with the setting at 60 and 65 to 67 with it off. The counter was right and didn't say why. It now reads `60 FPS (held)` when the grid sets the rate and `30 FPS (idle)` when the editor rests between frames of scenery that moves on its own, and its tooltip says what holds the rate and about how many a second the frame's work would allow (`app/viewport_bar.rs`, `Pace`). The frame log (`AXCENITY_FRAME_LOG`) is never held to the grid.
+
+**Against Paul's targets** (2026-11-25), Desert Homestead at 1996 × 998, release player, medians of one run each:
+
+| Configuration | Target | The tour | The still view | What limits it |
+|---|---|---|---|---|
+| Standard Ultra | 120+ | 119.2 | 102.0 | The frame's thread (8.2 and 9.6 ms) |
+| Advanced lighting (Ultra with real-time GI, no rays) | 90+ | 118.3 | 104.4 | The frame's thread |
+| Ray traced shadows and ambient occlusion | 90+ | 74.0 | 59.3 | Both sides (13.2 and 12.4 ms on the tour) |
+| Heavy ray traced scenes (everything on) | 60+ | 71.8 | 57.5 | Both sides |
+| Optimized Desert Homestead (everything on) | 100 | 71.8 | 57.5 | 10 ms a side is needed; they are 13.6 and 12.6 |
+
+Nothing was turned down to get these. What stands between the ray traced rows and their targets, by size: wgpu's per-instance TLAS cost and the ray scene's own walk (5.5 ms of the thread with ray tracing on), `finish` encoding 4,780 draw calls on one thread (4.0 ms), and on the GPU ray traced shadows (4.7 ms) and ambient occlusion (2.6).
+
+## Encoding on several threads, and one query a ray (the audit's third round, Desert Homestead)
+
+Paul accepted the second round's findings on 2026-11-25 and asked for five more things: keep a window without focus waiting for the display, go on looking at what ray tracing costs the GPU (shadow and ambient occlusion sampling, BVH traversal, denoising) without touching the picture, look at encoding on several threads and at fewer draw calls for the 4 ms `finish` took, consider a background rendering policy that can be set, and keep the measurements as regression benchmarks. Same project, settings and views as the sections above. Captures of three views with every ray traced effect on match the second round's: two byte for byte, the third in all but 16 of 1.44 million pixels, which is what two runs of one build differ by (17 to 21).
+
+**Two things about the earlier numbers first.**
+
+- **"3840 × 2160" was 2560 × 1405.** GNOME gives a window that nearly fills or overflows the screen the screen's free area, whatever was asked for (2400 × 1300 came out the same). The rows above that said 3840 × 2160 have been corrected. `--bench` now prints `drawn at` and the regression check calls out a size that differs from the baseline's.
+- **GPU pass times only compare where the GPU is the limit.** The still view at 1996 × 998 is limited by the frame's thread, so the card's clock follows whatever was changed: with ray traced shadows skipped whole, the GPU's frame read 12.0 ms against 12.8, because every other pass ran slower. The GPU figures below are from the same view in a 2560 × 1405 window, where `--bench` says `GPU-bound`.
+
+**1. Encoding on several threads** (`renderer/encoders.rs`). wgpu 30 only notes a pass's commands when they are recorded; `CommandEncoder::finish` checks each one and makes the backend's (wgpu-core's `encode_commands`). So the frame is recorded into several encoders, one after another, and they are finished on the renderer's threads together, then submitted in order in one call: the GPU does the same work in the same order. A part starts before each run of passes with many draw calls: every shadow view with 256 casters or more, the depth prepass (with motion vectors, ambient occlusion, the ray traced passes, fog and particles after it) and the scene (with post-processing and the UI). Desert Homestead's frame is six command buffers.
+
+| The still view, frame's thread | One encoder | In parts |
+|---|---|---|
+| Encoding (`finish`) | 4.00 ms | **1.57 ms** |
+| The parts' own times (posing and acceleration structures, three shadow views, prepass, scene) | — | 1.49, 0.35, 0.37, 0.67, 1.28, 1.34 |
+| Submit | 2.25 ms | 2.39 ms |
+| As shown | 57.0 a second | 64.7 |
+
+The parts take 5.5 ms between them where one encoder took 4.0, and 1.5 ms of the frame's thread, which waits for the longest. The pictures are the same pixel for pixel (`a_frame_recorded_in_parts_is_the_picture_one_encoder_draws`, with and without ray tracing), and the GPU's timestamps still work across encoders, since wgpu resolves them at submit. `AXCENITY_FRAME_ENCODERS=one` is the way back. What bounds the step now is the first part: building the acceleration structures, where wgpu writes every TLAS instance again.
+
+**2. Draw calls: where they come from, and why they weren't consolidated.** The still view's 4,345 draw calls: 923 in the scene pass, 919 in the prepass, 182 filling cut-outs' depth, 70 motion vectors, and 211, 388 and 568 in the three nearest shadow views (1,084 in the farthest on its turn). Of the 923 batches:
+
+- **350 are terrain chunks**, each its own mesh and its own binding, 141,632 triangles between them (3% of the 4.3 million drawn), and each is drawn again in the prepass and the shadow views;
+- the other 573 are 212 meshes with 148 sets of textures; sorting near to far in distance bands makes 923 batches of what would be 616;
+- 577 batches hold one instance.
+
+Sampled inside `finish` with one encoder (56 samples), 62% was render passes and 34% acceleration structures. Within the passes the largest single cost was binding: wgpu notes every texture of a newly bound group for each draw (`flush_bindings_helper`, about a fifth). A draw call costs about 0.9 µs. Merging the terrain's chunks would take about 1,400 draw calls off the frame, but since the passes are encoded beside one another and the acceleration structures' part is the longest, that would shorten recording (0.8 ms) by a quarter and nothing else on the frame's thread. It wasn't built: it changes how terrain is cut into chunks, for 0.2 to 0.3 ms.
+
+**3. Ray traced shadows and ambient occlusion: one query a ray.** Both asked twice for every ray: once for solid items and once for cut-outs, because a cut-out very near the surface isn't counted (`cut_out_near`) and each query had its own nearest distance. One query finds both. A solid item's triangles are committed by the traversal as they come (its BLAS is opaque); a cut-out's come as candidates, and the shader confirms them only past that distance and where the texture isn't cut out. For ambient occlusion the nearest hit of one query is the nearer of the two answers. For shadows only whether a ray is blocked matters, except for soft shadows' edge, which is as wide as the blocker is far: there a ray that a cut-out stopped asks once more for a solid item, so the distance is the one two queries gave (`ray_shadows.wgsl`'s `first_blocker` and `blocker_distance`, `ray_ao.wgsl`'s `nearest_hit`).
+
+| The still view at 2560 × 1405, GPU-bound, pinned (medians of two runs each) | Two queries a ray | One |
+|---|---|---|
+| Ray traced shadows | 6.57 ms | **4.66 ms** |
+| Ambient occlusion | 3.39 ms | **2.54 ms** |
+| GPU frame | 17.21 ms | **14.53 ms** |
+| As shown | 57.5 a second | **68.0** |
+
+Where the rest goes, by leaving one step out at a time at that size: the sun's rays 3.1 ms (4 a pixel), the fog's air 1.1 ms (4 rays for each of 921,600 cells), smoothing the soft shadows 0.45 ms; ambient occlusion's rays 2.3 ms (8 a pixel at half size), the screen-space pass under them 0.18 ms and its blur under 0.05 ms; acceleration structures 1.75 ms.
+
+- **Denoising isn't where the time is.** The two smoothing passes and the blur are 0.5 ms of 7.2. The rays are. Fewer rays with their results kept from frame to frame would be the next step, and it changes how shadows and ambient occlusion look when things move, so it's Paul's to decide, not done here.
+- **BVH traversal: fewer, bigger structures don't trace faster.** With every swaying plant bent into the shared bundles (16,953 of them instead of the 4,052 a frame's budget allows), the TLAS had a third of its instances and the trace passes were within 3% (ray traced shadows 4.64 → 4.50 ms, ambient occlusion 2.52 → 2.48). What fewer instances do buy is the frame's thread (below).
+
+**4. What wgpu does for every instance, every time the scene is bound.** At submit wgpu walks every instance of a TLAS for each pass that bound it, twice (`validate_acceleration_structure_actions`, `set_acceleration_structure_dependencies`), whether or not it was rebuilt. Six passes bound it; three trace. The sun's rays and the air's now share one compute pass and one binding, and the two smoothing passes have a layout without the scene (`ray_shadows.rs`, `only_the_passes_that_trace_bind_the_ray_traced_scene`). **Submit 2.37 → 1.73 ms.** The same experiment as above (a third of the instances) took submit from 2.19 to 0.90 ms: instances are what it costs. Building every plant's bundle each frame cost 7.2 ms of GPU, so that isn't the way; still plants would need bundles built once and kept, which is memory (every plant's triangles on their own, where they share a mesh's now) and a rule for plants that change level of detail. That is the next architectural step on this side and wasn't started.
+
+Also here: each traced item's BLAS was looked up twice a frame, now once (`RayScene::prepare`, 4.07 → 3.97 ms).
+
+**5. A pace the player couldn't leave.** Checking a covered window (below) showed a heavy game at 1000 × 600 held at 39.9 frames a second with the keyboard's focus, where it draws 91. The player asked the display for its refresh when it made its window, and under Wayland a new window isn't on a display yet: it got no answer, took 60 Hz, and on a 240 Hz display frames 17 to 25 ms long then never counted as missing the refresh (the pacer starts frames early after eight in a row at least 1.5 refreshes long). The player now asks again every 30 shown frames, as the editor did (`window::asks_refresh_on`). **As played at 1000 × 600: 43.8 → 97.9 a second;** the tour at 1996 × 998 as played 70.8 → 77.0; a light scene 239.2 to 239.8 as before.
+
+**6. A window's state, checked under GNOME** (`AXCENITY_BENCH_TIMELINE`'s counts file has each frame's time, focus and whether it was drawn; a second game was opened over the first for 14 seconds; the tour as played in a 1600 × 900 window, and a 1000 × 600 one for the covered row):
+
+| The heavy game's window | Frames | The card |
+|---|---|---|
+| Has the focus | 86 to 94 a second, drawn | busy |
+| Seen, another window has the focus | 30.5 a second, drawn, waiting for the display | 64% busy at 1,840 MHz, 82 W |
+| Wholly covered by another window | 30.0 steps a second, none drawn, from 0.4 s after it was covered | none of its own |
+| Minimized (second round) | 30 steps a second, none drawn | idle |
+| Focus back | 91 a second within 0.1 s | busy |
+
+**7. The cores with the large cache.** The regression check runs pinned, and pinned to the 9950X3D's eight cores with the 96 MB cache the same build was a third faster than my unpinned runs:
+
+| Everything on, 1996 × 998 | Any core (as launched) | The V-cache cores (`taskset -c 0-7,16-23`) | The other eight (`8-15,24-31`) |
+|---|---|---|---|
+| Still view, as shown | 66.3 a second | **90.9** | 67.4 |
+| Still view, frame's thread | 14.00 ms | 10.29 ms | 13.73 ms |
+| Debug editor at its start camera | 52.0 a second | **65.8** | — |
+
+The frame's thread walks tens of thousands of items and several hash tables each frame, and that work is bound by cache. This machine's `amd_x3d_mode` is `frequency`, which makes the kernel prefer the eight cores without the large cache, so that is where a game's frame lands. On Windows AMD's driver moves games to the V-cache cores; here it is one line as root (`echo cache > /sys/bus/platform/drivers/amd_x3d_vcache/*/amd_x3d_mode`) or GameMode's setting for it. The engine doesn't choose cores itself: a process that pins itself hands the limit to every program it starts (the editor's cooks and exports use all the cores), so that needs deciding, not slipping in. The tour is limited by the GPU and gains little (77 → 79).
+
+**Where it stands** (1996 × 998, release player, everything measured the same way as the second round's table: one run each, as launched; then the regression check's medians of three runs pinned to the V-cache cores):
+
+| Configuration | Target | Tour, second round → now | Still view, second round → now | Pinned: tour / still |
+|---|---|---|---|---|
+| Standard Ultra | 120+ | 119.2 → **132.6** | 102.0 → **114.7** | 143.7 / 179.5 |
+| Advanced lighting (Ultra with real-time GI, no rays) | 90+ | 118.3 → **131.7** | 104.4 → **116.5** | 143.0 / 178.6 |
+| Ray traced shadows and ambient occlusion | 90+ | 74.0 → **76.4** | 59.3 → **71.2** | 79.8 / 96.3 |
+| Heavy ray traced scenes (everything on) | 60+ | 71.8 → **77.2** | 57.5 → **68.3** | 79.3 / 91.1 |
+| Optimized Desert Homestead (everything on) | 100 | 71.8 → 77.2 | 57.5 → 68.3 | 79.3 / 91.1 |
+
+The debug editor at its start camera and default window: 26.7 at the start of the audit, 44.4 after the second round, **52.0** now. Nothing was turned down. The ray traced rows are still short of 90 and 100 wherever the GPU is the limit, which the tour is: its GPU frame is 12.4 ms, of which the scene pass is 4.2 (the same without ray tracing: the clouds' march, a known cost), ambient occlusion 2.5, ray traced shadows 2.2 and acceleration structures 1.3.
+
+**What is left, largest first.** On the frame's thread with ray tracing on (13.6 ms in the still view): the ray traced scene's walk and wgpu's per-instance TLAS work, about 7 ms across preparing, encoding and submitting, for which bundles of still plants built once are the lever; then the per-plant work of culling, materials, motion history and uploads (about 4 ms), for which each cluster's bounds and instances kept from frame to frame are. On the GPU: the rays themselves (5.4 ms of shadows and ambient occlusion at 2560 × 1405), the clouds, and building acceleration structures for swaying plants.
+
+**Regression benchmarks.** `benchmarks/baselines.json` has the four configurations on the tour and on the still view as `homestead-tour-*` and `homestead-still-*` (the settings are `benchmarks/features/owner-*.json`; a `still:` scene is the project with no script run and no Sequence playing), recorded for this machine under Fedora as `desktop-9950x3d-fedora`, with the frame as shown, the GPU's frame, the size drawn at and what each frame drew ([benchmarks.md](../benchmarks.md#regression-check)).
 
 ## Levels of detail, inspected
 

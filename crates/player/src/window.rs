@@ -1,6 +1,8 @@
 //! The window's events ([`ApplicationHandler`]): resizing, keys, the mouse,
 //! focus and redraws, which run a frame; plus the small helpers they use.
 
+use std::time::Duration;
+
 use super::*;
 
 /// Seconds since `last_frame` (0 for the first frame), and records now as the latest frame.
@@ -14,6 +16,120 @@ pub(crate) fn set_graphics(renderer: &mut Renderer, settings: &GraphicsSettings)
     for note in &renderer.graphics().notes {
         log::info!("graphics: {note}");
     }
+}
+
+/// The display's refresh is asked for again every this many shown frames.
+pub(crate) const REFRESH_ASKED_EVERY: u64 = 30;
+
+/// Whether shown frame number `frame` asks the display for its refresh
+/// again. A new window under Wayland isn't on a display yet and has none
+/// to say, and a window can be moved to another display with no event
+/// that says so.
+pub(crate) fn asks_refresh_on(frame: u64) -> bool {
+    frame.is_multiple_of(REFRESH_ASKED_EVERY)
+}
+
+/// How often `window`'s display refreshes, where it says.
+pub(crate) fn refresh_of(window: &Window) -> Option<Duration> {
+    let millihertz = window.current_monitor()?.refresh_rate_millihertz()?;
+    (millihertz > 0).then(|| Duration::from_secs_f64(1000.0 / f64::from(millihertz)))
+}
+
+/// A frame as the pacer sees it (`axcenity_render::FramePacer`): the time
+/// since the last frame started, the CPU's work in this one (its steps
+/// less the time `blocked` handing the picture over) and whether it
+/// waited for an earlier frame's GPU work (`gpu_wait`, part of `blocked`).
+pub(crate) fn paced(
+    seconds_since_last: f32,
+    steps: Duration,
+    blocked: Duration,
+    gpu_wait: Duration,
+) -> axcenity_render::PacedFrame {
+    /// Asking whether a finished frame is finished takes a few
+    /// microseconds: less than this wasn't waiting.
+    const WAITED: Duration = Duration::from_micros(300);
+    axcenity_render::PacedFrame {
+        interval: Duration::from_secs_f32(seconds_since_last.max(0.0)),
+        cpu: steps.saturating_sub(blocked),
+        waited_for_gpu: gpu_wait >= WAITED,
+    }
+}
+
+/// How long a frame that wasn't shown (the window is minimized or covered)
+/// lasts: the game keeps stepping, 30 times a second, without a display to
+/// pace it. Before, such frames came as fast as the loop turned over.
+const HIDDEN_FRAME: Duration = Duration::from_nanos(33_333_333);
+
+/// How long a redraw that was asked for may take to come before the
+/// window counts as hidden. Under Wayland a minimized or covered window
+/// is never asked to draw, so the game would stop altogether; any display
+/// that is showing the window asks far sooner than this.
+const REDRAW_OVERDUE: Duration = Duration::from_millis(250);
+
+/// What the event loop knows when it has nothing left to handle.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Waiting {
+    /// When the last frame started, if one has.
+    pub(crate) last_started: Option<Instant>,
+    /// The last frame wasn't drawn because the window can't show one
+    /// (`Renderer::hidden`: minimized, covered).
+    pub(crate) hidden: bool,
+    /// Frames are being stepped without drawing since a redraw went
+    /// unanswered ([`NextFrame::StepUnseen`]), until one comes.
+    pub(crate) unseen: bool,
+    /// When the redraw now waited for was asked for.
+    pub(crate) asked_at: Option<Instant>,
+}
+
+/// What the event loop does about the next frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum NextFrame {
+    /// Ask for a redraw and sleep until it comes as an event, or until
+    /// `give_up`, when the window counts as hidden.
+    Redraw { give_up: Instant },
+    /// Sleep until then, and look again: a hidden window's frames are
+    /// spaced out, since showing them doesn't pace them.
+    Sleep(Instant),
+    /// Run a frame without drawing it, now: nothing is asking for
+    /// frames, and the game goes on (a hosted game still serves).
+    StepUnseen,
+}
+
+/// What to do about the next frame at `now` (see [`NextFrame`]).
+pub(crate) fn next_frame(now: Instant, waiting: Waiting) -> NextFrame {
+    let spaced = waiting.last_started.map(|started| started + HIDDEN_FRAME);
+    if waiting.unseen {
+        // Still unasked: a frame every `HIDDEN_FRAME`.
+        return match spaced.filter(|due| *due > now) {
+            Some(due) => NextFrame::Sleep(due),
+            None => NextFrame::StepUnseen,
+        };
+    }
+    if waiting.hidden
+        && let Some(due) = spaced.filter(|due| *due > now)
+    {
+        return NextFrame::Sleep(due);
+    }
+    let give_up = waiting.asked_at.unwrap_or(now) + REDRAW_OVERDUE;
+    if give_up <= now {
+        NextFrame::StepUnseen
+    } else {
+        NextFrame::Redraw { give_up }
+    }
+}
+
+/// Whether `--bench` keeps vertical sync and the display's pacing:
+/// `AXCENITY_VSYNC` says `on` or `1`.
+pub(crate) fn bench_as_played(value: Option<&str>) -> bool {
+    asks_on(value)
+}
+
+/// Whether an environment switch's `value` says `on` or `1`.
+pub(crate) fn asks_on(value: Option<&str>) -> bool {
+    matches!(
+        value.map(str::trim).map(str::to_ascii_lowercase).as_deref(),
+        Some("on" | "1")
+    )
 }
 
 pub(crate) fn frame_seconds(last_frame: &mut Option<Instant>) -> f32 {
@@ -108,6 +224,13 @@ impl ApplicationHandler for App {
             Err(err) => return self.fail(event_loop, err.into()),
         };
 
+        // `AXCENITY_FRAME_CALLBACKS=on`: every frame waits for the display,
+        // as before frames were paced (to compare, and as a way back).
+        self.pacer = if asks_on(std::env::var("AXCENITY_FRAME_CALLBACKS").ok().as_deref()) {
+            axcenity_render::FramePacer::always_waiting(refresh_of(&window))
+        } else {
+            axcenity_render::FramePacer::new(refresh_of(&window))
+        };
         // GPU setup is `async`; `pollster::block_on` simply waits for it to finish.
         let size = window.inner_size();
         match pollster::block_on(Renderer::new(window.clone(), size.width, size.height)) {
@@ -126,8 +249,27 @@ impl ApplicationHandler for App {
                 };
                 if self.bench.is_some() {
                     // Frames as fast as they're drawn, each timed on the GPU.
-                    renderer.set_vsync(false);
+                    // Frames as fast as they're drawn, each timed on the
+                    // GPU. `AXCENITY_VSYNC=on` keeps vertical sync and the
+                    // display's pacing, to time frames as a player gets them.
+                    let as_played =
+                        bench_as_played(std::env::var("AXCENITY_VSYNC").ok().as_deref());
+                    renderer.set_vsync(as_played);
                     renderer.set_gpu_timing(true);
+                    if !as_played {
+                        self.pacer = axcenity_render::FramePacer::free_running();
+                    }
+                    // `AXCENITY_BENCH_LATENCY=on` times each frame from its
+                    // start to its finished picture, and
+                    // `AXCENITY_FRAMES_AHEAD=unlimited` lets frames queue as
+                    // deep as the swapchain, to see what the limit of one
+                    // is worth (`docs/benchmarks.md`).
+                    renderer.watch_latency(asks_on(
+                        std::env::var("AXCENITY_BENCH_LATENCY").ok().as_deref(),
+                    ));
+                    if std::env::var("AXCENITY_FRAMES_AHEAD").as_deref() == Ok("unlimited") {
+                        renderer.set_one_frame_ahead(false);
+                    }
                 }
                 self.sim.scripts.set_graphics(&settings, &capabilities);
                 set_graphics(&mut renderer, &settings);
@@ -189,6 +331,11 @@ impl ApplicationHandler for App {
             WindowEvent::Resized(size) => {
                 if let Some(renderer) = &mut self.renderer {
                     renderer.resize(size.width, size.height);
+                }
+                // Going full screen or moving to another display comes
+                // with a new size, and perhaps another refresh rate.
+                if let Some(window) = &self.window {
+                    self.pacer.set_refresh(refresh_of(window));
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -305,7 +452,11 @@ impl ApplicationHandler for App {
             }
             // One frame: the host's input first, then the shared schedule
             // (`axcenity_sim`, docs/architecture/frame-loop.md), then render.
-            WindowEvent::RedrawRequested => self.frame(event_loop),
+            WindowEvent::RedrawRequested => {
+                // The display asks for a frame: the window is seen.
+                self.unseen = false;
+                self.frame(event_loop);
+            }
             _ => {}
         }
     }
@@ -333,9 +484,202 @@ impl ApplicationHandler for App {
     }
 
     /// Called once all pending events are handled: ask for the next frame.
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        if let Some(window) = &self.window {
-            window.request_redraw();
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let (Some(window), Some(renderer)) = (&self.window, &self.renderer) else {
+            return;
+        };
+        // A frame that was shown is paced by showing it: the next comes
+        // as a redraw event (at once, or under Wayland when the display
+        // has shown the last, if that's waited for), and the loop sleeps
+        // until then. A window that can't show frames paces nothing, so
+        // its frames are spaced out here (`next_frame`).
+        let now = Instant::now();
+        let waiting = Waiting {
+            last_started: self.last_frame,
+            hidden: renderer.hidden(),
+            unseen: self.unseen,
+            asked_at: self.redraw_asked_at,
+        };
+        match next_frame(now, waiting) {
+            NextFrame::Redraw { give_up } => {
+                self.redraw_asked_at.get_or_insert(now);
+                window.request_redraw();
+                event_loop.set_control_flow(ControlFlow::WaitUntil(give_up));
+            }
+            NextFrame::Sleep(until) => {
+                event_loop.set_control_flow(ControlFlow::WaitUntil(until));
+            }
+            NextFrame::StepUnseen => {
+                // A redraw stays asked for: when the window is shown
+                // again it comes, and frames are drawn as before.
+                window.request_redraw();
+                self.unseen = true;
+                self.frame(event_loop);
+                event_loop.set_control_flow(ControlFlow::WaitUntil(now + HIDDEN_FRAME));
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod pacing_tests {
+    use super::*;
+
+    #[test]
+    fn a_paced_frame_counts_work_not_waiting() {
+        let ms = Duration::from_millis;
+        // 20 ms of steps, 6 of them blocked handing the picture over, 5 of
+        // those waiting for the frame before last on the GPU.
+        let frame = paced(0.025, ms(20), ms(6), ms(5));
+        assert_eq!(frame.cpu, ms(14));
+        assert_eq!(frame.interval, Duration::from_secs_f32(0.025));
+        assert!(frame.waited_for_gpu);
+        // Asking about a frame that had finished isn't waiting for it.
+        assert!(!paced(0.025, ms(20), ms(1), Duration::from_micros(20)).waited_for_gpu);
+        // The first frame has no frame before it.
+        assert_eq!(paced(0.0, ms(3), ms(5), ms(0)).cpu, Duration::ZERO);
+    }
+
+    fn shown(now: Instant) -> Waiting {
+        Waiting {
+            last_started: Some(now - Duration::from_millis(5)),
+            hidden: false,
+            unseen: false,
+            asked_at: None,
+        }
+    }
+
+    #[test]
+    fn the_displays_refresh_is_asked_for_again_as_frames_go_by() {
+        // Under Wayland a new window isn't on a display yet, so the first
+        // answer is "unknown" (taken as 60 Hz): frames 17 to 25 ms long on
+        // a 240 Hz display then never counted as missing its refresh.
+        assert!(asks_refresh_on(0));
+        assert_eq!(
+            (1..=REFRESH_ASKED_EVERY * 3)
+                .filter(|frame| asks_refresh_on(*frame))
+                .collect::<Vec<u64>>(),
+            [
+                REFRESH_ASKED_EVERY,
+                REFRESH_ASKED_EVERY * 2,
+                REFRESH_ASKED_EVERY * 3
+            ]
+        );
+        // Often enough to know within a second at any frame rate a game
+        // is played at, seldom enough to cost nothing.
+        assert!((10..=120).contains(&REFRESH_ASKED_EVERY));
+        // What knowing it changes: 22 ms from frame to frame is no miss
+        // at an assumed 60 Hz, and a miss five times over at 240.
+        let mut pacer = axcenity_render::FramePacer::new(None);
+        let frame = paced(
+            0.022,
+            Duration::from_millis(10),
+            Duration::ZERO,
+            Duration::ZERO,
+        );
+        for _ in 0..100 {
+            pacer.frame(frame);
+        }
+        assert!(pacer.waits_for_display());
+        pacer.set_refresh(Some(Duration::from_secs_f64(1.0 / 240.0)));
+        for _ in 0..8 {
+            pacer.frame(frame);
+        }
+        assert!(!pacer.waits_for_display());
+    }
+
+    #[test]
+    fn a_shown_frame_is_followed_by_a_redraw_waited_for_as_an_event() {
+        let now = Instant::now();
+        // Nothing turns over meanwhile; a quarter of a second without an
+        // answer and the window counts as hidden.
+        assert_eq!(
+            next_frame(now, shown(now)),
+            NextFrame::Redraw {
+                give_up: now + REDRAW_OVERDUE
+            }
+        );
+        // Still waiting for the same redraw a little later: same deadline.
+        let asked = Waiting {
+            asked_at: Some(now),
+            ..shown(now)
+        };
+        assert_eq!(
+            next_frame(now + Duration::from_millis(100), asked),
+            NextFrame::Redraw {
+                give_up: now + REDRAW_OVERDUE
+            }
+        );
+        // The very first frame, before any has started.
+        let first = Waiting {
+            last_started: None,
+            ..shown(now)
+        };
+        assert!(matches!(next_frame(now, first), NextFrame::Redraw { .. }));
+    }
+
+    #[test]
+    fn a_redraw_that_never_comes_does_not_stop_the_game() {
+        // Under Wayland a minimized window is never asked to draw.
+        let now = Instant::now();
+        let asked = Waiting {
+            asked_at: Some(now),
+            ..shown(now)
+        };
+        assert_eq!(
+            next_frame(now + REDRAW_OVERDUE, asked),
+            NextFrame::StepUnseen
+        );
+        // From then on a frame every thirtieth of a second, undrawn,
+        // sleeping in between, until a redraw comes.
+        let stepped = now + REDRAW_OVERDUE;
+        let unseen = Waiting {
+            last_started: Some(stepped),
+            hidden: false,
+            unseen: true,
+            asked_at: None,
+        };
+        assert_eq!(
+            next_frame(stepped + Duration::from_millis(1), unseen),
+            NextFrame::Sleep(stepped + HIDDEN_FRAME)
+        );
+        assert_eq!(
+            next_frame(stepped + HIDDEN_FRAME, unseen),
+            NextFrame::StepUnseen
+        );
+    }
+
+    #[test]
+    fn a_frame_the_window_could_not_show_spaces_out_the_next() {
+        // Minimized on Windows, covered on macOS: the redraw comes at
+        // once and the frame is skipped, so nothing else would pace it.
+        let now = Instant::now();
+        let hidden = Waiting {
+            hidden: true,
+            ..shown(now)
+        };
+        let started = hidden.last_started.unwrap();
+        assert_eq!(
+            next_frame(now, hidden),
+            NextFrame::Sleep(started + HIDDEN_FRAME)
+        );
+        // Its turn come, it's asked for as usual (and shown, if the
+        // window is back).
+        assert!(matches!(
+            next_frame(started + HIDDEN_FRAME, hidden),
+            NextFrame::Redraw { .. }
+        ));
+        // Thirty a second: enough for a hosted game to keep serving.
+        assert!(HIDDEN_FRAME >= Duration::from_millis(30));
+        assert!(HIDDEN_FRAME <= Duration::from_millis(40));
+    }
+
+    #[test]
+    fn a_bench_keeps_vertical_sync_only_when_asked() {
+        assert!(!bench_as_played(None));
+        assert!(!bench_as_played(Some("off")));
+        assert!(bench_as_played(Some("on")));
+        assert!(bench_as_played(Some(" On ")));
+        assert!(bench_as_played(Some("1")));
     }
 }

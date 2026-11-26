@@ -56,7 +56,7 @@ fn thread_count(asked: Option<&str>, cpus: usize) -> Option<usize> {
 /// Runs `job` on the renderer's pool (or the global one). Called from a
 /// thread of some pool already (a caller's own, as the tests' one-thread
 /// pool), the job stays in that pool.
-fn shared<R: Send>(job: impl FnOnce() -> R + Send) -> R {
+pub(super) fn shared<R: Send>(job: impl FnOnce() -> R + Send) -> R {
     match pool() {
         Some(pool) if rayon::current_thread_index().is_none() => pool.install(job),
         _ => job(),
@@ -83,6 +83,20 @@ pub(super) fn map_parts<'a, T: Sync, R: Send>(
         return vec![f(items)];
     }
     shared(|| items.par_chunks(PART).map(f).collect())
+}
+
+/// [`map_parts`] for items that each take long enough (a few hundred
+/// nanoseconds or more) to be worth sharing from `worth` of them up, in
+/// parts of `part`.
+pub(super) fn map_heavy_parts<'a, T: Sync, R: Send>(
+    items: &'a [T],
+    (worth, part): (usize, usize),
+    f: impl Fn(&'a [T]) -> R + Sync + Send,
+) -> Vec<R> {
+    if items.len() < worth {
+        return vec![f(items)];
+    }
+    shared(|| items.par_chunks(part.max(1)).map(f).collect())
 }
 
 /// `f` of each of `items`, in order, each its own job for the threads if

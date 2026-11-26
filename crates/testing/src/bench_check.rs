@@ -8,7 +8,9 @@
 //! uncounted warm-up round and then `--rounds` counted ones, and takes the
 //! median of the runs' medians. A project scene is copied from the projects
 //! folder into `target/bench-projects` once (without its `.axcenity`
-//! folder) and cooked there, so the owner's project is never written.
+//! folder) and cooked there, so the owner's project is never written. A
+//! `still:<name>` scene is such a copy with its scripts left out and its
+//! Sequences not playing, so the camera stands where the world puts it.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -32,16 +34,61 @@ struct Options {
 }
 
 /// What one scene measured: the frame's median and, from the player, its
-/// startup times and (where the GPU can be timed) the GPU frame's median,
-/// all in milliseconds, and the 1% low frame rate.
+/// startup times, (where the GPU can be timed) the GPU frame's median and
+/// the time from one frame's start to the next's (the frame as shown),
+/// all in milliseconds, and the 1% low frame rate. Then what isn't
+/// judged but explains a change: what limits the frame, the size it was
+/// drawn at and what each frame drew.
 #[derive(Default)]
 struct Measured {
     frame_ms: Vec<f64>,
     first_frame_ms: Vec<f64>,
     assets_ms: Vec<f64>,
     gpu_ms: Vec<f64>,
+    shown_ms: Vec<f64>,
     low_1pct_fps: Vec<f64>,
     bound: Option<String>,
+    size: Option<(u64, u64)>,
+    counts: Vec<(String, u64)>,
+}
+
+impl Measured {
+    /// Adds one run's `report` (the JSON line a host's `--bench` prints).
+    fn read(&mut self, report: &Value, host: &str) {
+        let median_of = |stages: &Value| {
+            stages
+                .as_array()
+                .and_then(|stages| stages.iter().find(|stage| stage["name"] == "frame"))
+                .and_then(|stage| stage["median_ms"].as_f64())
+        };
+        self.frame_ms.extend(median_of(&report["stages"]));
+        self.gpu_ms.extend(median_of(&report["gpu"]));
+        self.shown_ms
+            .extend(report["shown"]["interval_ms"].as_f64());
+        self.low_1pct_fps
+            .extend(report["pacing"]["low_1pct_fps"].as_f64());
+        if let Some(bound) = report["bound"].as_str() {
+            self.bound = Some(bound.to_owned());
+        }
+        if let [Some(width), Some(height)] =
+            [&report["size"][0], &report["size"][1]].map(Value::as_u64)
+        {
+            self.size = Some((width, height));
+        }
+        // The last run's counts: the same scene draws the same each run.
+        if let Some(counts) = report["counts"].as_object() {
+            self.counts = counts
+                .iter()
+                .filter_map(|(name, count)| Some((name.clone(), count.as_u64()?)))
+                .collect();
+        }
+        if host == "player" {
+            let startup = &report["startup"];
+            self.first_frame_ms.extend(startup["first frame"].as_f64());
+            self.assets_ms
+                .extend(startup["launch to assets loaded"].as_f64());
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -125,6 +172,12 @@ fn run() -> Result<ExitCode, String> {
                 startup_tolerance,
             ),
             ("gpu_ms", "GPU frame", &measured.gpu_ms, frame_tolerance),
+            (
+                "shown_ms",
+                "frame as shown",
+                &measured.shown_ms,
+                frame_tolerance,
+            ),
         ] {
             let Some(now) = median(samples) else { continue };
             entry.insert(key.into(), json!((now * 1000.0).round() / 1000.0));
@@ -164,6 +217,30 @@ fn run() -> Result<ExitCode, String> {
         if let Some(bound) = measured.bound.as_ref().filter(|_| drawn) {
             println!("{name:<34} {bound}");
             entry.insert("bound".into(), json!(bound));
+        }
+        // The size drawn at and what a frame drew: a frame that moved
+        // with these moved because the window or the scene did.
+        if let Some((width, height)) = measured.size {
+            let size = json!([width, height]);
+            let base = &recorded[name]["size"];
+            if !base.is_null() && *base != size {
+                println!(
+                    "{name:<34} DRAWN AT {width} x {height}, not the baseline's {base}: its times don't compare"
+                );
+            }
+            entry.insert("size".into(), size);
+        }
+        if !measured.counts.is_empty() {
+            let mut counts = Map::new();
+            for (count, now) in &measured.counts {
+                if let Some(base) = recorded[name]["counts"][count].as_u64()
+                    && base != *now
+                {
+                    println!("{name:<34} {count:<16} {base:>10} {now:>10}");
+                }
+                counts.insert(count.clone(), json!(now));
+            }
+            entry.insert("counts".into(), Value::Object(counts));
         }
         if let Some(note) = recorded[name]["known"].as_str() {
             println!("{name:<34} known: {note}");
@@ -320,31 +397,7 @@ fn measure(run: &Value, options: &Options) -> Result<Option<Measured>, String> {
         if round == 0 {
             continue;
         }
-        let frame = report["stages"]
-            .as_array()
-            .and_then(|stages| stages.iter().find(|stage| stage["name"] == "frame"))
-            .and_then(|stage| stage["median_ms"].as_f64());
-        measured.frame_ms.extend(frame);
-        let gpu = report["gpu"]
-            .as_array()
-            .and_then(|stages| stages.iter().find(|stage| stage["name"] == "frame"))
-            .and_then(|stage| stage["median_ms"].as_f64());
-        measured.gpu_ms.extend(gpu);
-        measured
-            .low_1pct_fps
-            .extend(report["pacing"]["low_1pct_fps"].as_f64());
-        if let Some(bound) = report["bound"].as_str() {
-            measured.bound = Some(bound.to_owned());
-        }
-        if host == "player" {
-            let startup = &report["startup"];
-            measured
-                .first_frame_ms
-                .extend(startup["first frame"].as_f64());
-            measured
-                .assets_ms
-                .extend(startup["launch to assets loaded"].as_f64());
-        }
+        measured.read(&report, host);
     }
     Ok(Some(measured))
 }
@@ -389,21 +442,71 @@ fn scene_folder(scene: &str, options: &Options) -> Result<Option<PathBuf>, Strin
             .map_err(|err| format!("making the showcase: {err}"))?;
         return cook(&copy, axcenity_testing::showcase::NAME).map(Some);
     }
-    let Some(project) = scene.strip_prefix("project:") else {
-        return Err(format!(
-            "unknown scene `{scene}`: use s10k, crowd, streaming, showcase:<view> or project:<name>"
-        ));
+    // `still:<name>` is the project standing still: its own copy, with
+    // no script run and no Sequence played.
+    let (project, still) = match (scene.strip_prefix("project:"), scene.strip_prefix("still:")) {
+        (Some(project), _) => (project, false),
+        (None, Some(project)) => (project, true),
+        (None, None) => {
+            return Err(format!(
+                "unknown scene `{scene}`: use s10k, crowd, streaming, showcase:<view>, \
+                 project:<name> or still:<name>"
+            ));
+        }
     };
     let source = options.projects.join(project);
     if !source.join("world.json").exists() {
         return Ok(None);
     }
-    let copy = PathBuf::from("target/bench-projects").join(project);
+    let folder = if still {
+        format!("{project} (still)")
+    } else {
+        project.to_owned()
+    };
+    let copy = PathBuf::from("target/bench-projects").join(folder);
     if options.fresh || !copy.join("world.json").exists() {
         let _ = std::fs::remove_dir_all(&copy);
         copy_project(&source, &copy).map_err(|err| format!("copying {project}: {err}"))?;
+        if still {
+            make_still(&copy).map_err(|err| format!("making {project} stand still: {err}"))?;
+        }
     }
     cook(&copy, project).map(Some)
+}
+
+/// Makes the project copy in `folder` stand still: its `scripts` folder
+/// is removed (a script may move the camera) and every Sequence's
+/// `AutoPlay` is turned off (a cutscene does), so a host's `--bench`
+/// draws the view the world itself starts with, every frame.
+fn make_still(folder: &Path) -> Result<(), String> {
+    let scripts = folder.join("scripts");
+    if scripts.exists() {
+        std::fs::remove_dir_all(&scripts).map_err(|err| err.to_string())?;
+    }
+    let path = folder.join("world.json");
+    let text = std::fs::read_to_string(&path).map_err(|err| err.to_string())?;
+    let mut world: Value = serde_json::from_str(&text).map_err(|err| err.to_string())?;
+    stop_sequences(&mut world);
+    let text = serde_json::to_string_pretty(&world).map_err(|err| err.to_string())?;
+    std::fs::write(&path, text).map_err(|err| err.to_string())
+}
+
+/// Turns `AutoPlay` off on every Sequence under `node`.
+fn stop_sequences(node: &mut Value) {
+    match node {
+        Value::Object(fields) => {
+            if fields.get("class").and_then(Value::as_str) == Some("Sequence")
+                && let Some(auto_play) = fields
+                    .get_mut("properties")
+                    .and_then(|properties| properties.get_mut("AutoPlay"))
+            {
+                *auto_play = json!(false);
+            }
+            fields.values_mut().for_each(stop_sequences);
+        }
+        Value::Array(items) => items.iter_mut().for_each(stop_sequences),
+        _ => {}
+    }
 }
 
 /// Cooks what isn't current yet in `copy`, as opening the project in the
@@ -493,6 +596,88 @@ mod tests {
         assert_eq!(options.only.as_deref(), Some("s10k"));
         assert!(parse_all(&["--machine", "desk", "--rounds", "0"]).is_err());
         assert!(parse_all(&["--machine", "desk", "--fast"]).is_err());
+    }
+
+    #[test]
+    fn a_still_copy_runs_no_script_and_plays_no_sequence() {
+        let root = std::env::temp_dir().join(format!("bench-check-still-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("scripts")).unwrap();
+        std::fs::create_dir_all(root.join("assets")).unwrap();
+        std::fs::write(root.join("scripts/tour.client.lua"), "print('hi')").unwrap();
+        std::fs::write(root.join("assets/a.png"), "a").unwrap();
+        let world = json!({
+            "workspace": { "children": [
+                { "class": "Sequence", "name": "Tour",
+                  "properties": { "SequenceId": "assets/Tour.json", "AutoPlay": true } },
+                { "class": "Part", "name": "AutoPlay", "properties": { "Anchored": true } },
+                { "class": "Folder", "children": [
+                    { "class": "Sequence", "properties": { "AutoPlay": true, "Looped": true } },
+                ] },
+            ] }
+        });
+        std::fs::write(root.join("world.json"), world.to_string()).unwrap();
+        make_still(&root).unwrap();
+        assert!(!root.join("scripts").exists());
+        assert!(root.join("assets/a.png").exists());
+        let still: Value =
+            serde_json::from_str(&std::fs::read_to_string(root.join("world.json")).unwrap())
+                .unwrap();
+        let children = &still["workspace"]["children"];
+        assert_eq!(children[0]["properties"]["AutoPlay"], json!(false));
+        assert_eq!(
+            children[0]["properties"]["SequenceId"],
+            json!("assets/Tour.json")
+        );
+        // Nothing else is touched.
+        assert_eq!(children[1], world["workspace"]["children"][1]);
+        let nested = &children[2]["children"][0]["properties"];
+        assert_eq!(
+            (&nested["AutoPlay"], &nested["Looped"]),
+            (&json!(false), &json!(true))
+        );
+        // Making it again changes nothing.
+        make_still(&root).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_players_report_gives_the_frame_as_shown_and_what_it_drew() {
+        let report = json!({
+            "host": "player",
+            "stages": [{ "name": "Render", "median_ms": 9.0 }, { "name": "frame", "median_ms": 10.5 }],
+            "gpu": [{ "name": "Scene", "median_ms": 2.0 }, { "name": "frame", "median_ms": 12.25 }],
+            "pacing": { "low_1pct_fps": 61.5 },
+            "shown": { "average_fps": 70.0, "interval_ms": 14.25 },
+            "size": [1996, 998],
+            "counts": { "draw calls": 4200, "traced instances": 23000 },
+            "bound": "GPU-bound",
+            "startup": { "first frame": 900.0, "launch to assets loaded": 6000.0 }
+        });
+        let mut measured = Measured::default();
+        measured.read(&report, "player");
+        measured.read(&report, "player");
+        assert_eq!(measured.frame_ms, [10.5, 10.5]);
+        assert_eq!(measured.gpu_ms, [12.25, 12.25]);
+        assert_eq!(measured.shown_ms, [14.25, 14.25]);
+        assert_eq!(measured.size, Some((1996, 998)));
+        assert_eq!(
+            measured.counts,
+            [
+                ("draw calls".to_owned(), 4200),
+                ("traced instances".to_owned(), 23000)
+            ]
+        );
+        assert_eq!(measured.bound.as_deref(), Some("GPU-bound"));
+        assert_eq!(measured.assets_ms, [6000.0, 6000.0]);
+        // A host that shows nothing has none of these.
+        let mut server = Measured::default();
+        server.read(
+            &json!({ "stages": [{ "name": "frame", "median_ms": 1.0 }] }),
+            "server",
+        );
+        assert_eq!(server.frame_ms, [1.0]);
+        assert!(server.shown_ms.is_empty() && server.size.is_none() && server.counts.is_empty());
+        assert!(server.assets_ms.is_empty());
     }
 
     #[test]

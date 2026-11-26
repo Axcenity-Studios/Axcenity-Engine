@@ -28,6 +28,7 @@ pub(super) const SCENE_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
@@ -42,6 +43,7 @@ pub(super) const WATER_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
@@ -59,6 +61,7 @@ pub(super) const TRACED_WATER_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
@@ -75,6 +78,7 @@ pub(super) const SCENE_TEMPLATE: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../shader.wgsl"),
@@ -88,6 +92,7 @@ pub(super) const TERRAIN_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../terrain.wgsl")
 );
@@ -97,6 +102,7 @@ pub(super) const DECAL_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../decal.wgsl")
 );
@@ -112,8 +118,15 @@ pub(super) const VOLUMETRIC_FOG_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../volumetric_fog.wgsl")
+);
+/// The traced clouds' passes (`cloud_trace.wgsl`, renderer/cloud_trace.rs):
+/// the clouds with `cloud_fill` read from a texture, not cloud_fill.wgsl's.
+pub(super) const CLOUD_TRACE_SHADER: &str = concat!(
+    include_str!("../clouds.wgsl"),
+    include_str!("../cloud_trace.wgsl")
 );
 /// Sun rays' pass (`sun_rays.wgsl`, renderer/sun_rays.rs).
 pub(super) const SUN_RAYS_SHADER: &str = include_str!("../sun_rays.wgsl");
@@ -125,6 +138,7 @@ pub(super) const RAY_GI_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../ray_cut_outs.wgsl"),
     include_str!("../ray_gi_hardware.wgsl"),
@@ -139,6 +153,7 @@ pub(super) const RAY_REFLECTIONS_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../ray_cut_outs.wgsl"),
     include_str!("../ray_reflections.wgsl")
@@ -150,6 +165,7 @@ pub(super) const RAY_GI_SOFTWARE_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../ray_soft.wgsl"),
     include_str!("../ray_gi_software.wgsl"),
@@ -165,6 +181,7 @@ pub(super) const PATH_TRACER_SHADER: &str = concat!(
     include_str!("../sky.wgsl"),
     include_str!("../fog.wgsl"),
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../lighting.wgsl"),
     include_str!("../ray_cut_outs.wgsl"),
     include_str!("../path_tracer.wgsl")
@@ -174,6 +191,7 @@ pub(super) const PATH_TRACER_SHADER: &str = concat!(
 /// and the clouds' noise it rolls gusts with.
 pub(super) const RAY_SWAY_SHADER: &str = concat!(
     include_str!("../clouds.wgsl"),
+    include_str!("../cloud_fill.wgsl"),
     include_str!("../sway.wgsl"),
     include_str!("../ray_sway.wgsl")
 );

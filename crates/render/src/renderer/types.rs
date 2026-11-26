@@ -744,6 +744,9 @@ pub(super) struct Batch {
     /// A cut-out surface, whose depth is drawn before anything is lit
     /// ([`PrefillPipelines`]).
     pub(super) prefilled: bool,
+    /// What it is, for the GPU's time by what is drawn; solid items are
+    /// sorted by it within a distance band.
+    pub(super) part: gpu_timer::DrawnPart,
     pub(super) instances: Range<u32>,
 }
 
@@ -1052,6 +1055,8 @@ pub(super) struct ScenePipeline {
     pub(super) water_frame_bind_group: Option<wgpu::BindGroup>,
     /// How far the wind has carried the clouds.
     pub(super) cloud_drift: clouds::CloudDrift,
+    /// The sky's clouds traced at half size (`renderer/cloud_trace.rs`).
+    pub(super) cloud_trace: cloud_trace::CloudTrace,
     /// The frame's bindings, for making them seen by compute shaders too.
     pub(super) frame_entries: Vec<wgpu::BindGroupLayoutEntry>,
     /// Whether the sky draws the sun's disc: false only while baking light
@@ -1172,6 +1177,21 @@ pub(super) struct ScenePipeline {
     /// Whether frames are timed while there's a timer: on unless a host
     /// turns it off (the player times only while someone is looking).
     pub(super) time_gpu: bool,
+    /// Times each frame to its finished picture, while a benchmark asks
+    /// (renderer/latency.rs).
+    pub(super) latency: Option<latency::LatencyWatch>,
+    /// The last frame's time on the calling thread, section by section.
+    pub(super) cpu_times: [Duration; CpuSection::COUNT],
+    /// Whether a frame waits for the one before the last to finish on the
+    /// GPU (`TextureRenderer::set_one_frame_ahead`).
+    pub(super) one_frame_ahead: bool,
+    /// Whether a frame is recorded into several encoders that are encoded
+    /// side by side (renderer/encoders.rs).
+    pub(super) frame_in_parts: bool,
+    /// The last frame's submission, for the next frame to wait for.
+    pub(super) last_frame: Option<wgpu::SubmissionIndex>,
+    /// How long the last frame waited for an earlier one's GPU work.
+    pub(super) gpu_wait: Duration,
     /// What the last frame drew.
     pub(super) counts: FrameCounts,
     /// While set, items are culled as if seen from this camera, not the
@@ -1182,6 +1202,8 @@ pub(super) struct ScenePipeline {
     pub(super) culling_bounds: Vec<CullingBounds>,
     /// Each item's level of detail, kept between frames.
     pub(super) lods: LodStates,
+    /// What each group of items is, worked out once (renderer/clusters.rs).
+    pub(super) clusters: clusters::Clusters,
     /// Hardware ray tracing's acceleration structures, while something
     /// traces rays (renderer/ray_tracing.rs).
     pub(super) ray_scene: Option<Box<super::ray_tracing::RayScene>>,
@@ -1246,6 +1268,8 @@ pub(super) struct ScenePipeline {
 pub(super) struct FrameCounts {
     /// Indexed draws, the shadow passes' and prepass's included.
     pub(super) draw_calls: u32,
+    /// The command buffers the frame was submitted as.
+    pub(super) command_buffers: u32,
     /// Triangles those draws sent, and their meshes' corners, counting
     /// every instance.
     pub(super) triangles: u64,

@@ -36,6 +36,7 @@ use crate::graphics::{
 use crate::mesh::{self};
 use anyhow::{Context, Result};
 use bytemuck::{Pod, Zeroable};
+pub use cpu_timer::CpuSection;
 pub use culling::CullingBounds;
 #[cfg(feature = "debug-views")]
 pub use debug_views::DebugView;
@@ -44,7 +45,7 @@ use glyphon::{
     TextBounds, TextRenderer as GlyphTextRenderer, Viewport as TextViewport,
 };
 pub use gpu_particles::MAX_GPU_PARTICLES;
-pub use gpu_timer::FramePass;
+pub use gpu_timer::{DrawnPart, FramePass, PartPass, PartTimes, part_label};
 #[cfg(feature = "debug-views")]
 pub use path_tracer::MOST_PATHS as PATH_TRACED_MOST_PATHS;
 pub use posing::PosingStats;
@@ -53,11 +54,15 @@ pub use ray_tracing::RayTracingStats;
 pub use surface_shaders::{ShaderError, SurfaceShader};
 
 mod atmosphere_sky;
+mod cloud_trace;
 mod clouds;
+mod clusters;
+mod cpu_timer;
 mod culling;
 #[cfg(feature = "debug-views")]
 mod debug_views;
 mod decals;
+mod encoders;
 mod environment;
 mod fog;
 mod gpu;
@@ -65,6 +70,7 @@ mod gpu_particles;
 mod gpu_timer;
 mod grading;
 mod grid;
+mod latency;
 mod lens;
 mod light_probes;
 mod lighting;
@@ -144,6 +150,9 @@ pub struct Renderer {
     config: wgpu::SurfaceConfiguration,
     /// True while the window is minimized (zero-sized), when there's nothing to draw.
     minimized: bool,
+    /// Whether the last frame wasn't drawn because the window can't show
+    /// one ([`Renderer::hidden`]).
+    hidden: bool,
     scene: ScenePipeline,
     /// How long the last frame was blocked getting its picture from the
     /// window and handing it back (vertical sync, or the GPU behind).
@@ -180,6 +189,9 @@ pub const LOD_SCREEN_SIZES: [f32; LOD_LEVELS - 1] = lod::LOD_SCREEN_SIZES;
 pub struct RenderStats {
     /// Indexed draws, including the shadow passes'.
     pub draw_calls: u32,
+    /// The command buffers the frame was submitted as: the parts it was
+    /// recorded in (`TextureRenderer::set_frame_in_parts`).
+    pub command_buffers: u32,
     /// Triangles those draws sent, counting every instance.
     pub triangles: u64,
     /// The corners of the meshes those draws sent, counting every instance.
@@ -187,6 +199,13 @@ pub struct RenderStats {
     /// The GPU's time for a recent frame (a frame or two behind), or `None`
     /// before the first reading or when it can't be measured.
     pub gpu_time: Option<Duration>,
+    /// The last frame's work on the thread that drew it, in
+    /// [`CpuSection::ALL`]'s order (see [`RenderStats::cpu_time`]).
+    pub cpu_times: [Duration; CpuSection::COUNT],
+    /// How long drawing the last frame was blocked waiting for an earlier
+    /// frame's GPU work (`TextureRenderer::set_one_frame_ahead`): time
+    /// the CPU spent waiting, not working.
+    pub gpu_wait: Duration,
     /// False when the device can't take timestamps, so `gpu_time` and
     /// `pass_times` stay `None`.
     pub gpu_timing: bool,
@@ -205,6 +224,12 @@ pub struct RenderStats {
     /// [`FramePass::ALL`]'s order: `None` for a pass that frame didn't draw
     /// (see [`RenderStats::pass_time`]).
     pub pass_times: [Option<Duration>; FramePass::COUNT],
+    /// The depth prepass's and the scene pass's GPU time by what was drawn
+    /// (terrain, scattered items, other items, the sky), for the frame
+    /// `gpu_time` measured: `None` for what it didn't draw, and all `None`
+    /// on a device that can't stamp inside a pass (see
+    /// [`RenderStats::part_time`]).
+    pub part_times: PartTimes,
     /// Items in the draw list.
     pub items_submitted: u32,
     /// Items the scene pass drew: those submitted in the camera's view,
@@ -267,9 +292,20 @@ pub struct RenderStats {
 }
 
 impl RenderStats {
+    /// The last frame's time in `section` on the thread that drew it.
+    pub fn cpu_time(&self, section: CpuSection) -> Duration {
+        self.cpu_times[section as usize]
+    }
+
     /// The GPU's time for `pass`, if it was measured and drawn.
     pub fn pass_time(&self, pass: FramePass) -> Option<Duration> {
         self.pass_times[pass as usize]
+    }
+
+    /// The GPU's time for `part` within `pass`, if it was measured and
+    /// drawn.
+    pub fn part_time(&self, pass: PartPass, part: DrawnPart) -> Option<Duration> {
+        self.part_times[pass as usize][part as usize]
     }
 }
 
@@ -309,7 +345,9 @@ impl Renderer {
             // readout and `--bench`; frames are only timed while
             // `set_gpu_timing` is on.
             required_features: adapter.features()
-                & (wgpu::Features::TEXTURE_COMPRESSION_BC | wgpu::Features::TIMESTAMP_QUERY),
+                & (wgpu::Features::TEXTURE_COMPRESSION_BC
+                    | wgpu::Features::TIMESTAMP_QUERY
+                    | wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES),
             ..Default::default()
         };
         // Hardware ray tracing where the GPU has it, for the optional ray
@@ -347,6 +385,9 @@ impl Renderer {
         let mut scene =
             ScenePipeline::new(device, queue, config.format, width, height, capabilities);
         scene.time_gpu = false;
+        // A window's frames are shown: never more than one waiting behind
+        // the one the GPU draws (`TextureRenderer::set_one_frame_ahead`).
+        scene.one_frame_ahead = true;
         log::info!(
             "graphics pipelines ready in {} ms",
             building.elapsed().as_millis()
@@ -355,6 +396,7 @@ impl Renderer {
         Ok(Self {
             surface,
             minimized: false,
+            hidden: false,
             scene,
             config,
             present_wait: Duration::ZERO,
@@ -396,11 +438,61 @@ impl Renderer {
         self.scene.stats()
     }
 
+    /// Whether the last frame wasn't drawn because the window can't show
+    /// one: it's minimized, or the system said it's covered or handed no
+    /// picture over in time. Nothing paces such frames (no picture is
+    /// presented), so a host should space them out itself.
+    pub fn hidden(&self) -> bool {
+        self.hidden
+    }
+
     /// How long the last frame was blocked on the window: getting a picture
     /// to draw into and presenting it. Vertical sync, or a GPU frames
     /// behind, shows up here rather than as work.
     pub fn present_wait(&self) -> Duration {
         self.present_wait
+    }
+
+    /// Times each frame from its start to its picture being finished on
+    /// the GPU, while `on`: the part of input latency the engine decides
+    /// (`docs/benchmarks.md`). It keeps a thread looking at the GPU, so
+    /// only benchmarks turn it on.
+    pub fn watch_latency(&mut self, on: bool) {
+        self.scene.watch_latency(on);
+    }
+
+    /// The next frame drawn started at `at`: when its host read the input
+    /// it shows. Only matters while [`Self::watch_latency`] is on.
+    pub fn frame_started(&mut self, at: std::time::Instant) {
+        self.scene.frame_started(at);
+    }
+
+    /// The watched frames' times since last asked, oldest first.
+    pub fn take_latencies(&self) -> Vec<Duration> {
+        self.scene.take_latencies()
+    }
+
+    /// Whether a frame waits for the frame before the last to finish on
+    /// the GPU (on for a window's renderer; see
+    /// [`TextureRenderer::set_one_frame_ahead`]). Off lets frames queue as
+    /// deep as the swapchain, to measure what the limit is worth.
+    pub fn set_one_frame_ahead(&mut self, on: bool) {
+        self.scene.one_frame_ahead = on;
+    }
+
+    /// The part of [`Renderer::present_wait`] the last frame spent waiting
+    /// for the frame before the one before it to finish on the GPU: a
+    /// window's renderer is always one frame ahead
+    /// (`TextureRenderer::set_one_frame_ahead`), so more than nothing here
+    /// means the GPU is the slower side.
+    pub fn gpu_wait(&self) -> Duration {
+        self.scene.gpu_wait
+    }
+
+    /// The size frames are drawn at, in physical pixels: the window's as
+    /// it really is, which may be smaller than a host asked for.
+    pub fn size(&self) -> (u32, u32) {
+        (self.config.width, self.config.height)
     }
 
     /// Call when the window changes size. Sizes are in physical pixels.
@@ -444,6 +536,14 @@ impl Renderer {
         self.scene.keep_undrawn = on;
     }
 
+    /// Whether the sky's clouds are traced in a pass of their own at half
+    /// size (on by default, `renderer/cloud_trace.rs`) or worked out by the
+    /// sky pass in each of its pixels, as they are wherever they can't be
+    /// traced. For comparing the two.
+    pub fn set_trace_clouds(&mut self, on: bool) {
+        self.scene.cloud_trace.enabled = on;
+    }
+
     /// How many background uploads are still on their way.
     pub fn pending_uploads(&self) -> usize {
         self.scene.pending_uploads()
@@ -472,6 +572,7 @@ impl Renderer {
     /// windowing libraries use that moment to pace frames (for example
     /// `winit`'s `Window::pre_present_notify`).
     pub fn render(&mut self, list: &DrawList, before_present: impl FnOnce()) -> Result<()> {
+        self.hidden = true;
         if self.minimized {
             self.present_wait = Duration::ZERO;
             return Ok(());
@@ -486,6 +587,8 @@ impl Renderer {
             // to another monitor). Reconfigure and draw on the next frame.
             wgpu::CurrentSurfaceTexture::Lost | wgpu::CurrentSurfaceTexture::Outdated => {
                 self.surface.configure(&self.scene.device, &self.config);
+                // Not hidden: the next frame draws.
+                self.hidden = false;
                 return Ok(());
             }
             // Still drawable, though no longer an exact match for the window
@@ -507,10 +610,13 @@ impl Renderer {
         let aspect = self.config.width as f32 / self.config.height as f32;
         self.scene
             .draw(list, &view, aspect, (self.config.width, self.config.height))?;
+        // Blocked on the frame before the last, not working.
+        self.present_wait += self.scene.gpu_wait;
         before_present();
         let presenting = std::time::Instant::now();
         self.scene.queue.present(frame);
         self.present_wait += presenting.elapsed();
+        self.hidden = false;
         Ok(())
     }
 }
@@ -579,6 +685,44 @@ impl TextureRenderer {
         )
     }
 
+    /// Times each frame from its start to its picture being finished on
+    /// the GPU, while `on`: the part of input latency the engine decides
+    /// (`docs/benchmarks.md`). It keeps a thread looking at the GPU, so
+    /// only benchmarks turn it on.
+    pub fn watch_latency(&mut self, on: bool) {
+        self.scene.watch_latency(on);
+    }
+
+    /// The next frame drawn started at `at`: when its host read the input
+    /// it shows. Only matters while [`Self::watch_latency`] is on.
+    pub fn frame_started(&mut self, at: std::time::Instant) {
+        self.scene.frame_started(at);
+    }
+
+    /// The watched frames' times since last asked, oldest first.
+    pub fn take_latencies(&self) -> Vec<Duration> {
+        self.scene.take_latencies()
+    }
+
+    /// Whether each frame waits for the frame before the last to finish on
+    /// the GPU before it returns (off for a new renderer). A host that
+    /// shows its frames and starts each as the last is handed over turns
+    /// it on: the GPU always has a frame to go on with, and input is one
+    /// frame of GPU work from the picture instead of as many as the
+    /// swapchain will queue. The wait is in [`RenderStats::gpu_wait`].
+    /// Leave it off for drawing that's read back or timed on the CPU.
+    pub fn set_one_frame_ahead(&mut self, on: bool) {
+        self.scene.one_frame_ahead = on;
+    }
+
+    /// Whether a frame is recorded into several command encoders, encoded
+    /// on the renderer's threads together and submitted in order (on,
+    /// unless `AXCENITY_FRAME_ENCODERS=one`). Off records one encoder on
+    /// the calling thread; the picture is the same either way.
+    pub fn set_frame_in_parts(&mut self, on: bool) {
+        self.scene.frame_in_parts = on;
+    }
+
     /// What the last frame drawn cost, for the editor's profiler.
     pub fn stats(&self) -> RenderStats {
         self.scene.stats()
@@ -620,6 +764,11 @@ impl TextureRenderer {
     /// See [`Renderer::set_keep_undrawn`].
     pub fn set_keep_undrawn(&mut self, on: bool) {
         self.scene.keep_undrawn = on;
+    }
+
+    /// See [`Renderer::set_trace_clouds`].
+    pub fn set_trace_clouds(&mut self, on: bool) {
+        self.scene.cloud_trace.enabled = on;
     }
 
     /// See [`Renderer::pending_uploads`].

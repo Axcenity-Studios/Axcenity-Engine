@@ -21,6 +21,7 @@
 use glam::{Mat4, Vec3};
 use rustc_hash::FxHashMap;
 
+use super::clusters::RayKind;
 use super::ray_cut_outs::has_holes;
 use super::ray_tracing::{SurfaceRaw, Surfaces, mask_of, surface_of};
 use super::{Draw, GpuMesh, MeshKey};
@@ -207,7 +208,7 @@ impl SoftScene {
                 to_mesh,
                 low,
                 high,
-                mask: mask_of(&item.material, draw),
+                mask: mask_of(RayKind::of(item), draw.casts_shadow),
                 cut_out: has_holes(&item.material),
             });
             surfaces.push(surface_of(

@@ -39,6 +39,21 @@ impl Laps {
         }
     }
 
+    /// A frame already timed: it started at `started` and its stages
+    /// took `stages`, one after another.
+    pub fn timed(started: Instant, stages: &[(&'static str, Duration)]) -> Self {
+        Self {
+            started,
+            last: started + stages.iter().map(|(_, time)| *time).sum::<Duration>(),
+            stages: stages.to_vec(),
+        }
+    }
+
+    /// When the frame started.
+    pub fn started(&self) -> Instant {
+        self.started
+    }
+
     /// Ends the stage `name`: the time since the last lap (or the start).
     pub fn lap(&mut self, name: &'static str) {
         let now = Instant::now();
@@ -388,9 +403,32 @@ pub struct BenchRun {
     /// The GPU's frame and passes, for frames the GPU was timed on (a
     /// host whose device can't take timestamps leaves this empty).
     pub gpu: StageSamples,
+    /// The depth prepass's and the scene pass's GPU time by what was drawn
+    /// (terrain, scattered items, other items, the sky), where the GPU can
+    /// be stamped between draws. Its frame is the parts' sum.
+    pub gpu_parts: StageSamples,
+    /// The drawing's work on the frame's thread, section by section
+    /// (the renderer's `CpuSection`s), for a host that draws.
+    pub drawing: StageSamples,
+    /// Each kept frame's time from its start to its picture being
+    /// finished on the GPU, for a host that measures it
+    /// ([`BenchRun::record_latency`]).
+    latency: Vec<Duration>,
     /// Stages that are time blocked rather than work, left out of the
     /// CPU's work when the bound is worked out.
     waits: Vec<&'static str>,
+    /// Whether the time between frames is counted
+    /// ([`BenchRun::time_between_frames`]).
+    between: bool,
+    /// When the last kept frame started.
+    last_started: Option<Instant>,
+    /// From each kept frame's start to the next one's.
+    intervals: Vec<Duration>,
+    /// What each kept frame drew, by name, for a host that draws
+    /// ([`BenchRun::record_counts`]).
+    counts: Vec<(&'static str, Vec<u64>)>,
+    /// The size frames were drawn at, in pixels ([`BenchRun::note_size`]).
+    size: Option<(u32, u32)>,
 }
 
 impl BenchRun {
@@ -408,8 +446,42 @@ impl BenchRun {
             warm_up_worst: Duration::ZERO,
             startup: Vec::new(),
             gpu: StageSamples::new(),
+            gpu_parts: StageSamples::new(),
+            drawing: StageSamples::new(),
+            latency: Vec::new(),
             waits: Vec::new(),
+            between: false,
+            last_started: None,
+            intervals: Vec::new(),
+            counts: Vec::new(),
+            size: None,
         }
+    }
+
+    /// Counts the time from each frame's start to the next one's, for a
+    /// host that shows its frames: the rate they are shown at
+    /// ([`BenchRun::shown`]), which the steps' sum misses whenever the
+    /// host waits between frames (for the display, or for the GPU to
+    /// finish the last one). The bound is then worked out against that
+    /// time. A host that steps as fast as it can has no use for it.
+    pub fn time_between_frames(&mut self) {
+        self.between = true;
+    }
+
+    /// How the kept frames came, start to start: the frame rate as shown.
+    /// `None` unless [`BenchRun::time_between_frames`] was asked for and
+    /// two frames were kept.
+    pub fn shown(&self) -> Option<FramePacing> {
+        if !self.between {
+            return None;
+        }
+        FramePacing::of(&self.intervals)
+    }
+
+    /// The median time from one kept frame's start to the next one's.
+    fn interval(&self) -> Option<Duration> {
+        self.shown()?;
+        Some(summarize("interval", &self.intervals).median)
     }
 
     /// Counts the stage `name` as waiting, not work, in the bound.
@@ -428,9 +500,83 @@ impl BenchRun {
         }
     }
 
+    /// Notes the GPU's time within the depth prepass and the scene pass by
+    /// what was drawn (nothing where `parts` is empty: a GPU that can't be
+    /// stamped between draws). Like [`BenchRun::record_gpu`], only kept
+    /// while measuring: call it before [`BenchRun::record`].
+    pub fn record_gpu_parts(&mut self, parts: &[(&'static str, Duration)]) {
+        if self.seen >= self.warm_up && !self.done() && !parts.is_empty() {
+            let total = parts.iter().map(|(_, time)| *time).sum();
+            self.gpu_parts.record(total, parts);
+        }
+    }
+
+    /// Notes where the drawing's time went on the frame's thread this
+    /// frame, section by section. Like [`BenchRun::record_gpu`], only
+    /// kept while measuring: call it before [`BenchRun::record`].
+    pub fn record_drawing(&mut self, sections: &[(&'static str, Duration)]) {
+        if self.seen >= self.warm_up && !self.done() {
+            let total = sections.iter().map(|(_, time)| *time).sum();
+            self.drawing.record(total, sections);
+        }
+    }
+
+    /// Notes what this frame drew, by name (draw calls, items, the ray
+    /// traced scene's instances): the report gives each one's median.
+    /// A frame rate that moved with these moved because the scene did.
+    /// Like [`BenchRun::record_gpu`], only kept while measuring: call it
+    /// before [`BenchRun::record`].
+    pub fn record_counts(&mut self, counts: &[(&'static str, u64)]) {
+        if self.seen < self.warm_up || self.done() {
+            return;
+        }
+        for &(name, count) in counts {
+            match self.counts.iter_mut().find(|(known, _)| *known == name) {
+                Some((_, kept)) => kept.push(count),
+                None => self.counts.push((name, vec![count])),
+            }
+        }
+    }
+
+    /// Each count's median over the kept frames, in the order first
+    /// noted.
+    pub fn counts(&self) -> Vec<(&'static str, u64)> {
+        self.counts
+            .iter()
+            .map(|(name, kept)| {
+                let mut sorted = kept.clone();
+                sorted.sort_unstable();
+                (*name, sorted[sorted.len() / 2])
+            })
+            .collect()
+    }
+
+    /// Notes the size frames are drawn at, in pixels: what the window
+    /// really is, which a window system may make smaller than was asked
+    /// for.
+    pub fn note_size(&mut self, width: u32, height: u32) {
+        self.size = Some((width, height));
+    }
+
+    /// Notes frames' times from their start (when the host read input)
+    /// to their picture being finished on the GPU: the part of input
+    /// latency the engine decides. They arrive a frame or two after the
+    /// frames they're of, so they're kept from the end of the warm-up on.
+    pub fn record_latency(&mut self, times: &[Duration]) {
+        if self.seen >= self.warm_up {
+            self.latency.extend_from_slice(times);
+        }
+    }
+
+    /// The frames' times to a finished picture, summarized (named
+    /// `latency`), if any were noted.
+    pub fn latency(&self) -> Option<StageSummary> {
+        (!self.latency.is_empty()).then(|| summarize("latency", &self.latency))
+    }
+
     /// What limits the measured frames, by their medians.
     pub fn bound(&self) -> Bound {
-        let frame = millis(self.samples.frame_summary().median);
+        let steps = millis(self.samples.frame_summary().median);
         let waited: f64 = self
             .samples
             .summaries()
@@ -439,7 +585,10 @@ impl BenchRun {
             .map(|summary| millis(summary.median))
             .sum();
         let gpu = (self.gpu.frames() > 0).then(|| millis(self.gpu.frame_summary().median));
-        Bound::of(frame, frame - waited, gpu)
+        // A frame lasts until the next one starts, where that was timed:
+        // a host that waits between frames isn't busy for that wait.
+        let frame = self.interval().map_or(steps, millis);
+        Bound::of(frame, steps - waited, gpu)
     }
 
     /// Notes one frame. True once every frame to keep has been kept.
@@ -448,6 +597,10 @@ impl BenchRun {
         let total = laps.total();
         self.first_frame.get_or_insert(total);
         if self.seen > self.warm_up {
+            if let Some(last) = self.last_started.replace(laps.started()) {
+                self.intervals
+                    .push(laps.started().saturating_duration_since(last));
+            }
             self.samples.record_laps(laps);
         } else {
             self.warm_up_worst = self.warm_up_worst.max(total);
@@ -488,8 +641,54 @@ impl BenchRun {
     /// The table, then the JSON line, as hosts print them when done.
     pub fn finish_text(&self, host: &str, scene: &str) -> String {
         let mut text = self.samples.report(&format!("{host}: {scene}"));
+        if self.drawing.frames() > 0 {
+            text.push_str(
+                &self
+                    .drawing
+                    .table("Drawing on the frame's thread, by section"),
+            );
+        }
         if self.gpu.frames() > 0 {
             text.push_str(&self.gpu.table("GPU, from timestamps"));
+        }
+        if self.gpu_parts.frames() > 0 {
+            text.push_str(
+                &self
+                    .gpu_parts
+                    .table("GPU within the prepass and the scene pass, by what is drawn"),
+            );
+        }
+        let shown = self.shown().zip(self.interval());
+        if let Some((shown, _)) = &shown {
+            let _ = writeln!(
+                text,
+                "  as shown: {:.1} FPS ({:.3} ms between frames, 1% low {:.1} FPS)",
+                shown.average_fps,
+                1000.0 / shown.average_fps.max(1e-9),
+                shown.low_1pct_fps
+            );
+        }
+        let latency = self.latency();
+        if let Some(latency) = &latency {
+            let _ = writeln!(
+                text,
+                "  input to finished picture: median {:.3} ms, p95 {:.3} ms, worst {:.3} ms ({} frames)",
+                millis(latency.median),
+                millis(latency.p95),
+                millis(latency.max),
+                self.latency.len()
+            );
+        }
+        if let Some((width, height)) = self.size {
+            let _ = writeln!(text, "  drawn at {width} x {height}");
+        }
+        let counts = self.counts();
+        if !counts.is_empty() {
+            let each: Vec<String> = counts
+                .iter()
+                .map(|(name, count)| format!("{name} {count}"))
+                .collect();
+            let _ = writeln!(text, "  each frame (median): {}", each.join(", "));
         }
         let bound = self.bound();
         let _ = writeln!(text, "  {}", bound.label());
@@ -500,8 +699,47 @@ impl BenchRun {
         let mut json = self.samples.json(host, scene);
         // `"startup":{…}` goes in before the closing brace.
         json.pop();
+        if self.drawing.frames() > 0 {
+            let _ = write!(json, ",\"drawing\":{}", self.drawing.stages_json());
+        }
         if self.gpu.frames() > 0 {
             let _ = write!(json, ",\"gpu\":{}", self.gpu.stages_json());
+        }
+        if self.gpu_parts.frames() > 0 {
+            let _ = write!(json, ",\"gpu_parts\":{}", self.gpu_parts.stages_json());
+        }
+        if let Some((shown, interval)) = &shown {
+            let _ = write!(
+                json,
+                ",\"shown\":{{\"average_fps\":{:.2},\"interval_ms\":{:.4},\"low_1pct_fps\":{:.2},\"p99_ms\":{:.4}}}",
+                shown.average_fps,
+                millis(*interval),
+                shown.low_1pct_fps,
+                shown.p99_ms
+            );
+        }
+        if let Some(latency) = &latency {
+            let _ = write!(
+                json,
+                ",\"latency\":{{\"median_ms\":{:.4},\"p95_ms\":{:.4},\"max_ms\":{:.4},\"frames\":{}}}",
+                millis(latency.median),
+                millis(latency.p95),
+                millis(latency.max),
+                self.latency.len()
+            );
+        }
+        if let Some((width, height)) = self.size {
+            let _ = write!(json, ",\"size\":[{width},{height}]");
+        }
+        if !counts.is_empty() {
+            json.push_str(",\"counts\":{");
+            for (index, (name, count)) in counts.iter().enumerate() {
+                if index > 0 {
+                    json.push(',');
+                }
+                let _ = write!(json, "{}:{count}", json_string(name));
+            }
+            json.push('}');
         }
         let _ = write!(json, ",\"bound\":{}", json_string(bound.label()));
         json.push_str(",\"startup\":{");
@@ -740,6 +978,168 @@ mod tests {
         assert!(json.contains("\"bound\":\"sync-bound\""), "{json}");
         let parsed: Vec<&str> = json.matches("\"startup\"").collect();
         assert_eq!(parsed.len(), 1);
+    }
+
+    /// A frame that started `at` after `origin` and whose steps took `work`.
+    fn frame_at(origin: Instant, at: Duration, work: Duration) -> Laps {
+        Laps::timed(origin + at, &[("Render", work)])
+    }
+
+    #[test]
+    fn a_run_that_counts_the_time_between_frames_reports_the_rate_as_shown() {
+        // Frames whose steps take 15 ms but which start 40 ms apart: the
+        // rest is waiting for the display, which no step counts.
+        let mut run = BenchRun::new(1, 4);
+        run.time_between_frames();
+        let origin = Instant::now();
+        for frame in 0..5 {
+            run.record(&frame_at(origin, ms(40 * frame), ms(15)));
+        }
+        let shown = run.shown().expect("frames were counted");
+        assert!((shown.average_fps - 25.0).abs() < 1e-9, "{shown:?}");
+        let text = run.finish_text("player", "Patch");
+        assert!(
+            text.contains("as shown: 25.0 FPS (40.000 ms between frames"),
+            "{text}"
+        );
+        let json = text.lines().last().unwrap();
+        assert!(
+            json.contains("\"shown\":{\"average_fps\":25.00,\"interval_ms\":40.0000,"),
+            "{json}"
+        );
+    }
+
+    #[test]
+    fn a_run_reports_what_its_frames_drew_and_at_what_size() {
+        let mut run = BenchRun::new(1, 3);
+        let origin = Instant::now();
+        // The warm-up frame's counts aren't kept.
+        run.record_counts(&[("draw calls", 9), ("items drawn", 9)]);
+        run.record(&frame_at(origin, ms(0), ms(1)));
+        for (frame, draws) in [(1, 4000), (2, 4400), (3, 4200)] {
+            run.record_counts(&[("draw calls", draws), ("items drawn", 15_000)]);
+            run.record(&frame_at(origin, ms(10 * frame), ms(1)));
+        }
+        run.note_size(1996, 998);
+        let text = run.finish_text("player", "Homestead");
+        assert!(text.contains("  drawn at 1996 x 998\n"), "{text}");
+        assert!(
+            text.contains("  each frame (median): draw calls 4200, items drawn 15000\n"),
+            "{text}"
+        );
+        let json = text.lines().last().unwrap();
+        assert!(json.contains("\"size\":[1996,998]"), "{json}");
+        assert!(
+            json.contains("\"counts\":{\"draw calls\":4200,\"items drawn\":15000}"),
+            "{json}"
+        );
+        // A host that draws nothing says nothing of either.
+        let mut quiet = BenchRun::new(0, 1);
+        quiet.record(&frame_at(origin, ms(0), ms(1)));
+        let text = quiet.finish_text("server", "S10k");
+        assert!(
+            !text.contains("drawn at") && !text.contains("each frame"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("\"size\"") && !text.contains("\"counts\""),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn the_bound_counts_the_time_between_frames() {
+        // 15 ms of steps and 22 ms of GPU work in frames 40 ms apart: the
+        // two take turns, so neither limits the frame.
+        let frames = |between: bool| {
+            let mut run = BenchRun::new(0, 4);
+            if between {
+                run.time_between_frames();
+            }
+            let origin = Instant::now();
+            for frame in 0..4 {
+                run.record_gpu(ms(22), &[("Scene", ms(22))]);
+                run.record(&frame_at(origin, ms(40 * frame), ms(15)));
+            }
+            run
+        };
+        assert_eq!(frames(true).bound(), Bound::Sync);
+        // Without it the steps' sum stands for the frame, as before.
+        assert_eq!(frames(false).bound(), Bound::Gpu);
+        assert!(frames(false).shown().is_none());
+        assert!(
+            !frames(false)
+                .finish_text("server", "S10k")
+                .contains("as shown")
+        );
+    }
+
+    #[test]
+    fn the_time_between_frames_leaves_the_warm_up_out() {
+        let mut run = BenchRun::new(2, 2);
+        run.time_between_frames();
+        let origin = Instant::now();
+        // A slow warm-up, then even frames.
+        for at in [0, 500, 1000, 1010, 1020] {
+            run.record(&frame_at(origin, ms(at), ms(1)));
+        }
+        let shown = run.shown().unwrap();
+        assert!((shown.average_fps - 100.0).abs() < 1e-9, "{shown:?}");
+    }
+
+    #[test]
+    fn a_run_reports_where_the_drawing_went_section_by_section() {
+        let mut run = BenchRun::new(1, 2);
+        for _ in 0..3 {
+            run.record_drawing(&[("Culling and batches", ms(2)), ("Ray traced scene", ms(3))]);
+            run.record(&Laps::start());
+        }
+        // The warm-up frame's isn't kept.
+        assert_eq!(run.drawing.frames(), 2);
+        assert_eq!(run.drawing.frame_summary().median, ms(5));
+        let text = run.finish_text("player", "Patch");
+        assert!(
+            text.contains("Drawing on the frame's thread, by section (2 frames)"),
+            "{text}"
+        );
+        assert!(text.contains("Ray traced scene"), "{text}");
+        let json = text.lines().last().unwrap();
+        assert!(
+            json.contains("\"drawing\":[{\"name\":\"Culling and batches\""),
+            "{json}"
+        );
+        // A host that draws nothing prints no such table.
+        let mut headless = BenchRun::new(0, 1);
+        headless.record(&Laps::start());
+        assert!(
+            !headless
+                .finish_text("server", "S10k")
+                .contains("Drawing on")
+        );
+    }
+
+    #[test]
+    fn a_run_reports_the_time_from_a_frames_start_to_its_finished_picture() {
+        let mut run = BenchRun::new(1, 3);
+        // Noted during the warm-up: not kept.
+        run.record_latency(&[ms(500)]);
+        run.record(&Laps::start());
+        run.record_latency(&[ms(20), ms(30)]);
+        run.record(&Laps::start());
+        run.record_latency(&[ms(40)]);
+        let latency = run.latency().expect("three were kept");
+        assert_eq!((latency.median, latency.max), (ms(30), ms(40)));
+        let text = run.finish_text("player", "Patch");
+        assert!(
+            text.contains("input to finished picture: median 30.000 ms, p95 40.000 ms, worst 40.000 ms (3 frames)"),
+            "{text}"
+        );
+        let json = text.lines().last().unwrap();
+        assert!(
+            json.contains("\"latency\":{\"median_ms\":30.0000,\"p95_ms\":40.0000,\"max_ms\":40.0000,\"frames\":3}"),
+            "{json}"
+        );
+        assert!(BenchRun::new(0, 1).latency().is_none());
     }
 
     #[test]

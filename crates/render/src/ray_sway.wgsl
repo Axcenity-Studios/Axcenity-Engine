@@ -1,42 +1,55 @@
 // Swaying plants in the ray traced scene (renderer/ray_sway.rs,
 // docs/rendering/ray-tracing.md): each corner of a swaying item's mesh
 // bent by the wind exactly as `vs_main` and `vs_shadow` bend it
-// (sway.wgsl's `swayed_at`), back in the item's own space, for the item's
-// own BLAS. Compiled after clouds.wgsl and sway.wgsl.
+// (sway.wgsl's `swayed_at`), where it stands in the world, as one geometry
+// of a BLAS it shares with other bent items. One dispatch bends every copy
+// of one mesh (a run). Compiled after clouds.wgsl and sway.wgsl.
 
-// Must match `BentRaw` in renderer/ray_sway.rs.
-struct Bent {
-    // The item's own space to the world, and back.
-    model: mat4x4<f32>,
-    to_object: mat4x4<f32>,
-    // As `InstanceRaw::sway`.
-    sway: vec4<f32>,
+// Must match `RunRaw` in renderer/ray_sway.rs.
+struct BentRun {
     // As `Frame::clock`: the time, then the wind.
     clock: vec4<f32>,
-    // x: how many corners, y: how many f32s each corner of `corners` takes.
+    // x: how many corners a copy has, y: how many f32s each corner of
+    // `corners` takes, z: the first copy's item in `items`, w: its first
+    // corner in `positions`.
     counts: vec4<u32>,
+    // x: how many copies.
+    copies: vec4<u32>,
 }
 
-@group(0) @binding(0) var<uniform> bent: Bent;
+// Must match `ItemRaw` in renderer/ray_sway.rs.
+struct BentItem {
+    // The rows of the item's own space to the world.
+    model: mat3x4<f32>,
+    // As `InstanceRaw::sway`.
+    sway: vec4<f32>,
+}
+
+@group(0) @binding(0) var<uniform> run: BentRun;
 // The mesh's corners (`Vertex`s; the position comes first).
 @group(0) @binding(1) var<storage, read> corners: array<f32>;
-// The bent positions, three f32s each, for the BLAS.
+// Every copy's bent positions in the world, three f32s each, for the BLAS.
 @group(0) @binding(2) var<storage, read_write> positions: array<f32>;
+@group(0) @binding(3) var<storage, read> items: array<BentItem>;
 
 // Corners a row of workgroups covers (65535 workgroups of 64).
 const ROW: u32 = 4194240u;
 
 @compute @workgroup_size(64)
 fn cs_bend(@builtin(global_invocation_id) id: vec3<u32>) {
-    let corner = id.x + id.y * ROW;
-    if corner >= bent.counts.x {
+    let index = id.x + id.y * ROW;
+    let per_copy = run.counts.x;
+    if index >= per_copy * run.copies.x {
         return;
     }
-    let at = corner * bent.counts.y;
-    let rest = vec3<f32>(corners[at], corners[at + 1u], corners[at + 2u]);
-    let world = (bent.model * vec4<f32>(rest, 1.0)).xyz;
-    let moved = (bent.to_object * vec4<f32>(swayed_at(world, bent.sway, bent.clock), 1.0)).xyz;
-    positions[corner * 3u] = moved.x;
-    positions[corner * 3u + 1u] = moved.y;
-    positions[corner * 3u + 2u] = moved.z;
+    let item = items[run.counts.z + index / per_copy];
+    let at = (index % per_copy) * run.counts.y;
+    let rest = vec4<f32>(corners[at], corners[at + 1u], corners[at + 2u], 1.0);
+    // A vector times a matrix of rows: each row dotted with it.
+    let world = rest * item.model;
+    let moved = swayed_at(world, item.sway, run.clock);
+    let to = (run.counts.w + index) * 3u;
+    positions[to] = moved.x;
+    positions[to + 1u] = moved.y;
+    positions[to + 2u] = moved.z;
 }

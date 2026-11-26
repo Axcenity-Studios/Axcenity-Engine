@@ -31,7 +31,7 @@ use std::fs;
 use std::ops;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use axcenity_anim::Animators;
@@ -406,11 +406,12 @@ fn main() -> Result<()> {
     app.bench = arguments.bench.map(|frames| {
         let mut run = BenchRun::new(BenchRun::DEFAULT_WARM_UP, frames);
         run.wait_stage(dev_console::PRESENT_WAIT);
+        run.time_between_frames();
         run
     });
     if app.bench.is_some() && std::env::var_os("AXCENITY_BENCH_TIMELINE").is_some() {
         app.bench_counts = Some(
-            "camera x,camera y,camera z,look x,look y,look z,items drawn,triangles,draw calls,shadow casters\n"
+            "camera x,camera y,camera z,look x,look y,look z,items drawn,triangles,draw calls,shadow casters,seconds,focused,drawn\n"
                 .to_owned(),
         );
     }
@@ -810,6 +811,19 @@ struct App {
     frame_ui_layout: Option<axcenity_ui::UiLayout>,
     /// When the previous frame was drawn, to measure how much time passed.
     last_frame: Option<Instant>,
+    /// Frames drawn by a `--bench` run.
+    bench_frames: u64,
+    /// Frames drawn and shown, for asking the display's refresh now and
+    /// then (`window::asks_refresh_on`).
+    frames_shown: u64,
+    /// The game is stepping without drawing: a redraw went unanswered, so
+    /// the window is hidden (`window::next_frame`).
+    unseen: bool,
+    /// When the redraw now waited for was asked for.
+    redraw_asked_at: Option<Instant>,
+    /// Whether a frame waits for the display to show the last one before
+    /// it starts, from how the last frames went (`window::pace`).
+    pacer: axcenity_render::FramePacer,
     /// Seconds of frames run, which moving surface shaders read.
     shader_time: f32,
     /// Watches the project's assets with `--watch`; `None` otherwise, and
@@ -914,6 +928,11 @@ impl App {
             replay: None,
             frame_ui_layout: None,
             last_frame: None,
+            bench_frames: 0,
+            frames_shown: 0,
+            unseen: false,
+            redraw_asked_at: None,
+            pacer: axcenity_render::FramePacer::default(),
             shader_time: 0.0,
             watcher: None,
             network: Network::new(GameInfo {
@@ -1405,6 +1424,18 @@ impl App {
     }
 }
 
+/// `AXCENITY_BENCH_MINIMIZE_AFTER`, if it names a frame.
+fn minimize_after() -> Option<u64> {
+    static AFTER: std::sync::OnceLock<Option<u64>> = std::sync::OnceLock::new();
+    *AFTER.get_or_init(|| {
+        std::env::var("AXCENITY_BENCH_MINIMIZE_AFTER")
+            .ok()?
+            .trim()
+            .parse()
+            .ok()
+    })
+}
+
 impl App {
     /// One frame, in the order from docs/architecture/frame-loop.md.
     fn frame(&mut self, event_loop: &ActiveEventLoop) {
@@ -1469,11 +1500,40 @@ impl App {
             .expect("checked at the start of the event")
             .clone();
         let draw_list = self.frame_draw.take().expect("the draw steps ran");
-        let rendered = self
-            .renderer
-            .as_mut()
-            .expect("checked")
-            .render(&draw_list, || window.pre_present_notify());
+        let waits_for_display = self.pacer.waits_for_display_when(self.focused);
+        // `AXCENITY_BENCH_MINIMIZE_AFTER=<frames>`: a benchmark minimizes
+        // its window that many frames in, to check a hidden window's
+        // pacing on a platform (`docs/benchmarks.md`).
+        if self.bench.is_some() {
+            self.bench_frames += 1;
+            if minimize_after() == Some(self.bench_frames) {
+                window.set_minimized(true);
+            }
+        }
+        // The frame started when its input was read (`frame_seconds`).
+        if let (Some(renderer), Some(started)) = (&mut self.renderer, self.last_frame) {
+            renderer.frame_started(started);
+        }
+        // A frame nothing asked for (the window is hidden) isn't drawn:
+        // the game's steps ran, and presenting to a window nobody shows
+        // could wait on it for as long as it's hidden.
+        self.redraw_asked_at = None;
+        let unseen = self.unseen;
+        let rendered = if unseen {
+            Ok(())
+        } else {
+            self.renderer
+                .as_mut()
+                .expect("checked")
+                .render(&draw_list, || {
+                    // Under Wayland this is what makes the next frame wait
+                    // for the display to show this one
+                    // (`axcenity_render::FramePacer`).
+                    if waits_for_display {
+                        window.pre_present_notify();
+                    }
+                })
+        };
         if let Err(err) = rendered {
             self.fail(event_loop, err);
         }
@@ -1484,23 +1544,60 @@ impl App {
             }
         }
         let renderer = self.renderer.as_mut().expect("checked");
-        watch.lap_with_wait("Render", dev_console::PRESENT_WAIT, renderer.present_wait());
+        // A frame that wasn't drawn waited for nothing, and says nothing
+        // of how fast frames can be shown.
+        let shown = !unseen && !renderer.hidden();
+        let blocked = if shown {
+            renderer.present_wait()
+        } else {
+            Duration::ZERO
+        };
+        watch.lap_with_wait("Render", dev_console::PRESENT_WAIT, blocked);
+        if shown {
+            // The display's rate, asked for now and then: at first a
+            // window under Wayland has no display to ask.
+            if window::asks_refresh_on(self.frames_shown) {
+                self.pacer.set_refresh(window::refresh_of(&window));
+            }
+            self.frames_shown += 1;
+            self.pacer.frame(window::paced(
+                real_seconds,
+                watch.total(),
+                blocked,
+                renderer.gpu_wait(),
+            ));
+        }
         // The GPU is timed while someone is looking: `--bench`, the `fps`
         // readout or the console's Stats tab.
         let looking = self.bench.is_some() || self.dev.show_fps || self.console.showing_stats();
         renderer.set_gpu_timing(looking);
         let render_stats = looking.then(|| renderer.stats());
+        if let (Some(bench), Some(stats)) = (&mut self.bench, &render_stats) {
+            bench.record_drawing(&axcenity_ui::drawing_times(stats));
+            bench.record_latency(&renderer.take_latencies());
+            bench.record_counts(&[
+                ("draw calls", u64::from(stats.draw_calls)),
+                ("items drawn", u64::from(stats.items_drawn)),
+                ("scene batches", u64::from(stats.batches)),
+                ("shadow casters", u64::from(stats.shadow_casters_drawn)),
+                ("traced instances", u64::from(stats.ray_tracing.instances)),
+                ("command buffers", u64::from(stats.command_buffers)),
+            ]);
+            let (width, height) = renderer.size();
+            bench.note_size(width, height);
+        }
         if let (Some(bench), Some(stats)) = (&mut self.bench, &render_stats)
             && let Some(gpu) = stats.gpu_time
             && stats.gpu_readings != self.frame_stats.gpu_readings()
         {
             bench.record_gpu(gpu, &axcenity_ui::pass_times(stats));
+            bench.record_gpu_parts(&axcenity_ui::part_times(stats));
         }
         if let (Some(counts), Some(stats)) = (&mut self.bench_counts, &render_stats) {
             let camera = draw_list.camera;
             let _ = writeln!(
                 counts,
-                "{:.2},{:.2},{:.2},{:.2},{:.2},{:.2},{},{},{},{}",
+                "{:.2},{:.2},{:.2},{:.2},{:.2},{:.2},{},{},{},{},{:.4},{},{}",
                 camera.position.x,
                 camera.position.y,
                 camera.position.z,
@@ -1510,7 +1607,13 @@ impl App {
                 stats.items_drawn,
                 stats.triangles,
                 stats.draw_calls,
-                stats.shadow_casters_drawn
+                stats.shadow_casters_drawn,
+                // When the frame ended, whether the window had the
+                // keyboard's focus and whether the frame was drawn: what a
+                // window's state did to its pacing (`docs/benchmarks.md`).
+                self.launched.elapsed().as_secs_f64(),
+                u8::from(self.focused),
+                u8::from(!unseen)
             );
         }
         self.note_memory();

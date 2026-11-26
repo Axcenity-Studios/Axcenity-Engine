@@ -135,7 +135,10 @@ mlua = { version = "0.12", features = ["luau", "luau-jit"] }
 luau0-src = "=0.22.0"
 # The process's memory use for the editor's profiler, on Windows, macOS and
 # Linux (MIT OR Apache-2.0).
-memory-stats = "1.2"
+# `always_use_statm`: on Linux the crate otherwise reads `/proc/self/smaps`,
+# 24 ms for a process with a big scene's mappings, which the player did on
+# the frame's thread every 30 frames (docs/rendering/performance.md).
+memory-stats = { version = "1.2", features = ["always_use_statm"] }
 # The editor's menus in the macOS menu bar (Apache-2.0 OR MIT; Tauri's menu
 # crate). macOS only: Windows and Linux keep the menus in the window.
 muda = { version = "0.21", default-features = false }
@@ -356,3 +359,4 @@ strip = "debuginfo"
 # and restitution keep their contacts between steps (vendor/README.md).
 [patch.crates-io]
 rapier3d = { path = "vendor/rapier3d" }
+egui-wgpu = { path = "vendor/egui-wgpu" }

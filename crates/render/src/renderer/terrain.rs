@@ -79,10 +79,36 @@ struct TerrainArrays {
 pub(super) type TerrainKey = [u64; 4];
 
 /// The key of `surface`'s bind group.
+#[cfg(test)]
 pub(super) fn terrain_key(surface: &TerrainSurface) -> TerrainKey {
+    terrain_key_with(surface, &mut LastArrays::default())
+}
+
+/// The layers a texture arrays key was last worked out of, and the key.
+///
+/// Every chunk of a terrain shares its layers, and working their key out
+/// reads and hashes every layer's textures: about half a microsecond,
+/// which Desert Homestead's 1,400 terrain chunks paid twice a frame each
+/// (1.7 ms of the frame's thread). Whoever asks for chunk after chunk
+/// keeps one of these between them. It holds the layers, so the address
+/// it compares can't have come to mean other layers.
+#[derive(Default)]
+pub(super) struct LastArrays(Option<(std::sync::Arc<TerrainLayers>, u64)>);
+
+/// [`terrain_key`], with the arrays key taken from `last` when `surface`
+/// has the layers it was worked out of.
+pub(super) fn terrain_key_with(surface: &TerrainSurface, last: &mut LastArrays) -> TerrainKey {
+    let arrays = match &last.0 {
+        Some((layers, key)) if std::sync::Arc::ptr_eq(layers, &surface.layers) => *key,
+        _ => {
+            let key = arrays_key(&surface.layers);
+            last.0 = Some((surface.layers.clone(), key));
+            key
+        }
+    };
     [
         surface.layers.id,
-        arrays_key(&surface.layers),
+        arrays,
         surface.weights[0].key(),
         surface.weights[1].key(),
     ]
@@ -125,6 +151,8 @@ pub(super) struct TerrainPass {
     layer_sampler: wgpu::Sampler,
     weight_sampler: wgpu::Sampler,
     arrays: HashMap<u64, Cached<TerrainArrays>>,
+    /// The layers of the chunk last made ready ([`LastArrays`]).
+    last_arrays: LastArrays,
     /// Each terrain's uniform, by [`TerrainLayers::id`], with the
     /// [`TerrainLayers::key`] it holds.
     uniforms: HashMap<u64, Cached<(u64, wgpu::Buffer)>>,
@@ -216,6 +244,7 @@ impl TerrainPass {
             prepass,
             layer_sampler,
             weight_sampler,
+            last_arrays: LastArrays::default(),
             arrays: HashMap::new(),
             uniforms: HashMap::new(),
             groups: HashMap::new(),
@@ -257,7 +286,7 @@ impl TerrainPass {
         frame: u64,
     ) {
         let layers = &surface.layers;
-        let key = terrain_key(surface);
+        let key = terrain_key_with(surface, &mut self.last_arrays);
         let arrays_key = key[1];
         if let Entry::Vacant(slot) = self.arrays.entry(arrays_key) {
             slot.insert(Cached {

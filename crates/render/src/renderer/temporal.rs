@@ -28,13 +28,14 @@ use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec2, Vec3};
+use rustc_hash::FxHashMap;
 
 use crate::draw_list::{DrawItem, DrawList, LensEffects, Skin};
 use crate::graphics::{EffectiveGraphics, MotionBlurQuality};
 use crate::mesh::Vertex;
 
 use super::gpu::{shader_module, target_bytes};
-use super::lighting::instance_raw;
+use super::lighting::{instance_sway, is_flat};
 use super::lod::Draw;
 use super::post::fullscreen_pass;
 use super::{DEPTH_FORMAT, FAR_PLANE, HDR_FORMAT, MeshKey, NEAR_PLANE};
@@ -172,7 +173,7 @@ pub(super) struct History {
     /// Last frame's clock and wind, as `Frame::clock` has them.
     clock: Option<[f32; 4]>,
     /// Each item's transform last frame, by its ID.
-    models: HashMap<u64, Mat4>,
+    models: FxHashMap<u64, Mat4>,
     /// Where each posed item's corners were in last frame's posed corners,
     /// by its ID and mesh (the two copies of a level-of-detail switch
     /// share an ID).
@@ -766,7 +767,11 @@ impl History {
         posed: impl Fn(&Skin, MeshKey) -> Option<u32>,
         clock: [f32; 4],
     ) -> Moved {
-        let mut instances = Vec::new();
+        // By mesh as they come, each mesh's in the draws' order: put
+        // together below in the meshes' order, which is what sorting them
+        // all by mesh would give, without moving every one about.
+        let mut by_mesh: FxHashMap<MeshKey, Vec<MotionInstance>> = FxHashMap::default();
+        let mut count = 0;
         // Plants move only while there's wind, now or last frame, and the
         // clock moved on.
         let windy = |clock: [f32; 4]| clock[1] != 0.0 || clock[3] != 0.0;
@@ -779,7 +784,9 @@ impl History {
                 continue;
             }
             let sways = swaying && item.sway.is_some_and(|sway| sway.strength > 0.0);
-            let previous = match self.models.get(&item.id).filter(|_| item.id != 0) {
+            // Only the list's own items with an ID were remembered.
+            let remembered = (item.id != 0).then(|| self.models.get(&item.id)).flatten();
+            let previous = match remembered {
                 Some(previous) => previous,
                 None if sways => &item.transform,
                 None => continue,
@@ -789,9 +796,11 @@ impl History {
             if *previous == item.transform && now.is_none() && !sways {
                 continue;
             }
-            let Some(raw) = instance_raw(item) else {
+            // Of the scene's instance the pass reads only where the item
+            // is and how it sways.
+            if is_flat(item) {
                 continue;
-            };
+            }
             // `previous_corner` in shader.wgsl: 1 for posed now but not
             // last frame, else 2 more than where it was.
             let skin = match now {
@@ -801,18 +810,22 @@ impl History {
                     None => [now, 1],
                 },
             };
-            instances.push((
-                mesh,
-                MotionInstance {
-                    model: raw.model,
-                    previous: previous.to_cols_array_2d(),
-                    skin,
-                    sway: raw.sway,
-                    fade: draw.fade,
-                },
-            ));
+            by_mesh.entry(mesh).or_default().push(MotionInstance {
+                model: item.transform.to_cols_array_2d(),
+                previous: previous.to_cols_array_2d(),
+                skin,
+                sway: instance_sway(item),
+                fade: draw.fade,
+            });
+            count += 1;
         }
-        instances.sort_by_key(|(mesh, _)| *mesh);
+        let mut meshes: Vec<MeshKey> = by_mesh.keys().copied().collect();
+        meshes.sort_unstable();
+        let mut instances = Vec::with_capacity(count);
+        for mesh in meshes {
+            let of_mesh = by_mesh.remove(&mesh).unwrap_or_default();
+            instances.extend(of_mesh.into_iter().map(|instance| (mesh, instance)));
+        }
         Moved { instances }
     }
 
@@ -1054,7 +1067,145 @@ impl TemporalPasses {
 
 #[cfg(test)]
 mod tests {
+    use super::super::lighting::instance_raw;
     use super::*;
+    use crate::{ItemChunk, Shape, Sway};
+
+    /// Plants the wind sways, of three shapes mixed up, some with IDs,
+    /// one moved since last frame, one squashed flat, one see-through.
+    fn swaying_plants() -> (Vec<DrawItem>, Vec<DrawItem>) {
+        let plant = |i: usize| {
+            let shape = [Shape::Sphere, Shape::Block, Shape::Cylinder][i % 3].clone();
+            let mut item = DrawItem {
+                shape,
+                transform: Mat4::from_translation(Vec3::new(i as f32, 0.0, -5.0)),
+                material: Default::default(),
+                uv_tile: 0.0,
+                casts_shadow: true,
+                id: if i.is_multiple_of(2) {
+                    100 + i as u64
+                } else {
+                    0
+                },
+                cull_distance: 0.0,
+                skin: None,
+                sway: Some(Sway {
+                    base: 0.5,
+                    height: 2.0 + i as f32,
+                    strength: 0.3,
+                    flutter: 0.2,
+                }),
+                decal_role: Default::default(),
+            };
+            if i == 7 {
+                item.transform = Mat4::from_scale(Vec3::new(1.0, 0.0, 1.0));
+            }
+            if i == 9 {
+                item.material.opacity = 0.5;
+            }
+            if i == 11 {
+                item.sway = None;
+            }
+            item
+        };
+        // The list's own items (their places are remembered by ID), and a
+        // group's (never remembered: they stand still).
+        ((0..6).map(plant).collect(), (6..14).map(plant).collect())
+    }
+
+    /// What `moved` gave before it was made to do less: each moved item's
+    /// whole scene instance worked out, then a stable sort by mesh.
+    fn moved_the_long_way(
+        history: &History,
+        draws: &[Draw<'_>],
+        clock: [f32; 4],
+    ) -> Vec<(MeshKey, MotionInstance)> {
+        let windy = |clock: [f32; 4]| clock[1] != 0.0 || clock[3] != 0.0;
+        let swaying = history
+            .clock
+            .is_some_and(|before| before != clock && (windy(before) || windy(clock)));
+        let mut instances = Vec::new();
+        for draw in draws {
+            let item = draw.item;
+            if !in_prepass(item) {
+                continue;
+            }
+            let sways = swaying && item.sway.is_some_and(|sway| sway.strength > 0.0);
+            let previous = match history.models.get(&item.id).filter(|_| item.id != 0) {
+                Some(previous) => previous,
+                None if sways => &item.transform,
+                None => continue,
+            };
+            if *previous == item.transform && !sways {
+                continue;
+            }
+            let Some(raw) = instance_raw(item) else {
+                continue;
+            };
+            instances.push((
+                draw.mesh(),
+                MotionInstance {
+                    model: raw.model,
+                    previous: previous.to_cols_array_2d(),
+                    skin: [0, 0],
+                    sway: raw.sway,
+                    fade: draw.fade,
+                },
+            ));
+        }
+        instances.sort_by_key(|(mesh, _)| *mesh);
+        instances
+    }
+
+    #[test]
+    fn what_moved_is_what_the_long_way_round_gave() {
+        let (own, grouped) = swaying_plants();
+        let mut list = DrawList {
+            items: own,
+            ..crate::renderer::tests::list_of(Vec::new())
+        };
+        list.chunks = vec![ItemChunk {
+            center: Vec3::ZERO,
+            radius: 100.0,
+            cull_distance: 0.0,
+            items: grouped.into(),
+        }];
+        let resolved = super::super::lod::LodStates::default().resolve(&list, 1, None);
+        let draws = resolved.draws;
+        assert_eq!(draws.len(), 14);
+        let clock = |time: f32| [time, 4.5, 0.0, -2.5];
+        let mut history = History::default();
+        // Last frame: the same list, one own item elsewhere.
+        let mut before = list.clone();
+        before.items[2].transform = Mat4::from_translation(Vec3::new(-9.0, 0.0, -5.0));
+        history.finish(&before, (Mat4::IDENTITY, clock(1.0)), HashMap::new(), true);
+
+        for now in [clock(1.1), clock(1.0), [1.1, 0.0, 0.0, 0.0]] {
+            let moved = history.moved(&draws, |_, _| None, now);
+            let long_way = moved_the_long_way(&history, &draws, now);
+            assert_eq!(moved.instances.len(), long_way.len(), "at {now:?}");
+            for (got, want) in moved.instances.iter().zip(&long_way) {
+                assert_eq!(got.0, want.0);
+                assert_eq!(bytemuck::bytes_of(&got.1), bytemuck::bytes_of(&want.1));
+            }
+        }
+        // While the wind blows every swaying solid plant moves but the
+        // flat one; with no wind and the same clock, only the moved one.
+        assert_eq!(
+            history
+                .moved(&draws, |_, _| None, clock(1.1))
+                .instances
+                .len(),
+            11
+        );
+        assert_eq!(
+            history
+                .moved(&draws, |_, _| None, clock(1.0))
+                .instances
+                .len(),
+            1
+        );
+    }
 
     #[test]
     fn the_jitter_steps_through_places_within_half_a_pixel() {

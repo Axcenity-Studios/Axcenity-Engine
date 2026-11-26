@@ -14,6 +14,7 @@ mod fonts;
 mod graphics;
 mod mesh;
 mod overdraw;
+mod pacing;
 mod renderer;
 mod tone_mapping;
 pub mod video_memory;
@@ -52,14 +53,16 @@ pub use graphics::{
 };
 pub use graphics::{MESH_BUDGET_SHARE, texture_budget_for, whole_gib};
 pub use overdraw::{MAX_LAYERS, OVERDRAW_BANDS, OVERDRAW_STEP, OverdrawStats, layers_of};
+pub use pacing::{FramePacer, PacedFrame};
 #[cfg(feature = "debug-views")]
 pub use renderer::DebugView;
 #[cfg(feature = "debug-views")]
 pub use renderer::PATH_TRACED_MOST_PATHS;
 pub use renderer::{
-    BakedProbe, CullingBounds, FramePass, LIGHT_PROBE_BAKE_SIZE, LOD_LEVELS, LOD_SCREEN_SIZES,
-    LightProbeBaker, MAX_GPU_PARTICLES, PROBE_BAKE_SIZE, PosingStats, RayTracingStats, RenderStats,
-    Renderer, SHADOW_CASCADE_COUNT, ShaderError, SurfaceShader, TextureRenderer,
+    BakedProbe, CpuSection, CullingBounds, DrawnPart, FramePass, LIGHT_PROBE_BAKE_SIZE, LOD_LEVELS,
+    LOD_SCREEN_SIZES, LightProbeBaker, MAX_GPU_PARTICLES, PROBE_BAKE_SIZE, PartPass, PartTimes,
+    PosingStats, RayTracingStats, RenderStats, Renderer, SHADOW_CASCADE_COUNT, ShaderError,
+    SurfaceShader, TextureRenderer, part_label,
 };
 pub use tone_mapping::ToneMapping;
 pub use water::{DEFAULT_WAVE_VARIATION, WATER_GRID, Water, water_surface};

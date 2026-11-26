@@ -21,7 +21,9 @@ struct CutOut {
 // three, by where it was hit, through the material's own scale, turn and
 // offset), and the alpha at them against the cutoff.
 fn cut_out_covers(hit: RayIntersection) -> bool {
-    let cut = cut_outs[hit.instance_custom_data];
+    // The item hit: its instance's first slot plus the geometry hit (swaying
+    // plants bent by the wind share an instance, renderer/ray_tracing.rs).
+    let cut = cut_outs[hit.instance_custom_data + hit.geometry_index];
     if cut.mesh.y == 0u {
         return true;
     }

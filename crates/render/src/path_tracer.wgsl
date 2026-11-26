@@ -60,8 +60,15 @@ struct PathTrace {
 // Two a TLAS slot (`SurfaceRaw`): rgb its color and w 1 for a cut-out,
 // then rgb its glow, both linear.
 @group(1) @binding(2) var<storage, read> pt_surfaces: array<vec4<f32>>;
-// Each TLAS slot's mesh's first triangle in `pt_normals`.
-@group(1) @binding(3) var<storage, read> pt_slots: array<u32>;
+// Each TLAS slot's item (`SlotRaw`): the three columns of its
+// world-to-object matrix (as bits), with its mesh's first triangle in
+// `pt_normals` in the first one's w.
+struct PtSlot {
+    a: vec4<u32>,
+    b: vec4<u32>,
+    c: vec4<u32>,
+}
+@group(1) @binding(3) var<storage, read> pt_slots: array<PtSlot>;
 // Every traced mesh's normals, three corners a triangle, each packed as
 // two 16-bit signed numbers a word (x and y, then z).
 @group(1) @binding(4) var<storage, read> pt_normals: array<vec2<u32>>;
@@ -116,12 +123,20 @@ fn pt_unpack(packed: vec2<u32>) -> vec3<f32> {
     return vec3<f32>(unpack2x16snorm(packed.x), unpack2x16snorm(packed.y).x);
 }
 
+// The slot of the item `hit` struck: its instance's first slot plus the
+// geometry hit (swaying plants bent by the wind share an instance,
+// renderer/ray_tracing.rs).
+fn pt_slot(hit: RayIntersection) -> u32 {
+    return hit.instance_custom_data + hit.geometry_index;
+}
+
 // The surface's normal in the world where `hit` struck it, between its
 // triangle's corners' normals, facing back toward `direction`'s start.
 // Without its mesh's normals (or with none to speak of), facing straight
 // back along the ray.
 fn pt_normal(hit: RayIntersection, direction: vec3<f32>) -> vec3<f32> {
-    let first = pt_slots[hit.instance_custom_data];
+    let slot = pt_slots[pt_slot(hit)];
+    let first = slot.a.w;
     if first == PT_NO_NORMALS {
         return -direction;
     }
@@ -130,9 +145,10 @@ fn pt_normal(hit: RayIntersection, direction: vec3<f32>) -> vec3<f32> {
     let local = pt_unpack(pt_normals[corner]) * (1.0 - b.x - b.y)
         + pt_unpack(pt_normals[corner + 1u]) * b.x + pt_unpack(pt_normals[corner + 2u]) * b.y;
     // Normals turn by the inverse transpose: the world-to-object matrix's
-    // columns dotted with the normal.
-    let w = hit.world_to_object;
-    let world = vec3<f32>(dot(local, w[0]), dot(local, w[1]), dot(local, w[2]));
+    // columns dotted with the normal. The item's own matrix, not its
+    // instance's: bent plants share an instance that isn't turned.
+    let world = vec3<f32>(dot(local, bitcast<vec3<f32>>(slot.a.xyz)),
+        dot(local, bitcast<vec3<f32>>(slot.b.xyz)), dot(local, bitcast<vec3<f32>>(slot.c.xyz)));
     let length_squared = dot(world, world);
     if length_squared < 1e-12 {
         return -direction;
@@ -212,7 +228,7 @@ fn pt_path(uv: vec2<f32>) -> vec3<f32> {
             }
             break;
         }
-        let surface = 2u * hit.instance_custom_data;
+        let surface = 2u * pt_slot(hit);
         let color = pt_surfaces[surface].rgb;
         let glow = pt_surfaces[surface + 1u].rgb;
         let n = pt_normal(hit, direction);

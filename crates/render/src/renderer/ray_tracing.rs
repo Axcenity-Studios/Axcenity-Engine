@@ -27,9 +27,13 @@
 use glam::{Mat4, Vec3};
 use rustc_hash::FxHashMap;
 
+use super::clusters::{Cluster, RayKind};
 use super::posing::Posing;
-use super::ray_cut_outs::{CutOutRaw, CutOuts, has_holes};
-use super::ray_sway::{BENT_TRIANGLES, BentKey, BentMeshes, POSED_TRIANGLES, bending, bent_raw};
+use super::ray_cut_outs::{CutOutRaw, CutOuts};
+use super::ray_sway::{
+    BENT_TRIANGLES, BentMeshes, BundleKey, POSED_TRIANGLES, PosedKey, SEEN_SWAY_PIXELS, Sight,
+    Swaying, bending, bundle_cell,
+};
 use super::scene::gpu_mesh_in;
 use super::{Draw, GpuMesh, MeshKey, ScenePipeline};
 use crate::draw_list::{DrawItem, Material};
@@ -116,14 +120,115 @@ type BlasKey = (MeshKey, bool);
 /// instance mask.
 type Wanted<'a> = (BlasKey, &'a GpuMesh, Mat4, u8);
 
-/// One TLAS slot: what's in it, compared frame to frame.
+/// One slot: an item of the ray traced scene, and a row of the tables rays
+/// look their hits up in (`Surfaces`, `CutOuts`, the path tracer's). A hit's
+/// slot is its TLAS instance's first one plus the geometry hit.
 #[derive(Clone, Copy, PartialEq)]
 struct Slot {
     mesh: BlasKey,
     transform: [f32; 12],
+}
+
+/// A copy of an item's mesh made for this frame alone.
+#[derive(Clone, Copy, PartialEq)]
+enum Moved {
+    /// A posed (skinned or morphed) item's, a BLAS of its own.
+    Posed(PosedKey),
+    /// A swaying item's, bent by the wind into a BLAS it shares, from this
+    /// corner on among the bent positions.
+    Bent(u32),
+}
+
+/// Whose BLAS a TLAS instance uses.
+#[derive(Clone, Copy, PartialEq)]
+enum InstanceBlas {
+    /// An item's mesh's.
+    Mesh(BlasKey),
+    /// A posed item's own.
+    Posed(PosedKey),
+    /// A bundle's: every swaying item bent into it this frame, each a
+    /// geometry of it and a slot of its own, already where it stands in
+    /// the world.
+    Bundle(BundleKey),
+}
+
+/// One TLAS instance, compared frame to frame.
+#[derive(Clone, Copy, PartialEq)]
+struct Instance {
+    blas: InstanceBlas,
+    transform: [f32; 12],
+    /// Its first (or only) slot, which rays read as its custom index.
+    first_slot: u32,
     mask: u8,
-    /// Its bent copy, for a swaying item in the wind.
-    bent: Option<BentKey>,
+}
+
+/// The rows of a 3 by 4 transform that moves nothing.
+const IN_PLACE: [f32; 12] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+
+/// The frame's slots and TLAS instances.
+struct Laid {
+    /// Each slot's item (an index into the wanted items).
+    order: Vec<usize>,
+    instances: Vec<Instance>,
+    /// Each bundle with its items' slots' range in `order`.
+    bundles: Vec<(BundleKey, std::ops::Range<usize>)>,
+}
+
+/// Lays out the frame's slots and TLAS instances from `in_slots` (indices
+/// into `wanted`) and each one's `moved` copy: first the items with an
+/// instance of their own, in order, then each bundle's bent items together
+/// (its geometries, in slot order), the biggest meshes first so a bundle's
+/// BLAS seldom has to be made again for a frame's different items.
+/// `distances` is how far each wanted item is from the camera.
+fn lay_out(
+    in_slots: &[usize],
+    moved: &[Option<Moved>],
+    wanted: &[Wanted<'_>],
+    distances: &[f32],
+) -> Laid {
+    let mut order = Vec::with_capacity(in_slots.len());
+    let mut instances = Vec::new();
+    let mut bundled: Vec<(BundleKey, u32, usize)> = Vec::new();
+    for (&index, moved) in in_slots.iter().zip(moved) {
+        let (mesh, gpu, transform, mask) = wanted[index];
+        let blas = match moved {
+            Some(Moved::Bent(_)) => {
+                let wide = gpu.index_format == wgpu::IndexFormat::Uint32;
+                let cell = bundle_cell(transform.w_axis.truncate(), distances[index]);
+                bundled.push(((mesh.1, mask, wide, cell), gpu.index_count, index));
+                continue;
+            }
+            Some(Moved::Posed(key)) => InstanceBlas::Posed(*key),
+            None => InstanceBlas::Mesh(mesh),
+        };
+        instances.push(Instance {
+            blas,
+            transform: rows_3x4(transform),
+            first_slot: order.len() as u32,
+            mask,
+        });
+        order.push(index);
+    }
+    // A stable sort: items of one size stay in the frame's order.
+    bundled.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
+    let mut bundles = Vec::new();
+    for bundle in bundled.chunk_by(|a, b| a.0 == b.0) {
+        let key = bundle[0].0;
+        let first = order.len();
+        instances.push(Instance {
+            blas: InstanceBlas::Bundle(key),
+            transform: IN_PLACE,
+            first_slot: first as u32,
+            mask: key.1,
+        });
+        order.extend(bundle.iter().map(|&(_, _, index)| index));
+        bundles.push((key, first..order.len()));
+    }
+    Laid {
+        order,
+        instances,
+        bundles,
+    }
 }
 
 /// The ray traced scene: BLASes by mesh and the TLAS.
@@ -132,7 +237,8 @@ pub(super) struct RayScene {
     tlas: wgpu::Tlas,
     capacity: u32,
     slots: Vec<Slot>,
-    /// Whether the TLAS has been built with `slots`.
+    instances: Vec<Instance>,
+    /// Whether the TLAS has been built with `instances`.
     built: bool,
     /// What rays hitting each slot find, while ray traced GI is on.
     pub(super) surfaces: Option<Surfaces>,
@@ -151,6 +257,7 @@ impl RayScene {
             tlas: create_tlas(device, capacity),
             capacity,
             slots: Vec::new(),
+            instances: Vec::new(),
             built: false,
             surfaces: None,
             cut_outs: CutOuts::new(device),
@@ -164,13 +271,14 @@ impl RayScene {
         &self.tlas
     }
 
-    /// Each TLAS slot's mesh, in slot order.
+    /// Each slot's mesh and its item's transform (the rows of a 3 by 4
+    /// matrix), in slot order.
     #[cfg(feature = "debug-views")]
-    pub(super) fn slot_meshes(&self) -> impl Iterator<Item = MeshKey> + '_ {
-        self.slots.iter().map(|slot| slot.mesh.0)
+    pub(super) fn slots(&self) -> impl Iterator<Item = (MeshKey, [f32; 12])> + '_ {
+        self.slots.iter().map(|slot| (slot.mesh.0, slot.transform))
     }
 
-    /// How many TLAS slots are filled.
+    /// How many slots are filled.
     #[cfg(feature = "debug-views")]
     pub(super) fn slot_count(&self) -> usize {
         self.slots.len()
@@ -187,8 +295,8 @@ impl RayScene {
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         encoder: &mut wgpu::CommandEncoder,
-        (frame, camera, reach, surfaces, clock): (u64, Vec3, f32, bool, [f32; 4]),
-        (draws, posing): (&[Draw], &Posing),
+        (frame, (camera, sight), reach, surfaces, clock): (u64, (Vec3, Sight), f32, bool, [f32; 4]),
+        (draws, clusters, posing): (&[Draw], &[&Cluster], &Posing),
         mesh: impl Fn(MeshKey) -> Option<&'a GpuMesh>,
     ) {
         if !surfaces {
@@ -206,25 +314,54 @@ impl RayScene {
             if draw.fade > 1.0 {
                 continue;
             }
-            let key = draw.mesh();
+            // What never changes of an item in a group comes from its
+            // cluster, where it was worked out once: a frame doesn't read
+            // the item of a still, unposed plant at all. The rest is
+            // worked out here from the item.
+            let at = draw.at as usize;
+            let kept = clusters
+                .get(draw.cluster as usize)
+                .filter(|cluster| !cluster.skinned[at]);
+            let key = match (draw.lod, kept) {
+                (None, Some(cluster)) => cluster.mesh_keys[at],
+                _ => draw.mesh(),
+            };
             let Some(gpu) = mesh(key) else {
                 continue;
             };
-            let Some(distance) = within_reach(item, gpu, camera, reach) else {
+            let (transform, distance) = match kept {
+                Some(cluster) => {
+                    let transform = cluster.transforms[at];
+                    let (center, radius) = gpu.bounds.sphere(transform);
+                    (
+                        transform,
+                        Some(center.distance(camera) - radius).filter(|d| *d <= reach),
+                    )
+                }
+                None => (item.transform, within_reach(item, gpu, camera, reach)),
+            };
+            let Some(distance) = distance else {
                 continue;
             };
-            let cut_out = has_holes(&item.material);
+            let cluster = clusters.get(draw.cluster as usize);
+            let kind = match cluster {
+                Some(cluster) => cluster.ray_kinds[at],
+                None => RayKind::of(item),
+            };
             wanted.push((
-                (key, cut_out),
+                (key, kind.holes),
                 gpu,
-                item.transform,
-                mask_of(&item.material, draw),
+                transform,
+                mask_of(kind, draw.casts_shadow),
             ));
             wanted_items.push(item);
             wanted_distances.push(distance);
             if surfaces {
                 let table = self.surfaces.get_or_insert_with(|| Surfaces::new(device));
-                wanted_surfaces.push(surface_of(&item.material, &mut table.texture_colors));
+                wanted_surfaces.push(match cluster {
+                    Some(cluster) => cluster.surfaces(&mut table.texture_colors)[draw.at as usize],
+                    None => surface_of(&item.material, &mut table.texture_colors),
+                });
             }
         }
 
@@ -232,6 +369,10 @@ impl RayScene {
         let mut budget = BLAS_TRIANGLES_PER_FRAME;
         let mut to_build: Vec<(BlasKey, &'a GpuMesh)> = Vec::new();
         let mut waiting = 0;
+        // Whether each wanted item's BLAS is built, or is being this frame:
+        // found here, so the 25,000 items of a meadow look their mesh up
+        // once a frame, not twice.
+        let mut ready = Vec::with_capacity(wanted.len());
         for &(key, gpu, _, _) in &wanted {
             let blas = self.blases.entry(key);
             let entry = match blas {
@@ -260,15 +401,18 @@ impl RayScene {
             };
             entry.last_used = frame;
             if entry.built || to_build.iter().any(|(queued, _)| *queued == key) {
+                ready.push(true);
                 continue;
             }
             let triangles = u64::from(gpu.index_count / 3);
             if triangles > budget && budget < BLAS_TRIANGLES_PER_FRAME {
                 waiting += 1;
+                ready.push(false);
                 continue;
             }
             budget = budget.saturating_sub(triangles);
             to_build.push((key, gpu));
+            ready.push(true);
         }
         for (key, gpu) in &to_build {
             if let Some(entry) = self.blases.get_mut(key) {
@@ -281,34 +425,49 @@ impl RayScene {
         }
 
         // The frame's slots: items whose BLAS is (or is being) built.
-        let in_slots: Vec<usize> = (0..wanted.len())
-            .filter(|&index| {
-                self.blases
-                    .get(&wanted[index].0)
-                    .is_some_and(|entry| entry.built)
-            })
-            .collect();
-        let (in_slots, bent, posed_left_out) = self.bend(
+        let in_slots: Vec<usize> = (0..wanted.len()).filter(|&index| ready[index]).collect();
+        let (in_slots, moved, posed_left_out) = self.bend(
             (device, queue),
             in_slots,
             (&wanted, &wanted_items, &wanted_distances),
-            (clock, posing),
+            (clock, sight, posing),
             frame,
         );
-        let slots: Vec<Slot> = in_slots
+        let laid = lay_out(&in_slots, &moved, &wanted, &wanted_distances);
+        let moved_of: FxHashMap<usize, Moved> = in_slots
             .iter()
-            .zip(&bent)
-            .map(|(&index, &bent)| {
-                let (mesh, _, transform, mask) = wanted[index];
+            .zip(&moved)
+            .filter_map(|(&index, moved)| Some((index, (*moved)?)))
+            .collect();
+        // Each bundle's bent copies become its BLAS's geometries, in slot
+        // order.
+        if let Some(meshes) = &mut self.bent {
+            for (key, range) in &laid.bundles {
+                let copies = laid.order[range.clone()]
+                    .iter()
+                    .filter_map(|index| {
+                        let Some(Moved::Bent(copy)) = moved_of.get(index) else {
+                            return None;
+                        };
+                        Some((*copy, size_of_mesh(wanted[*index].1, key.0)))
+                    })
+                    .collect();
+                meshes.bundle(device, *key, copies, frame);
+            }
+        }
+        let slots: Vec<Slot> = laid
+            .order
+            .iter()
+            .map(|&index| {
+                let (mesh, _, transform, _) = wanted[index];
                 Slot {
                     mesh,
                     transform: rows_3x4(transform),
-                    mask,
-                    bent,
                 }
             })
             .collect();
-        let cut_outs: Vec<CutOutRaw> = in_slots
+        let cut_outs: Vec<CutOutRaw> = laid
+            .order
             .iter()
             .map(|&index| {
                 let ((mesh, cut_out), gpu, _, _) = wanted[index];
@@ -322,46 +481,53 @@ impl RayScene {
             .collect();
         self.cut_outs.write(device, queue, cut_outs);
         if let Some(table) = &mut self.surfaces {
-            let raw: Vec<SurfaceRaw> = in_slots
+            let raw: Vec<SurfaceRaw> = laid
+                .order
                 .iter()
                 .map(|&index| wanted_surfaces[index])
                 .collect();
             table.write(device, queue, raw);
         }
         let count = slots.len() as u32;
-        if count > self.capacity {
-            self.capacity = count.next_power_of_two();
+        let instances = laid.instances;
+        if instances.len() as u32 > self.capacity {
+            self.capacity = (instances.len() as u32).next_power_of_two();
             self.tlas = create_tlas(device, self.capacity);
-            self.slots.clear();
+            self.instances.clear();
             self.built = false;
         }
-        // A bent copy is built afresh each frame, so the TLAS is too.
-        let any_bent = bent.iter().any(Option::is_some);
-        let changed = !self.built || slots != self.slots || !to_build.is_empty() || any_bent;
+        // A posed or bent copy is built afresh each frame, so the TLAS is
+        // too.
+        let any_moved = !moved_of.is_empty();
+        let changed =
+            !self.built || instances != self.instances || !to_build.is_empty() || any_moved;
         if changed {
-            for (index, slot) in slots.iter().enumerate() {
-                // A slot whose mesh was built again needs its new BLAS.
-                let rebuilt = to_build.iter().any(|(key, _)| *key == slot.mesh);
-                // A bent slot is set again too: its copy may be new.
-                if self.built
-                    && !rebuilt
-                    && slot.bent.is_none()
-                    && self.slots.get(index) == Some(slot)
-                {
-                    continue;
-                }
-                let blas = match (&slot.bent, &self.bent) {
-                    (Some(key), Some(bent)) => bent.blas(key),
-                    _ => &self.blases[&slot.mesh].blas,
+            for (index, instance) in instances.iter().enumerate() {
+                let blas = match (&instance.blas, &self.bent) {
+                    (InstanceBlas::Mesh(key), _) => {
+                        // An instance whose mesh was built again needs its
+                        // new BLAS.
+                        let rebuilt = to_build.iter().any(|(built, _)| built == key);
+                        if self.built && !rebuilt && self.instances.get(index) == Some(instance) {
+                            continue;
+                        }
+                        self.blases.get(key).map(|entry| &entry.blas)
+                    }
+                    // A copy's instance is set again: its BLAS may be new.
+                    (InstanceBlas::Posed(key), Some(bent)) => bent.posed_blas(key),
+                    (InstanceBlas::Bundle(key), Some(bent)) => bent.bundle_blas(key),
+                    (InstanceBlas::Posed(_) | InstanceBlas::Bundle(_), None) => None,
                 };
-                self.tlas[index] = Some(wgpu::TlasInstance::new(
-                    blas,
-                    slot.transform,
-                    index as u32,
-                    slot.mask,
-                ));
+                self.tlas[index] = blas.map(|blas| {
+                    wgpu::TlasInstance::new(
+                        blas,
+                        instance.transform,
+                        instance.first_slot,
+                        instance.mask,
+                    )
+                });
             }
-            for index in slots.len()..self.slots.len().min(self.capacity as usize) {
+            for index in instances.len()..self.instances.len().min(self.capacity as usize) {
                 self.tlas[index] = None;
             }
         }
@@ -371,13 +537,20 @@ impl RayScene {
         if let Some(bent_meshes) = &self.bent {
             bent_meshes.record(encoder);
         }
-        let bent_entries = in_slots.iter().zip(&bent).filter_map(|(&index, key)| {
-            let key = key.as_ref()?;
-            Some(
-                self.bent
-                    .as_ref()?
-                    .build_entry(key, wanted[index].1, posing.posed()),
-            )
+        let posed_entries = in_slots.iter().zip(&moved).filter_map(|(&index, moved)| {
+            let Some(Moved::Posed(key)) = moved else {
+                return None;
+            };
+            self.bent
+                .as_ref()?
+                .posed_entry(key, wanted[index].1, posing.posed())
+        });
+        let bundle_entries = laid.bundles.iter().filter_map(|(key, range)| {
+            let meshes: Vec<&GpuMesh> = laid.order[range.clone()]
+                .iter()
+                .map(|&index| wanted[index].1)
+                .collect();
+            self.bent.as_ref()?.bundle_entry(key, &meshes)
         });
         let entries: Vec<wgpu::BlasBuildEntry> = to_build
             .iter()
@@ -399,7 +572,8 @@ impl RayScene {
                     ]),
                 }
             })
-            .chain(bent_entries)
+            .chain(posed_entries)
+            .chain(bundle_entries)
             .collect();
         if changed || !entries.is_empty() {
             let tlas = changed.then_some(&self.tlas);
@@ -407,6 +581,7 @@ impl RayScene {
         }
         drop(entries);
         self.slots = slots;
+        self.instances = instances;
         self.built = true;
 
         // Meshes nothing has wanted for a while are freed.
@@ -434,18 +609,18 @@ impl RayScene {
 
     /// Builds this frame's posed items from their posed corners (`posing`)
     /// and bends its swaying ones in the wind of `clock`, nearest first
-    /// within [`POSED_TRIANGLES`] and [`BENT_TRIANGLES`]. Returns `in_slots` (indices into the wanted
-    /// items) without the posed items past the budget, each one's bent or
-    /// posed copy (`None` to keep its mesh's rest pose), and how many posed
-    /// items were left out.
+    /// within [`POSED_TRIANGLES`] and [`BENT_TRIANGLES`]. Returns `in_slots`
+    /// (indices into the wanted items) without the posed items past the
+    /// budget, each one's bent or posed copy (`None` to keep its mesh's rest
+    /// pose), and how many posed items were left out.
     fn bend(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         in_slots: Vec<usize>,
         (wanted, items, distances): (&[Wanted<'_>], &[&DrawItem], &[f32]),
-        (clock, posing): ([f32; 4], &Posing),
+        (clock, sight, posing): ([f32; 4], Sight, &Posing),
         frame: u64,
-    ) -> (Vec<usize>, Vec<Option<BentKey>>, u32) {
+    ) -> (Vec<usize>, Vec<Option<Moved>>, u32) {
         let mut bent = vec![None; in_slots.len()];
         // Posed items first (a skinned mesh never also sways here), then
         // swaying ones, each nearest first.
@@ -462,7 +637,11 @@ impl RayScene {
             .iter()
             .enumerate()
             .filter(|&(_, &index)| posed_mesh(index).is_none())
-            .filter_map(|(slot, &index)| Some((slot, bending(items[index], clock)?)))
+            .filter_map(|(slot, &index)| {
+                let (sway, moves) = bending(items[index], clock)?;
+                // Too far away for its sway to show: traced at rest.
+                (sight.pixels(moves, distances[index]) >= SEEN_SWAY_PIXELS).then_some((slot, sway))
+            })
             .collect();
         if swaying.is_empty() && posing.is_empty() {
             if let Some(meshes) = &mut self.bent {
@@ -509,29 +688,25 @@ impl RayScene {
                 first,
                 frame,
             );
-            bent[slot] = Some(key);
+            bent[slot] = Some(Moved::Posed(key));
         }
 
         let mut budget = BENT_TRIANGLES;
+        let mut bending: Vec<Swaying<'_>> = Vec::new();
+        let mut bending_slots = Vec::new();
         for (slot, sway) in swaying {
-            let index = in_slots[slot];
-            let (blas_key, gpu, transform, _) = wanted[index];
+            let ((mesh, _), gpu, transform, _) = wanted[in_slots[slot]];
             let triangles = u64::from(gpu.index_count / 3);
             if triangles > budget {
                 continue;
             }
             budget -= triangles;
-            let key = copy_of(blas_key);
-            let raw = bent_raw(transform, sway, clock, gpu);
-            meshes.bend(
-                (device, queue),
-                key,
-                gpu,
-                size_of_mesh(gpu, blas_key.1),
-                &raw,
-                frame,
-            );
-            bent[slot] = Some(key);
+            bending.push((mesh, gpu, transform, sway));
+            bending_slots.push(slot);
+        }
+        let first_corners = meshes.bend((device, queue), clock, &bending, frame);
+        for (slot, first_corner) in bending_slots.into_iter().zip(first_corners) {
+            bent[slot] = Some(Moved::Bent(first_corner));
         }
 
         if posed_left_out == 0 {
@@ -596,8 +771,15 @@ pub(super) fn prepare_scene(
         &FxHashMap<u64, super::Cached<GpuMesh>>,
     ),
     encoder: &mut wgpu::CommandEncoder,
-    (traces, frame, camera, reach, surfaces, clock): (bool, u64, Vec3, f32, bool, [f32; 4]),
-    draws: (&[Draw], &Posing),
+    (traces, frame, camera, reach, surfaces, clock): (
+        bool,
+        u64,
+        (Vec3, Sight),
+        f32,
+        bool,
+        [f32; 4],
+    ),
+    draws: (&[Draw], &[&Cluster], &Posing),
 ) -> bool {
     let ((device, queue), meshes, custom_meshes) = pipeline;
     if !traces {
@@ -700,11 +882,11 @@ fn average_color(rgba: &[u8]) -> [f32; 3] {
 }
 
 /// Which kinds of ray see an item (the instance mask): see the `MASK_*`s.
-pub(super) fn mask_of(material: &Material, draw: &Draw) -> u8 {
-    if material.opacity < 1.0 || material.water.is_some() {
+pub(super) fn mask_of(kind: RayKind, casts_shadow: bool) -> u8 {
+    if kind.see_through {
         return MASK_SEE_THROUGH;
     }
-    match (draw.casts_shadow, material.alpha_cutoff > 0.0) {
+    match (casts_shadow, kind.cut_out) {
         (true, true) => MASK_CUT_OUT,
         (true, false) => MASK_SOLID,
         (false, true) => MASK_NO_SHADOW_CUT_OUT,

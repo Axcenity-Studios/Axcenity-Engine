@@ -82,7 +82,8 @@ fn traced_reflection(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     if hit.kind == RAY_QUERY_INTERSECTION_NONE {
         return vec4<f32>(0.0);
     }
-    let surface = 2u * hit.instance_custom_data;
+    // The item hit: its instance's first slot plus the geometry hit.
+    let surface = 2u * (hit.instance_custom_data + hit.geometry_index);
     let color = water_surfaces[surface];
     let glow = water_surfaces[surface + 1u].rgb;
     let position = origin + dir * hit.t;

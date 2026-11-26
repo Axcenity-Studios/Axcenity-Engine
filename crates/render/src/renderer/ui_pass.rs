@@ -775,17 +775,19 @@ pub(super) fn create_ui_image_pipeline(
     (bind_layout, sampler, image, sheet)
 }
 
-/// Draws the sky as a full-screen triangle at the far plane, before any
-/// item, with the scene's `samples` per pixel.
+/// Draws the sky as a full-screen triangle at the far plane, after the
+/// solid items, with the scene's `samples` per pixel. Its bind group 2 is
+/// the traced clouds (`clouds_layout`, renderer/cloud_trace.rs).
 pub(super) fn create_sky_pipeline(
     device: &wgpu::Device,
     frame_layout: &wgpu::BindGroupLayout,
+    clouds_layout: &wgpu::BindGroupLayout,
     samples: u32,
 ) -> wgpu::RenderPipeline {
     let shader = super::gpu::shader_module(device, "sky", super::gpu::SCENE_SHADER);
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("sky"),
-        bind_group_layouts: &[Some(frame_layout)],
+        bind_group_layouts: &[Some(frame_layout), None, Some(clouds_layout)],
         immediate_size: 0,
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

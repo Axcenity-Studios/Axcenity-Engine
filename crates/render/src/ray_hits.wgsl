@@ -50,7 +50,8 @@ fn fs_ray_hits(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32>
     if hit.kind == RAY_QUERY_INTERSECTION_NONE {
         return vec4<f32>(0.03, 0.035, 0.05, 1.0);
     }
-    let bits = hash(hit.instance_custom_data + 1u);
+    // The item hit: its instance's first slot plus the geometry hit.
+    let bits = hash(hit.instance_custom_data + hit.geometry_index + 1u);
     let color = vec3<f32>(
         f32(bits & 255u),
         f32((bits >> 8u) & 255u),

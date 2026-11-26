@@ -89,6 +89,73 @@ mod ray_hits {
         );
     }
 
+    /// Swaying plants bent by the wind share a BLAS and a TLAS instance:
+    /// rays still tell them apart, by the geometry they hit.
+    #[test]
+    fn plants_bent_into_one_blas_are_still_items_of_their_own() {
+        use crate::Sway;
+        let Some((device, queue)) = ray_test_device() else {
+            return skipped();
+        };
+        const SIZE: usize = 128;
+        let mut renderer = TextureRenderer::new(&device, &queue, SIZE as u32, SIZE as u32);
+        renderer.set_debug_view(Some(DebugView::RayHits));
+        // Three poles side by side, 40 to 50 studs from the camera, in one
+        // 32-stud square of the ground.
+        const ACROSS: [f32; 3] = [4.0, 10.0, 16.0];
+        let poles = ACROSS
+            .map(|x| DrawItem {
+                transform: Mat4::from_scale_rotation_translation(
+                    Vec3::new(2.0, 8.0, 2.0),
+                    glam::Quat::IDENTITY,
+                    Vec3::new(x, 4.0, 4.0),
+                ),
+                sway: Some(Sway {
+                    base: 0.0,
+                    height: 8.0,
+                    strength: 1.0,
+                    flutter: 0.0,
+                }),
+                ..item(Shape::Block, Vec3::ZERO, 1.0)
+            })
+            .to_vec();
+        let mut list = list_of(poles);
+        list.camera = Camera {
+            position: Vec3::new(10.0, 4.0, 50.0),
+            look_at: Vec3::new(10.0, 4.0, 4.0),
+            fov_y_degrees: 30.0,
+        };
+        // Each pole's color, low on it where the wind hardly moves it.
+        let mut colors = |list: &DrawList| {
+            renderer.render(list).unwrap();
+            let hits = renderer.read_pixels();
+            let colors = ACROSS.map(|x| {
+                let clip = view_projection(list, 1.0) * Vec3::new(x, 0.5, 5.0).extend(1.0);
+                let ndc = clip.truncate() / clip.w;
+                let at = |ndc: f32| ((ndc * 0.5 + 0.5) * SIZE as f32) as usize;
+                pixel(&hits, SIZE, at(ndc.x), at(-ndc.y))
+            });
+            (colors, renderer.stats().ray_tracing)
+        };
+        let (at_rest, stats) = colors(&list);
+        assert_eq!(stats.bent, 0);
+        list.wind = Vec3::new(30.0, 0.0, 0.0);
+        let (bent, stats) = colors(&list);
+        assert_eq!((stats.bent, stats.instances), (3, 3), "{stats:?}");
+        for colors in [at_rest, bent] {
+            for pole in colors {
+                assert!(
+                    pole.iter().map(|&c| u32::from(c)).sum::<u32>() > 150,
+                    "a pole came back as {pole:?} among {colors:?}"
+                );
+            }
+            assert!(
+                colors[0] != colors[1] && colors[1] != colors[2] && colors[0] != colors[2],
+                "each pole has a color of its own: {colors:?}"
+            );
+        }
+    }
+
     #[test]
     fn items_past_the_ray_tracing_distance_are_left_out() {
         let Some((device, queue)) = ray_test_device() else {
