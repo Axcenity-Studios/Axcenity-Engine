@@ -19,6 +19,7 @@ mod cooked_textures;
 #[cfg(feature = "debug-views")]
 mod debug_views;
 mod decals;
+mod depth_from_prepass;
 mod environment_maps;
 mod fog;
 mod foliage_shadow_bench;
@@ -197,6 +198,7 @@ fn batch(mesh: MeshKey, transparent: bool, instances: Range<u32>) -> Batch {
     Batch {
         mesh,
         prefilled: false,
+        fading: false,
         material: MaterialKey::default(),
         transparent,
         double_sided: false,

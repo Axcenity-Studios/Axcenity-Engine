@@ -83,24 +83,57 @@ fn a_grouped_items_draw_says_which_group_and_item_it_is() {
     assert_eq!(clustered, 1, "own draws come before every group's");
 }
 
+/// The bindings `list`'s draws use (`FrameUses`): each distinct one, which
+/// each draw uses and the first draw to use each.
+fn uses_of(list: &DrawList) -> (Vec<MaterialKey>, Vec<u32>, Vec<u32>) {
+    let resolved = LodStates::default().resolve(list, 1, None);
+    let mut clusters = clusters::Clusters::default();
+    let groups = clusters.of(&resolved.clusters, 1);
+    let uses = FrameUses::of(&resolved.draws, &groups);
+    // Every draw's binding is its item's.
+    for (draw, &index) in resolved.draws.iter().zip(&uses.material_of) {
+        assert_eq!(uses.materials[index as usize], material_key(draw.item));
+    }
+    // And each binding's first draw is the first to use it.
+    for (index, &first) in uses.first_draw.iter().enumerate().skip(1) {
+        let earliest = uses.material_of.iter().position(|&m| m as usize == index);
+        assert_eq!(earliest, Some(first as usize));
+    }
+    (uses.materials, uses.material_of, uses.first_draw)
+}
+
+/// Thousands of grouped draws have their bindings worked out in parts, on
+/// several threads, and joined. The bindings must come out in the order
+/// the draws first come to them, as on one thread: a draw's place among
+/// those of its mesh follows its binding's, and with it which of two
+/// surfaces at one depth shows.
+#[test]
+fn thousands_of_grouped_items_get_the_bindings_they_would_listed_one_by_one() {
+    let many: Vec<DrawItem> = (0..160)
+        .flat_map(|copy| {
+            plants().into_iter().enumerate().map(move |(i, mut item)| {
+                // Bindings first met late in the list, some by few items.
+                if copy >= 100 && i % 5 == 0 {
+                    item.material.surface_parameters[1][0] = (copy % 7) as f32 + 1.0;
+                }
+                item
+            })
+        })
+        .collect();
+    let one_by_one = uses_of(&listed(many.clone()));
+    assert!(one_by_one.0.len() >= 10, "many bindings to tell apart");
+    assert!(one_by_one.1.len() > 7000, "enough draws to share out");
+    for size in [1, 37, 48, 1000] {
+        assert_eq!(
+            uses_of(&grouped(many.clone(), size)),
+            one_by_one,
+            "in groups of {size}"
+        );
+    }
+}
+
 #[test]
 fn grouped_items_get_the_material_bindings_they_would_listed_one_by_one() {
-    let uses_of = |list: &DrawList| {
-        let resolved = LodStates::default().resolve(list, 1, None);
-        let mut clusters = clusters::Clusters::default();
-        let groups = clusters.of(&resolved.clusters, 1);
-        let uses = FrameUses::of(&resolved.draws, &groups);
-        // Every draw's binding is its item's.
-        for (draw, &index) in resolved.draws.iter().zip(&uses.material_of) {
-            assert_eq!(uses.materials[index as usize], material_key(draw.item));
-        }
-        // And each binding's first draw is the first to use it.
-        for (index, &first) in uses.first_draw.iter().enumerate().skip(1) {
-            let earliest = uses.material_of.iter().position(|&m| m as usize == index);
-            assert_eq!(earliest, Some(first as usize));
-        }
-        (uses.materials, uses.material_of, uses.first_draw)
-    };
     let one_by_one = uses_of(&listed(plants()));
     assert!(one_by_one.0.len() >= 4, "several bindings to tell apart");
     // The same items in the same order, so the same answer, however

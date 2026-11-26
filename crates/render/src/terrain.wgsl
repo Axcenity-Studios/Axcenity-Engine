@@ -55,7 +55,9 @@ struct ChunkIn {
 }
 
 struct TerrainOut {
-    @builtin(position) clip_position: vec4<f32>,
+    // Invariant, so the prepass and the scene pass put a corner at exactly
+    // the same depth (the scene pass can draw only where they're equal).
+    @builtin(position) @invariant clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,

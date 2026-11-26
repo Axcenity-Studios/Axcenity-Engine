@@ -80,6 +80,9 @@ pub struct RayTracingStats {
     pub posed: u32,
     /// Posed characters in reach left out for the per-frame budget.
     pub posed_left_out: u32,
+    /// Swaying items whose sway shows that were traced at rest this frame,
+    /// for the per-frame budget: their shadows stand still while they move.
+    pub bent_left_out: u32,
     /// How far ray traced sun shadows reach this frame, in studs (0 while
     /// they're off): the ray tracing distance or the world's
     /// `ShadowDistance`, whichever is nearer.
@@ -603,6 +606,7 @@ impl RayScene {
             bent: self.bent.as_ref().map_or(0, BentMeshes::bent_count),
             posed: self.bent.as_ref().map_or(0, BentMeshes::posed_count),
             posed_left_out,
+            bent_left_out: self.stats.bent_left_out,
             shadow_reach: 0,
         };
     }
@@ -622,6 +626,7 @@ impl RayScene {
         frame: u64,
     ) -> (Vec<usize>, Vec<Option<Moved>>, u32) {
         let mut bent = vec![None; in_slots.len()];
+        self.stats.bent_left_out = 0;
         // Posed items first (a skinned mesh never also sways here), then
         // swaying ones, each nearest first.
         // Where an item's posed corners start this frame: its joints and its
@@ -698,6 +703,7 @@ impl RayScene {
             let ((mesh, _), gpu, transform, _) = wanted[in_slots[slot]];
             let triangles = u64::from(gpu.index_count / 3);
             if triangles > budget {
+                self.stats.bent_left_out += 1;
                 continue;
             }
             budget -= triangles;

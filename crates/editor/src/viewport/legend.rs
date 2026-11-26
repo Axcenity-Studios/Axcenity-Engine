@@ -296,6 +296,7 @@ mod tests {
                 bent: 0,
                 posed: 0,
                 posed_left_out: 0,
+                bent_left_out: 0,
                 shadow_reach: 0,
             },
             ..RenderStats::default()

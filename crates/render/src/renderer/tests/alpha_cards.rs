@@ -448,31 +448,31 @@ fn a_striped_hair_cards_shadow_is_striped_in_the_shadow_maps() {
     }
 }
 
-/// A Standard cut-out (a leaf card, a fence) casts its whole card in the
-/// shadow maps, as before CO7. Casting through its holes too more than
-/// doubled the Shadows pass on foliage (`bench_cut_out_foliage_shadows`:
-/// 0.19 to 0.42 ms for 36,000 leaf cards at 1080p High), so only Hair
-/// casts through its holes (review fixes 1).
+/// A Standard cut-out (a leaf card, a blade of grass, a fence) casts
+/// through its holes in the shadow maps as a hair card does: a plant's
+/// shadow is its leaves', not a block the size of its cards (which is what
+/// it was until 2026-11-26, when only Hair cast through its holes).
 #[test]
-fn a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps() {
+fn a_standard_cut_outs_shadow_follows_its_holes_in_the_shadow_maps() {
     let Some((device, queue)) = test_device() else {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     };
-    let pixels = shadow_mapped(&device, &queue, &striped_shadow(false, false));
-    evidence(
-        "shadow-map-stripes-hair-false-posed-false",
-        &pixels,
-        256,
-        256,
-    );
-    let (turns, low, high) = stripes_in(&pixels, 256);
-    eprintln!("shadow maps, standard: {turns} turns, {low}..{high}");
-    assert!(high - low > 40.0, "a shadow falls: {low}..{high}");
-    assert!(
-        turns <= 2,
-        "holes in a Standard cut-out's shadow ({turns} turns)"
-    );
+    let size = 256;
+    for posed in [false, true] {
+        let pixels = shadow_mapped(&device, &queue, &striped_shadow(false, posed));
+        evidence(
+            &format!("shadow-map-stripes-hair-false-posed-{posed}"),
+            &pixels,
+            size,
+            size,
+        );
+        let (turns, low, high) = stripes_in(&pixels, size);
+        eprintln!("shadow maps, standard, posed {posed}: {turns} turns, {low}..{high}");
+        assert!(high - low > 40.0, "a shadow falls: {low}..{high}");
+        // Four stripes and three gaps: about seven turns, not a slab's two.
+        assert!(turns >= 6, "posed {posed}: a slab ({turns} turns)");
+    }
 }
 
 /// A cut-out whose texture is tiled by its size (`uv_tile`, every textured

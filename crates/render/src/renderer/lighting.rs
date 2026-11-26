@@ -733,10 +733,7 @@ pub(super) fn shadow_setup(
     let mut slice_near = NEAR_PLANE;
     let ends = cascade_ends(distance, cascades);
     for (index, far) in ends.into_iter().take(cascades).enumerate() {
-        // The smallest sphere around the slice of the view between
-        // `slice_near` and `far`, centered on the view direction `center` away.
-        let center = (0.5 * (far + slice_near) * (1.0 + k2)).min(far);
-        let radius = ((far - center).powi(2) + far * far * k2).sqrt().max(1.0);
+        let (center, radius) = slice_sphere(slice_near, far, k2);
         let sphere_center = camera.position + forward * center;
         slice_near = far;
 
@@ -770,6 +767,39 @@ pub(super) fn shadow_setup(
     setup
 }
 
+/// The smallest sphere around the slice of a view between `near` and `far`
+/// studs along it: how far along the view its middle is, and its radius.
+/// `k2` is the view's widening, `tan²(fov / 2) × (1 + aspect²)`.
+fn slice_sphere(near: f32, far: f32, k2: f32) -> (f32, f32) {
+    let center = (0.5 * (far + near) * (1.0 + k2)).min(far);
+    let radius = ((far - center).powi(2) + far * far * k2).sqrt().max(1.0);
+    (center, radius)
+}
+
+/// Everything that can stand between the sun and what the camera sees
+/// within `distance` studs: the sun's view of a sphere around that much of
+/// the camera's view, from as far back as a cascade's
+/// ([`SHADOW_CASTER_RANGE`]). Ray traced shadows need it of a frame whose
+/// shadow maps don't cover that distance: their rays leave the picture.
+pub(super) fn sun_reach(list: &DrawList, distance: f32, aspect: f32) -> Mat4 {
+    let camera = &list.camera;
+    let forward = (camera.look_at - camera.position).normalize_or(Vec3::NEG_Z);
+    let distance = distance.clamp(NEAR_PLANE * 4.0, FAR_PLANE);
+    let tan_half = (camera.fov_y_degrees.to_radians() * 0.5).tan();
+    let k2 = tan_half * tan_half * (1.0 + aspect * aspect);
+    let (center, radius) = slice_sphere(NEAR_PLANE, distance, k2);
+    let middle = camera.position + forward * center;
+    let toward_sun = list.sun.direction.normalize_or(Vec3::Y);
+    let up = if toward_sun.y.abs() > 0.99 {
+        Vec3::X
+    } else {
+        Vec3::Y
+    };
+    let back = radius + SHADOW_CASTER_RANGE;
+    let view = rh::view::look_at_mat4(middle + toward_sun * back, middle, up);
+    rh::proj::directx::orthographic(-radius, radius, -radius, radius, 0.1, back + radius) * view
+}
+
 /// What a frame's draws use, each thing once, so that the work per material
 /// and per mesh follows how many there are and not how many draws share them.
 pub(super) struct FrameUses<'a> {
@@ -801,18 +831,21 @@ impl<'a> FrameUses<'a> {
         // in groups are worth sharing (0.6 ms on one thread for Desert
         // Homestead's 1,659).
         let parts = map_heavy_parts(own_draws, (512, 128), |draws| {
-            let mut distinct: Vec<(MaterialKey, u32)> = Vec::new();
-            let mut indexes: FxHashMap<MaterialKey, u32> = FxHashMap::default();
+            let mut distinct: Vec<(MaterialKey, u32, u64)> = Vec::new();
+            let mut places = MaterialPlaces::default();
             let mut material_of = Vec::with_capacity(draws.len());
             let mut seen_meshes: FxHashSet<*const ()> = FxHashSet::default();
             let mut meshes = Vec::new();
             let mut last_arrays = LastArrays::default();
             for (at, draw) in draws.iter().enumerate() {
                 let key = material_key_with(draw.item, &mut last_arrays);
-                let index = *indexes.entry(key).or_insert_with(|| {
-                    distinct.push((key, at as u32));
-                    (distinct.len() - 1) as u32
-                });
+                let digest = key_digest(&key);
+                let index = places
+                    .find(digest, &key, &distinct, |(key, ..)| key)
+                    .unwrap_or_else(|| {
+                        distinct.push((key, at as u32, digest));
+                        places.note(digest, distinct.len() as u32 - 1)
+                    });
                 material_of.push(index);
                 if let Some(source) = draw.source()
                     && seen_meshes.insert(Arc::as_ptr(source).cast())
@@ -828,19 +861,100 @@ impl<'a> FrameUses<'a> {
             first_draw: vec![0],
             meshes: Vec::new(),
         };
-        let mut indexes: FxHashMap<MaterialKey, u32> = FxHashMap::default();
-        indexes.insert(MaterialKey::default(), 0);
+        // Room for every part's materials at once (a terrain's pieces are
+        // a material each): growing as they come moves them all again
+        // each time.
+        let most: usize = parts.iter().map(|(_, distinct, ..)| distinct.len()).sum();
+        uses.materials.reserve(most);
+        uses.first_draw.reserve(most);
+        let mut places = MaterialPlaces::default();
+        places.0.reserve(most + 1);
+        places.note(key_digest(&MaterialKey::default()), 0);
         let mut seen_meshes: FxHashSet<*const ()> = FxHashSet::default();
         let mut start = 0;
         for (len, distinct, material_of, meshes) in parts {
             let remap: Vec<u32> = distinct
                 .into_iter()
-                .map(|(key, first)| {
-                    *indexes.entry(key).or_insert_with(|| {
-                        uses.materials.push(key);
-                        uses.first_draw.push(start + first);
-                        (uses.materials.len() - 1) as u32
-                    })
+                .map(|(key, first, digest)| uses.place(&mut places, key, digest, start + first))
+                .collect();
+            uses.material_of
+                .extend(material_of.into_iter().map(|index| remap[index as usize]));
+            uses.meshes.extend(
+                meshes
+                    .into_iter()
+                    .filter(|source| seen_meshes.insert(Arc::as_ptr(source).cast())),
+            );
+            start += len;
+        }
+        // The draws of items in groups, shared among the threads. A part
+        // lists the materials it comes to, each once as (its cluster, its
+        // place in the cluster's own, the first draw of the part to use
+        // it), with each draw's place in that list, and the meshes it
+        // comes to. A cluster's draws follow one another, so a part keeps
+        // one cluster's places at a time (a cluster met again only lists
+        // its materials again, which the joining below puts right).
+        let parts = map_parts(clustered, |draws| {
+            let mut found: Vec<(u32, u32, u32)> = Vec::new();
+            let mut material_of = Vec::with_capacity(draws.len());
+            let mut meshes = Vec::new();
+            let mut seen_meshes: FxHashSet<*const ()> = FxHashSet::default();
+            let mut current = u32::MAX;
+            let mut places: Vec<u32> = Vec::new();
+            for (at, draw) in draws.iter().enumerate() {
+                let cluster = clusters[draw.cluster as usize];
+                if draw.cluster != current {
+                    current = draw.cluster;
+                    places.clear();
+                    places.resize(cluster.materials.len(), u32::MAX);
+                }
+                let local = cluster.material_of[draw.at as usize];
+                let place = &mut places[local as usize];
+                if *place == u32::MAX {
+                    found.push((draw.cluster, local, at as u32));
+                    *place = found.len() as u32 - 1;
+                }
+                material_of.push(*place);
+                // A level of detail's mesh takes the item's own's place.
+                let source = match (draw.lod, cluster.mesh_of[draw.at as usize]) {
+                    (Some(lod), _) => Some(lod),
+                    (None, BUILT_IN) => None,
+                    (None, local) => Some(&cluster.meshes[local as usize]),
+                };
+                if let Some(source) = source
+                    && seen_meshes.insert(Arc::as_ptr(source).cast())
+                {
+                    meshes.push(source);
+                }
+            }
+            (draws.len(), found, material_of, meshes)
+        });
+        // Joined in order, so a material's place in the frame's is where
+        // the draws first come to it, as it would be on one thread: the
+        // order of draws with one mesh follows it, and with that order
+        // which of two surfaces at one depth shows. Each cluster's
+        // materials are looked up in the frame's once and remembered here.
+        let first_of: Vec<usize> = clusters
+            .iter()
+            .scan(0, |next, cluster| {
+                let first = *next;
+                *next += cluster.materials.len();
+                Some(first)
+            })
+            .collect();
+        let known = clusters.iter().map(|c| c.materials.len()).sum();
+        let mut in_frame = vec![u32::MAX; known];
+        let mut start = own;
+        for (len, found, material_of, meshes) in parts {
+            let remap: Vec<u32> = found
+                .into_iter()
+                .map(|(cluster, local, first)| {
+                    let index = &mut in_frame[first_of[cluster as usize] + local as usize];
+                    if *index == u32::MAX {
+                        let key = clusters[cluster as usize].materials[local as usize];
+                        let first = (start + first as usize) as u32;
+                        *index = uses.place(&mut places, key, key_digest(&key), first);
+                    }
+                    *index
                 })
                 .collect();
             uses.material_of
@@ -852,63 +966,70 @@ impl<'a> FrameUses<'a> {
             );
             start += len;
         }
-        // Each cluster's materials are looked up in the frame's once, the
-        // first time a draw comes to one, and remembered here.
-        let first_of: Vec<usize> = clusters
-            .iter()
-            .scan(0, |next, cluster| {
-                let first = *next;
-                *next += cluster.materials.len();
-                Some(first)
-            })
-            .collect();
-        let known = clusters.iter().map(|c| c.materials.len()).sum();
-        let mut in_frame = vec![u32::MAX; known];
-        // Likewise each cluster's meshes: noted the first time a draw
-        // uses one, without reading the item.
-        let first_mesh_of: Vec<usize> = clusters
-            .iter()
-            .scan(0, |next, cluster| {
-                let first = *next;
-                *next += cluster.meshes.len();
-                Some(first)
-            })
-            .collect();
-        let mut mesh_noted = vec![false; clusters.iter().map(|c| c.meshes.len()).sum()];
-        for (at, draw) in clustered.iter().enumerate() {
-            let cluster = clusters[draw.cluster as usize];
-            let local = cluster.material_of[draw.at as usize] as usize;
-            let index = &mut in_frame[first_of[draw.cluster as usize] + local];
-            if *index == u32::MAX {
-                let key = cluster.materials[local];
-                *index = *indexes.entry(key).or_insert_with(|| {
-                    uses.materials.push(key);
-                    uses.first_draw.push((own + at) as u32);
-                    (uses.materials.len() - 1) as u32
-                });
-            }
-            uses.material_of.push(*index);
-            // A level of detail's mesh takes the item's own's place.
-            let source = match (draw.lod, cluster.mesh_of[draw.at as usize]) {
-                (Some(lod), _) => Some(lod),
-                (None, BUILT_IN) => None,
-                (None, local) => {
-                    let noted =
-                        &mut mesh_noted[first_mesh_of[draw.cluster as usize] + local as usize];
-                    if std::mem::replace(noted, true) {
-                        None
-                    } else {
-                        Some(&cluster.meshes[local as usize])
-                    }
-                }
-            };
-            if let Some(source) = source
-                && seen_meshes.insert(Arc::as_ptr(source).cast())
-            {
-                uses.meshes.push(source);
-            }
-        }
         uses
+    }
+}
+
+impl FrameUses<'_> {
+    /// Where `key` (whose digest is `digest`) is among the frame's
+    /// materials, added as first used by draw `first` if it's new.
+    fn place(
+        &mut self,
+        places: &mut MaterialPlaces,
+        key: MaterialKey,
+        digest: u64,
+        first: u32,
+    ) -> u32 {
+        places
+            .find(digest, &key, &self.materials, |key| key)
+            .unwrap_or_else(|| {
+                self.materials.push(key);
+                self.first_draw.push(first);
+                places.note(digest, self.materials.len() as u32 - 1)
+            })
+    }
+}
+
+/// A material key's digest, which [`MaterialPlaces`] finds it by.
+fn key_digest(key: &MaterialKey) -> u64 {
+    use std::hash::BuildHasher;
+    rustc_hash::FxBuildHasher.hash_one(key)
+}
+
+/// Where each distinct material key is in a list of them, by the key's
+/// digest. A key is 480 bytes: a map of the keys themselves hashes and
+/// moves that much for each one it takes in, and Desert Homestead's frame
+/// has 1,500 (0.23 ms on the frame's thread; 0.05 this way, the digests
+/// worked out on the threads that work out the keys).
+#[derive(Default)]
+struct MaterialPlaces(FxHashMap<u64, u32>);
+
+impl MaterialPlaces {
+    /// `key`'s place among `keys`, each of which was noted here with its
+    /// digest and place, if it's one of them. `key_of` reads an entry's key.
+    fn find<K>(
+        &self,
+        digest: u64,
+        key: &MaterialKey,
+        keys: &[K],
+        key_of: impl Fn(&K) -> &MaterialKey,
+    ) -> Option<u32> {
+        match self.0.get(&digest) {
+            Some(&at) if key_of(&keys[at as usize]) == key => Some(at),
+            // Two keys with one digest: only the first is noted, so the
+            // other is looked for among them all.
+            Some(_) => keys
+                .iter()
+                .position(|other| key_of(other) == key)
+                .map(|at| at as u32),
+            None => None,
+        }
+    }
+
+    /// Notes that the key with `digest` is at `at`, and returns `at`.
+    fn note(&mut self, digest: u64, at: u32) -> u32 {
+        self.0.entry(digest).or_insert(at);
+        at
     }
 }
 
@@ -955,6 +1076,9 @@ pub(super) struct DrawPlan {
     /// Items in view with levels of detail, by level (see
     /// [`RenderStats::lod_items`](crate::RenderStats::lod_items)).
     pub(super) lod_items: [u32; crate::LOD_LEVELS],
+    /// Which of the frame's draws the camera sees, by the draw's index:
+    /// the others are planned only as shadow casters.
+    pub(super) in_view: Vec<bool>,
 }
 
 /// Puts the `draws` (`list`'s items at their levels of detail, see
@@ -987,15 +1111,29 @@ pub(super) fn plan_draws(
     // compares these instead.
     let keys = map_indexes(draws.len(), |index| {
         let draw = &draws[index];
+        let material = &draw.item.material;
+        let part = drawn_part(draw.item);
+        let shader = shader_key(draw.item);
+        let cut_out = material.alpha_cutoff > 0.0;
+        // Fading changes the shader a solid item is lit by only for the
+        // standard material's, with no holes (`Batch::fading`).
+        let whole = !cut_out
+            && shader.is_none()
+            && part != DrawnPart::Terrain
+            && material.opacity >= 1.0
+            && material.water.is_none()
+            && draw.item.decal_role != DecalRole::Decal;
+        let fading = whole && draw.fade != OPAQUE;
         let key = SortKey {
             band: distance_band(draw.item.transform.w_axis.truncate(), list.camera.position),
-            part: drawn_part(draw.item),
+            part,
+            pipeline: pipeline_rank(shader, material.double_sided, cut_out, fading),
             mesh: draw.mesh(),
             material: uses.material_of[index],
-            shader: shader_key(draw.item),
-            double_sided: draw.item.material.double_sided,
+            shader,
+            double_sided: material.double_sided,
             casts_shadow: draw.casts_shadow,
-            cut_out: draw.item.material.alpha_cutoff > 0.0,
+            cut_out,
         };
         (key, index as u32)
     });
@@ -1042,7 +1180,7 @@ pub(super) fn plan_draws(
     let parts = map_parts(&ordered, |part| {
         plan_part(part, draws, uses, view, &bounds, keep_seen)
     });
-    join_plan(parts, seen)
+    join_plan(parts, seen, draws.len())
 }
 
 /// What makes two draws one batch.
@@ -1079,6 +1217,8 @@ struct PlanPart<'a> {
     lod_items: [u32; crate::LOD_LEVELS],
     seen: Vec<CullingBounds>,
     skins: Vec<SkinUse<'a>>,
+    /// The draws the camera sees, by index.
+    in_view: Vec<u32>,
 }
 
 /// Plans the draws `ordered` picks, in that order.
@@ -1133,18 +1273,16 @@ fn plan_part<'a>(
         let Some(mut raw) = instance_raw_with(item, &mut colors) else {
             continue;
         };
-        // A hair card (a cut-out, no surface shader, terrain or water)
-        // casts its shadow through its texture's holes: many strands, not
-        // a slab. Other cut-outs (leaf cards, fences) cast their whole
-        // mesh, as before CO7: through their holes too, the Shadows pass
-        // of 36,000 leaf cards went from 0.19 to 0.42 ms at 1080p High
-        // (`bench_cut_out_foliage_shadows`). One whose texture is tiled by
-        // its size (`uv_tile`) casts its whole mesh too: `vs_shadow_cut_out`
-        // reads the mesh's own coordinates, so its holes would fall at the
-        // wrong scale (as `ray_cut_outs` leaves tiled items out).
+        // A cut-out (no surface shader, terrain or water) casts its shadow
+        // through its texture's holes: a plant's leaves and a head's
+        // strands, not their cards (`cut_outs_cast_whole` has what that
+        // costs, and the switch back). One whose texture is tiled by its
+        // size (`uv_tile`) casts its whole mesh: `vs_shadow_cut_out` reads
+        // the mesh's own coordinates, so its holes would fall at the wrong
+        // scale (as `ray_cut_outs` leaves tiled items out).
         let tiled = item.uv_tile.is_finite() && item.uv_tile > 0.0;
         let cut_out = (key.cut_out
-            && matches!(item.material.shading, Shading::Hair(_))
+            && (matches!(item.material.shading, Shading::Hair(_)) || !cut_outs_cast_whole())
             && !tiled
             && key.shader.is_none()
             && item.material.terrain.is_none()
@@ -1171,12 +1309,22 @@ fn plan_part<'a>(
             let index = part.instances.len() as u32;
             instance_at = Some(index);
             part.instances.push(raw);
+            part.in_view.push(at);
             let water = item.material.water.is_some();
             let outline = !transparent && outline_uniform(&item.material)[3] > 0.0;
+            // A solid item of the standard material with no holes, of
+            // which only some pixels are drawn.
+            let fading = draw.fade != OPAQUE
+                && !transparent
+                && !water
+                && !key.cut_out
+                && key.shader.is_none()
+                && key.part != DrawnPart::Terrain;
             let kind = (key, transparent, water, outline);
             match part.batches.last_mut() {
                 Some((_, last)) if last_batch == Some(kind) => {
                     last.instances.end = index + 1;
+                    last.fading |= fading;
                 }
                 _ => {
                     last_batch = Some(kind);
@@ -1198,6 +1346,7 @@ fn plan_part<'a>(
                                 && !water
                                 && key.shader.is_none()
                                 && item.material.terrain.is_none(),
+                            fading,
                             part: key.part,
                             instances: index..index + 1,
                         },
@@ -1221,8 +1370,15 @@ fn plan_part<'a>(
 /// Puts `parts` together, in order: a batch cut in two by where a share of
 /// the work ended is made whole, each skin's joints are added once, and
 /// each (skin, mesh) pair is listed once.
-fn join_plan(parts: Vec<PlanPart>, seen: Option<&mut Vec<CullingBounds>>) -> DrawPlan {
-    let mut plan = DrawPlan::default();
+fn join_plan(
+    parts: Vec<PlanPart>,
+    seen: Option<&mut Vec<CullingBounds>>,
+    draws: usize,
+) -> DrawPlan {
+    let mut plan = DrawPlan {
+        in_view: vec![false; draws],
+        ..DrawPlan::default()
+    };
     let mut first_instance = 0;
     let mut last_kind: Option<BatchKind> = None;
     // Where each skin's joints start, by the skin's address: items posed
@@ -1232,6 +1388,9 @@ fn join_plan(parts: Vec<PlanPart>, seen: Option<&mut Vec<CullingBounds>>) -> Dra
     let mut seen = seen;
     for mut part in parts {
         plan.culled += part.culled;
+        for draw in part.in_view {
+            plan.in_view[draw as usize] = true;
+        }
         for (level, count) in part.lod_items.into_iter().enumerate() {
             plan.lod_items[level] += count;
         }
@@ -1242,7 +1401,10 @@ fn join_plan(parts: Vec<PlanPart>, seen: Option<&mut Vec<CullingBounds>>) -> Dra
             batch.instances =
                 batch.instances.start + first_instance..batch.instances.end + first_instance;
             match plan.batches.last_mut() {
-                Some(last) if last_kind == Some(kind) => last.instances.end = batch.instances.end,
+                Some(last) if last_kind == Some(kind) => {
+                    last.instances.end = batch.instances.end;
+                    last.fading |= batch.fading;
+                }
                 _ => {
                     last_kind = Some(kind);
                     plan.batches.push(batch);
@@ -1287,6 +1449,8 @@ fn join_plan(parts: Vec<PlanPart>, seen: Option<&mut Vec<CullingBounds>>) -> Dra
 
 /// What a draw is sorted and batched by: draws with equal keys draw as one
 /// batch. Small, so sorting thousands of them compares little.
+///
+/// The fields are in the order they sort by.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct SortKey {
     /// Drawn nearest first: what's hidden behind near items never reaches
@@ -1297,6 +1461,9 @@ struct SortKey {
     /// keeps each kind's draws together, so the GPU's time can be taken by
     /// what is drawn with a stamp where the kind changes.
     part: DrawnPart,
+    /// Which pipeline it is drawn with, ahead of its mesh and material
+    /// ([`pipeline_rank`]); 0 while the old order is asked for.
+    pipeline: u32,
     mesh: MeshKey,
     /// Its material's index among the frame's distinct material keys.
     material: u32,
@@ -1306,6 +1473,45 @@ struct SortKey {
     casts_shadow: bool,
     /// Whether it has holes by its texture's alpha.
     cut_out: bool,
+}
+
+/// Where a draw's pipeline puts it among the draws of its distance band
+/// and part: draws of one pipeline get one rank, so they are drawn
+/// together, whatever their mesh. A change of pipeline between two small
+/// draws costs the GPU more than the draws themselves, and a change of
+/// mesh or material costs little: with plants of different pipelines
+/// alternating mesh by mesh, a quarter to half a millisecond of Desert
+/// Homestead's scene pass (`docs/rendering/performance.md`).
+///
+/// It changes which of two surfaces shows where both land on exactly the
+/// same depth value (far foliage, where a step of the depth buffer is a
+/// stud or more): single pixels, a few hundred to a few thousand of a
+/// 1920 × 1080 frame of that scene against sorting by mesh first, which
+/// the owner looked at and took (2026-11-26). `AXCENITY_PIPELINE_ORDER=0`
+/// puts the old order back, to compare: every draw's rank is 0 then and
+/// they sort by mesh first.
+///
+/// Two surface shaders can share a rank (it keeps 28 bits of their key),
+/// which only lets their draws mix: the key's other fields still tell
+/// them apart.
+fn pipeline_rank(shader: Option<u64>, double_sided: bool, cut_out: bool, fading: bool) -> u32 {
+    static BY_MESH: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *BY_MESH
+        .get_or_init(|| std::env::var_os("AXCENITY_PIPELINE_ORDER").is_some_and(|v| v == "0"))
+    {
+        return 0;
+    }
+    let shader = shader.map_or(0, |key| (key as u32 & 0x0fff_ffff) + 1);
+    shader << 3 | u32::from(fading) << 2 | u32::from(cut_out) << 1 | u32::from(double_sided)
+}
+
+/// Whether cut-outs other than hair cards cast their whole mesh in the
+/// shadow maps, as they did until 2026-11-26: `AXCENITY_NO_CUT_OUT_SHADOWS`
+/// asks for it, to measure what casting through their holes costs
+/// (`docs/rendering/shadows.md`).
+fn cut_outs_cast_whole() -> bool {
+    static ASKED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ASKED.get_or_init(|| std::env::var_os("AXCENITY_NO_CUT_OUT_SHADOWS").is_some())
 }
 
 /// What `item` is, for the order solid items are drawn in and the GPU's

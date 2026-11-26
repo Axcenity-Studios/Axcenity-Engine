@@ -224,6 +224,12 @@ impl ScenePipeline {
             [&frame_layout, &material_layout, &skinning.layout],
             samples,
         );
+        let plant_probe = probe::PlantProbe::from_environment(
+            &device,
+            [&frame_layout, &material_layout, &skinning.layout],
+            samples,
+        );
+        let depth_start = depth_start::DepthStart::new(&device);
         let mut terrain =
             terrain::TerrainPass::new(&device, &frame_layout, texture_bytes.clone(), samples);
         terrain.set_skipped_levels(graphics.texture_quality.skipped_levels());
@@ -295,6 +301,11 @@ impl ScenePipeline {
             sky_pipeline,
             item_pipelines,
             prefill_pipelines,
+            plant_probe,
+            depth_start,
+            // `AXCENITY_NO_WHOLE_SOLIDS` lights them with `fs_main` as
+            // before, for comparing the two.
+            whole_solids: std::env::var_os("AXCENITY_NO_WHOLE_SOLIDS").is_none(),
             cascades_drawn: [None; SHADOW_CASCADES],
             casters_planned: 0,
             outline_pipeline,
@@ -539,6 +550,15 @@ impl ScenePipeline {
             );
             self.edge_pipeline =
                 create_edge_pipeline(&self.device, &self.occlusion.layout, samples);
+            self.plant_probe = probe::PlantProbe::from_environment(
+                &self.device,
+                [
+                    &self.frame_layout,
+                    &self.material_layout,
+                    &self.skinning.layout,
+                ],
+                samples,
+            );
             self.terrain
                 .set_samples(&self.device, &self.frame_layout, samples);
             self.water.set_samples(
@@ -1174,6 +1194,16 @@ impl ScenePipeline {
                     .iter()
                     .map(|matrix| Frustum::of(glam::Mat4::from_cols_array_2d(matrix))),
             );
+            // Ray traced shadows' rays toward the sun, where the shadow
+            // maps reach less far than they do (or aren't drawn).
+            if let Some(rays) = ray_shadows::RayShadowPlan::of(list, &self.graphics)
+                && shadows_drawn(list.shadows, &self.graphics)
+                    .is_none_or(|(maps, _)| maps.distance < rays.reach)
+            {
+                reach
+                    .views
+                    .push(Frustum::of(sun_reach(list, rays.reach, aspect)));
+            }
             for spot in &planned_lights.spot_shadows {
                 reach.lamps.push((spot.bounds, Frustum::of(spot.view_proj)));
             }
@@ -1220,6 +1250,7 @@ impl ScenePipeline {
             skins,
             posed,
             lod_items,
+            in_view,
         } = {
             let (meshes, custom_meshes) = (&self.meshes, &self.custom_meshes);
             plan_draws(
@@ -1296,9 +1327,12 @@ impl ScenePipeline {
         // What moved since last frame, for the motion vectors.
         let moved = self.frame_targets.temporal.as_ref().map(|_| {
             let posing = &self.posing;
-            let moved = self
-                .history
-                .moved(&draws, |skin, mesh| posing.offset(skin, mesh), clock);
+            let moved = self.history.moved(
+                &draws,
+                Some(&in_view),
+                |skin, mesh| posing.offset(skin, mesh),
+                clock,
+            );
             let blur = list
                 .lens
                 .motion_blur
@@ -1699,7 +1733,13 @@ impl ScenePipeline {
             // cut-out's are its own, every other caster's the plain ones.
             let mut bound: Option<u32> = None;
             // See-through items, and parts with `CastShadow` off, cast no shadow.
-            for ((mesh, cut_out), instances) in casters {
+            // Whole casters first, then the cut-outs: a shadow map keeps
+            // the nearest depth whatever the order, and a plant's whole
+            // and cut-out parts would otherwise change the pipeline mesh
+            // by mesh.
+            let whole = casters.iter().filter(|((_, cut_out), _)| cut_out.is_none());
+            let cut_outs = casters.iter().filter(|((_, cut_out), _)| cut_out.is_some());
+            for ((mesh, cut_out), instances) in whole.chain(cut_outs) {
                 let Some(mesh) = self.gpu_mesh(*mesh) else {
                     continue;
                 };
@@ -1746,6 +1786,7 @@ impl ScenePipeline {
         encoder.part("prepass");
         mark(&mut encoder, FramePass::Prepass);
         let mut motion_draws = 0;
+        let mut prepass_draws = 0;
 
         // While ambient occlusion or contact shadows are on: solid items'
         // depth and normals, then (for ambient occlusion) how hidden each
@@ -1785,6 +1826,7 @@ impl ScenePipeline {
                         continue;
                     };
                     count(mesh, &batch.instances);
+                    prepass_draws += 1;
                     pass.draw_indexed(0..mesh.drawn_indices(snow_caps), 0, batch.instances.clone());
                 }
                 stamp_part(&mut pass, PartPass::Prepass, None);
@@ -1919,6 +1961,20 @@ impl ScenePipeline {
             .as_ref()
             .map_or_else(Vec::new, |particles| particles.draws());
 
+        // Where the prepass drew the same solid items with as many samples
+        // a pixel, the scene's depth starts a step behind the prepass's in
+        // place of the far plane (renderer/depth_start.rs): what's hidden
+        // then fails the depth test before it is lit, and what shows is
+        // drawn exactly as it would be.
+        let depth_started = match &self.frame_targets.occlusion {
+            Some(prepass) if self.frame_targets.samples == 1 => self.depth_start.draw(
+                &self.device,
+                &mut encoder,
+                &prepass.depth_view,
+                &self.frame_targets.depth_view,
+            ),
+            _ => false,
+        };
         // The scene is drawn into the HDR texture; post-processing then brings
         // it to `view`. With MSAA it's drawn into the multisampled texture,
         // whose samples are averaged into the HDR one as the pass ends.
@@ -1999,7 +2055,12 @@ impl ScenePipeline {
         // Each pass is a block so it ends (is dropped) before the next
         // begins and before `encoder.finish()`, which need the encoder back.
         {
-            let mut pass = begin_scene_pass(&mut encoder, &self.frame_targets, false, copied);
+            let mut pass = begin_scene_pass(
+                &mut encoder,
+                &self.frame_targets,
+                (false, depth_started),
+                copied,
+            );
             pass.set_bind_group(0, frame_bind_group, &[]);
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             // The cut-out surfaces' depth first, so they're lit only once
@@ -2057,7 +2118,7 @@ impl ScenePipeline {
                     camera_position: frame_uniform.camera_position,
                 },
             );
-            let mut pass = begin_scene_pass(&mut encoder, targets, true, false);
+            let mut pass = begin_scene_pass(&mut encoder, targets, (true, true), false);
             pass.set_bind_group(0, frame_bind_group, &[]);
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::SeeThrough));
@@ -2068,8 +2129,17 @@ impl ScenePipeline {
         }
         (counts.items_drawn, counts.batches) = drawn;
         counts.draw_calls += motion_draws + depth_fill.0 + decal_draws.len() as u32;
-        counts.triangles += depth_fill.1;
-        counts.vertices += depth_fill.2;
+        counts.prepass_draws = prepass_draws;
+        counts.motion_draws = motion_draws;
+        counts.depth_fill_draws = depth_fill.0;
+        counts.depth_from_prepass = depth_started;
+        for batch in solid
+            .iter()
+            .filter(|batch| batch.part == DrawnPart::Scattered)
+        {
+            counts.scattered_batches += 1;
+            counts.scattered_items += batch.instances.end - batch.instances.start;
+        }
         // The light the volumetric fog scattered in front of what was drawn.
         if let (Some(fog), Some(occlusion)) = (&self.volumetric_fog, &self.frame_targets.occlusion)
         {
@@ -2385,11 +2455,20 @@ impl ScenePipeline {
                 None => &water.blended,
             };
             let side = usize::from(batch.double_sided);
+            let probe = self
+                .plant_probe
+                .as_ref()
+                .filter(|_| kind == BatchPass::Scene)
+                .and_then(|probe| probe.pipeline(batch));
             let pipeline = match (prepass, batch.double_sided, surface) {
                 _ if kind == BatchPass::DepthFill => &self.prefill_pipelines.depth[side],
                 // Water is never in the prepass.
                 _ if batch.water => water,
+                _ if probe.is_some() => probe?,
                 (false, _, None) if batch.prefilled => &self.prefill_pipelines.lit[side],
+                (false, _, None) if !batch.transparent && !batch.fading && self.whole_solids => {
+                    &self.prefill_pipelines.whole[side]
+                }
                 (false, _, Some(surface)) => surface.items.of(batch),
                 (false, _, None) => self.item_pipelines.of(batch),
                 (true, double_sided, Some(surface)) => surface.prepass(double_sided),
@@ -2815,6 +2894,12 @@ impl ScenePipeline {
             items_submitted: counts.items_submitted,
             items_drawn: counts.items_drawn,
             batches: counts.batches,
+            prepass_draws: counts.prepass_draws,
+            motion_draws: counts.motion_draws,
+            depth_fill_draws: counts.depth_fill_draws,
+            scattered_batches: counts.scattered_batches,
+            scattered_items: counts.scattered_items,
+            depth_from_prepass: counts.depth_from_prepass,
             items_culled: counts.items_culled,
             shadow_casters_drawn: counts.shadow_casters_drawn,
             shadow_casters_culled: counts.shadow_casters_culled,
@@ -3499,19 +3584,24 @@ fn item_bounds(
     }
 }
 
+/// Begins a pass drawing into the scene's targets. `load` says whether
+/// the color, then the depth, already there is kept (else it's cleared),
+/// and `keep` whether a later pass carries on from what this one leaves.
 fn begin_scene_pass<'a>(
     encoder: &'a mut wgpu::CommandEncoder,
     targets: &'a FrameTargets,
-    load: bool,
+    (load_color, load_depth): (bool, bool),
     keep: bool,
 ) -> wgpu::RenderPass<'a> {
-    let (color_load, depth_load) = if load {
-        (wgpu::LoadOp::Load, wgpu::LoadOp::Load)
+    let color_load = if load_color {
+        wgpu::LoadOp::Load
     } else {
-        (
-            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-            wgpu::LoadOp::Clear(1.0),
-        )
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK)
+    };
+    let depth_load = if load_depth {
+        wgpu::LoadOp::Load
+    } else {
+        wgpu::LoadOp::Clear(1.0)
     };
     let kept = if keep {
         wgpu::StoreOp::Store
@@ -3612,6 +3702,8 @@ fn scene_pipelines(
         depth_double,
         lit,
         lit_double,
+        whole,
+        whole_double,
     ] = gpu::in_parallel([
         &|| create_sky_pipeline(device, frame_layout, clouds_layout, samples),
         &|| pipeline(false, false),
@@ -3632,6 +3724,8 @@ fn scene_pipelines(
         &|| prefill(depth_fill, true, DepthUse::Fill),
         &|| prefill("fs_prefilled", false, DepthUse::Filled),
         &|| prefill("fs_prefilled", true, DepthUse::Filled),
+        &|| prefill("fs_prefilled", false, DepthUse::Plain),
+        &|| prefill("fs_prefilled", true, DepthUse::Plain),
     ]);
     (
         sky,
@@ -3645,6 +3739,7 @@ fn scene_pipelines(
         PrefillPipelines {
             depth: [depth, depth_double],
             lit: [lit, lit_double],
+            whole: [whole, whole_double],
         },
     )
 }

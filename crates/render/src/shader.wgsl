@@ -321,9 +321,8 @@ struct ShadowCutOut {
     @location(1) @interpolate(flat) cut: vec2<f32>,
 }
 
-// Draws a cut-out caster (a hair card: `plan_part` sends no other here,
-// since through their holes foliage's shadows cost twice as much) into a
-// shadow map, as `vs_shadow` does, with what its fragment needs to leave
+// Draws a cut-out caster (a leaf card, a blade of grass, a hair card) into
+// a shadow map, as `vs_shadow` does, with what its fragment needs to leave
 // out its holes. Its texture coordinates aren't tiled by its size: a
 // cut-out drawn that way (`DrawItem::uv_tile`) casts its whole mesh.
 @vertex
@@ -351,7 +350,7 @@ fn vs_shadow_cut_out(
 }
 
 // A cut-out caster's pixel of a shadow map: left out where its texture is
-// cut out, so strands cast their own shapes, not their cards'.
+// cut out, so leaves and strands cast their own shapes, not their cards'.
 // A hair card's opacity is hashed against a fixed per-texel pattern over
 // the band round its cutoff (`HAIR_HASH_BAND`, as the scene pass hashes
 // it under TAA), so the shadow map's filter averages a strand's soft
@@ -571,11 +570,16 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
     return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, data_texel, footprint);
 }
 
-// A cut-out surface, in the scene pass. Its depth was drawn just before
-// (`fs_depth_only`), so the depth test (equal) already passes only its
-// nearest layer, and only where it isn't cut out. With no `discard` here
-// the GPU tests depth before running this, so the leaves hidden behind
-// the nearest one are never lit.
+// A surface every pixel of which is drawn, in the scene pass
+// (`PrefillPipelines` in renderer/types.rs). With no `discard` here the
+// GPU tests depth before running this, so what's hidden is never lit;
+// `fs_main`, which can discard, is run first and tested after.
+//
+// A cut-out surface's depth was drawn just before (`fs_depth_only`), so
+// its depth test (equal) passes only its nearest layer, and only where it
+// isn't cut out: the leaves hidden behind the nearest one are never lit.
+// A solid item with no cutoff that isn't fading (`dithered_out`) has
+// nothing `fs_main` would discard, so it's lit here with the plain test.
 @fragment
 fn fs_prefilled(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     let facing = select(-1.0, 1.0, front);
@@ -585,6 +589,43 @@ fn fs_prefilled(in: VertexOut, @builtin(front_facing) front: bool) -> @location(
     let data_texel = textureSample(metalness_texture, material_sampler, in.uv);
     let footprint = skin_footprint(in, shaded.normal, facing);
     return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, data_texel, footprint);
+}
+
+// Measuring only (`AXCENITY_PLANT_PROBE`, docs/rendering/performance.md):
+// scattered items' pixels in the scene pass with part of `fs_main`'s work
+// left out, to tell what their time is spent on. The picture is wrong
+// while one is on.
+//
+// `flat`: nothing read, so the vertex shader carries nothing to a corner
+// but its position, and a pixel costs nothing.
+@fragment
+fn fs_probe_flat() -> @location(0) vec4<f32> {
+    return vec4<f32>(0.18, 0.18, 0.18, 1.0);
+}
+
+// `carried`: everything the vertex shader carries is read, and nothing is
+// done with it. Against `flat`, the cost of carrying it.
+@fragment
+fn fs_probe_carried(in: VertexOut) -> @location(0) vec4<f32> {
+    let sum = in.world_position + in.normal + in.base_color.rgb + in.emissive + in.surface
+        + in.tangent.xyz + in.item_middle + in.item_half_size
+        + vec3<f32>(in.uv, in.fade) + vec3<f32>(in.role, in.rise, in.hangs);
+    return vec4<f32>(fract(sum * 0.01), in.base_color.a + in.tangent.w);
+}
+
+// `surface`: the material's textures are read as `fs_prefilled` reads
+// them, and the surface is not lit. Against `carried`, the textures'
+// cost; against the pass as it is, the lighting's.
+@fragment
+fn fs_probe_surface(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    let facing = select(-1.0, 1.0, front);
+    let shaded = pixel_surface(in, facing);
+    let occlusion_texel = textureSample(occlusion_texture, material_sampler, in.uv);
+    let specular_texel = textureSample(specular_texture, material_sampler, in.uv);
+    let data_texel = textureSample(metalness_texture, material_sampler, in.uv);
+    let rest = occlusion_texel.rgb + specular_texel.rgb + data_texel.rgb + shaded.normal
+        + shaded.emissive + vec3<f32>(shaded.metalness, shaded.roughness, shaded.opacity);
+    return vec4<f32>(shaded.base_color + rest * 0.001, 1.0);
 }
 
 // A cut-out surface's opacity at this pixel, as `standard_surface` and

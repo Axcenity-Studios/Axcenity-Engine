@@ -744,6 +744,14 @@ pub(super) struct Batch {
     /// A cut-out surface, whose depth is drawn before anything is lit
     /// ([`PrefillPipelines`]).
     pub(super) prefilled: bool,
+    /// A solid batch with no holes in which some item is drawn in part:
+    /// its level of detail is changing, or it is foliage near its cull
+    /// distance (`dithered_out` in shader.wgsl). A batch with none draws
+    /// every pixel it covers, so it is lit by a shader with no `discard`
+    /// ([`PrefillPipelines::whole`]). Always false for a cut-out, a
+    /// see-through item, terrain or a surface shader's, whose pipeline
+    /// doesn't depend on it.
+    pub(super) fading: bool,
     /// What it is, for the GPU's time by what is drawn; solid items are
     /// sorted by it within a distance band.
     pub(super) part: gpu_timer::DrawnPart,
@@ -964,16 +972,27 @@ pub(super) struct DrawnCascade {
     pub(super) camera: glam::Vec3,
 }
 
-/// The pipelines of cut-out surfaces (leaves, fences). Their `discard`
-/// keeps the GPU from skipping what's hidden, so a forest lights each
-/// pixel once per leaf in front of it. So their depth is drawn first, with
-/// a shader that only reads the alpha, and they're then lit with no
-/// `discard`, only where that depth is theirs.
+/// The pipelines that light solid items with no `discard`.
+///
+/// A shader that can `discard` and writes depth is tested against the
+/// depth only after it has run (the GPU can't know before whether the
+/// pixel will be there to write its depth), so what's hidden is lit all
+/// the same and then thrown away. With no `discard` the GPU tests first.
+///
+/// Cut-out surfaces (leaves, fences) need their holes: their depth is
+/// drawn first, with a shader that only reads the alpha, and they're then
+/// lit with no `discard`, only where that depth is theirs. Solid items
+/// with no holes and nothing fading draw every pixel they cover, so
+/// they're lit by the same shader with the plain depth test. What's left
+/// to `fs_main` and its `discard`: fading items, see-through ones (which
+/// don't write depth, so the GPU tests first anyway) and surface shaders.
 pub(super) struct PrefillPipelines {
     /// The depth pass's, by `double_sided`.
     pub(super) depth: [wgpu::RenderPipeline; 2],
     /// The lit pass's, by `double_sided`.
     pub(super) lit: [wgpu::RenderPipeline; 2],
+    /// Solid items with nothing left out, by `double_sided`.
+    pub(super) whole: [wgpu::RenderPipeline; 2],
 }
 
 /// The GPU objects for drawing a scene, whatever it's drawn into. Both
@@ -984,6 +1003,15 @@ pub(super) struct ScenePipeline {
     pub(super) sky_pipeline: wgpu::RenderPipeline,
     pub(super) item_pipelines: ItemPipelines,
     pub(super) prefill_pipelines: PrefillPipelines,
+    /// The measuring switch for scattered items, while its variable is set
+    /// (renderer/probe.rs).
+    pub(super) plant_probe: Option<probe::PlantProbe>,
+    /// Starts the scene pass's depth from the prepass's
+    /// (renderer/depth_start.rs).
+    pub(super) depth_start: depth_start::DepthStart,
+    /// Whether solid items with nothing left out are lit by a shader with
+    /// no `discard` ([`PrefillPipelines::whole`]).
+    pub(super) whole_solids: bool,
     /// Each sun cascade as last drawn, while the shadow map still holds it.
     pub(super) cascades_drawn: [Option<DrawnCascade>; SHADOW_CASCADES],
     /// How many shadow casters the last frame planned, whose far cascades
@@ -1279,6 +1307,13 @@ pub(super) struct FrameCounts {
     pub(super) items_drawn: u32,
     /// Instanced draws in the scene pass.
     pub(super) batches: u32,
+    /// See [`RenderStats`]'s fields of these names.
+    pub(super) prepass_draws: u32,
+    pub(super) motion_draws: u32,
+    pub(super) depth_fill_draws: u32,
+    pub(super) scattered_batches: u32,
+    pub(super) scattered_items: u32,
+    pub(super) depth_from_prepass: bool,
     /// Items outside the camera's view.
     pub(super) items_culled: u32,
     /// Casters drawn into shadow views, and those left out of a view they

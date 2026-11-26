@@ -1525,3 +1525,77 @@ mod global_illumination {
         }
     }
 }
+
+/// A wall facing the camera with the sun from the right and behind the
+/// camera, and a block beside and behind the camera, out of its view,
+/// whose shadow falls on the middle of the wall: listed on its own, or as
+/// a group (a painted plant's chunk).
+fn shadow_from_out_of_view(grouped: bool) -> DrawList {
+    let wall = DrawItem {
+        transform: Mat4::from_scale_rotation_translation(
+            Vec3::new(40.0, 30.0, 1.0),
+            glam::Quat::IDENTITY,
+            Vec3::new(0.0, 0.0, -10.5),
+        ),
+        ..big_block()
+    };
+    // Its shadow lands where x is 12 less than its own: the wall's middle.
+    let caster = big_block_at(Vec3::new(12.0, 0.0, 2.0));
+    let mut list = list_of(vec![wall]);
+    if grouped {
+        list.chunks = vec![crate::ItemChunk::of(vec![caster])];
+    } else {
+        list.items.push(caster);
+    }
+    list.sun.direction = Vec3::new(1.0, 0.0, 1.0).normalize();
+    list.shadows.softness = 0.0;
+    list
+}
+
+/// Ray traced shadows come from whatever stands between a pixel and the
+/// sun, in a view or not. Items in groups are passed over when no view of
+/// the frame reaches them (`Reach`), and without shadow maps the only view
+/// was the camera's: a plant beside the screen lost its shadow on what the
+/// camera did see, and got it back as it was turned into view.
+#[test]
+fn a_grouped_item_out_of_view_still_casts_its_ray_traced_shadow_into_it() {
+    let Some((device, queue)) = ray_test_device() else {
+        eprintln!("skipped: no GPU with hardware ray tracing on this machine");
+        return;
+    };
+    let size = 128;
+    let middle_of = |list: &DrawList| {
+        let mut renderer = TextureRenderer::new(&device, &queue, size, size);
+        renderer.set_graphics(&crate::GraphicsSettings {
+            shadow_quality: Some(crate::ShadowQuality::Off),
+            ray_traced_shadows: Some(crate::RayTracedShadows::Low),
+            anti_aliasing: Some(crate::AntiAliasing::Off),
+            ..crate::GraphicsSettings::default()
+        });
+        for _ in 0..4 {
+            renderer.render(list).unwrap();
+        }
+        let traced = renderer.stats().ray_tracing.instances;
+        (
+            super::card_set::rgb_at(&renderer.read_pixels(), size, size / 2, size / 2)[0],
+            traced,
+        )
+    };
+    let (listed, listed_traced) = middle_of(&shadow_from_out_of_view(false));
+    let (grouped, grouped_traced) = middle_of(&shadow_from_out_of_view(true));
+    let mut open = shadow_from_out_of_view(false);
+    open.items.pop();
+    let (lit, _) = middle_of(&open);
+    eprintln!(
+        "the wall's middle: lit {lit}, shaded by a listed block {listed}, by a grouped one {grouped}"
+    );
+    assert!(
+        lit - listed > 40.0,
+        "the listed block shades the wall: {listed} against {lit}"
+    );
+    assert_eq!(grouped_traced, listed_traced, "the grouped block is traced");
+    assert!(
+        (grouped - listed).abs() < 2.0,
+        "the grouped block shades the wall as the listed one does: {grouped} against {listed}"
+    );
+}

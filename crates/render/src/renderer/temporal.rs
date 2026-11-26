@@ -761,27 +761,91 @@ impl History {
     /// where it is). `posed` says where an item's skin was posed with a
     /// mesh this frame (`Posing::offset`), and `clock` is this frame's
     /// `Frame::clock`.
+    ///
+    /// `in_view` says which draws the camera sees (`DrawPlan::in_view`):
+    /// the prepass draws only those, and the motion pass draws only where
+    /// the prepass did, so the others (a swaying plant only a shadow view
+    /// reaches) are left out. `None` keeps every draw. The draws are
+    /// shared among the CPU's threads; `AXCENITY_NO_MOTION_SHARING` keeps
+    /// every draw on one thread, as before, for comparing the two.
     pub(super) fn moved(
         &self,
         draws: &[Draw<'_>],
-        posed: impl Fn(&Skin, MeshKey) -> Option<u32>,
+        in_view: Option<&[bool]>,
+        posed: impl Fn(&Skin, MeshKey) -> Option<u32> + Sync,
         clock: [f32; 4],
     ) -> Moved {
-        // By mesh as they come, each mesh's in the draws' order: put
-        // together below in the meshes' order, which is what sorting them
-        // all by mesh would give, without moving every one about.
-        let mut by_mesh: FxHashMap<MeshKey, Vec<MotionInstance>> = FxHashMap::default();
-        let mut count = 0;
+        static AS_BEFORE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        let as_before =
+            *AS_BEFORE.get_or_init(|| std::env::var_os("AXCENITY_NO_MOTION_SHARING").is_some());
+        let in_view = in_view.filter(|_| !as_before);
         // Plants move only while there's wind, now or last frame, and the
         // clock moved on.
         let windy = |clock: [f32; 4]| clock[1] != 0.0 || clock[3] != 0.0;
         let swaying = self
             .clock
             .is_some_and(|before| before != clock && (windy(before) || windy(clock)));
-        for draw in draws {
+        // One thread's share: its draws that moved, in their order.
+        let part = |part: &[Draw<'_>]| {
+            // Where the share starts among the draws.
+            let first = (part.as_ptr() as usize - draws.as_ptr() as usize) / size_of::<Draw<'_>>();
+            let mut moved = Vec::new();
+            for (at, draw) in part.iter().enumerate() {
+                if in_view.is_some_and(|in_view| !in_view[first + at]) {
+                    continue;
+                }
+                if let Some(instance) = self.moved_draw(draw, &posed, swaying) {
+                    moved.push((draw.mesh(), instance));
+                }
+            }
+            moved
+        };
+        let parts = if as_before {
+            vec![part(draws)]
+        } else {
+            super::parallel::map_parts(draws, part)
+        };
+        // By mesh, each mesh's in the draws' order, which is what sorting
+        // them all by mesh would give: but an instance is 150 bytes, so
+        // where each is (its share, its place there) is put in order and
+        // each is then copied once.
+        let mut by_mesh: FxHashMap<MeshKey, Vec<(u32, u32)>> = FxHashMap::default();
+        let mut count = 0;
+        for (share, moved) in parts.iter().enumerate() {
+            count += moved.len();
+            for (at, (mesh, _)) in moved.iter().enumerate() {
+                by_mesh
+                    .entry(*mesh)
+                    .or_default()
+                    .push((share as u32, at as u32));
+            }
+        }
+        let mut meshes: Vec<MeshKey> = by_mesh.keys().copied().collect();
+        meshes.sort_unstable();
+        let mut instances = Vec::with_capacity(count);
+        for mesh in meshes {
+            let places = by_mesh.remove(&mesh).unwrap_or_default();
+            instances.extend(
+                places
+                    .into_iter()
+                    .map(|(share, at)| parts[share as usize][at as usize]),
+            );
+        }
+        Moved { instances }
+    }
+
+    /// `draw`'s instance for the motion pass, if it moved (see
+    /// [`History::moved`]).
+    fn moved_draw(
+        &self,
+        draw: &Draw<'_>,
+        posed: &impl Fn(&Skin, MeshKey) -> Option<u32>,
+        swaying: bool,
+    ) -> Option<MotionInstance> {
+        {
             let item = draw.item;
             if !in_prepass(item) {
-                continue;
+                return None;
             }
             let sways = swaying && item.sway.is_some_and(|sway| sway.strength > 0.0);
             // Only the list's own items with an ID were remembered.
@@ -789,17 +853,17 @@ impl History {
             let previous = match remembered {
                 Some(previous) => previous,
                 None if sways => &item.transform,
-                None => continue,
+                None => return None,
             };
             let mesh = draw.mesh();
             let now = item.skin.as_deref().and_then(|skin| posed(skin, mesh));
             if *previous == item.transform && now.is_none() && !sways {
-                continue;
+                return None;
             }
             // Of the scene's instance the pass reads only where the item
             // is and how it sways.
             if is_flat(item) {
-                continue;
+                return None;
             }
             // `previous_corner` in shader.wgsl: 1 for posed now but not
             // last frame, else 2 more than where it was.
@@ -810,23 +874,14 @@ impl History {
                     None => [now, 1],
                 },
             };
-            by_mesh.entry(mesh).or_default().push(MotionInstance {
+            Some(MotionInstance {
                 model: item.transform.to_cols_array_2d(),
                 previous: previous.to_cols_array_2d(),
                 skin,
                 sway: instance_sway(item),
                 fade: draw.fade,
-            });
-            count += 1;
+            })
         }
-        let mut meshes: Vec<MeshKey> = by_mesh.keys().copied().collect();
-        meshes.sort_unstable();
-        let mut instances = Vec::with_capacity(count);
-        for mesh in meshes {
-            let of_mesh = by_mesh.remove(&mesh).unwrap_or_default();
-            instances.extend(of_mesh.into_iter().map(|instance| (mesh, instance)));
-        }
-        Moved { instances }
     }
 
     /// Keeps this frame's camera (`view_proj`, without the jitter),
@@ -1181,7 +1236,7 @@ mod tests {
         history.finish(&before, (Mat4::IDENTITY, clock(1.0)), HashMap::new(), true);
 
         for now in [clock(1.1), clock(1.0), [1.1, 0.0, 0.0, 0.0]] {
-            let moved = history.moved(&draws, |_, _| None, now);
+            let moved = history.moved(&draws, None, |_, _| None, now);
             let long_way = moved_the_long_way(&history, &draws, now);
             assert_eq!(moved.instances.len(), long_way.len(), "at {now:?}");
             for (got, want) in moved.instances.iter().zip(&long_way) {
@@ -1189,18 +1244,35 @@ mod tests {
                 assert_eq!(bytemuck::bytes_of(&got.1), bytemuck::bytes_of(&want.1));
             }
         }
+        // Only the draws the camera sees, when told which: what the long
+        // way gives of those alone.
+        let in_view: Vec<bool> = (0..draws.len()).map(|at| at % 3 != 0).collect();
+        let seen: Vec<_> = draws
+            .iter()
+            .zip(&in_view)
+            .filter(|(_, seen)| **seen)
+            .map(|(draw, _)| draw.clone())
+            .collect();
+        let moved = history.moved(&draws, Some(&in_view), |_, _| None, clock(1.1));
+        let long_way = moved_the_long_way(&history, &seen, clock(1.1));
+        assert!(!long_way.is_empty() && long_way.len() < 11);
+        assert_eq!(moved.instances.len(), long_way.len());
+        for (got, want) in moved.instances.iter().zip(&long_way) {
+            assert_eq!(got.0, want.0);
+            assert_eq!(bytemuck::bytes_of(&got.1), bytemuck::bytes_of(&want.1));
+        }
         // While the wind blows every swaying solid plant moves but the
         // flat one; with no wind and the same clock, only the moved one.
         assert_eq!(
             history
-                .moved(&draws, |_, _| None, clock(1.1))
+                .moved(&draws, None, |_, _| None, clock(1.1))
                 .instances
                 .len(),
             11
         );
         assert_eq!(
             history
-                .moved(&draws, |_, _| None, clock(1.0))
+                .moved(&draws, None, |_, _| None, clock(1.0))
                 .instances
                 .len(),
             1

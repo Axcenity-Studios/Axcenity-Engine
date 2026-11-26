@@ -10,6 +10,8 @@ Measured 2026-11-25 on the owner's desktop: Ryzen 9 9950X3D, Radeon RX 9070 XT (
 
 - **Unity HDRP draws this scene 1.2 to 1.7 times faster at 1920 × 1080 and 1.0 to 1.7 times faster at 2560 × 1405.** Five of the six views are between 1.3 and 1.7; the one with little sky in it (the porch) is 1.16 and 1.01.
 - **Since then (2026-11-26) the clouds are done**: 0.04 to 0.30 ms with the same picture, and the gap is 1.1 to 1.4 times at 1920 × 1080 and 0.84 to 1.3 times at 2560 × 1405 ("After step 1" below). The rest of this section is as measured on 2026-11-25.
+- **Then the scene pass (2026-11-26, later the same day)**: it lit most solid pixels before testing their depth. With the depth test first and the same picture, pixel for pixel, the six views are 186 to 246 frames a second at 1920 × 1080, 1.02 to 1.29 times behind Unity ("The plants' scene pass, profiled" below).
+- **Then the draw order, foliage shadows through the leaves, and the thread (2026-11-26, third session)**: 200 to 254 frames a second at 1920 × 1080, 0.98 to 1.21 times behind Unity, with the one thing its picture had over the engine's (shadows that follow the leaves) now drawn ("Shadows through the holes, and the thread" below).
 - **Most of the gap is two things.** The engine's clouds cost 1.6 to 2.9 ms a frame at 1080p where the sky shows, against 0.3 ms for HDRP's. And the part of the engine's GPU frame that does not depend on the window's size is about 3.5 ms, against about 1.8 ms for HDRP's: at a quarter of the pixels the engine still needs 3.8 to 4.7 ms of GPU time a frame, which is what HDRP needs for the whole frame at full size (3.8 to 4.3 ms).
 - **The frame's thread is the next limit.** It takes 4.0 to 5.0 ms (200 to 250 frames a second at most), 1.9 ms of it for the plants' 9,500 items. Unity's main thread takes 1.5 to 1.7 ms. With the clouds gone the windmill view is already limited by the thread, at 233 frames a second.
 - **Axcenity is ahead on what it uses**: 1.1 to 2.1 cores' worth of CPU time against Unity's 3.6 to 6.8, 2.6 to 2.9 GB of video memory against 3.8 to 4.3 GB, volumetric fog at 0.38 ms against 0.88 ms, and it starts in 2.9 seconds against 4.2. It uses more memory (2.45 GB against 1.47 GB).
@@ -151,7 +153,7 @@ Unity's player reports `SystemInfo.supportsRayTracing` false on this machine, so
 From the stills of the six views, side by side:
 
 - **The same**: framing, every plant and object in its place, the terrain's paint (the track, the pale ground by the house, the soil under plants), the direction and length of shadows, the haze at the foot of the range, the overall brightness (mean within about 6% in the three views checked).
-- **Foliage shadows.** The engine's rasterized shadows are each card's whole outline, so plants cast dark blocks. HDRP's follow the leaves and read as lighter and more believable. This is the clearest quality difference in Unity's favour, and the project's README already lists it as an engine limit.
+- **Foliage shadows.** As measured on 2026-11-25 the engine's rasterized shadows were each card's whole outline, so plants cast dark blocks, where HDRP's follow the leaves and read as lighter and more believable: the clearest quality difference in Unity's favour. Since 2026-11-26 the engine's follow the leaves too (below).
 - **Clouds.** The engine's are wispy and torn, with more shape in them than HDRP's default cumulus. In the engine's favour, and what it pays 1.6 to 2.9 ms for.
 - **Mountains.** Lit evenly in the engine. In Unity's pictures a cloud's shadow lies over the right half of the range. A difference in where the clouds are, not in what either engine can do.
 - **Ground and plants.** Unity's are warmer and paler (its tone curve, and HDRP's leaf translucency). The engine's ground has more contrast.
@@ -167,7 +169,7 @@ From the stills of the six views, side by side:
 | The frame's thread | Unity | 1.5 to 1.7 against 4.0 to 5.0 ms |
 | Contact shadows, TAA | Unity | 0.05 and 0.12 against 0.37 and 0.28 ms |
 | Memory | Unity | 1.47 against 2.45 GB |
-| Foliage shadows' look | Unity | follows the cut-out |
+| Foliage shadows' look | Unity on 2026-11-25; level since 2026-11-26 | both follow the cut-out |
 | CPU time used | Axcenity | 1.1 to 2.1 against 3.6 to 6.8 cores |
 | Video memory | Axcenity | 2.6 to 2.9 against 3.8 to 4.3 GB |
 | Volumetric fog's cost | Axcenity | 0.38 against 0.88 ms |
@@ -186,16 +188,16 @@ In the order the measurements give, as revised after the owner's review (2026-11
    - Draw the cloud's shadow into a small top-down texture once a frame and sample it in `light_surface` and in the fog, in place of `cloud_fill` in every lit pixel.
    - Accepted on pictures as well as time: before and after, side by side, of the clouds' edges (against the sky and against the horizon's silhouettes), their motion (a turning camera, a cut, the wind's drift: no trails, no swimming), their lighting (noon and a low sun), and their shadows on the ground held still and drifting (no shimmer, no crawl). The existing cloud tests' pictures stay within their tolerance.
    - Timed by a "Clouds" GPU timer of its own. From the no-clouds runs plus HDRP's 0.3 ms the windmill view would go from 150 to about 215 frames a second at 1080p and the hero view from 140 to about 170: an estimate to be replaced by the measurement.
-2. **GPU timers by what is drawn: required before any work on the scene pass. The timers and their first table are done (2026-11-26): see "After step 2" below, which sets what follows.** At a quarter of the pixels the scene pass and the prepass still take 1.7 to 2.4 ms together; HDRP's whole fixed cost, shadows included, is 1.8 ms. Today only the whole pass is timed, and the experiments above give its parts only by taking things away.
+2. **GPU timers by what is drawn: required before any work on the scene pass. The timers and their first table are done (2026-11-26): see "After step 2" below, which sets what follows. Its first two moves (the plants' per-triangle cost, the cut-outs' depth) are done too: "The plants' scene pass, profiled".** At a quarter of the pixels the scene pass and the prepass still take 1.7 to 2.4 ms together; HDRP's whole fixed cost, shadows included, is 1.8 ms. Today only the whole pass is timed, and the experiments above give its parts only by taking things away.
    - Timers inside the prepass and the scene pass by what is drawn (terrain, painted foliage, models, sky and clouds), in `--bench`'s table, read at each view at a quarter of the pixels, at 1920 × 1080 and at 2560 × 1405, so each part has a fixed cost and a per-pixel cost.
    - Nothing below is started before that table exists, since without it the work could go to the wrong part. Then, by what it shows: the terrain's shader (seven layers with anti-tiling and height blend in every pixel) if the terrain is the large part; drawing solid geometry once where the prepass is not needed for it; culling items hidden behind others from the prepass's depth before the scene and shadow passes draw them (Unity culls on the GPU and has no full prepass: 7.5 M triangles a frame against the engine's 10.3 M for the same 3.6 M in view).
-3. **The frame's thread: a prototype of plants kept on the GPU, before any rewrite.** 4.0 to 5.0 ms a frame is a ceiling of 200 to 250 frames a second. In the runs above the GPU was the limit at both sizes (its frame took longer than the thread's in every view but the porch at 1920 × 1080); with step 1 done the windmill view reaches the thread's ceiling, and steps 2 and 4 will bring the others to it. The plants' items are 1.9 ms of it: `Levels of detail`, `Materials`, `Uploads`, `Culling and batches` and `Motion history` are 2.2 ms together today, and the encoding of 3,500 draws another 0.9. Unity's main thread does the same scene in 1.5 ms, on 3.6 to 6.8 cores' worth of CPU time against the engine's 1.1 to 2.1.
+3. **The frame's thread: a prototype of plants kept on the GPU, before any rewrite. Started 2026-11-26 (the motion history and the grouped draws' materials shared among threads, two per-frame costs that were not the plants' removed; the GPU candidate is not built): "Step 3, started" and "Shadows through the holes, and the thread".** 4.0 to 5.0 ms a frame is a ceiling of 200 to 250 frames a second. In the runs above the GPU was the limit at both sizes (its frame took longer than the thread's in every view but the porch at 1920 × 1080); with step 1 done the windmill view reaches the thread's ceiling, and steps 2 and 4 will bring the others to it. The plants' items are 1.9 ms of it: `Levels of detail`, `Materials`, `Uploads`, `Culling and batches` and `Motion history` are 2.2 ms together today, and the encoding of 3,500 draws another 0.9. Unity's main thread does the same scene in 1.5 ms, on 3.6 to 6.8 cores' worth of CPU time against the engine's 1.1 to 2.1.
    - Two candidates, measured against each other and against today's path at the same views. **Worker threads**: the plants' culling, level-of-detail choice and instance packing shared among the renderer's threads (some of the frame's planning is shared already, `renderer/parallel.rs`), which keeps every draw as it is. **On the GPU**: each foliage group's instances in a buffer that stays there, with what is in view, its level of detail and its cull distance chosen by a compute pass and drawn indirectly (`multi_draw_indexed_indirect_count`, which wgpu has on Vulkan and DirectX 12 as a native feature), so the thread's work is per group and not per plant.
    - Behind a switch, with today's path kept as the fallback (and for adapters without indirect counts).
    - Compared on: the thread's time, GPU time, the process's memory and the card's, and the picture (the same plants at the same levels of detail, the same cross-fades, sway, shadows and motion vectors).
    - The rewrite is decided from that comparison, not from Unity's number.
 4. **Shadows, by measurement only: 1.05 to 1.38 ms whatever the window's size.** The same as HDRP's, so this is not where Unity is ahead, but it is a fifth of the frame. Measure the four cascades one by one first (as "Shadows on the patch, cascade by cascade" did). The far cascades change little from frame to frame and are the candidates for being kept; the engine uses over 1 GB less of the card's memory than HDRP here, so there is room to keep them. A kept cascade must still show the plants' sway where a texel of it can: that is part of what is measured. Nothing is changed without a cascade's measurement that says so.
-5. **Cut-out shadows for foliage in the rasterized path: a matter of the picture, kept apart from the speed work.** The one place Unity's picture is plainly better. The shadow pass already has the pipeline (`fs_shadow_cut_out`, which hair cards cast through); leaf cards were left casting whole because through their holes the Shadows pass of 36,000 leaf cards went from 0.19 to 0.42 ms (`bench_cut_out_foliage_shadows`, `renderer/lighting.rs`). So this is a switch and a measurement in Homestead, not a new shader: solid casters' draws don't change. Its cost is measured on its own (shadow time with and without, view by view), not folded into step 4's numbers, and the shadow pass is not made dearer just to match the reference: if the cost is large it becomes a quality setting's choice, or cut-outs in the near cascades only, where they can be seen.
+5. **Cut-out shadows for foliage in the rasterized path: a matter of the picture, kept apart from the speed work. Done 2026-11-26 at the owner's asking, on in every cascade, its cost measured on its own: "Shadows through the holes, and the thread".** The one place Unity's picture is plainly better. The shadow pass already has the pipeline (`fs_shadow_cut_out`, which hair cards cast through); leaf cards were left casting whole because through their holes the Shadows pass of 36,000 leaf cards went from 0.19 to 0.42 ms (`bench_cut_out_foliage_shadows`, `renderer/lighting.rs`). So this is a switch and a measurement in Homestead, not a new shader: solid casters' draws don't change. Its cost is measured on its own (shadow time with and without, view by view), not folded into step 4's numbers, and the shadow pass is not made dearer just to match the reference: if the cost is large it becomes a quality setting's choice, or cut-outs in the near cascades only, where they can be seen.
 6. **Put off until the large items are done**: contact shadows (0.37 against 0.05 ms), TAA (0.28 against 0.12), and memory (2.45 against 1.47 GB: look for meshes' and textures' CPU copies kept after upload).
 7. **Ray tracing is its own track**: 77 to 78 frames a second against a target of 90 for shadows and ambient occlusion, with nothing in Unity to compare against on this machine. Steps 1 to 3 help it too: its frames contain the same clouds, scene pass and thread work.
 
@@ -295,6 +297,200 @@ What the table says, largest first:
 7. **The sky is 0.00 to 0.06 ms** now that its clouds are traced before it.
 
 So step 2's next moves, in this order and each from its own failing measurement: find which per-triangle cost the scattered items pay in the scene pass; let the scene pass use the prepass's depth for cut-outs; then the terrain's shader. Occlusion culling is not what the table points to first: nothing here says hidden items are a large share, and that needs its own count (items drawn whose pixels all fail the depth test) before it is built.
+
+## The plants' scene pass, profiled (2026-11-26)
+
+"After step 2" left one question: why the same plants cost the scene pass four to six times what they cost the prepass, whatever the window's size. The owner's brief asked for three comparisons before anything was changed. All numbers are at 1920 × 1080 on the owner's Ultra, the engine pinned as before; the tables are three runs each, the median shown.
+
+### What the three comparisons found
+
+**1. What the vertex shader carries to each corner.** The scene pass's fragment shader reads all 13 values `vs_main` hands on (32 numbers a corner). The prepass's has use for 9 of them (22 numbers): not for the light an item gives off, the item's middle and half size (the leaves' canopy shading) or whether it hangs. That count is from reading the shaders; what the driver then drops was not dumped. To price that, a measuring switch draws the scattered items' pixels with part of the work left out (`AXCENITY_PLANT_PROBE`, `crates/render/src/renderer/probe.rs`; the picture is wrong while it is on):
+
+| Scattered items in the scene pass, ms | Hero | Windmill |
+|---|---|---|
+| As drawn | 0.94 | 1.01 |
+| `flat`: only the position carried, a pixel costs nothing | 0.18 | 0.27 |
+| `carried`: all 13 values carried and read, nothing done with them | 0.24 | 0.33 |
+| `surface`: the material's textures read, nothing lit | 0.22 | 0.31 |
+| The prepass, the same triangles | 0.20 | 0.27 |
+
+So the corners' own work and the rasterizer's are 0.18 to 0.27 ms, the prepass's cost exactly. Carrying everything is 0.06 ms. The textures are nothing that can be measured. **Lighting the pixels is 0.7 ms of the 0.94 to 1.01.** A leaner plant vertex would save at most 0.06 ms here: that is not where the time is, and it sets what the step 3 prototype should expect from a lean payload.
+
+**2. Draw calls.** In the hero view the frame's 3,532 draw calls are 879 in the scene pass, 869 in the prepass, 169 for the cut-outs' depth, 70 for the motion vectors and 1,545 in the shadow views. The plants are 339 of the scene pass's batches (9,473 items: 28 to a draw) and the same 339 in the prepass, so the count is not what differs between the two passes. What does matter is what changes between one draw and the next: see "The order of the draws" below.
+
+**3. The depth test against `discard`.** This is where the time was. The standard material's fragment shader, `fs_main`, can `discard` (a cut-out's holes, a fading item's dither), and it writes depth. A GPU cannot test depth before running such a shader, because it does not know yet whether the pixel will be there to write its depth: it runs the whole shader first and tests after. Cut-outs already had their own way round this (their depth drawn first, then lit where depth is equal). Everything else solid did not: the house, the truck, the mountains, the stones, every plant part without holes. Each of their pixels was lit, shadows and clouds and all, whether or not it ended up hidden, and it stayed 0.7 ms however small the window because the hidden ones were lit too.
+
+### What was changed, with the picture the same
+
+Three things are in, on by default, each with a switch that puts the old path back. With all three the six views' stills (1920 × 1080, TAA settled over 24 frames) are **the original's pixel for pixel: 0 of 2,073,600 pixels differ in each view** (`target/cross-engine/homestead/scene-depth/`: `original` and `default`).
+
+- **Solid items that leave no pixel out are lit by a shader with no `discard`** (`fs_prefilled`, with the plain depth test and depth written as before; `PrefillPipelines::whole`). A solid item of the standard material with no cutoff, in a batch where nothing is fading, has nothing `fs_main` would discard, so the two shaders give the same pixels, and the GPU now tests depth before lighting. A batch with a fading item in it keeps `fs_main`. Off with `AXCENITY_NO_WHOLE_SOLIDS=1`.
+- **The scene pass's depth starts from the prepass's**, one representable step farther, in place of the far plane (`crates/render/src/renderer/depth_start.rs`). The prepass has drawn the same solid items from the same corners, so what will show is still nearer than what is there and is drawn as before, and whatever is behind it fails the test before it is lit, in whatever order it comes. The step back is what keeps the picture exact: a surface's own pixel still passes the same "nearer than" test and writes its own depth, so a second surface at exactly that depth fails as it always did. Only where the two passes have one sample a pixel each and the prepass is drawn: not under MSAA, which draws as before. The terrain's position is now `@invariant` like the items', which this needs. Off with `AXCENITY_NO_DEPTH_START=1`.
+- **The motion vectors' instances** are worked out on the renderer's threads and only for the plants the camera sees (step 3's first piece, below). Off with `AXCENITY_NO_MOTION_SHARING=1`.
+
+| View | As it was | Now | Unity | Unity ÷ now | 1% low, was and now |
+|---|---|---|---|---|---|
+| hero | 164.8 | 186.5 | 234.1 | 1.26× | 148, 159 |
+| mailbox | 161.4 | 191.3 | 232.6 | 1.22× | 146, 163 |
+| porch | 202.0 | 232.0 | 236.5 | 1.02× | 158, 165 |
+| truck | 198.3 | 219.5 | 226.7 | 1.03× | 155, 166 |
+| windmill | 225.4 | 246.1 | 256.8 | 1.04× | 173, 182 |
+| crane | 170.3 | 192.9 | 248.8 | 1.29× | 146, 157 |
+
+"As it was" is this build with the three switches set, which draws the original's pictures exactly; the runs' ranges are within 1.1% of their medians (the windmill's "now" 242.5 to 247.2). Unity's column is 2026-11-25's.
+
+GPU time, ms (the scene pass, then its parts):
+
+| View | Scene pass, was | Now | Items | Scattered items | Terrain | Cut-outs' depth | GPU frame, was and now | Frame's thread, was and now |
+|---|---|---|---|---|---|---|---|---|
+| hero | 3.27 | 2.57 | 0.86 → 0.55 | 0.93 → 0.80 | 0.90 → 0.66 | 0.14 → 0.11 | 5.96, 5.25 | 4.41, 4.16 |
+| mailbox | 3.52 | 2.58 | 1.01 → 0.59 | 0.70 → 0.59 | 1.15 → 0.77 | 0.14 → 0.10 | 6.10, 5.14 | 4.17, 3.85 |
+| porch | 2.08 | 1.45 | 1.27 → 0.69 | 0.52 → 0.50 | 0.06 → 0.06 | 0.14 → 0.09 | 4.85, 4.20 | 4.23, 4.00 |
+| truck | 2.30 | 1.83 | 0.95 → 0.55 | 0.66 → 0.62 | 0.46 → 0.46 | 0.12 → 0.10 | 4.93, 4.45 | 4.57, 4.25 |
+| windmill | 1.72 | 1.38 | 0.43 → 0.35 | 1.01 → 0.74 | 0.02 → 0.02 | 0.18 → 0.16 | 4.13, 3.72 | 4.30, 3.92 |
+| crane | 3.14 | 2.51 | 0.70 → 0.51 | 1.24 → 0.97 | 0.92 → 0.73 | 0.14 → 0.14 | 5.76, 5.09 | 5.11, 4.71 |
+
+The process's video memory and memory are unchanged (2.79 to 2.92 GB and 2.49 GB in both). The depth start is one full-screen pass writing depth; its cost is inside the scene pass's numbers above.
+
+**The duplicate cut-out depth is not gone.** The scene pass still draws the cut-outs' depth (0.09 to 0.16 ms now, since most of what it draws fails the test early). Dropping it means lighting cut-outs wherever their depth *equals* the prepass's, which was built and measured first: every solid item lit where depth is equal, no fill, no `discard` anywhere. It was the fastest (hero 207.8 frames a second, scene pass 1.98 ms) and it is not in, because it does not draw the same picture: where two surfaces land on exactly the same depth value, "equal" lets both through and the last drawn shows, where "nearer than" shows the first. That was 0.14 to 1.2% of the pixels of a still (far mountains and foliage, where one step of the depth buffer is a stud or more, and a few props with doubled faces). It cannot be mended by drawing in the opposite order, since the ties are also between triangles of one mesh.
+
+### The order of the draws: built, measured, off until the owner has looked
+
+The scattered items were still 0.60 ms where the depth-equal experiment had them at 0.35, with the same pixels lit. The difference turned out to be **changes of pipeline between small draws**. Solid items are sorted by distance band, part, then mesh, so a band's plants alternate between the pipelines of cut-outs, solid parts and fading ones mesh by mesh, several hundred times a frame. Sorted by pipeline before mesh within each band and part (`pipeline_rank` in `renderer/lighting.rs`), the same draws cost the GPU 0.25 to 0.5 ms less. The frame's thread gains little: its encoding is 0.04 to 0.08 ms shorter over three runs (a first single run had suggested 0.15), and the 110 to 140 more draw calls the order makes take most of that back:
+
+| View | Now | With the pipeline order | Scattered items, ms | Scene pass, ms |
+|---|---|---|---|---|
+| hero | 186.5 | 205.4 | 0.80 → 0.38 | 2.57 → 2.11 |
+| mailbox | 191.3 | 205.2 | 0.59 → 0.29 | 2.58 → 2.23 |
+| porch | 232.0 | 240.5 | 0.50 → 0.26 | 1.45 → 1.19 |
+| truck | 219.5 | 224.9 | 0.62 → 0.32 | 1.83 → 1.47 |
+| windmill | 246.1 | 245.0 (the thread's limit) | 0.74 → 0.43 | 1.38 → 1.06 |
+| crane | 192.9 | 206.1 | 0.97 → 0.51 | 2.51 → 2.00 |
+
+It is **off unless `AXCENITY_PIPELINE_ORDER=1` is set**, because it does not pass the owner's rule as it stands: any change to the order solid items are drawn in changes which of two surfaces shows where both land on exactly the same depth value. Against the original's stills:
+
+| View | Pixels that differ | More than 4 of 255 apart | More than 8 apart | Largest difference | Mean difference of a channel |
+|---|---|---|---|---|---|
+| hero | 744 (0.036%) | 0.012% | 0.006% | 51 | 0.0013 |
+| mailbox | 369 (0.018%) | 0.006% | 0.003% | 43 | 0.0007 |
+| porch | 64 (0.003%) | 0.001% | 0.001% | 39 | 0.0002 |
+| truck | 158 (0.008%) | 0.002% | 0.001% | 38 | 0.0003 |
+| windmill | 355 (0.017%) | 0.003% | 0.001% | 30 | 0.0003 |
+| crane | 4,623 (0.22%) | 0.073% | 0.031% | 46 | 0.0074 |
+
+They are single pixels scattered through distant foliage (`target/cross-engine/homestead/scene-depth/crane-pipeline-order-compare.png` and `hero-…`: the original, the new order, their difference eight times over; the stills are in `pipeline-order`). Neither picture is the more correct one there: the depth buffer cannot tell the two surfaces apart, and which shows was always decided by the order they happened to be drawn in. The sort by part that step 2 added moved the same kind of pixel. For scale: in each view compared both times the mean difference is smaller than the traced clouds' was (hero 0.0013 against 0.040, mailbox 0.0007 against 0.006, windmill 0.0003 against 0.143, crane 0.0074 against 0.025), but its single largest differences are larger and, in the hero view, more of its pixels are over 8 apart (0.006% against 0.003%). **The decision is the owner's**: with it on, Unity's frame rate is 0.98 to 1.21 times the engine's across the six views (1.02 to 1.29 without).
+
+What would remove the question is a depth buffer that can tell far surfaces apart (reversed depth: the same 32 bits, spread evenly over distance). Then the two paths would agree, and so would "equal", which would let the cut-outs' second depth go as well. It touches every pass that reads depth, so it is its own piece of work, not part of this.
+
+### Two things learned about measuring
+
+- A split that looked free was not. Giving fading items batches of their own *in the draws' order* (to keep the picture exact) took the hero view from 3,532 to 5,534 draw calls, the plants' scene time from 1.04 to 1.63 ms and the thread from 4.37 to 5.20 ms: slower than doing nothing. A batch with a fading item now simply keeps the old shader.
+- Per-draw counts are now in `--bench`'s counts (`prepass draws`, `motion draws`, `depth fill draws`, `scattered batches`, `scattered items`, `depth from prepass`).
+
+## Step 3, started: the frame's thread (2026-11-26)
+
+With the scene pass shorter, the thread is the limit in the windmill view (3.92 ms against the GPU's 3.72) and within 10% of the GPU's frame in the porch, truck and crane views; in the hero and mailbox views the GPU's frame is still a millisecond longer (5.25 against 4.16).
+
+**Where the plants' thread time is** (hero view, the thread's sections with and without the painted foliage, from the earlier take-away run): levels of detail 0.25 against 0.02 ms, materials 0.55 against 0.32, uploads 0.42 against 0.39, culling and batches 0.50 against 0.20, motion history 0.46 against 0.02, instances written 0.10 against 0.01, recording 0.32 against 0.20, encoding 0.85 against 0.58. Two things in that were not expected: **uploads cost 0.4 ms a frame with nothing to upload and no plants**, and materials 0.32 ms for 577 items. Neither is the plants', and both are on the thread every frame.
+
+**The worker-thread candidate, first piece: the motion history.** It was the largest section only the plants pay: one thread built a 150-byte motion instance for every swaying plant the frame knew of, including those only a shadow view reaches, which the motion pass can never draw (it draws where the prepass did, and the prepass draws what the camera sees). Now the renderer's threads share the work and only the camera's draws are kept (`History::moved`, `DrawPlan::in_view`). Same build, both paths, 1920 × 1080:
+
+| View | Motion history, ms | Frame's thread, ms | Motion draws | Frames a second |
+|---|---|---|---|---|
+| hero | 0.49 → 0.21 | 4.40 → 4.12 | 70 → 65 | 186.1 → 188.5 (the GPU's limit) |
+| truck | 0.56 → 0.24 | 4.61 → 4.25 | 75 → 57 | 210.9 → 219.2 |
+| windmill | 0.58 → 0.24 | 4.29 → 3.95 | 92 → 69 | 225.9 → 245.6 |
+
+The picture is unchanged (0 pixels differ in the six stills, with the two changes above). One trap on the way: putting the instances in mesh order by sorting them moved 150 bytes at every swap and cost more than the sharing saved (0.79 ms on one thread); their places are sorted now, and each instance is copied once.
+
+**What the candidate has left**, by the sections above: the materials' loop over grouped draws (one thread, a hash look-up a draw), culling and batches (shared already; 0.3 ms of it is the plants'), levels of detail (shared; a lock an item), and the 0.4 ms of uploads that is not the plants' at all. At the motion history's rate these are worth perhaps 0.5 to 0.8 ms together: an estimate, not a measurement.
+
+**The GPU candidate is not built.** What was checked for it in wgpu 30's source, so the next step starts from facts:
+
+- `RenderPass::multi_draw_indexed_indirect_count` needs `Features::MULTI_DRAW_INDIRECT_COUNT` (DirectX 12, and Vulkan 1.2 or `VK_KHR_draw_indirect_count`); no device in the engine asks for it yet.
+- A draw's first instance in an indirect buffer needs `Features::INDIRECT_FIRST_INSTANCE`. On DirectX 12, `@builtin(instance_index)` leaves the indirect buffer's first instance out unless `InstanceFlags::VALIDATION_INDIRECT_CALL` is on, which a release build turns off by default and which adds a validating pass over every indirect buffer. The engine draws with DirectX 12 on Windows, so a path that finds its instances from `instance_index` must either keep that validation on or hand each draw its offset another way.
+- What it can save on the GPU is bounded by the probes above: the plants' corners and rasterizing are 0.18 to 0.27 ms a pass and carrying every value 0.06 ms. Its case is the thread's 1.5 ms, not the GPU's.
+- What it must reproduce to draw the same picture: each plant's level of detail with its hysteresis and 30-frame cross-fade (state per plant, kept between frames), the fade near the cull distance, shadows to 35% of it, the sway in all four passes, and the batches' order, which decides the pixels at depth ties as the section above shows.
+
+## Shadows through the holes, and the thread (2026-11-26, third session)
+
+The owner's brief: the rasterized foliage shadows drawn as each card's whole outline, a shimmer he saw with ray traced shadows on, the two costs on the thread that are not the plants', the rest of the worker-thread candidate, and the draw order's decision. Same machine, settings and method; three runs a view, the median shown, the engine alone (Unity's column is 2026-11-25's).
+
+### Foliage shadows follow the leaves
+
+Not a regression from the scene pass's new shader: `plan_part` sent only hair cards through the shadow pass's cut-out pipeline, a cost decision of 2026-11-18 (step 5 of the plan). Every cut-out of the standard material goes through it now, and each shadow view draws its whole casters first and its cut-outs after, so the pipeline changes once a view and not mesh by mesh (worth 0.11 ms of the Shadows pass in the hero view, 0.12 at the windmill). `AXCENITY_NO_CUT_OUT_SHADOWS=1` casts whole cards as before.
+
+The Shadows pass, ms, with the draw order below on in both columns:
+
+| View | Whole cards | Through the holes | More | Frames a second, whole and through |
+|---|---|---|---|---|
+| hero | 1.06 | 1.19 | 0.13 | 206.0, 200.9 |
+| mailbox | 1.14 | 1.30 | 0.16 | 206.7, 200.4 |
+| porch | 1.37 | 1.51 | 0.14 | 249.4, 241.1 |
+| truck | 1.12 | 1.29 | 0.17 | 241.7, 232.0 |
+| windmill | 0.79 | 1.21 | 0.42 | 272.6, 254.2 |
+| crane | 0.96 | 1.13 | 0.17 | 213.8, 206.4 |
+
+It is the feature's price, paid in every cascade (the cut-out pipeline reads the texture and can `discard`, so depth is not tested first), and HDRP pays the same for the same thing. Reading the opacity map only where a material has one was tried and was worth 0.00 to 0.02 ms, so it is not in. If the windmill view's 0.42 ms is too much, the plan's other choices are still open: a quality setting, or the near cascades only.
+
+**The picture** (`target/cross-engine/homestead/final/`: `as-before`, `shadows-only`, `default`, 1920 × 1080, TAA settled over 24 frames). The blocks under plants are gone and the plants themselves are lighter, since their own cards no longer shade them whole: 7 to 9% of the pixels change in the four views with open ground (hero, mailbox, windmill, crane), 1.2% at the truck, 0.1% at the porch; mean brightness rises by 0.8 to 2.7 levels in those four. Against a ray traced still of the hero view the rasterized shadows now have the same shape and weight (`target/cross-engine/homestead/shadows/`: `whole`, `cut-out`, `rt`). With the switch set the six stills are the earlier build's pixel for pixel.
+
+### The shimmer with ray traced shadows: what was checked and what was found
+
+The three causes the brief named:
+
+1. **The ray traced scene only holds what the frame's views reach: true, and mended where it could show.** Items in groups (the painted plants) are passed over when no view reaches them, and the views are the camera's, the shadow maps' cascades and the lamps'. In the hero view 14,869 of the 42,357 items within the ray tracing distance are traced, and the count changes every frame of a turn. At the owner's settings the cascades reach as far as the rays, so nothing that shades the picture is missing: the six ray traced stills with the whole world traced differ from the usual ones only on plants a side effect touched (with 28,000 more candidates the bending budget ran out, and in five of the views 1,800 to 4,500 swaying plants were traced at rest). Where the maps are off or reach less far than the rays, a plant beside the screen cast no shadow into it until it was turned into view (`a_grouped_item_out_of_view_still_casts_its_ray_traced_shadow_into_it` failed). Such a frame now also keeps what the sun's view of the camera's view holds (`sun_reach`). The owner's ray traced stills are unchanged by it (0 pixels in five views, 8 pixels one level apart in the sixth).
+2. **The cut-outs' alpha is read at level 0 already** (`textureSampleLevel` in `cut_out_covers`, ray_shadows.wgsl and ray_cut_outs.wgsl). Nothing to change.
+3. **There is no history in the ray traced shadows.** They are traced afresh each frame, smoothed by two passes across and down, and TAA does the rest; nothing of theirs can trail or be rejected. Frame to frame the picture changes no more with them than with the shadow maps: 0.56 against 0.58 levels over the ground of the hero view standing still in the wind, 5.25 against 5.48 turning at 3 degrees a second.
+
+What did turn out to depend on the shadow maps with ray tracing on: **the light that comes through a leaf from behind** (`through_thin`, `soft_sun_visibility`) is always read from the cascades. With whole-card maps that put card-shaped patches on the plants themselves, 2.0 to 2.5% of the pixels of the hero, mailbox and crane views (0.5 to 1.0% more than 8 levels apart, up to 97), tied to the cascades' texels, which move with the camera. With the maps following the leaves those pixels are lit through the holes. Their frame-to-frame change standing still fell a little (0.89 to 0.64% of them more than 8 levels apart from one frame to the next).
+
+**Not reproduced**: a shimmer that only ray traced shadows have. What the stills and sequences did show, in both modes, and what may be what was seen: (a) painted plants cast no shadow past 35% of their cull distance (`SHADOW_REACH`), so in the crane view most mid-distance grass and bushes have none, and as the camera moves each plant's shadow appears or goes at once; ray traced shadows are sharp enough to show it. It is a rule both engines were given (README, "What is the same"), so changing it is the owner's choice. (b) Under TAA a moving frame is 4 to 5 levels from the settled one over the ground in both modes: the picture softens in motion. Neither was changed.
+
+### The draw order is the default
+
+The owner's brief: if `hero-pipeline-order-compare.png` and `crane-pipeline-order-compare.png` show no structural z-fighting, make the order the default. They show single pixels scattered through far foliage and no bands or patches on any surface, so solid draws are now sorted by pipeline before mesh, and `AXCENITY_PIPELINE_ORDER=0` puts the old order back. With whole-card shadows this build's stills in the new order are last session's `pipeline-order` stills pixel for pixel; with the shadows through the holes the two orders differ by 63 to 4,626 pixels a view, as before.
+
+### The thread: two costs that were not the plants', and one more shared loop
+
+Each was found by timing inside the section, then mended with the picture unchanged (this build with `AXCENITY_PIPELINE_ORDER=0` and `AXCENITY_NO_CUT_OUT_SHADOWS=1` draws last session's stills: 0 of 2,073,600 pixels differ in each of the six views).
+
+- **Uploads, 0.42 ms with nothing to upload.** 0.33 ms of it was one loop: 1,280 of the list's 1,659 own items are pieces of the two terrains, and each piece made its terrain's layers ready again every frame (the texture arrays looked up, the uniform of eight layers worked out and copied to the heap, 255 ns a piece). A terrain's layers are now made ready once a frame, by its first piece (`TerrainPass::prepare`).
+- **Materials, 0.32 ms for 577 items.** The frame has 1,479 distinct materials, since each terrain piece is one, and a material's key is 480 bytes. Joining the threads' shares went through a map of the keys themselves, which hashed and moved each key and did it all again each time the map doubled: 0.23 ms. Sized up front it was 0.14 ms; found by a digest that the threads work out with the keys (`MaterialPlaces`), 0.06 ms.
+- **The grouped draws' materials** (the plants' 14,800 draws, 0.25 ms on one thread) are worked out in parts on the renderer's threads and joined in order, so a material's place is still where the draws first come to it (the draw order follows it; `thousands_of_grouped_items_get_the_bindings_they_would_listed_one_by_one`). Worth about 0.05 ms: less than hoped, the joining being most of what is left.
+
+The thread's sections, hero view, ms (last session's table, then this build):
+
+| | Before | Now |
+|---|---|---|
+| Levels of detail | 0.24 | 0.24 |
+| Materials | 0.54 | 0.33 |
+| Uploads | 0.41 | 0.20 |
+| Culling and batches | 0.58 | 0.62 |
+| Motion history | 0.23 | 0.21 |
+| Encoding | 0.88 | 0.83 |
+| **The frame's thread** | **4.16** | **3.74** |
+
+**Culling and batches is not done.** Timed inside, its 0.6 ms is the draws' keys 0.06 (shared), splitting solid from see-through 0.09 (one thread), the sort of 16,500 keys 0.27 (shared already), the culling and batching itself 0.13 (shared) and the joining 0.04. Sorting the draws' indexes by their keys, in place of the keys, was tried for the sort and the split and was worth 0.015 ms, inside the noise, so it is not in. The new draw order makes 100 to 140 more batches a view, which is the 0.02 to 0.05 ms this section rose by. Levels of detail were not touched (shared already; the time is a lock an item). What is left of the worker-thread candidate is small, by these numbers about 0.2 ms; the larger sums on the thread are now the recording and encoding of 3,650 draws (1.15 ms), which only fewer draws shortens.
+
+### Where that leaves the six views
+
+Frames a second (1% low), 1920 × 1080, Ultra:
+
+| View | Last session | This build, old order and whole-card shadows | New order, whole-card shadows | Now (new order, shadows through the holes) | Unity | Unity ÷ now | GPU frame, was and now | Frame's thread, was and now |
+|---|---|---|---|---|---|---|---|---|
+| hero | 186.5 (159) | 189.6 (175) | 206.0 (183) | 200.9 (189) | 234.1 | 1.17× | 5.25, 4.89 | 4.16, 3.74 |
+| mailbox | 191.3 (166) | 192.8 (178) | 206.7 (191) | 200.4 (184) | 232.6 | 1.16× | 5.14, 4.91 | 3.83, 3.56 |
+| porch | 232.0 (142) | 235.5 (211) | 249.4 (223) | 241.1 (207) | 236.5 | 0.98× | 4.22, 4.06 | 3.96, 3.57 |
+| truck | 219.5 (166) | 222.6 (195) | 241.7 (214) | 232.0 (209) | 226.7 | 0.98× | 4.46, 4.23 | 4.22, 3.79 |
+| windmill | 246.1 (182) | 264.4 (232) | 272.6 (244) | 254.2 (222) | 256.8 | 1.01× | 3.72, 3.85 | 3.92, 3.53 |
+| crane | 192.9 (156) | 195.2 (179) | 213.8 (195) | 206.4 (188) | 248.8 | 1.21× | 5.08, 4.75 | 4.71, 4.23 |
+
+The runs' ranges are within 0.5% of their medians (last session's 1% lows were measured with other work on the machine and are low for that). Every run was limited by the GPU. Memory and video memory are unchanged (2.48 GB; 2.85 to 2.93 GB).
+
+Ray traced shadows and ambient occlusion (`owner-rt-shadows-ao.json`, one run each, this build with the two switches set and without): hero 90.9 → 93.2 frames a second, crane 89.6 → 91.7 (the scene pass 2.32 → 1.90 and 2.29 → 1.82 ms by the draw order, the Shadows pass 0.13 and 0.18 ms dearer).
+
+**Not run**: the larger window, the tour, Unity again, DirectX 12 or another card, the other crates' tests and the regression check (`axcenity-bench-check`).
 
 ## What these numbers don't cover
 

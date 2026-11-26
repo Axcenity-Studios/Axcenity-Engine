@@ -62,6 +62,7 @@ mod culling;
 #[cfg(feature = "debug-views")]
 mod debug_views;
 mod decals;
+mod depth_start;
 mod encoders;
 mod environment;
 mod fog;
@@ -81,6 +82,7 @@ mod parallel;
 mod path_tracer;
 mod posing;
 mod post;
+mod probe;
 mod probe_bake;
 mod probes;
 mod ray_ao;
@@ -122,7 +124,7 @@ use gpu::{
 use lighting::{
     DrawPlan, FrameUses, camera_view_projection, casters_in_views, frame_uniform, linear_color,
     maps_uniform_of, material_textures, plan_draws, plan_lights, post_drawn, post_uniform,
-    shadows_drawn,
+    shadows_drawn, sun_reach,
 };
 #[cfg(test)]
 use lighting::{cascade_ends, light_raw, material_key, uv_matrix, view_projection};
@@ -237,6 +239,20 @@ pub struct RenderStats {
     pub items_drawn: u32,
     /// Instanced draws in the scene pass, one per mesh and material.
     pub batches: u32,
+    /// Of the frame's draw calls: the prepass's, the motion vectors' pass's
+    /// and those drawing the cut-out surfaces' depth before the scene is
+    /// lit. The scene pass's are `batches`; the rest are the shadow views'.
+    pub prepass_draws: u32,
+    pub motion_draws: u32,
+    pub depth_fill_draws: u32,
+    /// Whether the scene pass's depth started from the prepass's, not
+    /// from the far plane (renderer/depth_start.rs).
+    pub depth_from_prepass: bool,
+    /// Of the solid batches in view, those of scattered items (a
+    /// terrain's painted plants, stones and litter), and the items in
+    /// them: a draw each in the prepass and in the scene pass.
+    pub scattered_batches: u32,
+    pub scattered_items: u32,
     /// Items outside the camera's view, so not drawn by the scene pass.
     pub items_culled: u32,
     /// Casters drawn into the shadow views (each cascade and shadowing spot
@@ -544,6 +560,16 @@ impl Renderer {
         self.scene.cloud_trace.enabled = on;
     }
 
+    /// Whether the scene pass's depth starts a step behind the prepass's
+    /// in place of the far plane, so that what is hidden is never lit
+    /// (renderer/depth_start.rs): one sample per pixel only (not under
+    /// MSAA), and only while the prepass is drawn. The picture is the
+    /// same either way. For comparing the two
+    /// (`docs/rendering/performance.md`).
+    pub fn set_depth_from_prepass(&mut self, on: bool) {
+        self.scene.depth_start.enabled = on;
+    }
+
     /// How many background uploads are still on their way.
     pub fn pending_uploads(&self) -> usize {
         self.scene.pending_uploads()
@@ -769,6 +795,11 @@ impl TextureRenderer {
     /// See [`Renderer::set_trace_clouds`].
     pub fn set_trace_clouds(&mut self, on: bool) {
         self.scene.cloud_trace.enabled = on;
+    }
+
+    /// See [`Renderer::set_depth_from_prepass`].
+    pub fn set_depth_from_prepass(&mut self, on: bool) {
+        self.scene.depth_start.enabled = on;
     }
 
     /// See [`Renderer::pending_uploads`].

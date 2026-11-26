@@ -153,6 +153,9 @@ pub(super) struct TerrainPass {
     arrays: HashMap<u64, Cached<TerrainArrays>>,
     /// The layers of the chunk last made ready ([`LastArrays`]).
     last_arrays: LastArrays,
+    /// The terrains whose layers are ready this frame (`prepare`), by
+    /// their [`TerrainLayers::id`] and `key`, and which frame that is.
+    ready: (u64, Vec<(u64, u64)>),
     /// Each terrain's uniform, by [`TerrainLayers::id`], with the
     /// [`TerrainLayers::key`] it holds.
     uniforms: HashMap<u64, Cached<(u64, wgpu::Buffer)>>,
@@ -245,6 +248,7 @@ impl TerrainPass {
             layer_sampler,
             weight_sampler,
             last_arrays: LastArrays::default(),
+            ready: (0, Vec::new()),
             arrays: HashMap::new(),
             uniforms: HashMap::new(),
             groups: HashMap::new(),
@@ -288,45 +292,16 @@ impl TerrainPass {
         let layers = &surface.layers;
         let key = terrain_key_with(surface, &mut self.last_arrays);
         let arrays_key = key[1];
-        if let Entry::Vacant(slot) = self.arrays.entry(arrays_key) {
-            slot.insert(Cached {
-                gpu: Some(create_arrays(
-                    device,
-                    queue,
-                    layers,
-                    &self.texture_bytes,
-                    self.skipped_levels,
-                )),
-                last_drawn: frame,
-            });
-        } else if let Some(cached) = self.arrays.get_mut(&arrays_key) {
-            cached.last_drawn = frame;
+        // A terrain is drawn in a thousand pieces that share its layers:
+        // those are made ready by the first piece of a frame, and the rest
+        // only look for their own weights' bind group.
+        if self.ready.0 != frame {
+            self.ready = (frame, Vec::new());
         }
-        let contents = bytemuck::bytes_of(&uniform(layers)).to_vec();
-        match self.uniforms.entry(layers.id) {
-            Entry::Occupied(mut cached) => {
-                let cached = cached.get_mut();
-                cached.last_drawn = frame;
-                if let Some((held, buffer)) = &mut cached.gpu
-                    && *held != layers.key
-                {
-                    queue.write_buffer(buffer, 0, &contents);
-                    *held = layers.key;
-                }
-            }
-            Entry::Vacant(slot) => {
-                let buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("terrain layers"),
-                    size: contents.len() as u64,
-                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-                queue.write_buffer(&buffer, 0, &contents);
-                slot.insert(Cached {
-                    gpu: Some((layers.key, buffer)),
-                    last_drawn: frame,
-                });
-            }
+        let layers_ready = self.ready.1.contains(&(layers.id, layers.key));
+        if !layers_ready {
+            self.ready.1.push((layers.id, layers.key));
+            self.prepare_layers(device, queue, layers, arrays_key, frame);
         }
         if let Some(cached) = self.groups.get_mut(&key) {
             cached.last_drawn = frame;
@@ -373,6 +348,59 @@ impl TerrainPass {
                 last_drawn: frame,
             },
         );
+    }
+
+    /// What every piece of a terrain shares, made or marked as drawn this
+    /// frame: its layers' texture arrays (`arrays_key`) and its uniform,
+    /// rewritten when the layers changed.
+    fn prepare_layers(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        layers: &TerrainLayers,
+        arrays_key: u64,
+        frame: u64,
+    ) {
+        if let Entry::Vacant(slot) = self.arrays.entry(arrays_key) {
+            slot.insert(Cached {
+                gpu: Some(create_arrays(
+                    device,
+                    queue,
+                    layers,
+                    &self.texture_bytes,
+                    self.skipped_levels,
+                )),
+                last_drawn: frame,
+            });
+        } else if let Some(cached) = self.arrays.get_mut(&arrays_key) {
+            cached.last_drawn = frame;
+        }
+        let contents = bytemuck::bytes_of(&uniform(layers)).to_vec();
+        match self.uniforms.entry(layers.id) {
+            Entry::Occupied(mut cached) => {
+                let cached = cached.get_mut();
+                cached.last_drawn = frame;
+                if let Some((held, buffer)) = &mut cached.gpu
+                    && *held != layers.key
+                {
+                    queue.write_buffer(buffer, 0, &contents);
+                    *held = layers.key;
+                }
+            }
+            Entry::Vacant(slot) => {
+                let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("terrain layers"),
+                    size: contents.len() as u64,
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
+                queue.write_buffer(&buffer, 0, &contents);
+                slot.insert(Cached {
+                    gpu: Some((layers.key, buffer)),
+                    last_drawn: frame,
+                });
+            }
+        }
     }
 
     pub(super) fn group(&self, key: &TerrainKey) -> Option<&wgpu::BindGroup> {

@@ -83,7 +83,7 @@ The pre-#65 Farmhouse row is from the PR's own run and isn't directly comparable
 | 2560×1440 | 1.03–1.07 | 0.99–1.12 | 0.93 | noise / 0.24 |
 | 3840×2160 | 1.90–1.92 | 1.27 | 1.01 | 0.20–0.26 / below noise |
 
-**Cut-out shadows on foliage (CO7 review fixes 1, 2026-11-18, `bench_cut_out_foliage_shadows`)**: 24 trees of 1,500 cut-out leaf cards (36,000) under a low sun with its cascades, 1080p High with TAA, medians of 200 frames; Desktop, pinned to CPUs 0 to 15, five rounds alternating with `main` (`e1658afb`). Casting every cut-out through its holes was dropped for this; only hair cards do (`docs/rendering/shadows.md`).
+**Cut-out shadows on foliage (CO7 review fixes 1, 2026-11-18, `bench_cut_out_foliage_shadows`)**: 24 trees of 1,500 cut-out leaf cards (36,000) under a low sun with its cascades, 1080p High with TAA, medians of 200 frames; Desktop, pinned to CPUs 0 to 15, five rounds alternating with `main` (`e1658afb`). Casting every cut-out through its holes was dropped for this then, and only hair cards did. Since 2026-11-26 every cut-out of the standard material does, at the owner's asking: in Desert Homestead (Ultra, 1920 × 1080) the Shadows pass is 0.13 to 0.17 ms dearer for it in five views and 0.42 ms in one (`docs/rendering/shadows.md`).
 
 | Build | Shadows | Prepass | Scene |
 |---|---|---|---|
