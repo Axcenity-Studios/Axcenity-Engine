@@ -1037,17 +1037,37 @@ impl MaterialPlaces {
 #[derive(Clone, Copy)]
 pub(super) struct Caster {
     pub(super) mesh: MeshKey,
-    /// A cut-out's material, as its index in the frame's
-    /// [`FrameUses::materials`]: its shadow is drawn through its texture's
+    /// A cut-out's material: its shadow is drawn through its texture's
     /// holes (`fs_shadow_cut_out`). `None` casts the whole mesh.
-    pub(super) cut_out: Option<u32>,
+    pub(super) cut_out: Option<CutOutCaster>,
     pub(super) sphere: Sphere,
     pub(super) raw: InstanceRaw,
 }
 
+/// A caster whose shadow is drawn through its texture's holes, or with a
+/// share of it left out (`InstanceRaw::emissive_fade`'s last value, which a
+/// caster's copy holds [`Draw::shadow`] in).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) struct CutOutCaster {
+    /// Its material, as its index in the frame's [`FrameUses::materials`],
+    /// or [`CutOutCaster::NO_HOLES`].
+    pub(super) material: u32,
+    /// A hair card, or a caster near the end of its shadow's reach: drawn
+    /// this way in every one of the sun's cascades, not only the nearest
+    /// ([`cut_out_cascades`]).
+    pub(super) every_cascade: bool,
+}
+
+impl CutOutCaster {
+    /// The material of a caster with no holes of its own, drawn this way
+    /// only to leave a share of its shadow out: no frame has this many
+    /// materials, so the shadow pass binds the plain one.
+    pub(super) const NO_HOLES: u32 = u32::MAX;
+}
+
 /// Which casters a shadow view draws together: one mesh, and for a
 /// cut-out its material (see [`Caster::cut_out`]).
-pub(super) type CasterGroup = (MeshKey, Option<u32>);
+pub(super) type CasterGroup = (MeshKey, Option<CutOutCaster>);
 
 /// What a frame draws (see [`plan_draws`]).
 #[derive(Default)]
@@ -1281,14 +1301,34 @@ fn plan_part<'a>(
         // the mesh's own coordinates, so its holes would fall at the wrong
         // scale (as `ray_cut_outs` leaves tiled items out).
         let tiled = item.uv_tile.is_finite() && item.uv_tile > 0.0;
+        let hair = matches!(item.material.shading, Shading::Hair(_));
         let cut_out = (key.cut_out
-            && (matches!(item.material.shading, Shading::Hair(_)) || !cut_outs_cast_whole())
+            && (hair || !cut_outs_cast_whole())
             && !tiled
             && key.shader.is_none()
             && item.material.terrain.is_none()
             && item.material.water.is_none())
-        .then_some(key.material);
+        .then_some(CutOutCaster {
+            material: key.material,
+            every_cascade: hair,
+        });
+        // Near the end of its shadow's reach a caster casts a share of its
+        // shadow (`Draw::shadow`): the cut-out pipeline leaves the rest
+        // out, dithered, whether or not it has holes of its own.
+        let thinning = draw.shadow < 1.0;
+        let cut_out = match cut_out {
+            Some(cut_out) => Some(CutOutCaster {
+                every_cascade: cut_out.every_cascade || thinning,
+                ..cut_out
+            }),
+            None => thinning.then_some(CutOutCaster {
+                material: CutOutCaster::NO_HOLES,
+                every_cascade: true,
+            }),
+        };
         let caster_at = caster.then(|| {
+            let mut raw = raw;
+            raw.emissive_fade[3] = draw.shadow;
             part.casters.push(Caster {
                 mesh,
                 cut_out,
@@ -1512,6 +1552,17 @@ fn pipeline_rank(shader: Option<u64>, double_sided: bool, cut_out: bool, fading:
 fn cut_outs_cast_whole() -> bool {
     static ASKED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ASKED.get_or_init(|| std::env::var_os("AXCENITY_NO_CUT_OUT_SHADOWS").is_some())
+}
+
+/// How many of the sun's nearest cascades a cut-out other than a hair card
+/// casts through its holes in, as a renderer starts: all of them, or
+/// `AXCENITY_CUT_OUT_CASCADES` (0 to 4), to measure what the far ones cost
+/// and show (`docs/rendering/shadows.md`). Past them it casts its whole mesh.
+pub(super) fn cut_out_cascades() -> usize {
+    std::env::var("AXCENITY_CUT_OUT_CASCADES")
+        .ok()
+        .and_then(|asked| asked.trim().parse::<usize>().ok())
+        .map_or(SHADOW_CASCADES, |asked| asked.min(SHADOW_CASCADES))
 }
 
 /// What `item` is, for the order solid items are drawn in and the GPU's

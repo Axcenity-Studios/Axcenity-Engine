@@ -306,6 +306,7 @@ impl ScenePipeline {
             // `AXCENITY_NO_WHOLE_SOLIDS` lights them with `fs_main` as
             // before, for comparing the two.
             whole_solids: std::env::var_os("AXCENITY_NO_WHOLE_SOLIDS").is_none(),
+            cut_out_cascades: lighting::cut_out_cascades(),
             cascades_drawn: [None; SHADOW_CASCADES],
             casters_planned: 0,
             outline_pipeline,
@@ -1732,17 +1733,31 @@ impl ScenePipeline {
             // Which caster group's pipeline and material are bound: a
             // cut-out's are its own, every other caster's the plain ones.
             let mut bound: Option<u32> = None;
+            // A cut-out's material where this view draws it through its
+            // holes: a lamp's view and the sun's nearest cascades do, and
+            // every cascade for a hair card. Past them it casts whole.
+            let near = index >= SHADOW_CASCADES || index < self.cut_out_cascades;
+            let through = |cut_out: &Option<lighting::CutOutCaster>| {
+                cut_out
+                    .filter(|cut_out| near || cut_out.every_cascade)
+                    .map(|cut_out| cut_out.material)
+            };
             // See-through items, and parts with `CastShadow` off, cast no shadow.
             // Whole casters first, then the cut-outs: a shadow map keeps
             // the nearest depth whatever the order, and a plant's whole
             // and cut-out parts would otherwise change the pipeline mesh
             // by mesh.
-            let whole = casters.iter().filter(|((_, cut_out), _)| cut_out.is_none());
-            let cut_outs = casters.iter().filter(|((_, cut_out), _)| cut_out.is_some());
+            let whole = casters
+                .iter()
+                .filter(|((_, cut_out), _)| through(cut_out).is_none());
+            let cut_outs = casters
+                .iter()
+                .filter(|((_, cut_out), _)| through(cut_out).is_some());
             for ((mesh, cut_out), instances) in whole.chain(cut_outs) {
                 let Some(mesh) = self.gpu_mesh(*mesh) else {
                     continue;
                 };
+                let cut_out = &through(cut_out);
                 if *cut_out != bound {
                     match cut_out {
                         Some(material) => {

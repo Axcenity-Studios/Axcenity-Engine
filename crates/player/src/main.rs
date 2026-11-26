@@ -1586,6 +1586,10 @@ impl App {
                 ("scattered items", u64::from(stats.scattered_items)),
                 ("depth from prepass", u64::from(stats.depth_from_prepass)),
                 ("shadow casters", u64::from(stats.shadow_casters_drawn)),
+                ("cascade 1 casters", u64::from(stats.cascade_casters[0])),
+                ("cascade 2 casters", u64::from(stats.cascade_casters[1])),
+                ("cascade 3 casters", u64::from(stats.cascade_casters[2])),
+                ("cascade 4 casters", u64::from(stats.cascade_casters[3])),
                 ("traced instances", u64::from(stats.ray_tracing.instances)),
                 ("command buffers", u64::from(stats.command_buffers)),
             ]);

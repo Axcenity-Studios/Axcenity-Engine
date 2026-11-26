@@ -625,6 +625,13 @@ pub(super) fn create_shadow_pipeline(
             offset: std::mem::offset_of!(InstanceRaw, surface) as u64,
             shader_location: 11,
         },
+        // A caster's copy holds how much of its shadow it casts in the
+        // fade's place.
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: std::mem::offset_of!(InstanceRaw, emissive_fade) as u64,
+            shader_location: 10,
+        },
     ];
     let mut instance_attributes = vec![
         wgpu::VertexAttribute {

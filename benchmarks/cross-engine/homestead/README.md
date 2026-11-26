@@ -24,7 +24,7 @@ The engine's space is right-handed and Unity's left-handed. Everything is turned
 | Geometry | The engine's meshes | The same corners and triangles, from the dump |
 | Levels of detail | A simpler copy below 30% and 12% of the screen's height (its bounding sphere's), cross-faded | A LODGroup per thing with the same sphere and the same two sizes, cross-faded |
 | Foliage culling | Past a distance set by the plant's size, 60 to 1,500 studs | The same distance, as the LODGroup's last size for the field of view in use |
-| Foliage shadows | Through the leaves' cut-outs (since 2026-11-26), none past 35% of the cull distance | The same, as a second renderer without shadows for the far part of each level |
+| Foliage shadows | Through the leaves' cut-outs (since 2026-11-26), whole to 35% of the cull distance (then thinning to none at 45%, see below) | Through the cut-outs, none past 35%, as a second renderer without shadows for the far part of each level |
 | Textures | BC7, BC5 normal maps, full size | The same images in the same formats |
 | Terrain | Its own, from `heights.png` and seven painted layers | Unity's Terrain from the same heights and weights, eight-layer TerrainLit, layers mixed by weight |
 | Sun shadows | 4 cascades of 4096², to 300 studs, percentage-closer soft shadows, contact shadows | 4 cascades at HDRP's Ultra (4096²), to 300 units, High filtering (PCSS), contact shadows |
@@ -42,6 +42,7 @@ Axcenity runs at the owner's Ultra settings, `benchmarks/features/owner-ultra.js
 
 - **Wind.** The engine sways every plant in the vertex shader (and its shadow, and its motion vectors). HDRP's Lit shader has no vertex animation, and the port doesn't add a Shader Graph for it, so Unity's plants stand still. This saves Unity work: the vertex shader's sway and an object motion vector pass over the foliage.
 - **Cut-out shadows.** The same since 2026-11-26: both shadow passes follow the leaves' cut-outs. Until then the engine's rasterized shadows drew each card whole, which was cheaper and looked heavier; the tables of 2026-11-25 and the first two sessions of 2026-11-26 were measured that way.
+- **Where a plant's shadow ends.** Both cast it whole to 35% of the plant's cull distance. Since 2026-11-26 (the fourth session) the engine's then thins out to nothing at 45%, so shadows don't pop as the camera moves; the port's still ends at 35% (`ShadowReach` in `HomesteadWorld.cs`). The engine draws 1,700 to 2,400 more shadow caster draws a view for it, 0.07 to 0.11 ms: its cost, and Unity's tables of 2026-11-25 don't have it.
 - **Leaves.** The engine lets light through leaves with its own term; Unity's leaves use HDRP's translucent material with its foliage diffusion profile.
 - **Sun rays, dust.** The engine's screen-space sun rays and the two dust emitters have no counterpart in the port. Axcenity's cost, and not small where the dust is in view: 0.34 to 0.42 ms of GPU time in the hero and mailbox views at 1920 × 1080 (results.md, "After step 2").
 - **Scripts.** The still views run no scripts in either engine. In the tour the engine's script turns the windmill, rocks the chair and rolls a tumbleweed; Unity's tour moves only the camera, the lens and the fades.

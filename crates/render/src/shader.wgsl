@@ -317,8 +317,9 @@ fn vs_shadow(
 struct ShadowCutOut {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
-    // The item's own opacity and its cutoff.
-    @location(1) @interpolate(flat) cut: vec2<f32>,
+    // The item's own opacity, its cutoff, and how much of its shadow it
+    // casts (1 all of it; less near the end of its shadow's reach).
+    @location(1) @interpolate(flat) cut: vec3<f32>,
 }
 
 // Draws a cut-out caster (a leaf card, a blade of grass, a hair card) into
@@ -335,6 +336,7 @@ fn vs_shadow_cut_out(
     @location(4) model_2: vec4<f32>,
     @location(5) model_3: vec4<f32>,
     @location(9) base_color: vec4<f32>,
+    @location(10) emissive_fade: vec4<f32>,
     @location(11) surface: vec4<f32>,
     @location(14) skin: vec2<u32>,
     @location(15) sway: vec4<f32>,
@@ -345,7 +347,7 @@ fn vs_shadow_cut_out(
     var out: ShadowCutOut;
     out.clip_position = shadow_cascade * vec4<f32>(world, 1.0);
     out.uv = mat2x2<f32>(maps.uv_matrix.xy, maps.uv_matrix.zw) * uv + maps.uv_offset.xy;
-    out.cut = vec2<f32>(base_color.a, surface.z);
+    out.cut = vec3<f32>(base_color.a, surface.z, emissive_fade.w);
     return out;
 }
 
@@ -366,7 +368,10 @@ fn fs_shadow_cut_out(in: ShadowCutOut) {
         threshold = clamp(in.cut.y + HAIR_HASH_BAND * (pixel_noise(in.clip_position.xy) - 0.5),
             0.002, 0.998);
     }
-    if opacity < threshold {
+    // A caster near the end of its shadow's reach (renderer/lod.rs) casts
+    // a share of it: the rest of its texels are left out by the same fixed
+    // pattern, and the shadow filter averages them into a lighter shadow.
+    if opacity < threshold || dithered_out(in.cut.z, in.clip_position.xy) {
         discard;
     }
 }

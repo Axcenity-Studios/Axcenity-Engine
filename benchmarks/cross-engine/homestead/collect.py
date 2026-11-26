@@ -116,7 +116,7 @@ def table(folder):
         names = []
         for _, m in parts:
             names += [name for name in m["gpu_parts_ms"] if name not in names]
-        print("\nAxcenity's GPU time within the prepass and the scene pass, by what is drawn, ms:\n")
+        print("\nAxcenity's GPU time within the prepass, the scene pass and the shadows, by what is drawn, ms:\n")
         print("| View | " + " | ".join(names) + " |")
         print("|---|" + "---|" * len(names))
         for view, m in parts:

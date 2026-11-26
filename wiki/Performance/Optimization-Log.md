@@ -22,6 +22,7 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 
 | Item | PR | Area | Headline (Measured) | Machine |
 |---|---|---|---|---|
+| A plant's shadow thins out before it ends, TAA reads last frame through a spline; cut-outs in the near cascades only measured and left off | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080, six views: 199–252 → 196–246 frames a second (Shadows pass 0.07–0.11 ms dearer for 1,700–2,400 more caster draws; the spline 0.01 ms); with ray traced shadows and ambient occlusion 84–116 → 85–117, the crane view 90.9 → 87.5. A picture change, not a speed-up: the shadows' pop is a tenth of what it was, a turning frame a third nearer the settled one | Desktop (Fedora) |
 | Foliage shadows through the leaves' holes, the pipeline-first draw order on by default, a terrain's layers made ready once a frame, the frame's materials found by digest | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080, six views: 187–246 → 200–254 frames a second with the shadows following the leaves (206–273 with whole cards, as before); the frame's thread 3.83–4.71 → 3.53–4.23 ms (Uploads 0.42 → 0.21, Materials 0.54 → 0.33); Shadows pass 0.13–0.42 ms dearer for the holes. Unity HDRP: 227–257 | Desktop (Fedora) |
 | The scene pass tests depth before it lights: solid items with no `discard`, depth started from the prepass's; the motion vectors' instances shared among threads | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080, six views, the stills the same pixel for pixel: 161–225 → 186–246 frames a second (hero 164.8 → 186.5, mailbox 161.4 → 191.3, windmill 225.4 → 246.1); scene pass 1.72–3.52 → 1.38–2.58 ms; the frame's thread 4.17–5.11 → 3.85–4.71 ms (motion history 0.47–0.67 → 0.19–0.25). Unity HDRP: 227–257 | Desktop (Fedora) |
 | The sky's clouds traced before the scene pass; the prepass and the scene pass timed by what is drawn | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080: clouds 1.3–2.6 ms → 0.04–0.30 (the `Clouds` pass), the same picture; hero view 139.9 → 164.2 frames a second, windmill 149.8 → 230.4, the tour 151.9 → 181.4; at 2560 × 1405 the tour 112.4 → 147.2 (Unity HDRP: 150.9) | Desktop (Fedora) |
@@ -68,6 +69,22 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | Culling, LOD | graphics Ph. 12–13 | Render | Edge views draw only what's seen; foliage cull distances | Desktop |
 
 ## Entries
+
+### Where a plant's shadow ends, TAA in motion, and the near cascades (2026-11-26)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | The Desert Homestead comparison, the owner's fourth brief of the day (uncommitted when written) |
+| **Evidence** | Measured |
+| **Problem** | Plants' shadows popped on and off as the camera moved. The picture softened under TAA while the camera moved. The cut-out shadows' 0.42 ms at the windmill view was to be won back by keeping them to the near cascades |
+| **Root cause** | A painted plant cast its whole shadow to 35% of its cull distance and none past it. TAA read last frame's picture between pixels as a plain blend of four, which blurs a little more each frame. The cut-outs' cost is mostly in the two nearest cascades (0.28 of 0.41 ms), not the far ones |
+| **Solution** | A shadow whole to 35% and thinning to none at 45%: dithered in the shadow maps through the cut-out pipeline, ray by ray in ray traced shadows from a share in each cut-out's slot. TAA's history read through the Catmull-Rom filter upscaling already used. Near-cascade cut-outs built behind a count that stays at every cascade. Each sun cascade's time in `--bench` |
+| **Affected components** | `crates/render` (`ShadowReach` and `Draw::shadow` in `renderer/lod.rs`; `CutOutCaster` and `cut_out_cascades` in `renderer/lighting.rs`; the shadow views' loop in `renderer/scene.rs`; `fs_shadow_cut_out`; `CutOutRaw::casting`, `casts_on_this_ray`; `fs_taa`), `crates/ui` and `crates/player` (the bench's cascade times and counts) |
+| **Before → after** | 1920 × 1080, Ultra, medians of three runs, frames a second: hero 199.4 → 196.1, mailbox 198.6 → 195.6, porch 238.4 → 233.3, truck 229.3 → 223.9, windmill 251.6 → 245.5, crane 204.9 → 201.6. Ray traced shadows and ambient occlusion: 92.7 → 91.9, 84.1 → 84.5, 109.3 → 107.8, 116.1 → 116.8, 92.2 → 90.8, 90.9 → 87.5. The pop (pixels of the crane view more than 8 levels apart for a 1% step): 0.027% → 0.003%. A turning frame against the settled one: 3.3–3.6 → 2.3–2.5 levels |
+| **Method** | As the entries below; both paths on one build (`AXCENITY_SHADOW_REACH=0.35,0`, `AXCENITY_TAA_PROBE=soft`, which together draw the earlier stills pixel for pixel). Motion: sequences of 90 moving and 50 held frames from the still tool, the last moving frame against the settled one, with anti-aliasing off as the control |
+| **Hardware** | Desktop under Fedora |
+| **Trade-offs** | 3 to 6 frames a second for the longer reach, and the crane view with ray traced shadows under 90. Left off for what they do to the picture: cut-outs in the two nearest cascades only (0.09–0.14 ms, blocks back under mid-distance plants), variance clipping (a tenth more flicker at rest) |
+| **Detail** | `benchmarks/cross-engine/homestead/results.md`, "Near cascades, where a plant's shadow ends, and TAA in motion"; `docs/rendering/shadows.md`, `docs/rendering/temporal.md` |
 
 ### Foliage shadows through the holes, the draw order, and the thread's per-frame costs (2026-11-26)
 

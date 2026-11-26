@@ -49,7 +49,8 @@ struct RayShadows {
 // Cut-outs' holes (renderer/ray_cut_outs.rs). Must match `CutOutRaw`.
 struct CutOut {
     // x: its mesh's first triangle in `cut_out_uvs`, y: its alpha's layer
-    // plus 1 (0: no holes), z: the alpha cutoff's bits.
+    // plus 1 (0: no holes), z: the alpha cutoff's bits, w: the bits of the
+    // share of its shadow it leaves out (`casts_on_this_ray`).
     mesh: vec4<u32>,
     // The columns of the material's texture coordinate matrix.
     uv_matrix: vec4<f32>,
@@ -110,6 +111,9 @@ const CUT_OUT_NEAR: f32 = 0.35;
 const PREPASS_CUT_OUT: f32 = 0.875;
 // The pixel being traced's `cut_out_near`, set by `cs_trace` and `cs_air`.
 var<private> cut_out_near_here: f32 = CUT_OUT_NEAR;
+// The ray being traced's place in the pattern a thinning shadow is left
+// out by (`casts_on_this_ray`), set by `cs_trace`: 1 casts every shadow.
+var<private> shadow_share_here: f32 = 1.0;
 // The widest a soft edge is smoothed, in pixels each way.
 const MAX_BLUR: i32 = 12;
 // The narrowest, so the few rays a pixel traces always even out with
@@ -173,6 +177,17 @@ fn cut_out_covers(hit: RayIntersection) -> bool {
     return alpha >= bitcast<f32>(cut.mesh.z);
 }
 
+// Whether the cut-out a ray's candidate hit is on casts its shadow on this
+// ray. Near the end of its shadow's reach (renderer/lod.rs) a plant casts
+// a share of its shadow: its slot says how much is left out, and the rays
+// of that share of the pixels pass through it, by a pattern that moves on
+// each frame under TAA, so the smoothing and TAA make a lighter shadow of
+// it where the shadow maps' filter does.
+fn casts_on_this_ray(hit: RayIntersection) -> bool {
+    let left_out = bitcast<f32>(cut_outs[hit.instance_custom_data + hit.geometry_index].mesh.w);
+    return shadow_share_here >= left_out;
+}
+
 // One ray from `origin` along `direction` (normalized), up to `far`:
 // whether a solid item blocks it, or a cut-out further off than
 // `cut_out_near_here` where its texture isn't cut out. x: how far along
@@ -195,7 +210,7 @@ fn first_blocker(origin: vec3<f32>, direction: vec3<f32>, far: f32) -> vec2<f32>
     while rayQueryProceed(&query) {
         let candidate = rayQueryGetCandidateIntersection(&query);
         if candidate.kind == RAY_QUERY_INTERSECTION_TRIANGLE && candidate.t > cut_out_near_here
-            && cut_out_covers(candidate) {
+            && casts_on_this_ray(candidate) && cut_out_covers(candidate) {
             rayQueryConfirmIntersection(&query);
             cut_out = 1.0;
         }
@@ -354,6 +369,9 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let view_normal = textureLoad(normal_texture, pixel, 0);
     let normal = normalize((rays.view_to_world * vec4<f32>(view_normal.xyz, 0.0)).xyz);
     cut_out_near_here = cut_out_near(point.xyz, abs(view_normal.w - PREPASS_CUT_OUT) < 0.05);
+    // Above 0, so a slot that leaves nothing out casts on every ray.
+    shadow_share_here = max(fract(pixel_noise(vec2<f32>(pixel)) + rays.settings.y * 0.569840291
+        + 0.5), 1e-4);
     if rays.lamps.x != 0u && index < arrayLength(&lamp_mask) {
         lamp_mask[index] = traced_lamps(pixel, point.xyz, normal, distance);
     }
@@ -389,6 +407,8 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         let offset = sqrt(k) * radius * vec2<f32>(cos(angle), sin(angle));
         let direction = normalize(sun + right * offset.x + forward * offset.y);
         let t = blocker_distance(origin, direction);
+        // The next ray's place in the thinning shadows' pattern.
+        shadow_share_here = max(fract(shadow_share_here + 0.618034), 1e-4);
         if t == 0.0 {
             lit += 1.0;
         } else {

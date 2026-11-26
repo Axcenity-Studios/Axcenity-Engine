@@ -310,6 +310,8 @@ impl RayScene {
         let mut wanted_items = Vec::new();
         // Each wanted item's distance, for bending the nearest first.
         let mut wanted_distances = Vec::new();
+        // How much of its shadow each casts (`Draw::shadow`).
+        let mut wanted_shadows = Vec::new();
         let mut wanted_surfaces: Vec<SurfaceRaw> = Vec::new();
         for draw in draws {
             let item = draw.item;
@@ -351,12 +353,13 @@ impl RayScene {
                 Some(cluster) => cluster.ray_kinds[at],
                 None => RayKind::of(item),
             };
-            wanted.push((
-                (key, kind.holes),
-                gpu,
-                transform,
-                mask_of(kind, draw.casts_shadow),
-            ));
+            // Near the end of its shadow's reach a cut-out's shadow thins
+            // out ray by ray (`CutOutRaw::casting`); an item without
+            // holes, whose hits a ray can't pass over, casts until half
+            // of its shadow is gone.
+            let casts = draw.casts_shadow && (kind.holes || draw.shadow >= 0.5);
+            wanted.push(((key, kind.holes), gpu, transform, mask_of(kind, casts)));
+            wanted_shadows.push(draw.shadow);
             wanted_items.push(item);
             wanted_distances.push(distance);
             if surfaces {
@@ -477,6 +480,7 @@ impl RayScene {
                 if cut_out {
                     self.cut_outs
                         .slot((device, queue), wanted_items[index], mesh, gpu.version)
+                        .casting(wanted_shadows[index])
                 } else {
                     CutOutRaw::default()
                 }

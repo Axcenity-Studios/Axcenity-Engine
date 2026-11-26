@@ -1012,6 +1012,10 @@ pub(super) struct ScenePipeline {
     /// Whether solid items with nothing left out are lit by a shader with
     /// no `discard` ([`PrefillPipelines::whole`]).
     pub(super) whole_solids: bool,
+    /// How many of the sun's nearest cascades a cut-out casts through its
+    /// holes in ([`lighting::cut_out_cascades`]); past them it casts its
+    /// whole mesh.
+    pub(super) cut_out_cascades: usize,
     /// Each sun cascade as last drawn, while the shadow map still holds it.
     pub(super) cascades_drawn: [Option<DrawnCascade>; SHADOW_CASCADES],
     /// How many shadow casters the last frame planned, whose far cascades

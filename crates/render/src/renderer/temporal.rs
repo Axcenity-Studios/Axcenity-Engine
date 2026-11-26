@@ -914,6 +914,43 @@ fn in_prepass(item: &DrawItem) -> bool {
     material.opacity >= 1.0 && material.water.is_none() && material.terrain.is_none()
 }
 
+/// A measuring switch for TAA at full size (`fs_taa`), to tell which part
+/// of it a moving picture's faults come from: `AXCENITY_TAA_PROBE` is a
+/// list of `clip` (history held to the mean and spread of the colors
+/// around the pixel, not only their lowest and highest), `soft` (last
+/// frame read as a plain blend of four pixels, as it was until 2026-11-26,
+/// not through the Catmull-Rom filter), `own`
+/// (each pixel's own motion, not the nearest surface's around it) and
+/// `share=<0 to 1>` (this frame's share of the blend). Nothing set draws as
+/// always (`docs/rendering/temporal.md`).
+#[derive(Clone, Copy, Default)]
+struct TaaProbe {
+    /// `TAA_PROBE_*` in temporal.wgsl.
+    flags: u32,
+    share: Option<f32>,
+}
+
+fn taa_probe() -> TaaProbe {
+    static ASKED: std::sync::OnceLock<TaaProbe> = std::sync::OnceLock::new();
+    *ASKED.get_or_init(|| {
+        let mut probe = TaaProbe::default();
+        let asked = std::env::var("AXCENITY_TAA_PROBE").unwrap_or_default();
+        for part in asked.split(',').map(str::trim) {
+            match part {
+                "clip" => probe.flags |= 1,
+                "soft" => probe.flags |= 2,
+                "own" => probe.flags |= 4,
+                _ => {
+                    if let Some(share) = part.strip_prefix("share=") {
+                        probe.share = share.parse().ok().map(|s: f32| s.clamp(0.01, 1.0));
+                    }
+                }
+            }
+        }
+        probe
+    })
+}
+
 impl TemporalPasses {
     /// Binds `previous` (`Posing::previous`, made again) as last frame's
     /// posed corners.
@@ -937,6 +974,7 @@ impl TemporalPasses {
         clock: [f32; 4],
         moved: &Moved,
     ) {
+        let probe = taa_probe();
         let (width, height) = (size.0.max(1) as f32, size.1.max(1) as f32);
         let output = upscaled_to.unwrap_or(size);
         let (output_width, output_height) = (output.0.max(1) as f32, output.1.max(1) as f32);
@@ -948,7 +986,7 @@ impl TemporalPasses {
             inv_view_proj: drawn.inverse().to_cols_array_2d(),
             settings: [
                 f32::from(u8::from(history.valid)),
-                TAA_SHARE,
+                probe.share.unwrap_or(TAA_SHARE),
                 NEAR_PLANE,
                 FAR_PLANE,
             ],
@@ -959,7 +997,7 @@ impl TemporalPasses {
                 quality.samples() as f32,
                 blur_tile(size.1) as f32,
             ],
-            noise: [(history.frame % 64) as f32, 0.0, 0.0, 0.0],
+            noise: [(history.frame % 64) as f32, probe.flags as f32, 0.0, 0.0],
             output: [
                 output_width,
                 output_height,

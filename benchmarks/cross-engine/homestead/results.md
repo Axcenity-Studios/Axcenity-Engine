@@ -12,6 +12,7 @@ Measured 2026-11-25 on the owner's desktop: Ryzen 9 9950X3D, Radeon RX 9070 XT (
 - **Since then (2026-11-26) the clouds are done**: 0.04 to 0.30 ms with the same picture, and the gap is 1.1 to 1.4 times at 1920 × 1080 and 0.84 to 1.3 times at 2560 × 1405 ("After step 1" below). The rest of this section is as measured on 2026-11-25.
 - **Then the scene pass (2026-11-26, later the same day)**: it lit most solid pixels before testing their depth. With the depth test first and the same picture, pixel for pixel, the six views are 186 to 246 frames a second at 1920 × 1080, 1.02 to 1.29 times behind Unity ("The plants' scene pass, profiled" below).
 - **Then the draw order, foliage shadows through the leaves, and the thread (2026-11-26, third session)**: 200 to 254 frames a second at 1920 × 1080, 0.98 to 1.21 times behind Unity, with the one thing its picture had over the engine's (shadows that follow the leaves) now drawn ("Shadows through the holes, and the thread" below).
+- **Then where a plant's shadow ends, and TAA in motion (2026-11-26, fourth session)**: shadows thin out over a band where they popped, and a moving picture stays a third sharper under TAA, for 3 to 6 frames a second (196 to 246 at 1920 × 1080, 1.01 to 1.23 times behind Unity). Cut-outs in the near cascades only was built and left off: most of their cost is in the near cascades ("Near cascades, where a plant's shadow ends, and TAA in motion" below).
 - **Most of the gap is two things.** The engine's clouds cost 1.6 to 2.9 ms a frame at 1080p where the sky shows, against 0.3 ms for HDRP's. And the part of the engine's GPU frame that does not depend on the window's size is about 3.5 ms, against about 1.8 ms for HDRP's: at a quarter of the pixels the engine still needs 3.8 to 4.7 ms of GPU time a frame, which is what HDRP needs for the whole frame at full size (3.8 to 4.3 ms).
 - **The frame's thread is the next limit.** It takes 4.0 to 5.0 ms (200 to 250 frames a second at most), 1.9 ms of it for the plants' 9,500 items. Unity's main thread takes 1.5 to 1.7 ms. With the clouds gone the windmill view is already limited by the thread, at 233 frames a second.
 - **Axcenity is ahead on what it uses**: 1.1 to 2.1 cores' worth of CPU time against Unity's 3.6 to 6.8, 2.6 to 2.9 GB of video memory against 3.8 to 4.3 GB, volumetric fog at 0.38 ms against 0.88 ms, and it starts in 2.9 seconds against 4.2. It uses more memory (2.45 GB against 1.47 GB).
@@ -197,7 +198,7 @@ In the order the measurements give, as revised after the owner's review (2026-11
    - Compared on: the thread's time, GPU time, the process's memory and the card's, and the picture (the same plants at the same levels of detail, the same cross-fades, sway, shadows and motion vectors).
    - The rewrite is decided from that comparison, not from Unity's number.
 4. **Shadows, by measurement only: 1.05 to 1.38 ms whatever the window's size.** The same as HDRP's, so this is not where Unity is ahead, but it is a fifth of the frame. Measure the four cascades one by one first (as "Shadows on the patch, cascade by cascade" did). The far cascades change little from frame to frame and are the candidates for being kept; the engine uses over 1 GB less of the card's memory than HDRP here, so there is room to keep them. A kept cascade must still show the plants' sway where a texel of it can: that is part of what is measured. Nothing is changed without a cascade's measurement that says so.
-5. **Cut-out shadows for foliage in the rasterized path: a matter of the picture, kept apart from the speed work. Done 2026-11-26 at the owner's asking, on in every cascade, its cost measured on its own: "Shadows through the holes, and the thread".** The one place Unity's picture is plainly better. The shadow pass already has the pipeline (`fs_shadow_cut_out`, which hair cards cast through); leaf cards were left casting whole because through their holes the Shadows pass of 36,000 leaf cards went from 0.19 to 0.42 ms (`bench_cut_out_foliage_shadows`, `renderer/lighting.rs`). So this is a switch and a measurement in Homestead, not a new shader: solid casters' draws don't change. Its cost is measured on its own (shadow time with and without, view by view), not folded into step 4's numbers, and the shadow pass is not made dearer just to match the reference: if the cost is large it becomes a quality setting's choice, or cut-outs in the near cascades only, where they can be seen.
+5. **Cut-out shadows for foliage in the rasterized path: a matter of the picture, kept apart from the speed work. Done 2026-11-26 at the owner's asking, on in every cascade, its cost measured on its own: "Shadows through the holes, and the thread". The near cascades only was then built and measured, and is off: "Near cascades, where a plant's shadow ends, and TAA in motion".** The one place Unity's picture is plainly better. The shadow pass already has the pipeline (`fs_shadow_cut_out`, which hair cards cast through); leaf cards were left casting whole because through their holes the Shadows pass of 36,000 leaf cards went from 0.19 to 0.42 ms (`bench_cut_out_foliage_shadows`, `renderer/lighting.rs`). So this is a switch and a measurement in Homestead, not a new shader: solid casters' draws don't change. Its cost is measured on its own (shadow time with and without, view by view), not folded into step 4's numbers, and the shadow pass is not made dearer just to match the reference: if the cost is large it becomes a quality setting's choice, or cut-outs in the near cascades only, where they can be seen.
 6. **Put off until the large items are done**: contact shadows (0.37 against 0.05 ms), TAA (0.28 against 0.12), and memory (2.45 against 1.47 GB: look for meshes' and textures' CPU copies kept after upload).
 7. **Ray tracing is its own track**: 77 to 78 frames a second against a target of 90 for shadows and ambient occlusion, with nothing in Unity to compare against on this machine. Steps 1 to 3 help it too: its frames contain the same clouds, scene pass and thread work.
 
@@ -491,6 +492,99 @@ The runs' ranges are within 0.5% of their medians (last session's 1% lows were m
 Ray traced shadows and ambient occlusion (`owner-rt-shadows-ao.json`, one run each, this build with the two switches set and without): hero 90.9 → 93.2 frames a second, crane 89.6 → 91.7 (the scene pass 2.32 → 1.90 and 2.29 → 1.82 ms by the draw order, the Shadows pass 0.13 and 0.18 ms dearer).
 
 **Not run**: the larger window, the tour, Unity again, DirectX 12 or another card, the other crates' tests and the regression check (`axcenity-bench-check`).
+
+## Near cascades, where a plant's shadow ends, and TAA in motion (2026-11-26, fourth session)
+
+The owner's brief: keep the cut-out shadows to the near cascades to win back the windmill view's 0.42 ms, stop the plants' shadows popping at 35% of their cull distance, and find whether TAA or the shadows themselves are behind the distortion he sees round plant shadows while the camera moves. Same machine, settings and method; three runs a view, the median shown. `--bench` now times each of the sun's cascades (`Shadows: cascade 1` to `4` in `"gpu_parts"`).
+
+### Cut-outs in the near cascades only: built, measured, left at every cascade
+
+The windmill's 0.42 ms is not where the brief took it to be. By cascade (the windmill view, whole cards against through the holes, one run): the first cascade 0.14 → 0.29 ms, the second 0.18 → 0.31, the third 0.24 → 0.34, the fourth 0.22 → 0.25. So 0.28 of the 0.41 ms is in the two nearest cascades, where a plant covers the most texels and its holes are plainest, and those are the ones the brief keeps.
+
+`ScenePipeline::cut_out_cascades` (`AXCENITY_CUT_OUT_CASCADES=0` to `4`) is how many of the nearest cascades cast through the holes; past them a cut-out casts whole, a hair card excepted. The Shadows pass, ms, and what the stills show against every cascade (1920 × 1080, TAA settled over 24 frames):
+
+| View | Every cascade | Nearest three | Nearest two | Pixels that change with two | More than 16 of 255 apart |
+|---|---|---|---|---|---|
+| hero | 1.20 | 1.17 | 1.10 | 2.1% | 0.58% |
+| mailbox | 1.30 | 1.27 | 1.21 | 1.1% | 0.27% |
+| porch | 1.51 | 1.49 | 1.42 | 0.1% | 0.04% |
+| truck | 1.30 | 1.26 | 1.18 | 0.5% | 0.19% |
+| windmill | 1.22 | 1.19 | 1.08 | 1.6% | 0.33% |
+| crane | 1.13 | 1.11 | 1.04 | 4.4% | 1.5% |
+
+With two, the frame rate is 4 to 10 frames a second higher (windmill 252.9 → 263.2) and the picture loses what the third session added from 51 studs out: blocks under the mid-distance plants of the crane view, and the hero view's junipers shading themselves whole (`target/cross-engine/homestead/step2/crane-cascades-compare.png`, `hero-cascades-compare.png`). With three, 0.02 to 0.04 ms and 0.02 to 0.75% of pixels. The premise that the far cascades' texels are too coarse for a leaf's holes does not hold here: the tour's lenses are long (30° to 46°), so in the hero view the third cascade's texel is about 0.04 studs and the fourth's 0.10 (worked out from the cascades' sizes, not read back). **It is left at every cascade**, which draws the third session's stills pixel for pixel; two is one constant away if the owner wants the 0.1 ms more than the mid-distance shadows.
+
+### A plant's shadow thins out before it ends
+
+Painted plants cast no shadow past 35% of their cull distance, all at once. Now the shadow is whole to 35% and thins to nothing at 45% (`ShadowReach` in `renderer/lod.rs`; [docs/rendering/shadows.md](../../../docs/rendering/shadows.md)): dithered in the shadow maps, ray by ray in ray traced shadows (an item without holes, whose hits a ray cannot pass over, still goes at once there, half way through the band).
+
+**The pop, measured.** Two settled stills of the crane view with the line moved by 1% of the cull distance, which is what the camera moving that much nearer does to the shadows and to nothing else (`target/cross-engine/homestead/step3/crane-shadow-pop-compare.png`):
+
+| | Pixels more than 8 levels apart | More than 16 | Largest change |
+|---|---|---|---|
+| Shadow maps, sudden end | 0.027% | 0.020% | 99 |
+| Shadow maps, thinning | 0.003% | 0.000% | 25 |
+| Ray traced, sudden end | 0.027% | 0.016% | 95 |
+| Ray traced, thinning | 0.001% | 0.000% | 29 |
+
+**What reach costs** (the Shadows pass against 35% with a sudden end, one run a view): to 50% with no fade 0.10 to 0.13 ms; to 70% 0.22 to 0.27 ms in five views, and in the crane view the frame plans over 12,000 casters there, so its far cascades start taking turns; whole to 25% thinning to 35%, 0.00 to 0.04 ms (and less shadow than before); whole to 30% thinning to 40%, 0.03 to 0.06 ms; whole to 35% thinning to 45%, 0.08 to 0.12 ms. The last is in, since it takes no shadow away that was there. The Unity port still ends its shadows at 35% (README, "What differs").
+
+### TAA in motion: what was measured
+
+Sequences of 90 moving frames and 50 held, with the wind stopped so only the camera moves: a sideways walk of 0.2 studs a frame and a turn of 0.4° a frame, from the hero and the crane views (`target/cross-engine/homestead/step3/motion/`). "Apart" is the last moving frame against the settled frame of the same view, in levels of 255 (mean; the share of pixels more than 8 apart).
+
+| Drawn with | hero, walk | hero, turn | crane, walk | crane, turn | Still, frame to frame |
+|---|---|---|---|---|---|
+| Shadow maps, no anti-aliasing | 0.01 | 0.00 | 0.00 | 0.00 | 0.001 |
+| Ray traced shadows, no anti-aliasing | 0.01 | 0.00 | 0.00 | 0.00 | 0.001 |
+| Shadow maps, TAA as it was | 2.01 (5.6%) | 3.57 (12.9%) | 1.94 (5.0%) | 3.62 (12.7%) | 0.30 to 0.57 |
+| Ray traced shadows, TAA as it was | 1.90 (5.1%) | 3.34 (11.8%) | 1.87 (4.6%) | 3.32 (11.0%) | 0.29 to 0.54 |
+| Ray traced, history read through the spline | 1.56 (3.8%) | 2.26 (6.0%) | 1.44 (3.2%) | 2.27 (5.7%) | 0.29 to 0.54 |
+| Ray traced, history held to one spread of the mean | 1.68 (4.2%) | 2.95 (9.5%) | 1.64 (3.6%) | 2.92 (8.7%) | 0.33 to 0.60 |
+| Ray traced, each pixel's own motion | 1.95 (5.3%) | 3.34 (11.8%) | 1.90 (4.8%) | 3.31 (10.9%) | 0.29 to 0.54 |
+| Ray traced, the spline and the spread together | 1.38 (3.2%) | 1.98 (4.6%) | 1.27 (2.6%) | 1.98 (4.4%) | 0.33 to 0.60 |
+| Ray traced, this frame's share 0.2 | 1.56 (3.7%) | 2.56 (7.5%) | 1.57 (3.4%) | 2.58 (7.1%) | 0.58 to 1.11 |
+| The editor's settings at 998 × 405, as it was | 1.99 (5.9%) | 3.58 (12.3%) | 1.97 (5.5%) | 3.64 (12.8%) | 0.35 to 0.61 |
+| The editor's settings at 998 × 405, the spline | 1.70 (4.8%) | 2.44 (6.5%) | 1.57 (4.0%) | 2.51 (7.0%) | 0.35 to 0.61 |
+
+What that says:
+
+1. **The shadows are steady under a moving camera, both kinds.** Without anti-aliasing a moving frame is the settled frame, to a hundredth of a level. Nothing in the shadow maps or in the ray traced shadows trails, warps or lags when only the camera moves.
+2. **All of what changes in motion is TAA, and it is the same with either kind of shadow.** It is a softening of the whole picture, the ground's texture and the plants' edges alike, not something round shadows (`hero-turn-taa-compare.png`, `crane-turn-taa-compare.png` in the motion folder).
+3. **Its largest part was how last frame's picture was read.** Between pixels it was a plain blend of four, which blurs a little more each frame. Read through the spline that upscaling TAA already used, a turning frame is a third nearer the settled one, for 0.01 ms. This is in (`fs_taa`, [docs/rendering/temporal.md](../../../docs/rendering/temporal.md)); a still picture changes by one level in 1.3 to 1.5% of its pixels.
+4. **Variance clipping helps a little and costs steadiness**: a tenth less softening, a tenth more flicker standing still. Not in. A larger share for this frame doubles the flicker. Taking a pixel's own motion changes nothing: the nearest surface's motion is not dragging the ground along.
+5. **The editor's viewport and the player differ in size and pace, not in TAA.** One pipeline, the same eight jitter places, the same motion vectors. The editor's saved layout draws 998 × 405 pixels, so a blade of grass and its shadow are under a pixel wide sooner (a tenth more flicker standing still above); an editor nobody touches draws swaying scenery at 30 frames a second, where TAA's blend takes three times as long to follow a swaying shadow as at 90; and the owner's editor settings add real-time GI and ray traced reflections.
+6. **Ray traced shadows of swaying plants are not left behind here.** In every sequence with the wind on, at both sizes, the ray traced scene bent every plant whose sway shows (470 to 3,500 a frame, none left out for the budget, none waiting for a build).
+
+**Still not reproduced: a shimmer only ray traced shadows have.** What was found and mended is in both modes: the pop at the end of a plant's shadow, and the softening in motion. If something is left after these, the next things to look at are a swaying plant's shadow on still ground (the ground's motion is the camera's alone, so TAA holds the old shadow to the colors round the pixel and follows it over about ten frames) and the editor's 30 frames a second while idle.
+
+### Where that leaves the six views
+
+Frames a second (1% low), 1920 × 1080, Ultra. "As it was" is this build with `AXCENITY_SHADOW_REACH=0.35,0` and `AXCENITY_TAA_PROBE=soft`, which draws the third session's stills pixel for pixel (0 of 2,073,600 in each view).
+
+| View | As it was | Now | Unity | Unity ÷ now | Shadows pass, was and now | Frame's thread, was and now |
+|---|---|---|---|---|---|---|
+| hero | 199.4 (188) | 196.1 (185) | 234.1 | 1.19× | 1.19, 1.27 | 3.71, 3.71 |
+| mailbox | 198.6 (182) | 195.6 (183) | 232.6 | 1.19× | 1.30, 1.37 | 3.46, 3.51 |
+| porch | 238.4 (207) | 233.3 (212) | 236.5 | 1.01× | 1.51, 1.62 | 3.56, 3.56 |
+| truck | 229.3 (199) | 223.9 (201) | 226.7 | 1.01× | 1.30, 1.41 | 3.79, 3.82 |
+| windmill | 251.6 (228) | 245.5 (221) | 256.8 | 1.05× | 1.22, 1.32 | 3.45, 3.56 |
+| crane | 204.9 (186) | 201.6 (187) | 248.8 | 1.23× | 1.13, 1.22 | 4.17, 4.31 |
+
+Ray traced shadows and ambient occlusion (`owner-rt-shadows-ao.json`), the same two builds:
+
+| View | As it was | Now | Ray traced shadows pass, was and now | Frame's thread, was and now |
+|---|---|---|---|---|
+| hero | 92.7 (89) | 91.9 (88) | 2.18, 2.25 | 6.45, 6.42 |
+| mailbox | 84.1 (80) | 84.5 (81) | 2.62, 2.54 | 6.22, 6.16 |
+| porch | 109.3 (104) | 107.8 (103) | 2.15, 2.16 | 6.57, 6.61 |
+| truck | 116.1 (109) | 116.8 (110) | 1.54, 1.48 | 6.71, 6.76 |
+| windmill | 92.2 (88) | 90.8 (86) | 3.01, 3.03 | 6.71, 6.79 |
+| crane | 90.9 (87) | 87.5 (84) | 2.15, 2.35 | 8.32, 8.60 |
+
+The runs' ranges are within 1% of their medians, one run excepted (the hero's third "as it was", 194.8). Every run was limited by the GPU. All of the cost is the longer reach: 1,700 to 2,400 more caster draws a view. **The crane view with ray traced shadows goes under the owner's 90**, from 90.9 to 87.5: the price of the fade as built, and whole to 30% thinning to 40% would be about half of it.
+
+**Not run**: the larger window, the tour, Unity again (its port still ends shadows at 35%), DirectX 12 or another card, the regression check (`axcenity-bench-check`). Tests run: `cargo test -p axcenity-render` (507 passed), the `ui` and `core` crates' library tests, `cargo clippy --workspace --all-targets -- -D warnings`.
 
 ## What these numbers don't cover
 

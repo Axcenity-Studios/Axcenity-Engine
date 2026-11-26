@@ -606,6 +606,65 @@ fn a_plant_swaying_in_the_wind_has_motion_of_its_own() {
 
 /// A camera cut in a rendered movie: without forgetting, motion blur
 /// streaks the first frame after the jump and TAA mixes the old view in.
+/// TAA reads last frame's picture from where each pixel was, which while
+/// the camera turns is between pixels. Read there as a plain blend of the
+/// four around it, the picture lost a little sharpness every frame, so a
+/// moving view went soft and came back as the camera stopped (in Desert
+/// Homestead a turning frame was 3.3 levels from the settled one, 2.3 read
+/// through the spline upscaling already used).
+#[test]
+fn taa_keeps_a_turning_cameras_picture_close_to_the_settled_one() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    // A checkered card, each square about four pixels wide.
+    let checkers = super::card_set::Made::shared(0x7aa_c4ec, 64, |x, y| {
+        let light = (x / 2 + y / 2).is_multiple_of(2);
+        let value = if light { 235 } else { 40 };
+        [value, value, value, 255]
+    });
+    let mut board = card(
+        [1.0; 3],
+        Vec3::new(0.0, 0.0, -8.0),
+        Vec3::new(12.0, 12.0, 0.1),
+        1,
+    );
+    board.material.base_color_texture = Some(checkers);
+    // Turned a third of a pixel a frame (91 pixels a radian here).
+    let at = |frame: u32| {
+        let mut list = list_of(vec![board.clone()]);
+        let yaw = frame as f32 * 0.37 / 91.4;
+        list.camera.look_at = Vec3::new(-yaw.sin(), 0.0, -yaw.cos());
+        list
+    };
+    let mut renderer = renderer(
+        &device,
+        &queue,
+        &settings(AntiAliasing::Taa, MotionBlurQuality::Off),
+    );
+    let mut moving = Vec::new();
+    for frame in 0..=40 {
+        moving = draw(&mut renderer, &at(frame));
+    }
+    let mut settled = Vec::new();
+    for _ in 0..48 {
+        settled = draw(&mut renderer, &at(40));
+    }
+    let middle = SIZE / 4..SIZE * 3 / 4;
+    let apart = middle
+        .clone()
+        .flat_map(|y| middle.clone().map(move |x| (x, y)))
+        .map(|(x, y)| f32::from(pixel(&moving, x, y)[0].abs_diff(pixel(&settled, x, y)[0])))
+        .sum::<f32>()
+        / (SIZE * SIZE / 4) as f32;
+    eprintln!("turning against settled: {apart:.2} levels");
+    assert!(
+        apart < 9.0,
+        "the turning picture is {apart} levels from the settled one"
+    );
+}
+
 #[test]
 fn forgetting_history_draws_the_frame_after_a_camera_jump_as_a_first_frame() {
     let Some((device, queue)) = test_device() else {

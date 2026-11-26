@@ -40,7 +40,8 @@ struct Temporal {
     // Motion blur: x the share of a frame's motion that streaks, y the
     // longest half-streak in pixels, z samples, w the tile size in pixels.
     blur: vec4<f32>,
-    // x: the frame, for the noise.
+    // x: the frame, for the noise; y: a measuring switch (`TAA_PROBE_*`,
+    // 0 unless `AXCENITY_TAA_PROBE` asks).
     noise: vec4<f32>,
     // Upscaling TAA: the output's width and height, and 1 over each.
     output: vec4<f32>,
@@ -82,6 +83,11 @@ fn fs_camera_motion(@builtin(position) position: vec4<f32>) -> @location(0) vec4
     return vec4<f32>(now - before, 0.0, 0.0);
 }
 
+// `AXCENITY_TAA_PROBE`'s switches (renderer/temporal.rs).
+const TAA_PROBE_CLIP: u32 = 1u;
+const TAA_PROBE_SOFT: u32 = 2u;
+const TAA_PROBE_OWN: u32 = 4u;
+
 fn to_ycocg(c: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(
         0.25 * c.r + 0.5 * c.g + 0.25 * c.b,
@@ -111,12 +117,16 @@ fn fs_taa(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     var high = vec3<f32>(-1e9);
     var nearest = pixel;
     var nearest_depth = 2.0;
+    var sum = vec3<f32>(0.0);
+    var squares = vec3<f32>(0.0);
     for (var y = -1; y <= 1; y += 1) {
         for (var x = -1; x <= 1; x += 1) {
             let at = clamp(pixel + vec2<i32>(x, y), vec2<i32>(0), last);
             let color = to_ycocg(max(textureLoad(scene, at, 0).rgb, vec3<f32>(0.0)));
             low = min(low, color);
             high = max(high, color);
+            sum += color;
+            squares += color * color;
             let depth = textureLoad(depth_texture, at, 0);
             if depth < nearest_depth {
                 nearest_depth = depth;
@@ -126,6 +136,17 @@ fn fs_taa(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     }
     if temporal.settings.x == 0.0 {
         return vec4<f32>(current, 1.0);
+    }
+    let probe = u32(temporal.noise.y);
+    if (probe & TAA_PROBE_CLIP) != 0u {
+        // Within one spread of the mean of the colors around the pixel.
+        let mean = sum / 9.0;
+        let spread = sqrt(max(squares / 9.0 - mean * mean, vec3<f32>(0.0)));
+        low = max(low, mean - spread);
+        high = min(high, mean + spread);
+    }
+    if (probe & TAA_PROBE_OWN) != 0u {
+        nearest = pixel;
     }
     let moved = textureLoad(motion, nearest, 0).xy;
     let uv = (position.xy) * temporal.size.zw;
@@ -139,7 +160,13 @@ fn fs_taa(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let moved_before = textureLoad(previous_motion, previous_pixel, 0).xy;
     let difference = length((moved - moved_before) * temporal.size.xy);
     let kept = 1.0 - saturate((difference - 0.5) / 1.5);
-    var past = max(textureSampleLevel(history, history_sampler, was, 0.0).rgb, vec3<f32>(0.0));
+    // Read through the spline, as the upscaling path reads it: between
+    // pixels a plain blend of the four around softened the picture a
+    // little more every frame the camera moved.
+    var past = history_at(was);
+    if (probe & TAA_PROBE_SOFT) != 0u {
+        past = max(textureSampleLevel(history, history_sampler, was, 0.0).rgb, vec3<f32>(0.0));
+    }
     past = from_ycocg(clamp(to_ycocg(past), low, high));
     let share = mix(1.0, temporal.settings.y, kept);
     let current_weight = share * blend_weight(current);
