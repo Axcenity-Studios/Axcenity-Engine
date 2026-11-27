@@ -348,19 +348,127 @@ fn taa_smooths_edges_and_thin_geometry_over_frames() {
 
 #[test]
 fn taa_leaves_no_ghost_behind_a_moving_part() {
-    leaves_no_ghost(1.0, 2.0);
+    leaves_no_ghost(1.0, 2.0, |_| 0.0);
 }
 
 /// G9 stage 2: TAA that upscales (from half the size) leaves none either.
 /// Its edges are softer, so more round the part is left out.
 #[test]
 fn upscaling_taa_leaves_no_ghost_behind_a_moving_part() {
-    leaves_no_ghost(0.5, 4.0);
+    leaves_no_ghost(0.5, 4.0, |_| 0.0);
+}
+
+/// Nor while the camera turns by a different amount each frame: the
+/// history is kept through the camera's own changes of pace
+/// (`taa_keeps_its_history_while_the_camera_turns_unevenly`), and still
+/// dropped where the part uncovered the wall.
+#[test]
+fn taa_leaves_no_ghost_behind_a_moving_part_while_the_camera_turns_unevenly() {
+    leaves_no_ghost(1.0, 2.0, uneven_yaw);
+    leaves_no_ghost(0.5, 4.0, uneven_yaw);
+}
+
+/// What a moving part uncovers starts again from the frame as drawn. A
+/// grey part crosses a wall of dark and light stripes four pixels wide:
+/// grey is among the colors round every pixel at a stripe's edge, so
+/// holding the history to those colors lets the part's grey through, and
+/// only the history's being dropped where the motion differs from last
+/// frame's keeps the stripes it uncovers from being washed grey. (The
+/// plain wall of `leaves_no_ghost` shows no ghost either way.) With the
+/// camera still, and turning by a different amount each frame, where the
+/// camera's own change of pace must not be taken for the part's.
+#[test]
+fn taa_drops_the_history_of_what_a_moving_part_uncovers() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let stripes = super::card_set::Made::shared(0x057a_19e5, 64, |x, _| {
+        let value = if (x / 2).is_multiple_of(2) { 235 } else { 40 };
+        [value, value, value, 255]
+    });
+    let mut board = card(
+        [1.0; 3],
+        Vec3::new(0.0, 0.0, -8.0),
+        Vec3::new(12.0, 12.0, 0.1),
+        1,
+    );
+    board.material.base_color_texture = Some(stripes);
+    let graphics = settings(AntiAliasing::Taa, MotionBlurQuality::Off);
+    for (name, yaw) in [
+        ("still", (|_| 0.0) as fn(u32) -> f32),
+        ("uneven", uneven_yaw),
+    ] {
+        // The part moves a third of a stud (about 6 pixels) a frame.
+        let part = |frame: u32| {
+            let x = -3.0 + frame as f32 / 3.0;
+            card(
+                [0.54; 3],
+                Vec3::new(x, 0.0, -5.0),
+                Vec3::new(1.5, 1.5, 0.1),
+                2,
+            )
+        };
+        let at = |frame: u32, with_part: bool| {
+            let mut items = vec![board.clone()];
+            if with_part {
+                items.push(part(frame));
+            }
+            let mut list = list_of(items);
+            let yaw = yaw(frame);
+            list.camera.look_at = list.camera.position + Vec3::new(-yaw.sin(), 0.0, -yaw.cos());
+            list
+        };
+        let frames = 13;
+        let mut taa = renderer(&device, &queue, &graphics);
+        let mut ours = Vec::new();
+        for frame in 0..frames {
+            ours = draw(&mut taa, &at(frame, true));
+        }
+        // The stripes alone from the same view, settled.
+        let last = at(frames - 1, true);
+        let mut alone = renderer(&device, &queue, &graphics);
+        let mut theirs = Vec::new();
+        for _ in 0..48 {
+            theirs = draw(&mut alone, &at(frames - 1, false));
+        }
+        // Where the part was two frames ago, clear of where it is now.
+        let now = screen_box(&last, &[&last.items[1]], 3.0);
+        let was = at(frames - 3, true);
+        let mut trail = screen_box(&last, &[&was.items[1]], 0.0);
+        trail[2] = trail[2].min(now[0] - 1);
+        assert!(trail[0] + 6 < trail[2], "{name}: a trail to look at");
+        let mut apart = 0.0;
+        let mut pixels = 0.0;
+        for y in trail[1] + 2..trail[3] - 2 {
+            for x in trail[0]..=trail[2] {
+                apart += f32::from(pixel(&ours, x, y)[0].abs_diff(pixel(&theirs, x, y)[0]));
+                pixels += 1.0;
+            }
+        }
+        let apart = apart / pixels;
+        eprintln!("{name}: the uncovered stripes are {apart:.1} levels from the stripes alone");
+        assert!(
+            apart < 22.0,
+            "{name}: the stripes the part uncovered are {apart} levels off, washed by its grey"
+        );
+    }
+}
+
+/// The camera's yaw at `frame`, in radians, turning there and back by a
+/// different amount each frame: 2.9 pixels, 0.2, then both back (91 pixels
+/// a radian here), so each frame's motion is about 3 pixels from the last
+/// one's and the view stays within 3 pixels of straight ahead.
+fn uneven_yaw(frame: u32) -> f32 {
+    const STEPS: [f32; 4] = [2.9, 0.2, -2.9, -0.2];
+    let turned: f32 = (0..frame).map(|at| STEPS[at as usize % 4]).sum();
+    turned / 91.4
 }
 
 /// A part crossing a wall with TAA at `render_scale`, against the wall drawn
-/// without TAA at full size, away from `margin` pixels round the part.
-fn leaves_no_ghost(render_scale: f32, margin: f32) {
+/// without TAA at full size, away from `margin` pixels round the part. The
+/// camera is turned `yaw(frame)` radians at each frame.
+fn leaves_no_ghost(render_scale: f32, margin: f32, yaw: fn(u32) -> f32) {
     let Some((device, queue)) = test_device() else {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
@@ -369,7 +477,10 @@ fn leaves_no_ghost(render_scale: f32, margin: f32) {
     // a frame.
     let at = |frame: u32| {
         let x = -3.0 + frame as f32 / 3.0;
-        list_of(vec![wall(-6.0), cube(Vec3::new(x, 0.0, -5.0), 1.5, 2)])
+        let mut list = list_of(vec![wall(-6.0), cube(Vec3::new(x, 0.0, -5.0), 1.5, 2)]);
+        let yaw = yaw(frame);
+        list.camera.look_at = list.camera.position + Vec3::new(-yaw.sin(), 0.0, -yaw.cos());
+        list
     };
     let mut taa = renderer(
         &device,
@@ -662,6 +773,62 @@ fn taa_keeps_a_turning_cameras_picture_close_to_the_settled_one() {
     assert!(
         apart < 9.0,
         "the turning picture is {apart} levels from the settled one"
+    );
+}
+
+/// A camera never turns by the same amount two frames running: a hand on
+/// a mouse doesn't, a frame that took longer moves it further, and it
+/// starts and stops. TAA dropped its history wherever this frame's motion
+/// was over half a pixel from last frame's, meant for what a moving part
+/// uncovers, so each such frame showed the whole picture as drawn, with no
+/// anti-aliasing and every per-pixel noise bare (in Desert Homestead a turn
+/// with steps 40% uneven read twice as sharp as a steady one, every frame).
+/// The camera's own change of pace is now left out of that comparison.
+#[test]
+fn taa_keeps_its_history_while_the_camera_turns_unevenly() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let checkers = super::card_set::Made::shared(0x7aa_c4ec, 64, |x, y| {
+        let light = (x / 2 + y / 2).is_multiple_of(2);
+        let value = if light { 235 } else { 40 };
+        [value, value, value, 255]
+    });
+    let mut board = card(
+        [1.0; 3],
+        Vec3::new(0.0, 0.0, -8.0),
+        Vec3::new(12.0, 12.0, 0.1),
+        1,
+    );
+    board.material.base_color_texture = Some(checkers);
+    let at = |frame: u32| {
+        let mut list = list_of(vec![board.clone()]);
+        let yaw = uneven_yaw(frame);
+        list.camera.look_at = Vec3::new(-yaw.sin(), 0.0, -yaw.cos());
+        list
+    };
+    let graphics = settings(AntiAliasing::Taa, MotionBlurQuality::Off);
+    let mut renderer = renderer(&device, &queue, &graphics);
+    let mut moving = Vec::new();
+    for frame in 0..=41 {
+        moving = draw(&mut renderer, &at(frame));
+    }
+    let mut settled = Vec::new();
+    for _ in 0..48 {
+        settled = draw(&mut renderer, &at(41));
+    }
+    let middle = SIZE / 4..SIZE * 3 / 4;
+    let apart = middle
+        .clone()
+        .flat_map(|y| middle.clone().map(move |x| (x, y)))
+        .map(|(x, y)| f32::from(pixel(&moving, x, y)[0].abs_diff(pixel(&settled, x, y)[0])))
+        .sum::<f32>()
+        / (SIZE * SIZE / 4) as f32;
+    eprintln!("turning unevenly against settled: {apart:.2} levels");
+    assert!(
+        apart < 9.0,
+        "the unevenly turning picture is {apart} levels from the settled one"
     );
 }
 

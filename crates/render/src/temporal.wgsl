@@ -10,7 +10,8 @@
 // each pixel was. History that doesn't fit what's around the pixel now is
 // pulled into the colors around it, and history from a pixel that moved
 // differently (something uncovered) is dropped, so moving parts leave no
-// ghosts.
+// ghosts. The camera changing its own pace moves every pixel differently
+// at once and is left out of that (`camera_change`).
 //
 // Below 100% render scale TAA upscales too (`fs_taau`): drawn at the
 // output's size, each output pixel gathers the scene's jittered samples
@@ -48,6 +49,9 @@ struct Temporal {
     // x, y: this frame's jitter in the scene's pixels; z: 1 while TAA
     // upscales.
     jitter: vec4<f32>,
+    // The view of the frame before last, without the jitter
+    // (`camera_change`).
+    before_view_proj: mat4x4<f32>,
 }
 
 @group(0) @binding(0) var<uniform> temporal: Temporal;
@@ -87,6 +91,28 @@ fn fs_camera_motion(@builtin(position) position: vec4<f32>) -> @location(0) vec4
 const TAA_PROBE_CLIP: u32 = 1u;
 const TAA_PROBE_SOFT: u32 = 2u;
 const TAA_PROBE_OWN: u32 = 4u;
+const TAA_PROBE_JUMPY: u32 = 8u;
+
+// How much the camera alone changed the motion of the still surface at the
+// scene's pixel `at` and `depth` since last frame, in texture coordinates:
+// its motion now less its motion then. Nothing while the camera stands
+// still or keeps its pace; a turn that starts, stops, or goes on by a
+// different amount each frame (a hand on a mouse, a frame that took
+// longer) changes every pixel's motion at once, and that is no sign of
+// anything uncovered.
+fn camera_change(at: vec2<i32>, depth: f32) -> vec2<f32> {
+    if (u32(temporal.noise.y) & TAA_PROBE_JUMPY) != 0u {
+        return vec2<f32>(0.0);
+    }
+    let uv = (vec2<f32>(at) + 0.5) * temporal.size.zw;
+    let ndc = vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
+    let world = temporal.inv_view_proj * ndc;
+    let point = vec4<f32>(world.xyz / world.w, 1.0);
+    let now = clip_to_uv(temporal.view_proj * point);
+    let last = clip_to_uv(temporal.previous_view_proj * point);
+    let before = clip_to_uv(temporal.before_view_proj * point);
+    return (now - last) - (last - before);
+}
 
 fn to_ycocg(c: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(
@@ -155,10 +181,12 @@ fn fs_taa(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
         return vec4<f32>(current, 1.0);
     }
     // History from a pixel that moved differently last frame belongs to
-    // something else (what's now uncovered was behind it): drop it.
+    // something else (what's now uncovered was behind it): drop it. The
+    // camera's own change of pace is not such a difference.
     let previous_pixel = clamp(vec2<i32>(was * temporal.size.xy), vec2<i32>(0), last);
     let moved_before = textureLoad(previous_motion, previous_pixel, 0).xy;
-    let difference = length((moved - moved_before) * temporal.size.xy);
+    let change = moved - moved_before - camera_change(nearest, nearest_depth);
+    let difference = length(change * temporal.size.xy);
     let kept = 1.0 - saturate((difference - 0.5) / 1.5);
     // Read through the spline, as the upscaling path reads it: between
     // pixels a plain blend of the four around softened the picture a
@@ -272,7 +300,8 @@ fn fs_taau(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     }
     let previous_pixel = clamp(vec2<i32>(was * temporal.size.xy), vec2<i32>(0), last);
     let moved_before = textureLoad(previous_motion, previous_pixel, 0).xy;
-    let difference = length((moved - moved_before) * temporal.size.xy);
+    let change = moved - moved_before - camera_change(nearest, nearest_depth);
+    let difference = length(change * temporal.size.xy);
     let kept = 1.0 - saturate((difference - 0.5) / 1.5);
     let past = from_ycocg(clamp(to_ycocg(history_at(was)), low, high));
     // Each output pixel has a sample of its own only now and then: this

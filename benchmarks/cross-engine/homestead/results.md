@@ -586,6 +586,71 @@ The runs' ranges are within 1% of their medians, one run excepted (the hero's th
 
 **Not run**: the larger window, the tour, Unity again (its port still ends shadows at 35%), DirectX 12 or another card, the regression check (`axcenity-bench-check`). Tests run: `cargo test -p axcenity-render` (507 passed), the `ui` and `core` crates' library tests, `cargo clippy --workspace --all-targets -- -D warnings`.
 
+## The idle editor, a swaying shadow on still ground, and the camera changing pace (2026-11-26, fifth session)
+
+The owner's brief: check how the editor's 30 frames a second while idle meets camera movement, wind and every ray traced effect at once (ray traced shadows, ambient occlusion, reflections, real-time GI) at the editor's 998 × 405; make sure input wakes it without a late frame, which would show as a jump in what TAA has gathered; and find whether swaying plants' shadows on still ground trail or warp while standing in the wind, before changing any filter. Same machine. Pictures are from the still tool at the editor's saved graphics settings (`target/cross-engine/homestead/step5/graphics/editor.json`), 998 × 405; the editor itself was timed in its debug build (the one the owner runs) on a copy of the project with scratch settings.
+
+### The editor has no 30 frames a second to wake from
+
+`AXCENITY_WAKE_LOG=3` (new; [docs/benchmarks.md](../../../docs/benchmarks.md)) prints every frame of an untouched editor, how long after the last it came and which lines of code asked for it, and every three seconds wakes the editor as an input event would.
+
+| The project copy | Frames while nobody touches it | Asked for by | A woken frame, after it was asked for |
+|---|---|---|---|
+| As it is | 18.4 ms apart (54 a second; 1 in 100 over 20.4, the longest 24.5, of 2,056) | the particles, every frame (`viewport.rs`, "Particles keep moving"), and the scenery's timer | median 6.8 ms, at most 18.0 |
+| Its two dust emitters removed | 18.3 ms apart (the longest 22.5 of 2,605) | the scenery's timer alone | median 4.6 ms, at most 14.8 |
+| And the wind stopped | 15.9 ms apart | the scenery's timer (the clouds drift) | 0.0 to 13.8 ms |
+
+1. **The pace meant to be 30 a second is 55 to 60.** `viewport::shader_time` asks for the next frame a thirtieth of a second on; egui takes its guess at a frame's length, a sixtieth, off every such wait (`Context::request_repaint_after`), so the frame comes 16.7 ms after it was asked for. In the debug editor Desert Homestead with every ray traced effect draws in 18.3 ms, so the editor simply draws as fast as it can, touched or not.
+2. **Particles ask for every frame**, so a project with an emitter in view never had the slower pace even in intent.
+3. **Input is taken by the next frame.** A woken frame came a median 5 to 7 ms after it was asked for and never more than one frame; the frame it woke was as long as any other (18.0 to 20.8 ms). eframe replaces a pending timed repaint with one now when a window event arrives (`handle_event_result`), and `keep_frames_steady` counts any event, a held key or a held button as input. A view cube swing and a held fly key ask for the next frame themselves. Nothing here arrives a frame or two late.
+4. **Were the pace really 30, the picture would not jump on waking.** Two sequences, standing still in the wind at a thirtieth and at a ninetieth of a second a frame and then turning at a ninetieth, with the same clock, camera and jitter from the first moving frame on, are 0.80 levels apart before the turn and 0.84 at its first frame (the clouds, which gather over frames, are all of it).
+
+Not changed: the pace itself. Making it a real 30 would spare the GPU as the code means to, and coarsen the sway of an untouched editor; it is in [the wiki's limitations](../../../wiki/Roadmap/Known-Limitations.md) for the owner to decide.
+
+### A swaying shadow on still ground does not trail
+
+Standing still for 150 frames with the wind on, then the clock stopped for 50: the last windy frame against the settled picture of the same moment, in levels of 255 (mean; the share of pixels more than 8 apart). "Floor" is two settled frames against each other, which TAA's jitter alone makes differ. "Ground" is the pixels no plant ever covers (from a sequence drawn without shadows or anti-aliasing), so only light and shadow can change there.
+
+| Drawn with | View | Whole picture, 30 a second | 90 a second | Floor | Ground, 30 a second | 90 a second | Floor |
+|---|---|---|---|---|---|---|---|
+| Every ray traced effect, no anti-aliasing | all three | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| Every ray traced effect, TAA | hero | 1.14 (1.2%) | 0.99 (0.9%) | 0.81 (0.4%) | 1.02 (0.50%) | 1.00 (0.49%) | 0.91 (0.28%) |
+| | crane | 1.16 (1.0%) | 1.08 (0.9%) | 0.87 (0.3%) | 0.86 (0.27%) | 0.86 (0.26%) | 0.81 (0.14%) |
+| | a bush from 10 studs | 1.15 (0.9%) | 1.09 (0.8%) | 0.95 (0.3%) | 0.97 (0.04%) | 0.96 (0.04%) | 0.91 (0.03%) |
+| Shadow maps, TAA | hero | 1.19 (1.5%) | 1.03 (1.2%) | 0.84 (0.4%) | 1.05 (0.73%) | 1.03 (0.71%) | 0.94 (0.34%) |
+| | crane | 1.22 (1.3%) | 1.13 (1.2%) | 0.91 (0.3%) | 0.92 (0.55%) | 0.91 (0.53%) | 0.84 (0.18%) |
+| | a bush from 10 studs | 1.20 (1.3%) | 1.13 (1.0%) | 0.98 (0.4%) | 0.99 (0.17%) | 0.98 (0.13%) | 0.93 (0.05%) |
+| Every ray traced effect, TAA, four times the wind | a bush from 10 studs | | | | 1.05 (0.22%) | 1.00 (0.09%) | 0.91 (0.03%) |
+| Shadow maps, TAA, four times the wind | a bush from 10 studs | | | | 1.07 (0.38%) | 1.01 (0.23%) | 0.92 (0.04%) |
+
+1. **Nothing in the ray traced effects keeps anything from one frame to the next.** Without anti-aliasing a windy frame is the settled picture of its moment to one level, with ray traced shadows, ambient occlusion, reflections and GI all on. There is no filter over time in them to trail (the fog's and the clouds' gathering apart); what follows the wind late can only be TAA.
+2. **On the ground TAA is within a tenth of a level of its own floor**, at either pace, and the ray traced picture is nearer its floor than the shadow maps' is. Two to three in a thousand ground pixels are more than 8 levels off for the wind's sake, and they sit round the plants' feet and thin stems, not in the shadows (`step5/editor-hero-30-where.png`, `bush-w4-worst-ground.png`).
+3. **Only at four times the wind does the pace show**: 0.22% of ground pixels at 30 a second against 0.09% at 90, none over 41 levels. That is TAA following a shadow edge over its ten frames, and too little to see.
+4. The settings' real-time GI changed no pixel of these views, and ray traced reflections 0.2% of them by at most 6 levels: the picture is its shadows and ambient occlusion.
+
+So no change to any filter for this. The warping the owner sees round plant shadows is not the shadows trailing while he stands still.
+
+### The camera changing pace threw TAA's history away: mended
+
+Found while measuring the wake. TAA drops a pixel's history where its motion differs from last frame's by more than two pixels, meant for what a moving part uncovers. A camera that starts to turn, stops, or turns by a different amount each frame changes every pixel's motion at once, so the whole picture started again from one frame as drawn: no anti-aliasing, and every per-pixel noise bare (ray traced shadows' and ambient occlusion's lean on TAA most). The sequences of the fourth session turned by exactly the same amount every frame, which is the one motion that never showed it.
+
+Sharpness of each frame (the mean size of the Laplacian below the sky; the settled picture reads 20, the picture without anti-aliasing 26.5), the bush view turning 0.4° a frame, every ray traced effect on:
+
+| Sequence | As it was | Now |
+|---|---|---|
+| A steady turn | 11.5 to 11.9 every frame | the same (within 0.02 levels a pixel) |
+| The first frames of a turn, from standing still | 26.8, 20.5, 17.8, 16.3, 15.0 … 11.7 after twenty | 16.8, 15.6, 14.4, 13.9, 13.4 … 11.7 |
+| One frame three times as long, in a steady turn | 27.4, 27.4, 20.6, 18.0, 16.1 … fourteen frames to settle | 11.7, 11.8, 11.6: no mark |
+| Each step 40% uneven (a hand on a mouse) | 20 to 25 every frame, changing frame to frame | 11.3 to 11.8 every frame |
+
+Shadow maps read within 1 of these in every row: this was in both kinds of shadow. The owner's editor draws Desert Homestead at 54 frames a second with 1 frame in 100 over a tenth longer than the rest, under a mouse; it was in the uneven row whenever he turned. **This is the likeliest source of the shimmer he sees in motion**, and of its being worse with ray traced shadows, whose one ray a pixel is noise until TAA has gathered it. It is for him to say whether it is gone.
+
+The mend (`camera_change` in temporal.wgsl; [docs/rendering/temporal.md](../../../docs/rendering/temporal.md)): the camera's own change of a still surface's motion, from this frame's view and the two before it, is taken out of the difference. With the camera still or keeping its pace it is nothing, so a still view is the same pixel for pixel. `AXCENITY_TAA_PROBE=jumpy` is the rule as it was (the same pictures exactly, 0 of 404,190 pixels in nine frames compared). The plain-wall ghost tests turned out to pass with the rule removed altogether, so `taa_drops_the_history_of_what_a_moving_part_uncovers` was added first: a grey part over stripes, 12 levels off the stripes alone with the camera still and 15 with it turning unevenly, 37 with the history never dropped.
+
+**What it costs**: 0.004 ms. Post-processing, which TAA is timed in, is 0.179 ms in the hero view and 0.184 in the crane view at 1920 × 1080 with it and 0.175 and 0.180 with `jumpy`, two runs each on the one build; the frame rates are 194.9 and 200.2 against 194.6 and 199.7, inside what two runs differ by.
+
+**Not run**: the other four views, the tour, upscaling TAA in Desert Homestead (its tests pass), a release editor, another machine. Tests run: `cargo test -p axcenity-render` (510 passed), `cargo clippy --workspace --all-targets -- -D warnings`. The editor crate's tests were not run.
+
 ## Shadow views by mesh, lamp faces kept, and the porch lamp's lantern (2026-11-26, seventh session)
 
 The sixth session's diagnosis of the owner's Profiler reading at dusk (10,607 draw calls, Shadows 4.10 ms, "z-fighting" on the front door) found three engine causes; the owner asked for all three to be fixed, with the picture kept where it should be. Everything here is from the still tool (`crate-s4`, `SHOT_COUNTS=1`) at 1920 × 1080, the owner's Ultra with TAA (`owner-ultra.json`; ray traced: `owner-rt-all.json`), the eight views of `step6/door-maps` (front, oblique, grazing and yard, by day and at dusk with the six lamps lit as `homestead.server.lua` lights them). Both builds drew a frozen copy of the project (the owner was saving it meanwhile, which made the first comparison wrong); "before" is the same engine built from a worktree at `7956a6b7` with the fifth session's changes. GPU and CPU times are one run each, the CPU's the mean of frames 8 to 31.

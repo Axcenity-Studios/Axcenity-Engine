@@ -119,6 +119,7 @@ mod update_install;
 mod updates;
 mod version_history;
 mod viewport_bar;
+mod wake_log;
 mod welcome;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -325,6 +326,8 @@ pub struct EditorApp {
     /// Whether a frame waits for the display to show the last one before
     /// it starts (see [`EditorApp::pace_display`]).
     display_pace: DisplayPace,
+    /// `AXCENITY_WAKE_LOG`: timed wakes from the idle pace, each frame logged.
+    wake_log: Option<wake_log::WakeLog>,
     /// The parts the viewport drag under way has moved, for Join Surfaces.
     dragged_parts: Vec<InstanceId>,
     /// The game, while Play is on. `world` stays as it was before Play.
@@ -1097,6 +1100,7 @@ impl EditorApp {
             frame_pace: None,
             next_present: None,
             display_pace: DisplayPace::default(),
+            wake_log: wake_log::WakeLog::from_env(),
             dragged_parts: Vec::new(),
             play: None,
             play_settings: PlaySettings::default(),
@@ -1381,6 +1385,9 @@ impl eframe::App for EditorApp {
     /// Takes the keys that move the game UI's focus during Play before
     /// egui sees them, so Tab and the arrows don't move egui's own focus.
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        if let Some(log) = &mut self.wake_log {
+            log.before_frame(ctx, raw_input);
+        }
         // First, so keys chosen from the macOS menu bar reach Play's too.
         self.take_native_menu_input(raw_input);
         self.take_nav_keys(ctx, raw_input);

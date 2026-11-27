@@ -78,6 +78,10 @@ pub(super) struct TemporalUniform {
     output: [f32; 4],
     /// This frame's jitter in the scene's pixels, and 1 while TAA upscales.
     jitter: [f32; 4],
+    /// The view of the frame before last, without the jitter: with the
+    /// other two it says how the camera's own motion changed
+    /// (`camera_change` in temporal.wgsl).
+    before_view_proj: [[f32; 4]; 4],
 }
 
 /// A moved item as the motion pass reads it. Must match `MotionIn` in
@@ -170,6 +174,8 @@ pub(super) struct History {
     frame: u64,
     /// Last frame's view, without the jitter.
     view_proj: Option<Mat4>,
+    /// The view of the frame before that.
+    before: Option<Mat4>,
     /// Last frame's clock and wind, as `Frame::clock` has them.
     clock: Option<[f32; 4]>,
     /// Each item's transform last frame, by its ID.
@@ -895,7 +901,7 @@ impl History {
         posed: HashMap<(u64, MeshKey), u32>,
         taa: bool,
     ) {
-        self.view_proj = Some(view_proj);
+        self.before = self.view_proj.replace(view_proj);
         self.clock = Some(clock);
         self.models.clear();
         for item in list.items.iter().filter(|item| item.id != 0) {
@@ -920,8 +926,10 @@ fn in_prepass(item: &DrawItem) -> bool {
 /// around the pixel, not only their lowest and highest), `soft` (last
 /// frame read as a plain blend of four pixels, as it was until 2026-11-26,
 /// not through the Catmull-Rom filter), `own`
-/// (each pixel's own motion, not the nearest surface's around it) and
-/// `share=<0 to 1>` (this frame's share of the blend). Nothing set draws as
+/// (each pixel's own motion, not the nearest surface's around it), `jumpy`
+/// (history dropped wherever a pixel's motion differs from last frame's,
+/// the camera's own changes of pace included, as it was until 2026-11-26)
+/// and `share=<0 to 1>` (this frame's share of the blend). Nothing set draws as
 /// always (`docs/rendering/temporal.md`).
 #[derive(Clone, Copy, Default)]
 struct TaaProbe {
@@ -940,6 +948,7 @@ fn taa_probe() -> TaaProbe {
                 "clip" => probe.flags |= 1,
                 "soft" => probe.flags |= 2,
                 "own" => probe.flags |= 4,
+                "jumpy" => probe.flags |= 8,
                 _ => {
                     if let Some(share) = part.strip_prefix("share=") {
                         probe.share = share.parse().ok().map(|s: f32| s.clamp(0.01, 1.0));
@@ -1010,6 +1019,13 @@ impl TemporalPasses {
                 f32::from(u8::from(upscaled_to.is_some())),
                 0.0,
             ],
+            // With no frame before last, the camera is taken to have
+            // stood still until last frame.
+            before_view_proj: history
+                .before
+                .or(history.view_proj)
+                .unwrap_or(view_proj)
+                .to_cols_array_2d(),
         };
         queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(&uniform));
         if moved.instances.len() > self.instance_capacity {

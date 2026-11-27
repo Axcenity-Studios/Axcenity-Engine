@@ -2022,7 +2022,10 @@ pub fn shader_time(ui: &egui::Ui, list: &axcenity_render::DrawList) -> f32 {
         // Swaying plants and drifting clouds don't need every frame the
         // display can show: while nobody touches the editor they're drawn
         // at `SCENERY_FPS`, sparing the GPU. Input brings full-rate frames
-        // back (`EditorApp::keep_frames_steady`).
+        // back (`EditorApp::keep_frames_steady`). As measured (2026-11-26,
+        // `AXCENITY_WAKE_LOG`) they come at 55 to 60 a second, not 30: egui
+        // takes its guess at a frame's length, a sixtieth of a second, off
+        // the wait (`docs/editor/shell.md`).
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_secs_f32(1.0 / SCENERY_FPS));
     }
