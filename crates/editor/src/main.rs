@@ -169,6 +169,28 @@ fn wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
     }
 }
 
+/// What `axcenity-editor --help` prints.
+fn usage() -> String {
+    format!(
+        "usage: axcenity-editor [<project folder>] [{host} | {join} <invite link>]\n\
+         \x20      axcenity-editor {studio}\n\
+         \x20      axcenity-editor {build} <project folder> <output folder> [--target windows|macos|linux]\n\
+         \x20      axcenity-editor {cook} <project folder>\n\
+         \x20      {movie}\n\
+         \x20      axcenity-editor {mcp} <project folder>   (an MCP server for AI clients)\n\
+         \x20      axcenity-editor --version [--json]\n\
+         example: cargo run -p axcenity-editor -- crates/samples/projects/touched\n\
+         With no folder the editor opens on the start screen.",
+        host = app::team::HOST_FLAG,
+        join = app::team::JOIN_FLAG,
+        studio = character_workspace::FLAG,
+        build = build_game::BUILD_FLAG,
+        cook = cooking::COOK_FLAG,
+        movie = movie::cli::USAGE.trim_start_matches("usage: "),
+        mcp = app::mcp::FLAG,
+    )
+}
+
 fn main() -> eframe::Result {
     axcenity_release::console::attach_parent_console();
     // `--version` (and `--version --json`): this build's version, channel,
@@ -179,6 +201,11 @@ fn main() -> eframe::Result {
         .collect();
     if let Some(text) = axcenity_release::version_flag("axcenity-editor", &all) {
         println!("{text}");
+        return Ok(());
+    }
+    // `--help` or `-h`: the ways to start the editor, then exit (QA-003).
+    if axcenity_release::help_flag(&all) {
+        println!("{}", usage());
         return Ok(());
     }
     // Same logging defaults as the player: warnings and errors, minus

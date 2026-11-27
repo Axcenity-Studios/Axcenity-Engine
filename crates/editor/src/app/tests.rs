@@ -1096,6 +1096,28 @@ fn a_folder_that_fails_to_open_in_the_background_is_reported() {
     assert!(line.text.contains("axcenity.json"), "{}", line.text);
 }
 
+/// QA-011: opening the folder the projects are kept in, rather than one
+/// of them, says so and names the projects inside.
+#[test]
+fn opening_a_folder_of_projects_names_the_projects_inside() {
+    let folder = temp_project("folder-of-projects", &[]);
+    for name in ["Alpha", "Beta"] {
+        std::fs::create_dir_all(folder.join(name)).unwrap();
+        std::fs::write(folder.join(name).join("axcenity.json"), "{}").unwrap();
+    }
+    let app = EditorApp::new(Some(&folder));
+    assert!(app.project.is_none());
+    let line = last_line(&app);
+    assert_eq!(line.kind, OutputKind::Error);
+    assert!(
+        line.text.contains("isn't an Axcenity project")
+            && line.text.contains("`Alpha` and `Beta`"),
+        "{}",
+        line.text
+    );
+    let _ = std::fs::remove_dir_all(folder);
+}
+
 #[test]
 fn a_missing_project_folder_is_reported_in_output() {
     let app = EditorApp::new(Some(&example("no-such-project")));

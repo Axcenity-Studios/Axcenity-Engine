@@ -127,6 +127,13 @@ pub fn version_flag(program: &str, args: &[String]) -> Option<String> {
     })
 }
 
+/// Whether `args` (without the program's own name) ask for help: `--help`
+/// or `-h`. Every program prints its usage then and exits with success,
+/// rather than treating the flag as an unknown option or a project folder.
+pub fn help_flag(args: &[String]) -> bool {
+    args.iter().any(|a| a == "--help" || a == "-h")
+}
+
 /// Days since 1970 to a civil date (proleptic Gregorian), so no date crate
 /// is needed. Howard Hinnant's `civil_from_days`.
 pub(crate) fn day_of(seconds: u64) -> String {
@@ -183,6 +190,15 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["version"], env!("CARGO_PKG_VERSION"));
         assert_eq!(value["kind"], "local");
+    }
+
+    #[test]
+    fn help_flag_answers_only_when_asked() {
+        let args = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(!help_flag(&args(&["crates/samples/projects/part"])));
+        assert!(!help_flag(&args(&[])));
+        assert!(help_flag(&args(&["--help"])));
+        assert!(help_flag(&args(&["-h"])));
     }
 
     #[test]

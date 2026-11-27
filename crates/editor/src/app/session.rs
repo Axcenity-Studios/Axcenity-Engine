@@ -196,10 +196,35 @@ impl EditorApp {
         ctx.request_repaint();
     }
     pub(super) fn open_failed(&mut self, folder: &Path, err: &str) {
-        self.output.error(format!(
-            "Could not open the project in `{}`: {err}",
-            folder.display()
-        ));
+        let shown = folder.display();
+        // The usual mistakes, said plainly (QA-011): a folder that isn't
+        // there, or one that isn't a project, such as the folder the
+        // projects are kept in.
+        let text = if !folder.exists() {
+            format!(
+                "Could not open the project in `{shown}`: that folder isn't there (moved, \
+                 renamed or deleted?), so there's no axcenity.json to open."
+            )
+        } else if folder.is_dir() && !folder.join(axcenity_project::MANIFEST_FILE).exists() {
+            let inside = projects_inside(folder);
+            let hint = if inside.is_empty() {
+                "Open the project's own folder, the one with axcenity.json in it, or make one \
+                 with New Project."
+                    .to_owned()
+            } else {
+                format!(
+                    "It holds {}: open one of those.",
+                    quoted_list(&inside.iter().map(String::as_str).collect::<Vec<_>>())
+                )
+            };
+            format!(
+                "Could not open the project in `{shown}`: it isn't an Axcenity project (there's \
+                 no axcenity.json in it). {hint}"
+            )
+        } else {
+            format!("Could not open the project in `{shown}`: {err}")
+        };
+        self.output.error(text);
     }
     /// Opens `project`, read with its models and textures into `assets`.
     pub(super) fn open_loaded(
@@ -1585,4 +1610,20 @@ fn finishing_area(rect: egui::Rect) -> egui::Area {
         .fixed_pos(rect.min)
         .constrain(false)
         .fade_in(false)
+}
+
+/// The projects directly inside `folder` (folders with an `axcenity.json`),
+/// by name, at most five.
+fn projects_inside(folder: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().join(axcenity_project::MANIFEST_FILE).is_file())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names.truncate(5);
+    names
 }

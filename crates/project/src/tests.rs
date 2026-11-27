@@ -257,7 +257,12 @@ fn every_template_makes_a_project_that_loads_cleanly() {
         match template {
             Template::Empty => assert_eq!(parts, 0),
             Template::Baseplate => {
-                assert_eq!(parts, 1);
+                // The baseplate and the pad the character spawns on.
+                assert_eq!(parts, 2);
+                assert!(project
+                    .world
+                    .find_first_child(project.world.workspace(), "SpawnLocation")
+                    .is_some());
                 let plate = project
                     .world
                     .find_first_child(project.world.workspace(), "Baseplate")
