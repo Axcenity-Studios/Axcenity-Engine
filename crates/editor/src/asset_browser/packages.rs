@@ -6,6 +6,10 @@
 //! else, so the panel shows them as one folder tile named after the model,
 //! which opens to show them. A search still finds each file on its own.
 //!
+//! Inserting a character does the same in `assets/characters/<family>/`:
+//! its body, hair, clothing, skins and their pictures. Each family is one
+//! folder tile too ("Human character").
+//!
 //! This module decides what's in each folder and what the grid shows
 //! ([`shown`]), and draws the folder tile and the row above an open folder.
 
@@ -21,6 +25,7 @@ use crate::widgets;
 
 const MODELS: &str = "assets/models/";
 const ANIMATIONS: &str = "assets/animations/";
+const CHARACTERS: &str = "assets/characters/";
 
 /// The files of one imported model.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,6 +37,11 @@ pub struct Package {
     /// Every file in it: models, then state machines and clips, then
     /// textures, each in path order.
     pub members: Vec<AssetEntry>,
+    /// A character family's files from the character library
+    /// (`assets/characters/<family>/`), not an imported model's. Its
+    /// "model" is the body's parts, which isn't placed on its own, so its
+    /// tile isn't dragged, deleted or made global.
+    pub character: bool,
 }
 
 impl Package {
@@ -71,6 +81,46 @@ impl Package {
     pub fn holds(&self, entry: &AssetEntry) -> bool {
         self.members.iter().any(|member| member.path == entry.path)
     }
+
+    /// True if the project folder `dir` (`assets/...`, `/` between
+    /// folders) is this package's or inside it, so the panel needn't offer
+    /// it as a folder of its own.
+    pub fn covers(&self, dir: &str) -> bool {
+        let dir = dir.to_lowercase();
+        let roots: Vec<String> = if self.character {
+            match character_family(&self.model.path) {
+                Some(family) => vec![format!("{CHARACTERS}{family}")],
+                None => Vec::new(),
+            }
+        } else {
+            let name = self.name.to_lowercase();
+            vec![format!("{MODELS}{name}"), format!("{ANIMATIONS}{name}")]
+        };
+        roots
+            .iter()
+            .any(|root| dir == *root || dir.starts_with(&format!("{root}/")))
+    }
+}
+
+/// The character family folder `path` is in, in lower case: `human` for
+/// `assets/characters/human/skins/young_asian_male.jpg`. None for a file
+/// right in `assets/characters` or outside it.
+fn character_family(path: &str) -> Option<String> {
+    let lower = path.to_lowercase();
+    let rest = lower.strip_prefix(CHARACTERS)?;
+    let (family, _) = rest.split_once('/')?;
+    Some(family.to_owned())
+}
+
+/// A character family's folder tile's name: `human` is "Human character".
+fn character_name(folder: &str) -> String {
+    let mut letters = folder.chars();
+    let first: String = letters
+        .next()
+        .into_iter()
+        .flat_map(char::to_uppercase)
+        .collect();
+    format!("{first}{} character", letters.as_str())
 }
 
 /// The package `path` (a file in the project) would belong to, by name in
@@ -78,6 +128,10 @@ impl Package {
 /// `assets/animations`, or for a model file right in `assets/models`, its
 /// own name.
 fn key(path: &str, kind: AssetKind) -> Option<String> {
+    // A character family's key can't be a model folder's: it has a `/`.
+    if let Some(family) = character_family(path) {
+        return Some(format!("characters/{family}"));
+    }
     let lower = path.to_lowercase();
     for root in [MODELS, ANIMATIONS] {
         if let Some(rest) = lower.strip_prefix(root) {
@@ -95,8 +149,10 @@ fn key(path: &str, kind: AssetKind) -> Option<String> {
 
 /// Groups `files` into packages: one per model in `assets/models` (in a
 /// folder of its own, or a file on its own), holding every file in its
-/// folder and in `assets/animations/<name>/`. Only packages of more than
-/// one file are made; a model on its own stays a plain tile.
+/// folder and in `assets/animations/<name>/`, and one per character family
+/// in `assets/characters/<family>/`, holding every file under it. Only
+/// packages of more than one file are made; a model on its own stays a
+/// plain tile.
 pub fn packages(files: &[AssetEntry]) -> Vec<Package> {
     let mut packages: Vec<(String, Package)> = Vec::new();
     for entry in files.iter().filter(|entry| entry.kind == AssetKind::Model) {
@@ -106,9 +162,15 @@ pub fn packages(files: &[AssetEntry]) -> Vec<Package> {
         if packages.iter().any(|(known, _)| *known == key) {
             continue;
         }
-        let name = match entry.path[MODELS.len()..].split_once('/') {
-            Some((folder, _)) => folder.to_owned(),
-            None => entry.name.clone(),
+        let character = entry.path.to_lowercase().starts_with(CHARACTERS);
+        let name = if character {
+            let rest = &entry.path[CHARACTERS.len()..];
+            character_name(rest.split_once('/').map_or(rest, |(folder, _)| folder))
+        } else {
+            match entry.path[MODELS.len()..].split_once('/') {
+                Some((folder, _)) => folder.to_owned(),
+                None => entry.name.clone(),
+            }
         };
         packages.push((
             key,
@@ -116,8 +178,26 @@ pub fn packages(files: &[AssetEntry]) -> Vec<Package> {
                 name,
                 model: entry.clone(),
                 members: Vec::new(),
+                character,
             },
         ));
+    }
+    // A character family's model is its body: a model right in its folder
+    // (`human/HumanParts.glb`) rather than the first hair or garment.
+    for entry in files.iter().filter(|entry| entry.kind == AssetKind::Model) {
+        let Some(family) = character_family(&entry.path) else {
+            continue;
+        };
+        let in_family_folder = entry.path[CHARACTERS.len()..].matches('/').count() == 1;
+        if !in_family_folder {
+            continue;
+        }
+        let key = format!("characters/{family}");
+        if let Some((_, package)) = packages.iter_mut().find(|(known, _)| *known == key)
+            && package.model.path[CHARACTERS.len()..].matches('/').count() > 1
+        {
+            package.model = entry.clone();
+        }
     }
     for entry in files {
         let Some(key) = key(&entry.path, entry.kind) else {
@@ -379,17 +459,25 @@ impl AssetBrowser {
         };
         let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
         let id = response.id;
-        let global = self.is_global(&package.model.path);
-        let response = response.on_hover_text(format!(
-            "{}\n{}, from one import.\nClick to open. Drag into the viewport to place the model.{}",
-            package.name,
-            package.summary(),
-            if global {
-                "\nGlobal asset: in every project."
-            } else {
-                ""
-            }
-        ));
+        let global = !package.character && self.is_global(&package.model.path);
+        let response = response.on_hover_text(if package.character {
+            format!(
+                "{}\n{}: the character library's body, hair, clothing and skins.\nClick to open.",
+                package.name,
+                package.summary(),
+            )
+        } else {
+            format!(
+                "{}\n{}, from one import.\nClick to open. Drag into the viewport to place the model.{}",
+                package.name,
+                package.summary(),
+                if global {
+                    "\nGlobal asset: in every project."
+                } else {
+                    ""
+                }
+            )
+        });
         let mut menu = None;
         let local = self.is_local(&package.model.path);
         let paths: Vec<String> = package
@@ -399,11 +487,15 @@ impl AssetBrowser {
             .map(|member| member.path.clone())
             .collect();
         response.context_menu(|ui| {
-            menu = self.global_checkbox(ui, &package.model.path);
+            if !package.character {
+                menu = self.global_checkbox(ui, &package.model.path);
+            }
             if local && let Some(chosen) = super::export_package_button(ui, &package.name, &paths) {
                 menu = Some(chosen);
             }
-            if !can_edit || !local {
+            // Characters wear what's in a family's folder, so it isn't
+            // deleted from here.
+            if !can_edit || !local || package.character {
                 return;
             }
             ui.separator();
@@ -414,7 +506,7 @@ impl AssetBrowser {
                 menu = Some(chosen);
             }
         });
-        if can_edit && response.drag_started() {
+        if can_edit && !package.character && response.drag_started() {
             egui::DragAndDrop::set_payload(ui.ctx(), AssetPayload(package.model.clone()));
         }
         let palette = theme::palette(ui.ctx());
@@ -461,11 +553,16 @@ impl AssetBrowser {
             egui::FontId::proportional(side * 0.6),
             color,
         );
-        // The model's icon on the folder, so it reads as "a model's files".
+        // The model's icon on the folder, so it reads as "a model's files"
+        // (a person's for a character's).
         painter.text(
             picture.center() + egui::vec2(0.0, side * 0.06),
             egui::Align2::CENTER_CENTER,
-            icons::CUBE_TRANSPARENT,
+            if package.character {
+                icons::PERSON
+            } else {
+                icons::CUBE_TRANSPARENT
+            },
             egui::FontId::proportional(side * 0.26),
             color,
         );
@@ -539,6 +636,7 @@ impl AssetBrowser {
         }
         // While dragged, the model's icon follows the mouse.
         if response.dragged()
+            && !package.character
             && let Some(pointer) = ui.ctx().pointer_latest_pos()
         {
             let layer = egui::LayerId::new(egui::Order::Tooltip, id.with("dragged"));
@@ -622,6 +720,71 @@ mod tests {
         // A model file on its own in assets/models, with clips of its name.
         assert_eq!(packages[0].members.len(), 2);
         assert_eq!(section(walking.members[1].kind), "Animation");
+    }
+
+    /// Inserting a character copies its family's body, hair, clothing and
+    /// skins into `assets/characters/<family>/`: one folder tile per
+    /// family, named so it can't be taken for a model folder of the same
+    /// name, whose model is the body.
+    #[test]
+    fn a_character_familys_files_are_one_package() {
+        let files: Vec<AssetEntry> = [
+            "assets/audio/ding.wav",
+            "assets/characters/human/HumanParts.glb",
+            "assets/characters/human/HumanRegions.png",
+            "assets/characters/human/hair/short02/HairShort02.glb",
+            "assets/characters/human/hair/short02/HairShort02.png",
+            "assets/characters/human/items/bandeau/Bandeau.cover.png",
+            "assets/characters/human/items/bandeau/Bandeau.glb",
+            "assets/characters/human/skins/young_asian_male.jpg",
+            "assets/characters/humanoid/HumanoidParts.glb",
+            "assets/characters/humanoid/HumanoidRegions.png",
+            "assets/models/Humanoid/Humanoid.glb",
+            "assets/models/Humanoid/HumanoidAnimations.glb",
+        ]
+        .iter()
+        .map(|path| entry(path))
+        .collect();
+        let packages = packages(&files);
+        let names: Vec<&str> = packages.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, ["Human character", "Humanoid", "Humanoid character"]);
+
+        let human = &packages[0];
+        assert!(human.character);
+        assert!(!packages[1].character);
+        assert_eq!(human.model.path, "assets/characters/human/HumanParts.glb");
+        assert_eq!(human.members.len(), 7);
+        assert_eq!(human.summary(), "3 models, 4 textures");
+        assert!(!human.holds(&files[0]));
+        assert_eq!(packages[2].members.len(), 2);
+
+        // Its folders, and the folders inside them, are the tile's.
+        assert!(human.covers("assets/characters/human"));
+        assert!(human.covers("assets/characters/Human/items/bandeau"));
+        assert!(!human.covers("assets/characters/humanoid"));
+        assert!(!human.covers("assets/characters"));
+        assert!(packages[1].covers("assets/models/Humanoid"));
+        assert!(packages[1].covers("assets/animations/humanoid"));
+        assert!(!packages[1].covers("assets/characters/humanoid"));
+
+        // The All grid: the three folders and the sound, nothing loose.
+        let shown: Vec<String> = shown(files.clone(), &packages, None, false)
+            .into_iter()
+            .flat_map(|block| block.items)
+            .map(|item| match item {
+                Shown::Asset(entry) => entry.name,
+                Shown::Folder(package) => format!("[{}]", package.name),
+            })
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                "[Human character]",
+                "[Humanoid]",
+                "[Humanoid character]",
+                "ding"
+            ]
+        );
     }
 
     /// An imported Hero (model, two textures, a clip and a state machine)
