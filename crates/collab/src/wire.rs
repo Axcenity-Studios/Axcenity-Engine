@@ -6,10 +6,17 @@
 //! A join snapshot carries every Instance under `game` (services included,
 //! server-only ones too: collaborators edit ServerScriptService) and every
 //! deleted one, each with the properties that differ from its class's
-//! defaults. Not yet: Terrain voxels, the string table and the other
-//! world-wide settings (later). Files (TC5) travel in pieces by hash.
+//! defaults, and each Terrain's landscape: heights, paint, painted
+//! foliage, holes, painted water and its generator settings (what the
+//! scatter rules place is made again on arrival). Without them a Terrain
+//! arrived flat, and the host's own editor, which joins its session
+//! through the same snapshot, lost its ground. Not yet: the string table
+//! and the other world-wide settings (later). Files (TC5) travel in pieces
+//! by hash.
 
-use axcenity_core::{ClassName, InstanceId, Value, World};
+use axcenity_core::{
+    ClassName, FoliageInstance, FoliageSource, InstanceId, PaintWeights, TerrainData, Value, World,
+};
 use axcenity_net::WireValue;
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +37,7 @@ use crate::project::{HostCard, MembersList};
 use crate::role::Role;
 
 /// The first byte of every message. Raise it when a message changes.
-pub const FORMAT: u8 = 10;
+pub const FORMAT: u8 = 11;
 
 /// Set in the first byte of a message whose postcard is zstd-packed (C11).
 const PACKED: u8 = 0x80;
@@ -419,6 +426,104 @@ struct WireWorld {
     instances: Vec<WireInstance>,
     /// Each deleted Instance: its ID, and its old parent and position.
     graveyard: Vec<(u64, u64, u64)>,
+    /// Each Terrain's landscape, by the Terrain's ID.
+    terrains: Vec<WireTerrain>,
+}
+
+/// One Terrain's landscape ([`TerrainData`]), row by row.
+#[derive(Serialize, Deserialize)]
+struct WireTerrain {
+    id: u64,
+    size_x: u32,
+    size_z: u32,
+    heights: Vec<f32>,
+    paint: Vec<PaintWeights>,
+    foliage: Vec<WireFoliage>,
+    holes: Vec<bool>,
+    water: Vec<f32>,
+    generation: Option<String>,
+}
+
+/// A painted plant, prop or model: its source as `foliage.json` and
+/// scatter rules write it ([`FoliageSource::entry`]).
+#[derive(Serialize, Deserialize)]
+struct WireFoliage {
+    source: String,
+    x: f32,
+    z: f32,
+    yaw: f32,
+    scale: f32,
+    collide: bool,
+    lean: f32,
+    sink: f32,
+    shadow: bool,
+}
+
+impl WireTerrain {
+    fn of(id: InstanceId, data: &TerrainData) -> WireTerrain {
+        let (size_x, size_z) = data.size();
+        WireTerrain {
+            id: id.to_bits(),
+            size_x: size_x as u32,
+            size_z: size_z as u32,
+            heights: data.heights().to_vec(),
+            paint: data.paint().to_vec(),
+            foliage: data
+                .foliage()
+                .iter()
+                .map(|f| WireFoliage {
+                    source: f.source.entry(),
+                    x: f.x,
+                    z: f.z,
+                    yaw: f.yaw,
+                    scale: f.scale,
+                    collide: f.collide,
+                    lean: f.lean,
+                    sink: f.sink,
+                    shadow: f.shadow,
+                })
+                .collect(),
+            holes: data.holes().to_vec(),
+            water: data.water().to_vec(),
+            generation: data.generation.clone(),
+        }
+    }
+
+    fn into_data(self) -> Result<TerrainData, WireError> {
+        let mut data = TerrainData::from_parts(
+            self.size_x as usize,
+            self.size_z as usize,
+            self.heights,
+            self.paint,
+        )
+        .map_err(|e| WireError::Unknown(format!("a Terrain's landscape: {e}")))?;
+        let foliage = self
+            .foliage
+            .into_iter()
+            .filter_map(|f| {
+                Some(FoliageInstance {
+                    source: FoliageSource::from_entry(&f.source)?,
+                    x: f.x,
+                    z: f.z,
+                    yaw: f.yaw,
+                    scale: f.scale,
+                    collide: f.collide,
+                    lean: f.lean,
+                    sink: f.sink,
+                    shadow: f.shadow,
+                })
+            })
+            .collect();
+        data.load_foliage(foliage);
+        if !self.holes.is_empty() && !data.load_holes(self.holes) {
+            return Err(WireError::Unknown("a Terrain's holes".to_owned()));
+        }
+        if !self.water.is_empty() && !data.load_water(self.water) {
+            return Err(WireError::Unknown("a Terrain's painted water".to_owned()));
+        }
+        data.generation = self.generation;
+        Ok(data)
+    }
 }
 
 /// The properties of `id` that differ from its class's defaults (with
@@ -493,8 +598,18 @@ impl WireWorld {
         for (dead, _) in &graves {
             add_tree(**dead, None);
         }
+        let mut terrains: Vec<WireTerrain> = instances
+            .iter()
+            .filter(|wire| wire.class == ClassName::Terrain.as_str())
+            .filter_map(|wire| {
+                let id = InstanceId::from_bits(wire.id);
+                Some(WireTerrain::of(id, world.terrain(id)?))
+            })
+            .collect();
+        terrains.sort_by_key(|t| t.id);
         WireWorld {
             instances,
+            terrains,
             graveyard: graves
                 .iter()
                 .map(|(id, place)| (id.to_bits(), place.parent.to_bits(), place.index as u64))
@@ -540,6 +655,11 @@ impl WireWorld {
         }
         for (id, name, reference) in references {
             let _ = world.set_property(id, name, reference);
+        }
+        for terrain in self.terrains {
+            let id = id(terrain.id);
+            let data = terrain.into_data()?;
+            world.set_terrain(id, Arc::new(data));
         }
         // What a new World starts with that the host's doesn't have.
         let sent: rustc_hash::FxHashSet<u64> = self.instances.iter().map(|i| i.id).collect();

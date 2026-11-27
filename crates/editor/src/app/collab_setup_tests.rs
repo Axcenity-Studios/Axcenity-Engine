@@ -150,6 +150,20 @@ fn every_wizard_page_draws_and_follows_tailscale() {
     app.team_panel.setup.checks = Some(host_checks(&tailnet(None), 0));
     draw(&mut app, "collaborate-setup-checks");
     assert_eq!(app.team_panel.setup.page, Some(Page::Check));
+    // A firewall that doesn't open the port: its command is shown apart,
+    // whole, to copy.
+    let closed = axcenity_collab::firewall::parse_firewalld(
+        Ok((false, "no".into())),
+        "  target: default",
+        None,
+        47800,
+    );
+    let checks = app.team_panel.setup.checks.as_mut().unwrap();
+    let firewall = checks.last_mut().unwrap();
+    firewall.outcome = Err(closed.explain());
+    firewall.command = closed.command().map(str::to_owned);
+    draw(&mut app, "collaborate-setup-firewall-closed");
+    assert_eq!(app.team_panel.setup.page, Some(Page::Check));
 
     // Signing out goes back a page.
     app.team_panel.setup.state = Some(State::Stopped);

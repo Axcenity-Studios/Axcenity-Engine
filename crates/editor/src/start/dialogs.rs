@@ -365,6 +365,15 @@ impl StartScreen {
         } else {
             Vec::new()
         };
+        // The project's picture as the start screen has it, for Settings.
+        let mut pictured = None;
+        let current_picture = match &self.dialog {
+            Some(Dialog::Settings { folder, .. }) => {
+                let folder = folder.clone();
+                self.thumbnail(ctx, &folder)
+            }
+            _ => None,
+        };
         let user_templates = self.user_templates.clone();
         let templates_folder = self.templates_folder.clone();
         let mut imported = false;
@@ -580,6 +589,8 @@ impl StartScreen {
                     description,
                     show_splash,
                     loading_gui,
+                    chosen_picture,
+                    picture,
                     error,
                 } => {
                     dialog::header(
@@ -598,6 +609,16 @@ impl StartScreen {
                             .desired_rows(3)
                             .margin(theme::space::margin(theme::space::S, 6.0))
                             .desired_width(f32::INFINITY),
+                    );
+                    ui.add_space(10.0);
+                    field_label(ui, &palette, "Picture");
+                    picture_section(
+                        ui,
+                        &palette,
+                        current_picture.as_ref(),
+                        *chosen_picture,
+                        picture,
+                        error,
                     );
                     ui.add_space(10.0);
                     ui.checkbox(show_splash, "Show the Axcenity splash in built games");
@@ -624,7 +645,12 @@ impl StartScreen {
                     if save {
                         let saved = axcenity_project::set_name(folder, name)
                             .and_then(|()| axcenity_project::set_description(folder, description))
-                            .and_then(|()| axcenity_project::set_show_splash(folder, *show_splash));
+                            .and_then(|()| axcenity_project::set_show_splash(folder, *show_splash))
+                            .map_err(|err| format!("{err}: {}", err.source))
+                            .and_then(|()| picture.apply(folder));
+                        if !matches!(picture, PictureEdit::Unchanged) {
+                            pictured = Some(folder.clone());
+                        }
                         match saved {
                             Ok(()) => {
                                 if let Some(link) =
@@ -635,7 +661,7 @@ impl StartScreen {
                                 }
                                 close = true;
                             }
-                            Err(err) => *error = Some(format!("{err}: {}", err.source)),
+                            Err(err) => *error = Some(err),
                         }
                     }
                     close |= cancel;
@@ -929,6 +955,9 @@ impl StartScreen {
         if let Some(folder) = restored {
             self.edited.remove(&folder);
         }
+        if let Some(folder) = pictured {
+            self.thumbnails.remove(&folder);
+        }
         if dismissed && matches!(self.dialog, Some(Dialog::Join { waiting: true, .. })) {
             join = Some(StartAction::CancelJoin);
         }
@@ -938,6 +967,164 @@ impl StartScreen {
         self.join_asked = join;
         created
     }
+}
+
+/// What Project Settings' Save does to the project's picture.
+#[derive(Default)]
+pub(super) enum PictureEdit {
+    #[default]
+    Unchanged,
+    /// An image the person chose, fitted to 16:9 (`thumbnail::fit`), and
+    /// how it's shown in the dialog.
+    Chosen {
+        png: Vec<u8>,
+        shown: egui::TextureHandle,
+    },
+    /// Back to a picture of the scene, taken at the next save.
+    Scene,
+}
+
+impl PictureEdit {
+    /// Writes the change to `folder`.
+    pub(super) fn apply(&self, folder: &Path) -> Result<(), String> {
+        let note = |chosen| {
+            axcenity_project::set_chosen_picture(folder, chosen)
+                .map_err(|err| format!("{err}: {}", err.source))
+        };
+        match self {
+            PictureEdit::Unchanged => Ok(()),
+            PictureEdit::Chosen { png, .. } => {
+                crate::thumbnail::save(folder, png)?;
+                note(true)
+            }
+            PictureEdit::Scene => note(false),
+        }
+    }
+}
+
+/// Project Settings' picture: what the start screen shows, where it comes
+/// from, and buttons to choose an image or go back to the scene.
+pub(super) fn picture_section(
+    ui: &mut egui::Ui,
+    palette: &Palette,
+    current: Option<&egui::TextureHandle>,
+    chosen: bool,
+    edit: &mut PictureEdit,
+    error: &mut Option<String>,
+) {
+    let width = ui.available_width();
+    let size = vec2(width, (width * 9.0 / 16.0).round());
+    let (shown, from_image) = match &*edit {
+        PictureEdit::Chosen { shown, .. } => (Some(shown.clone()), true),
+        PictureEdit::Scene => (current.cloned(), false),
+        PictureEdit::Unchanged => (current.cloned(), chosen),
+    };
+    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+    match &shown {
+        Some(texture) => {
+            egui::Image::new((texture.id(), size))
+                .corner_radius(theme::radius::CONTROL)
+                .paint_at(ui, rect);
+        }
+        None => {
+            ui.painter()
+                .rect_filled(rect, theme::radius::CONTROL, palette.inset);
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                icons::IMAGE,
+                egui::FontId::proportional(theme::size::ICON_LARGE * 1.5),
+                palette.text_weak,
+            );
+        }
+    }
+    ui.painter().rect_stroke(
+        rect,
+        theme::radius::CONTROL,
+        Stroke::new(1.0_f32, palette.border),
+        egui::StrokeKind::Inside,
+    );
+    ui.add_space(theme::space::XS);
+    let caption = match (&*edit, from_image, shown.is_some()) {
+        (PictureEdit::Scene, ..) => {
+            "A picture of the scene from the editor's camera, taken the next time you save the \
+             project, then at every save."
+        }
+        (_, true, _) => "An image you chose. Saving the project leaves it as it is.",
+        (_, false, true) => {
+            "A picture of the scene from the editor's camera, taken each time you save the \
+             project. Frame the view you want before saving, or choose an image."
+        }
+        (_, false, false) => {
+            "No picture yet: one of the scene is taken from the editor's camera the next \
+             time you save the project. Or choose an image."
+        }
+    };
+    ui.add(
+        egui::Label::new(
+            RichText::new(caption)
+                .size(type_scale::SMALL)
+                .color(palette.text_weak),
+        )
+        .wrap(),
+    );
+    ui.add_space(theme::space::XS);
+    ui.horizontal(|ui| {
+        if ui
+            .add(widgets::button(
+                widgets::Role::Secondary,
+                Some(icons::IMAGE),
+                "Choose Image…",
+                palette,
+            ))
+            .on_hover_text("Use a PNG, JPEG, BMP or TGA image, cut to 16:9 in its middle")
+            .clicked()
+        {
+            let picked = rfd::FileDialog::new()
+                .set_title("Choose the project's picture")
+                .add_filter("Images", &["png", "jpg", "jpeg", "bmp", "tga"])
+                .pick_file();
+            if let Some(file) = picked {
+                match std::fs::read(&file)
+                    .map_err(|e| format!("couldn't read {}: {e}", file.display()))
+                    .and_then(|bytes| crate::thumbnail::fit(&bytes))
+                {
+                    Ok(png) => match eframe::icon_data::from_png_bytes(&png) {
+                        Ok(icon) => {
+                            let image = egui::ColorImage::from_rgba_unmultiplied(
+                                [icon.width as usize, icon.height as usize],
+                                &icon.rgba,
+                            );
+                            let shown = ui.ctx().load_texture(
+                                "chosen project picture",
+                                image,
+                                egui::TextureOptions::LINEAR,
+                            );
+                            *edit = PictureEdit::Chosen { png, shown };
+                            *error = None;
+                        }
+                        Err(why) => *error = Some(format!("couldn't show the image: {why}")),
+                    },
+                    Err(why) => *error = Some(why),
+                }
+            }
+        }
+        let from_image = matches!(edit, PictureEdit::Chosen { .. })
+            || (chosen && matches!(edit, PictureEdit::Unchanged));
+        if from_image
+            && ui
+                .add(widgets::button(
+                    widgets::Role::Secondary,
+                    Some(icons::CAMERA),
+                    "Use the Scene",
+                    palette,
+                ))
+                .on_hover_text("Go back to a picture of the scene, taken at each save")
+                .clicked()
+        {
+            *edit = PictureEdit::Scene;
+        }
+    });
 }
 
 /// Copies the template file `file` into the user's templates `folder`

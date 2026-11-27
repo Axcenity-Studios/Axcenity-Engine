@@ -77,12 +77,6 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
             "Whether the ribbon's buttons start at the left of the window or sit in its middle.",
         ),
         setting(
-            Appearance,
-            "Menu icons",
-            &["Icon alignment", "Centered icons", "Left icons", "Menus"],
-            "Whether menu icons sit at the left of their column or in its middle.",
-        ),
-        setting(
             Typography,
             "Density",
             &["Compact", "Comfortable", "Spacing", "Row height"],
@@ -360,129 +354,205 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         ),
         setting(
             Graphics,
-            "Shadow quality",
-            &["Shadow resolution", "Shadow map"],
-            "How sharp and far-reaching shadows are.",
-        ),
-        setting(
-            Graphics,
-            "Shadow distance",
-            &["Shadow range", "Cascades"],
-            "How far from the camera shadows are drawn.",
-        ),
-        setting(
-            Graphics,
-            "Post-processing",
-            &["Bloom", "Tone mapping", "Effects"],
-            "Bloom, colour correction and the other screen effects.",
-        ),
-        setting(
-            Graphics,
             "Render scale",
             &["Resolution", "Upscaling", "Supersampling"],
-            "How many pixels are drawn, before scaling to the window.",
-        ),
-        setting(
-            Graphics,
-            "Texture quality",
-            &["Texture resolution", "Mipmaps"],
-            "How detailed textures are.",
-        ),
-        setting(
-            Graphics,
-            "Texture memory",
-            &["VRAM", "Texture budget", "GPU memory"],
-            "How much graphics memory textures may use.",
+            "How many pixels are drawn, before scaling to the window. High cost.",
         ),
         setting(
             Graphics,
             "Anti-aliasing",
             &["AA", "MSAA", "TAA", "FXAA", "Jaggies"],
-            "Smoothing jagged edges.",
+            "Smoothing jagged edges. Medium cost.",
+        ),
+        setting(
+            Graphics,
+            "Shadow quality",
+            &["Shadow resolution", "Shadow map"],
+            "How sharp and far-reaching shadows are. High cost.",
         ),
         setting(
             Graphics,
             "Ambient occlusion",
             &["AO", "SSAO", "GTAO"],
-            "Soft shadows in corners and creases.",
+            "Soft shadows in corners and creases. Low cost.",
         ),
         setting(
             Graphics,
-            "Reflection quality",
-            &["Reflections"],
-            "How reflections are drawn.",
+            "Global illumination",
+            &[
+                "GI",
+                "Ray traced GI",
+                "Bounce light",
+                "Indirect light",
+                "Baked probes",
+            ],
+            "Bounced light: baked probes, or ray traced (in software on GPUs without ray tracing).",
         ),
         setting(
             Graphics,
-            "Cloud quality",
-            &["Clouds", "Sky"],
-            "How detailed volumetric clouds are.",
-        ),
-        setting(
-            Graphics,
-            "Contact shadows",
-            &["Small shadows"],
-            "Short screen-space shadows where things touch.",
+            "Sky and probe reflections",
+            &[
+                "Reflection quality",
+                "Reflections",
+                "Environment map",
+                "Reflection probes",
+            ],
+            "The sky's environment maps and reflection probes. No frame cost, video memory only.",
         ),
         setting(
             Graphics,
             "Screen-space reflections",
             &["SSR", "Reflections", "Wet", "Puddles"],
-            "Smooth and wet surfaces reflect what's on the screen.",
+            "Smooth and wet surfaces reflect what's on the screen. Medium cost.",
         ),
         setting(
             Graphics,
-            "Real-time GI",
-            &["Global illumination", "Bounce light", "GI"],
-            "Light bouncing off surfaces, worked out as you go.",
+            "Clouds",
+            &["Cloud quality", "Sky", "Volumetric clouds"],
+            "How detailed volumetric clouds are. Low cost.",
         ),
         setting(
             Graphics,
             "Volumetric fog",
             &["Fog", "God rays", "Light shafts"],
-            "Fog that lights and shadows shine through.",
+            "Fog that lights and shadows shine through. Low cost.",
+        ),
+        setting(
+            Graphics,
+            "Ray tracing",
+            &["RT", "RTX", "Ray tracing status"],
+            "Whether this graphics card can ray trace, and each ray traced effect.",
+        ),
+        setting(
+            Graphics,
+            "Hardware ray tracing",
+            &["RT", "RTX", "Ray queries", "Enable ray tracing"],
+            "Opens the graphics card with ray tracing at the next start.",
+        ),
+        setting(
+            Graphics,
+            "Ray traced shadows",
+            &["RT shadows", "Soft shadows", "Traced shadows"],
+            "The sun's and lamps' shadows traced as rays. High cost.",
+        ),
+        setting(
+            Graphics,
+            "Ray traced ambient occlusion",
+            &["RT AO", "RTAO", "Traced ambient occlusion"],
+            "Corners darkened by short rays, off-screen occluders too. High cost.",
+        ),
+        setting(
+            Graphics,
+            "Ray traced reflections",
+            &["RT reflections", "Mirror", "Traced reflections"],
+            "Glossy surfaces mirror off-screen geometry. Low cost in the worlds measured.",
+        ),
+        setting(
+            Graphics,
+            "Bloom and tone mapping",
+            &["Post-processing", "Bloom", "Tone mapping", "Effects"],
+            "Bloom and tone mapping, when the world's Lighting asks for them. Low cost.",
         ),
         setting(
             Graphics,
             "Depth of field",
             &["DOF", "Blur", "Focus"],
-            "Blurring what's out of focus.",
+            "Blurring what's out of focus. Low cost.",
         ),
         setting(
             Graphics,
             "Motion blur",
             &["Blur"],
-            "Blurring fast movement.",
+            "Blurring fast movement. Low cost.",
+        ),
+        setting(
+            Graphics,
+            "Lens effects",
+            &[
+                "Vignette",
+                "Film grain",
+                "Chromatic aberration",
+                "Sharpen",
+                "Sun rays",
+            ],
+            "Every lens effect on or off at once. No frame cost.",
+        ),
+        setting(
+            Graphics,
+            "Shadow distance",
+            &["Shadow range", "Cascades"],
+            "How far from the camera shadows are drawn (Advanced). Shorter isn't cheaper.",
+        ),
+        setting(
+            Graphics,
+            "Contact shadows",
+            &["Small shadows"],
+            "Short screen-space shadows where things touch (Advanced). Low cost.",
+        ),
+        setting(
+            Graphics,
+            "Texture quality",
+            &["Texture resolution", "Mipmaps"],
+            "How detailed textures are (Advanced). Video memory only.",
+        ),
+        setting(
+            Graphics,
+            "Texture memory",
+            &["VRAM", "Texture budget", "GPU memory"],
+            "How much graphics memory textures may use (Advanced).",
+        ),
+        setting(
+            Graphics,
+            "Ray tracing distance",
+            &["RT distance", "Ray reach", "Ray traced scene"],
+            "How far rays see from the camera (Advanced). High CPU cost when far.",
+        ),
+        setting(
+            Graphics,
+            "Ray traced shadow resolution",
+            &["Half resolution shadows", "RT shadow resolution"],
+            "Traced shadows from every pixel or one in four (Advanced). Half saves about 55%.",
+        ),
+        setting(
+            Graphics,
+            "Real-time GI (raster)",
+            &[
+                "Real-time GI",
+                "Realtime GI",
+                "Light probes",
+                "Bounce light",
+            ],
+            "Light probe volumes drawn again as the light changes, without ray tracing (Advanced). High CPU cost.",
         ),
         setting(
             Graphics,
             "Vignette",
-            &["Dark corners"],
-            "Darkening the screen's corners.",
+            &["Dark corners", "Lens effect"],
+            "Darkening the screen's corners (Advanced).",
         ),
         setting(
             Graphics,
             "Film grain",
-            &["Noise", "Grain"],
-            "A film-like noise over the picture.",
+            &["Noise", "Grain", "Lens effect"],
+            "A film-like noise over the picture (Advanced).",
         ),
         setting(
             Graphics,
             "Chromatic aberration",
             &["Colour fringing", "Lens effect"],
-            "Colour fringes towards the screen's edges.",
+            "Colour fringes towards the screen's edges (Advanced).",
         ),
         setting(
             Graphics,
             "Sharpen",
-            &["Sharpness", "Sharpening"],
-            "Crisper edges after scaling.",
+            &["Sharpness", "Sharpening", "Lens effect"],
+            "Crisper edges after scaling (Advanced).",
         ),
         setting(
             Graphics,
             "Sun rays",
-            &["God rays", "Light shafts", "Sun shafts"],
-            "Beams of sunlight through gaps, from a SunRaysEffect.",
+            &["God rays", "Light shafts", "Sun shafts", "Lens effect"],
+            "Beams of sunlight through gaps, from a SunRaysEffect (Advanced).",
         ),
         setting(
             Graphics,
@@ -637,6 +707,13 @@ pub(in crate::app) fn section(ui: &mut egui::Ui, name: &str) {
 pub(super) fn found_label(ui: &mut egui::Ui, name: &str) {
     let row = ui.label(name);
     found(ui, &row, name);
+}
+
+/// The row search is showing, while it's outlined: a page with folded rows
+/// opens the fold that holds it.
+pub(super) fn sought_setting(ctx: &egui::Context) -> Option<&'static str> {
+    ctx.data(|data| data.get_temp::<Finding>(finding_id()))
+        .map(|finding| finding.name)
 }
 
 /// If search asked for the row `name` (drawn as `row`), scrolls to it once

@@ -391,6 +391,18 @@ const PREVIEW_FACE: &str = "Studio Expression Preview";
 const NOTICE_FOR: Duration = Duration::from_secs(8);
 
 impl CharacterWorkspace {
+    /// Gives the preview a renderer made on another thread, so its first
+    /// frame doesn't wait for shaders (`EditorApp::begin_character_workspace`).
+    pub fn adopt_renderer(
+        &mut self,
+        renderer: axcenity_render::TextureRenderer,
+        render_state: &eframe::egui_wgpu::RenderState,
+    ) {
+        self.canvas.adopt(renderer, render_state);
+    }
+}
+
+impl CharacterWorkspace {
     /// Opens the workspace on `description`, its files in `folder` (written
     /// where missing: the humanoid's files and the character library). A
     /// description whose base model the library hasn't is shown on the

@@ -507,7 +507,13 @@ fn each_section_is_drawn_under_its_tab_only() {
         (
             StudioTab::Terrain,
             // "Water" alone is the Materials tab's Water brush too.
-            &["Generate", "Masks", "Fill the hollows", "Terrain data"],
+            &[
+                "Generate",
+                "Masks",
+                "Fill the hollows",
+                "Terrain data",
+                "New ground",
+            ],
         ),
     ];
     for (tab, own) in sections {
@@ -550,4 +556,139 @@ fn a_tools_settings_are_under_its_tab() {
             "{tool:?}: {texts:?}"
         );
     }
+}
+
+/// Draws the panel 260 points wide with `events` and returns its actions
+/// and the texts drawn, with where.
+fn frame_actions(
+    ctx: &egui::Context,
+    world: &World,
+    studio: &mut TerrainStudio,
+    events: Vec<egui::Event>,
+) -> (Vec<TerrainAction>, Vec<(String, egui::Rect)>) {
+    let input = egui::RawInput {
+        screen_rect: Some(egui::Rect::from_min_size(
+            egui::Pos2::ZERO,
+            egui::vec2(260.0, 2400.0),
+        )),
+        events,
+        ..Default::default()
+    };
+    let mut actions = Vec::new();
+    let output = crate::theme::run(ctx, input, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
+            actions = studio.show(
+                ui,
+                &StudioContext {
+                    world,
+                    selected: None,
+                    editing: true,
+                    time: 0.0,
+                    textures: &[],
+                    pictures: &HashMap::new(),
+                    world_presets: &[],
+                },
+            );
+        });
+    });
+    fn walk(shape: &egui::Shape, found: &mut Vec<(String, egui::Rect)>) {
+        match shape {
+            egui::Shape::Text(text) => found.push((
+                text.galley.text().to_owned(),
+                text.galley.rect.translate(text.pos.to_vec2()),
+            )),
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, found)),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        walk(&clipped.shape, &mut found);
+    }
+    (actions, found)
+}
+
+#[test]
+fn the_tiles_section_adds_a_tile_on_a_free_side_only() {
+    use axcenity_terrain::tiles::Side;
+    let (mut world, terrain) = layered_terrain();
+    let mut studio = TerrainStudio::default();
+    studio.switch_tab(StudioTab::Terrain);
+    let ctx = crate::theme::test_context();
+    let click = |ctx: &egui::Context, world: &World, studio: &mut TerrainStudio, label: &str| {
+        let (_, texts) = frame_actions(ctx, world, studio, Vec::new());
+        let (_, texts) = if texts.is_empty() {
+            frame_actions(ctx, world, studio, Vec::new())
+        } else {
+            (Vec::new(), texts)
+        };
+        let at = texts
+            .iter()
+            .find(|(text, _)| text.ends_with(label))
+            .unwrap_or_else(|| panic!("{label} in {texts:?}"))
+            .1
+            .center();
+        let button = |pressed| egui::Event::PointerButton {
+            pos: at,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let mut actions = Vec::new();
+        for events in [
+            vec![egui::Event::PointerMoved(at)],
+            vec![button(true)],
+            vec![button(false)],
+        ] {
+            actions.extend(frame_actions(ctx, world, studio, events).0);
+        }
+        (actions, texts)
+    };
+    let (actions, texts) = click(&ctx, &world, &mut studio, "+X");
+    assert!(
+        texts.iter().any(|(text, _)| text.contains("One tile")),
+        "{texts:?}"
+    );
+    assert!(
+        actions.contains(&TerrainAction::AddTile(Side::PosX)),
+        "{actions:?}"
+    );
+    // With a tile on +X, its button does nothing.
+    let east = world.duplicate(terrain).unwrap();
+    world.set_parent(east, Some(world.workspace())).unwrap();
+    let size = world
+        .get(terrain)
+        .unwrap()
+        .property("Size")
+        .unwrap()
+        .as_vector3()
+        .unwrap();
+    let mut position = world
+        .get(terrain)
+        .unwrap()
+        .property("Position")
+        .unwrap()
+        .as_vector3()
+        .unwrap();
+    position.x += size.x;
+    world
+        .set_property(east, "Position", Value::Vector3(position))
+        .unwrap();
+    studio.target = Some(terrain);
+    let (actions, texts) = click(&ctx, &world, &mut studio, "+X");
+    assert!(
+        texts.iter().any(|(text, _)| text.contains("2 tiles")),
+        "{texts:?}"
+    );
+    assert!(
+        !actions
+            .iter()
+            .any(|a| matches!(a, TerrainAction::AddTile(_))),
+        "{actions:?}"
+    );
+    let (actions, _) = click(&ctx, &world, &mut studio, "−Z");
+    assert!(
+        actions.contains(&TerrainAction::AddTile(Side::NegZ)),
+        "{actions:?}"
+    );
 }

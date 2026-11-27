@@ -1015,3 +1015,21 @@ fn hello_streaming_example_loads_with_streaming_on() {
     let settings = axcenity_core::streaming::Settings::of(&project.world).unwrap();
     assert_eq!(settings.target_radius, 400.0);
 }
+
+#[test]
+fn a_chosen_picture_is_noted_in_the_manifest_and_taken_out_again() {
+    let parent =
+        std::env::temp_dir().join(format!("axcenity-chosen-picture-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&parent);
+    fs::create_dir_all(&parent).unwrap();
+    let folder = create_project(&parent, "Pictured").unwrap();
+    assert!(!read_manifest(&folder).unwrap().chosen_picture);
+    set_chosen_picture(&folder, true).unwrap();
+    assert!(read_manifest(&folder).unwrap().chosen_picture);
+    set_chosen_picture(&folder, false).unwrap();
+    assert!(!read_manifest(&folder).unwrap().chosen_picture);
+    // Taken out, not left as false: older editors read the manifest.
+    let text = fs::read_to_string(folder.join(MANIFEST_FILE)).unwrap();
+    assert!(!text.contains("chosen_picture"), "{text}");
+    let _ = fs::remove_dir_all(&parent);
+}

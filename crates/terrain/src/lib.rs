@@ -12,6 +12,7 @@
 //! - [`materials`] lays layers down by height and slope, blended with paint.
 //! - [`mesh`] builds chunk meshes at several levels of detail.
 //! - [`raycast`] finds where a ray meets the terrain.
+//! - [`tiles`] lays several Terrains side by side as one landscape.
 //! - [`files`] reads and writes the saved PNG and JSON files.
 //! - [`job`] runs slow work on another thread, with progress and cancel.
 
@@ -26,6 +27,7 @@ pub mod materials;
 pub mod mesh;
 pub mod noise;
 pub mod raycast;
+pub mod tiles;
 pub mod volume;
 
 use axcenity_core::{ClassName, Instance, TerrainData, Value};

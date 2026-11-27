@@ -4,7 +4,7 @@
 //! tabs (`tabs.rs`), each with its row of tools: Sculpt (Raise / Lower,
 //! Smooth, Flatten, Sculpt, Stamp, Noise, Holes), Materials (Paint, Auto
 //! Materials, then the terrain's layers, biomes and scatter rules) and
-//! Terrain (Generate, Erosion, Masks, then its water and data). Painting
+//! Terrain (Generate, Erosion, Masks, then its tiles, water and data). Painting
 //! plants and props by hand is the Scatter pane (`scatter_pane.rs`).
 //! Under the tools, only the settings of the tool picked, with the rarely
 //! needed ones folded away; at the bottom, how the viewport shows the
@@ -26,6 +26,7 @@ mod tabs;
 pub(crate) mod biomes;
 mod layers;
 pub(crate) mod scatter;
+mod tiles;
 mod tool_settings;
 mod water;
 pub(crate) mod world_presets;
@@ -82,6 +83,17 @@ pub enum Combine {
     Replace,
     /// Its hills and dips are added to the ground already there.
     Add,
+}
+
+/// How a new tile's ground is made (the Tiles section).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TileFill {
+    /// The landscape goes on: the tile's generator settings moved one tile
+    /// along, eased into the edge it joins.
+    #[default]
+    Continue,
+    /// Flat ground at the edge's height, eased into the edge.
+    Flat,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -174,6 +186,9 @@ pub enum TerrainAction {
     BakeScatter,
     /// Change the terrain's resolution (samples along X).
     Resample(usize),
+    /// Add a tile beside the terrain on this side, made the studio's
+    /// `tile_fill` way, as one undo step.
+    AddTile(axcenity_terrain::tiles::Side),
     ImportHeightmap,
     ExportHeightmap,
     PickStampImage,
@@ -189,6 +204,9 @@ pub struct RunningJob {
     pub job: Job<JobResult>,
     /// True for erosion alone (not on top of a generated preview).
     pub erosion: bool,
+    /// Making a new tile beside `terrain` on this side: the result goes
+    /// into the world as that tile, not into a preview.
+    pub tile: Option<axcenity_terrain::tiles::Side>,
 }
 
 /// What a job made.
@@ -310,6 +328,8 @@ pub struct TerrainStudio {
     pub pending_world: Option<axcenity_project::WorldPreset>,
     /// The name Save as preset uses.
     pub preset_name: String,
+    /// How the Tiles section's Add tile makes the new tile's ground.
+    pub tile_fill: TileFill,
 }
 
 impl Default for TerrainStudio {
@@ -359,6 +379,7 @@ impl Default for TerrainStudio {
             world_preset: 0,
             pending_world: None,
             preset_name: String::new(),
+            tile_fill: TileFill::Continue,
         }
     }
 }
@@ -504,6 +525,7 @@ impl TerrainStudio {
                             self.view_section(ui);
                         }
                         StudioTab::Terrain => {
+                            self.tiles_section(ui, cx.world, terrain, &mut actions);
                             self.water_section(ui, cx.world, terrain, &mut actions);
                             self.view_section(ui);
                             self.data_section(ui, cx.world, terrain, &mut actions);

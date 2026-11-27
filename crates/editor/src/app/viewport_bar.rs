@@ -38,9 +38,6 @@ pub(super) enum Pace {
     /// Ready sooner, and held to the steady frame rate's grid, this many
     /// a second (`EditorApp::pace_frame`).
     Held(u32),
-    /// Nothing asked for it at once: it came on a timer (scenery that
-    /// moves on its own, 30 times a second) or after a rest.
-    OnDemand,
 }
 
 /// What the bar measures from each rendered viewport frame.
@@ -239,7 +236,6 @@ impl ViewportBar {
         let note = match self.held_by() {
             Pace::Free => "",
             Pace::Held(_) => " (held)",
-            Pace::OnDemand => " (idle)",
         };
         match self.fps() {
             Some(fps) => format!("{fps:.0} FPS{note}"),
@@ -254,7 +250,7 @@ impl ViewportBar {
             format!(
                 " While you work, the editor holds frames to {steady_hz} Hz (Settings > \
                  Accessibility > Steady frame rate); scenery that moves on its own is drawn \
-                 30 times a second while you don't."
+                 as fast as it can be while you don't."
             )
         } else {
             String::new()
@@ -282,14 +278,6 @@ impl ViewportBar {
                     " This rate is held to {hz} Hz, not the scene's: each frame is ready \
                      sooner (about {without:.0} a second without the hold). Settings > \
                      Accessibility > Steady frame rate changes it."
-                ),
-                String::new(),
-            ),
-            Pace::OnDemand => (
-                format!(
-                    " This is the editor resting, not the scene's rate: scenery that moves on \
-                     its own is drawn 30 times a second while you don't touch the editor \
-                     (about {without:.0} a second when you do)."
                 ),
                 String::new(),
             ),
@@ -646,21 +634,17 @@ mod tests {
     }
 
     #[test]
-    fn frames_drawn_on_a_timer_say_the_editor_is_idle() {
-        // Nobody touches the editor; the wind moves the plants, drawn 30
-        // times a second to spare the GPU.
+    fn moving_scenery_in_an_untouched_editor_reads_its_own_rate() {
+        // Nobody touches the editor; the wind moves the plants, drawn as
+        // fast as they can be, so the rate shown is the scene's.
         let mut bar = ViewportBar::default();
         let mut at = Instant::now();
         for _ in 0..90 {
-            at += Duration::from_micros(33_333);
-            bar.note_pace(Pace::OnDemand);
-            bar.record(Some(cost(9.0, Some(6.0))), Duration::ZERO, at);
+            at += Duration::from_micros(8_333);
+            bar.note_pace(Pace::Free);
+            bar.record(Some(cost(7.0, Some(6.0))), Duration::ZERO, at);
         }
-        assert_eq!(bar.fps_text(), "30 FPS (idle)");
-        assert!(
-            bar.fps_tooltip(60)
-                .contains("while you don't touch the editor")
-        );
+        assert_eq!(bar.fps_text(), "120 FPS");
     }
 
     #[test]

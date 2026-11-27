@@ -169,6 +169,34 @@ impl Drop for Loading {
     }
 }
 
+/// A loading screen for something other than a project (Character
+/// Studio): `name` under "Opening", what it's doing with a sliding bar,
+/// and `note` under it. Blank for the first [`GRACE`] seconds after
+/// `started`, so a quick open shows nothing. True when Cancel was clicked.
+pub fn show_step(
+    ui: &mut egui::Ui,
+    rect: Rect,
+    name: &str,
+    doing: &str,
+    note: Option<&str>,
+    started: Instant,
+    mark: Option<&egui::TextureHandle>,
+) -> bool {
+    let elapsed = started.elapsed().as_secs_f32();
+    if elapsed < GRACE {
+        paint_blank(ui, rect);
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs_f32(GRACE - elapsed));
+        return false;
+    }
+    let status = Status {
+        doing: doing.to_owned(),
+        note: note.map(str::to_owned),
+        ..Status::default()
+    };
+    paint(ui, rect, name, &status, Some(elapsed), mark)
+}
+
 /// The screen held after the project opens, while its scene is sent to
 /// the graphics card: `uploads` is how many of the meshes and textures on
 /// their way are there, of how many, while any are. After a load too quick

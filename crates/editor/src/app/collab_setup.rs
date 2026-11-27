@@ -169,6 +169,9 @@ pub(crate) struct CheckResult {
     /// that doesn't stop setup.
     pub(crate) outcome: Result<String, String>,
     pub(crate) warning: bool,
+    /// A command that fixes it, shown apart from the text with a Copy
+    /// button (the firewall's on Linux).
+    pub(crate) command: Option<String>,
 }
 
 /// Checks that this computer can host over Tailscale: it has a name
@@ -183,6 +186,7 @@ pub(crate) fn host_checks(net: &Tailnet, port: u16) -> Vec<CheckResult> {
             "Tailscale gave this computer no address yet. Wait a moment and check again.".to_owned()
         }),
         warning: false,
+        command: None,
     });
     if let Some(name) = &net.dns_name {
         let found: Vec<IpAddr> = (name.as_str(), port)
@@ -202,6 +206,7 @@ pub(crate) fn host_checks(net: &Tailnet, port: u16) -> Vec<CheckResult> {
                 ))
             },
             warning: true,
+            command: None,
         });
     }
     checks.push(CheckResult {
@@ -214,8 +219,9 @@ pub(crate) fn host_checks(net: &Tailnet, port: u16) -> Vec<CheckResult> {
             )),
         },
         warning: true,
+        command: None,
     });
-    checks.push(firewall_check());
+    checks.push(firewall_check(port));
     checks
 }
 
@@ -225,9 +231,9 @@ pub(crate) const FIREWALL_CHECK: &str = "The firewall lets others connect";
 /// What this computer's firewall says about the editor listening
 /// (cohesion pass CW7.4). Only reads; a warning, since a rule may be
 /// added when the first session starts.
-pub(crate) fn firewall_check() -> CheckResult {
+pub(crate) fn firewall_check(port: u16) -> CheckResult {
     let verdict = std::env::current_exe()
-        .map(|program| axcenity_collab::firewall::check(&program))
+        .map(|program| axcenity_collab::firewall::check(&program, port))
         .unwrap_or_else(|e| axcenity_collab::firewall::Verdict::Unknown(e.to_string()));
     CheckResult {
         what: FIREWALL_CHECK.to_owned(),
@@ -237,7 +243,47 @@ pub(crate) fn firewall_check() -> CheckResult {
             _ => Err(verdict.explain()),
         },
         warning: true,
+        command: verdict.command().map(str::to_owned),
     }
+}
+
+/// A command in a code box, selectable, with a Copy button beside it: the
+/// whole line goes to the clipboard, ready to paste into a terminal.
+fn command_to_copy(ui: &mut egui::Ui, command: &str) {
+    let palette = theme::palette(ui.ctx());
+    ui.add_space(theme::space::XS);
+    egui::Frame::new()
+        .fill(palette.inset)
+        .stroke(egui::Stroke::new(1.0, palette.border))
+        .corner_radius(theme::radius::CONTROL)
+        .inner_margin(theme::space::margin(theme::space::S, theme::space::XS))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(
+                egui::Label::new(egui::RichText::new(command).monospace().color(palette.text))
+                    .wrap()
+                    .selectable(true),
+            );
+            ui.add_space(theme::space::XS);
+            let row = egui::vec2(ui.available_width(), theme::size::BUTTON_HEIGHT);
+            ui.allocate_ui_with_layout(
+                row,
+                egui::Layout::right_to_left(egui::Align::Center),
+                |ui| {
+                    let copy = ui
+                        .add(widgets::button(
+                            widgets::Role::Secondary,
+                            Some(icons::COPY),
+                            "Copy",
+                            &palette,
+                        ))
+                        .on_hover_text("Copy the whole command, to paste into a terminal");
+                    if copy.clicked() {
+                        ui.ctx().copy_text(command.to_owned());
+                    }
+                },
+            );
+        });
 }
 
 /// Asks Tailscale how it is every [`WATCH_EVERY`] on its own thread, while
@@ -722,6 +768,9 @@ impl EditorApp {
                                                 .family(theme::medium_family()),
                                         );
                                         note(ui, text);
+                                        if let Some(command) = &check.command {
+                                            command_to_copy(ui, command);
+                                        }
                                         // Only on the person's click, never
                                         // by itself; Windows asks to approve.
                                         if cfg!(windows)

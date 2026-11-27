@@ -297,7 +297,6 @@ impl EditorApp {
         }
         // The game being played belongs to the old project, and so do the models.
         self.play = None;
-        self.thumbnail = None;
         self.thumbnail_wanted = None;
         self.pending_ui_activation = None;
         self.pending_ui_events.clear();
@@ -1371,49 +1370,79 @@ impl EditorApp {
         self.replace_world(World::new());
         self.start.reload_thumbnails();
     }
-    /// Asks for a screenshot when a thumbnail is wanted and the viewport is
-    /// showing. Without a viewport to photograph, a pending close just happens.
-    pub(super) fn start_thumbnail(&mut self, ctx: &egui::Context) {
+    /// Takes the project's picture when one is wanted (at a save, or when
+    /// the project closes): the scene from the editor's camera, drawn on a
+    /// thread (`thumbnail.rs`). Not during Play, nor when the person chose
+    /// the picture. A close goes ahead at once; the picture is saved when
+    /// it's drawn.
+    pub(super) fn start_thumbnail(
+        &mut self,
+        render_state: Option<&eframe::egui_wgpu::RenderState>,
+    ) {
         let Some(then_close) = self.thumbnail_wanted.take() else {
             return;
         };
-        let Some(folder) = self.project.as_ref().map(|project| project.folder.clone()) else {
-            return;
-        };
-        match self.viewport_rect {
-            Some(area) if !self.playing() => {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
-                self.thumbnail = Some(ThumbnailShot {
-                    folder,
-                    area,
-                    then_close,
-                });
-            }
-            _ if then_close => self.finish_closing_project(),
-            _ => {}
-        }
-    }
-    /// Saves the screenshot asked for by [`Self::start_thumbnail`], when it arrives.
-    pub(super) fn finish_thumbnail(&mut self, ctx: &egui::Context) {
-        let screenshot = ctx.input(|input| {
-            input.events.iter().find_map(|event| match event {
-                egui::Event::Screenshot { image, .. } => Some(image.clone()),
-                _ => None,
-            })
-        });
-        let (Some(image), Some(shot)) = (screenshot, self.thumbnail.take()) else {
-            return;
-        };
-        let png = thumbnail::encode(&image, shot.area, ctx.pixels_per_point());
-        if let Some(png) = png
-            && let Err(err) =
-                std::fs::write(shot.folder.join(axcenity_project::THUMBNAIL_FILE), png)
-        {
-            log::warn!("could not save the project thumbnail: {err}");
-        }
-        if shot.then_close {
+        self.take_project_picture(render_state, false);
+        if then_close {
             self.finish_closing_project();
         }
+    }
+
+    /// Draws the project's picture from the editor's camera on a thread.
+    /// `chosen_too` replaces a picture the person chose (Capture Project
+    /// Picture), and then saves take it again. False if it wasn't started.
+    pub(super) fn take_project_picture(
+        &mut self,
+        render_state: Option<&eframe::egui_wgpu::RenderState>,
+        chosen_too: bool,
+    ) -> bool {
+        let (Some(project), Some(render_state)) = (&self.project, render_state) else {
+            return false;
+        };
+        let folder = project.folder.clone();
+        let chosen = axcenity_project::read_manifest(&folder).is_some_and(|m| m.chosen_picture);
+        if self.playing() || self.thumbnail.is_some() || (chosen && !chosen_too) {
+            return false;
+        }
+        if chosen {
+            let _ = axcenity_project::set_chosen_picture(&folder, false);
+        }
+        // The game's own picture: no grid, gizmos or light icons. The
+        // viewport's terrain meshes are reused (the same camera, so the
+        // same detail), and ray traced effects are left out: the picture's
+        // renderer is its own and small.
+        let list = axcenity_scene::build_draw_list_posed(
+            &self.world,
+            &self.assets,
+            self.viewport.render_camera(),
+            &axcenity_scene::Poses::new(),
+            &mut self.viewport.terrain,
+        );
+        self.thumbnail = crate::thumbnail::PictureJob::start(
+            &render_state.device,
+            &render_state.queue,
+            list,
+            self.graphics.without_ray_traced_effects(),
+            folder,
+        );
+        self.thumbnail.is_some()
+    }
+
+    /// Notes the project's picture when its thread has drawn and saved it,
+    /// so the start screen shows the new one.
+    pub(super) fn finish_thumbnail(&mut self, ctx: &egui::Context) {
+        let Some(job) = &self.thumbnail else {
+            return;
+        };
+        let Some(result) = job.poll() else {
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+            return;
+        };
+        if let Err(error) = result {
+            log::warn!("could not save the project's picture: {error}");
+        }
+        self.thumbnail = None;
+        self.start.reload_thumbnails();
     }
     /// `request` then, if nothing needs asking, `go_ahead`.
     pub(super) fn request_and_go_ahead(&mut self, ctx: &egui::Context, discard: Discard) {
@@ -1561,10 +1590,10 @@ impl EditorApp {
                 self.settings.open = true;
             }
             Some(StartAction::NewCharacter(start)) => {
-                self.open_character_workspace(Some(start), None)
+                self.begin_character_workspace(ctx, Some(start), None, render_state)
             }
             Some(StartAction::OpenCharacter(file)) => {
-                self.open_character_workspace(None, Some(&file))
+                self.begin_character_workspace(ctx, None, Some(&file), render_state)
             }
             None => {}
         }

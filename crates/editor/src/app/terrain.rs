@@ -40,6 +40,7 @@ mod jobs;
 mod layers;
 mod scatter;
 mod strokes;
+mod tiles;
 mod world_presets;
 
 pub(super) use world_presets::WorldPresets;
@@ -161,7 +162,11 @@ impl EditorApp {
             let now = ctx.input(|input| input.time);
             let regenerating = self.terrain.tool == Some(TerrainTool::Generate)
                 && self.terrain.live_preview
-                && (self.terrain.job.as_ref().is_some_and(|job| !job.erosion)
+                && (self
+                    .terrain
+                    .job
+                    .as_ref()
+                    .is_some_and(|job| !job.erosion && job.tile.is_none())
                     || self.terrain.preview.as_ref().is_some_and(|p| !p.erosion));
             if !regenerating {
                 self.terrain.changed_at = None;
@@ -325,6 +330,11 @@ impl EditorApp {
                 }
             }
             TerrainAction::Resample(samples) => self.resample_terrain(samples),
+            TerrainAction::AddTile(side) => {
+                if let Some(terrain) = target {
+                    self.add_terrain_tile(terrain, side, self.terrain.tile_fill);
+                }
+            }
             TerrainAction::ImportHeightmap => self.import_heightmap(),
             TerrainAction::ExportHeightmap => self.export_heightmap(),
             TerrainAction::PickStampImage => self.pick_stamp_image(),
@@ -430,5 +440,7 @@ mod biome_tests;
 mod scatter_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tile_tests;
 #[cfg(test)]
 mod world_preset_tests;

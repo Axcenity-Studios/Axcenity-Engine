@@ -168,7 +168,6 @@ use crate::start::{self, Brand, ProjectLink, StartAction, StartScreen};
 use crate::style_panel::{self, StyleEdit};
 use crate::terrain_studio::TerrainStudio;
 use crate::theme::{self, Appearance, filled_icons, icons};
-use crate::thumbnail;
 use crate::toast::{self, Toasts};
 use crate::toolbox_panel::ToolboxPanel;
 use crate::tree::{self, Insertable};
@@ -465,8 +464,8 @@ pub struct EditorApp {
     recent_tabs: welcome::RecentTabs,
     /// The start screen's thumbnails, search and dialogs.
     start: StartScreen,
-    /// The thumbnail being captured, if one was asked for.
-    thumbnail: Option<ThumbnailShot>,
+    /// The project's picture being drawn on its thread, if one was asked for.
+    thumbnail: Option<crate::thumbnail::PictureJob>,
     /// Set when a thumbnail should be taken at the end of this frame. True
     /// inside means the project closes once it's saved.
     thumbnail_wanted: Option<bool>,
@@ -520,6 +519,8 @@ pub struct EditorApp {
     /// The Character Studio workspace, open in place of the start screen
     /// (`docs/research/character-studio.md` CS2), and where it keeps files.
     character_workspace: Option<Box<crate::character_workspace::CharacterWorkspace>>,
+    /// Character Studio opening on its thread, with a loading screen.
+    character_opening: Option<character_workspace::CharacterOpening>,
     characters_folder: Option<PathBuf>,
     /// Described characters shown in edit mode (OPEN-21).
     edit_characters: Box<edit_characters::EditCharacters>,
@@ -958,15 +959,6 @@ enum Discard {
     Update(axcenity_updater::apply::Action),
 }
 
-/// A screenshot asked for, to make the open project's thumbnail from.
-struct ThumbnailShot {
-    folder: PathBuf,
-    /// Where the viewport was, in points.
-    area: egui::Rect,
-    /// Close the project once it's saved.
-    then_close: bool,
-}
-
 /// The answers to "Save changes?".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Answer {
@@ -1189,6 +1181,7 @@ impl EditorApp {
             effect_editor: Default::default(),
             character_studio: Default::default(),
             character_workspace: None,
+            character_opening: None,
             characters_folder: None,
             edit_characters: Default::default(),
             block_tab_pointer: None,
@@ -1739,11 +1732,7 @@ impl EditorApp {
         // Timing the editor (`AXCENITY_FRAME_LOG`) times the scene, not the grid.
         if !steady || self.appearance.steady_hz == 0 || viewport_bar::frame_log_on() {
             self.next_present = None;
-            self.viewport_bar_state.note_pace(if steady {
-                viewport_bar::Pace::Free
-            } else {
-                viewport_bar::Pace::OnDemand
-            });
+            self.viewport_bar_state.note_pace(viewport_bar::Pace::Free);
             return;
         }
         let interval =
@@ -2095,7 +2084,7 @@ impl EditorApp {
             self.poll_toolbox_background(ctx);
         } else if self.character_workspace.is_some() {
             self.character_workspace_ui(ui, render_state);
-        } else {
+        } else if !self.character_opening_ui(ui, render_state) {
             self.start_screen(ui, render_state);
         }
         if let Some(clicked) = output.clicked {
@@ -2257,7 +2246,7 @@ impl EditorApp {
         self.import_dropped(ctx);
         self.import_prompt(ctx, render_state);
         self.ribbon_tab_editor(ctx);
-        self.start_thumbnail(ctx);
+        self.start_thumbnail(render_state);
         if self.learn_open && self.project.is_some() {
             let folder = self.project.as_ref().map(|project| project.folder.clone());
             let playing = self.playing();

@@ -361,3 +361,88 @@ fn join_time_of_ten_thousand_parts() {
     );
     net.assert_converged();
 }
+
+/// A Terrain's landscape travels in the join snapshot. It didn't: every
+/// Terrain arrived flat at a quarter of its height, unpainted and bare,
+/// and since the host's own editor joins through the same snapshot, its
+/// ground went flat too the moment a session started.
+#[test]
+fn a_terrains_landscape_travels_in_the_join_snapshot() {
+    use axcenity_core::{FoliageInstance, FoliageSource, NO_WATER, SampleRect, TerrainData};
+    let mut world = World::new();
+    let workspace = world.workspace();
+    let terrain = world.create(ClassName::Terrain).unwrap();
+    world.set_parent(terrain, Some(workspace)).unwrap();
+    let (nx, nz) = (65, 33);
+    let heights: Vec<f32> = (0..nx * nz).map(|i| (i % 97) as f32 / 97.0).collect();
+    let paint = (0..nx * nz)
+        .map(|i| {
+            let mut weights = [0u8; axcenity_core::MAX_TERRAIN_LAYERS];
+            weights[i % 3] = 255;
+            weights
+        })
+        .collect();
+    let mut data = TerrainData::from_parts(nx, nz, heights, paint).unwrap();
+    data.load_foliage(vec![FoliageInstance {
+        source: FoliageSource::Model("assets/models/Juniper.glb".into()),
+        x: 10.5,
+        z: 4.25,
+        yaw: 1.0,
+        scale: 1.5,
+        collide: true,
+        lean: 0.3,
+        sink: 0.1,
+        shadow: false,
+    }]);
+    data.holes_mut_in(SampleRect::new(2, 2, 4, 4)).fill(true);
+    let mut water = vec![NO_WATER; nx * nz];
+    water[100] = 0.4;
+    assert!(data.load_water(water));
+    data.generation = Some("{\"seed\":7}".into());
+    world.set_terrain(terrain, std::sync::Arc::new(data));
+    let sent = world.terrain(terrain).unwrap().clone();
+
+    let bytes = crate::wire::encode_to_client(&crate::message::ToClient::Welcome {
+        world: crate::message::Snapshot(Box::new(world.clone())),
+        graveyard: Default::default(),
+        seq: 0,
+        last_client_seq: 0,
+        role: Role::Editor,
+        ids: None,
+        rejected: Vec::new(),
+        files: Default::default(),
+        session: String::new(),
+        epoch: 0,
+    });
+    let crate::message::ToClient::Welcome { world: arrived, .. } =
+        crate::wire::decode_to_client(&bytes).unwrap()
+    else {
+        panic!("not a Welcome");
+    };
+    let got = arrived
+        .0
+        .terrain(terrain)
+        .expect("the Terrain has its landscape");
+    assert_eq!(got.size(), (nx, nz));
+    assert_eq!(got.heights(), sent.heights());
+    assert_eq!(got.paint(), sent.paint());
+    assert_eq!(got.foliage(), sent.foliage());
+    assert_eq!(got.holes(), sent.holes());
+    assert_eq!(got.water(), sent.water());
+    assert_eq!(got.generation, sent.generation);
+
+    // The host's editor, joining its own session, keeps its own data (and
+    // its number, which its meshes and its note of what's saved go by).
+    let mut arrived = *arrived.0;
+    crate::client::keep_same_landscapes(&world, &mut arrived);
+    assert_eq!(arrived.terrain(terrain).unwrap().uid(), sent.uid());
+    // Data that differs isn't kept.
+    let mut changed = (*sent).clone();
+    changed.heights_mut_in(SampleRect::new(0, 0, 1, 1))[0] = 0.9;
+    let mut other = world.clone();
+    other.set_terrain(terrain, std::sync::Arc::new(changed));
+    let mut fresh = world.clone();
+    let before = fresh.terrain(terrain).unwrap().uid();
+    crate::client::keep_same_landscapes(&other, &mut fresh);
+    assert_eq!(fresh.terrain(terrain).unwrap().uid(), before);
+}

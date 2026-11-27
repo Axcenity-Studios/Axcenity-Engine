@@ -7,8 +7,12 @@
 //! - Windows: Windows Defender Firewall's inbound rules for this program
 //!   (`Get-NetFirewallApplicationFilter`), which is where Defender puts the
 //!   Block rules it adds when its first prompt is dismissed.
-//! - Linux: `ufw` or `firewalld`, if one is installed and answers without
-//!   root; most desktops have neither on.
+//! - Linux: `firewalld` (Fedora, openSUSE), asked whether the zone that
+//!   Tailscale's and the network's traffic arrives in opens the port, which
+//!   it answers without root and counting port ranges (Fedora Workstation
+//!   opens 1025-65535); or `ufw` (Ubuntu), whose rules need root to read.
+//!   When the port is closed, the command that opens it is given apart from
+//!   the text, for the wizard's Copy button.
 //! - macOS: the Application Firewall's answer for this program.
 
 use std::path::Path;
@@ -30,6 +34,18 @@ pub enum Verdict {
     NoRule,
     /// No firewall is on, or none was found.
     Off,
+    /// The firewall is on and doesn't open the port: others can't connect
+    /// until `command`, run in a terminal, opens it.
+    Closed {
+        firewall: &'static str,
+        command: String,
+    },
+    /// The firewall is on but won't say without administrator rights
+    /// whether the port is open; `command` opens it if it isn't.
+    MaybeClosed {
+        firewall: &'static str,
+        command: String,
+    },
     /// The firewall couldn't be asked; the text says why.
     Unknown(String),
 }
@@ -50,20 +66,37 @@ impl Verdict {
                  here now."
                 .to_owned(),
             Verdict::Off => "No firewall is blocking connections.".to_owned(),
+            Verdict::Closed { firewall, .. } => format!(
+                "{firewall} is on and doesn't let others reach Axcenity's port. Run this command \
+                 in a terminal to open it, then click Check again:"
+            ),
+            Verdict::MaybeClosed { firewall, .. } => format!(
+                "{firewall} is on, and only an administrator can see whether it lets others \
+                 reach Axcenity's port. If others can't connect, run this command in a terminal:"
+            ),
             Verdict::Unknown(why) => format!("Couldn't ask the firewall: {why}."),
+        }
+    }
+
+    /// The command that opens the port, to show apart from the text so it
+    /// can be copied whole.
+    pub fn command(&self) -> Option<&str> {
+        match self {
+            Verdict::Closed { command, .. } | Verdict::MaybeClosed { command, .. } => Some(command),
+            _ => None,
         }
     }
 
     /// Whether others may fail to reach this computer.
     pub fn is_problem(&self) -> bool {
-        matches!(self, Verdict::Blocked { .. })
+        matches!(self, Verdict::Blocked { .. } | Verdict::Closed { .. })
     }
 }
 
 /// Asks this platform's firewall about `program` (the running editor or
-/// server) listening. Blocks for up to a few seconds: call it off the UI
-/// thread.
-pub fn check(program: &Path) -> Verdict {
+/// server) listening on TCP `port`. Blocks for up to a few seconds: call
+/// it off the UI thread.
+pub fn check(program: &Path, port: u16) -> Verdict {
     if cfg!(windows) {
         match run(
             Path::new("powershell"),
@@ -86,9 +119,104 @@ pub fn check(program: &Path) -> Verdict {
             (Err(why), _) | (_, Err(why)) => Verdict::Unknown(why),
         }
     } else {
-        let ufw = run(Path::new("ufw"), &["status"]);
-        let firewalld = run(Path::new("firewall-cmd"), &["--state"]);
-        parse_linux(ufw, firewalld)
+        check_linux(port)
+    }
+}
+
+/// firewalld when it runs, else ufw.
+fn check_linux(port: u16) -> Verdict {
+    let tool = Path::new("firewall-cmd");
+    if let Ok(state) = run(tool, &["--state"])
+        && state.trim() == "running"
+    {
+        // Tailscale's interface is in a zone of its own only if someone put
+        // it there; otherwise its traffic, like the network's, meets the
+        // default zone, which `--query-port` without `--zone` asks.
+        let zone = run(tool, &["--get-zone-of-interface=tailscale0"])
+            .ok()
+            .map(|zone| zone.trim().to_owned())
+            .filter(|zone| !zone.is_empty());
+        let zone_arg = zone.as_ref().map(|zone| format!("--zone={zone}"));
+        let mut query: Vec<String> = zone_arg.iter().cloned().collect();
+        query.push(format!("--query-port={port}/tcp"));
+        let query: Vec<&str> = query.iter().map(String::as_str).collect();
+        let open = ask(tool, &query);
+        let mut info: Vec<&str> = vec!["--info-zone"];
+        let default_zone;
+        if let Some(zone) = &zone {
+            info = vec!["--info-zone", zone];
+        } else {
+            default_zone = run(tool, &["--get-default-zone"]).unwrap_or_default();
+            info.push(default_zone.trim());
+        }
+        let info = run(tool, &info).unwrap_or_default();
+        return parse_firewalld(open, &info, zone.as_deref(), port);
+    }
+    parse_ufw(run(Path::new("ufw"), &["status"]), port)
+}
+
+/// Reads firewalld's answer to `--query-port` (whether it exited well,
+/// and what it printed) and the zone's `--info-zone`, whose `target:
+/// ACCEPT` (the trusted zone) lets everything in.
+pub fn parse_firewalld(
+    query: Result<(bool, String), String>,
+    info: &str,
+    zone: Option<&str>,
+    port: u16,
+) -> Verdict {
+    let accepts_all = info
+        .lines()
+        .any(|line| line.trim().eq_ignore_ascii_case("target: ACCEPT"));
+    match query {
+        Ok((_, answer)) if answer.trim() == "yes" => Verdict::Allowed,
+        _ if accepts_all => Verdict::Allowed,
+        Ok((_, answer)) if answer.trim() == "no" => Verdict::Closed {
+            firewall: "firewalld",
+            command: firewalld_command(zone, port),
+        },
+        Ok((_, answer)) => Verdict::Unknown(format!("firewalld answered \"{}\"", answer.trim())),
+        Err(why) => Verdict::Unknown(why),
+    }
+}
+
+/// Opens `port` for good: `--permanent` keeps it after a restart, and the
+/// reload applies it now.
+pub fn firewalld_command(zone: Option<&str>, port: u16) -> String {
+    let zone = zone
+        .map(|zone| format!(" --zone={zone}"))
+        .unwrap_or_default();
+    format!(
+        "sudo firewall-cmd --permanent{zone} --add-port={port}/tcp && sudo firewall-cmd --reload"
+    )
+}
+
+/// Reads `ufw status`: off, a rule allowing `port`, none, or no answer
+/// without root.
+pub fn parse_ufw(status: Result<String, String>, port: u16) -> Verdict {
+    let command = format!("sudo ufw allow {port}/tcp");
+    match status {
+        Ok(status) if status.contains("Status: active") => {
+            let allows = status.lines().any(|line| {
+                let mut words = line.split_whitespace();
+                let target = words.next().unwrap_or("");
+                let target = target.strip_suffix("/tcp").unwrap_or(target);
+                target == port.to_string() && line.contains("ALLOW")
+            });
+            if allows {
+                Verdict::Allowed
+            } else {
+                Verdict::Closed {
+                    firewall: "ufw",
+                    command,
+                }
+            }
+        }
+        Ok(_) => Verdict::Off,
+        Err(why) if why.contains("root") => Verdict::MaybeClosed {
+            firewall: "ufw",
+            command,
+        },
+        Err(_) => Verdict::Off,
     }
 }
 
@@ -221,25 +349,24 @@ pub fn parse_macos(state: &str, app: &str) -> Verdict {
     }
 }
 
-/// Reads `ufw status` and `firewall-cmd --state`, either of which may be
-/// missing or need root.
-pub fn parse_linux(ufw: Result<String, String>, firewalld: Result<String, String>) -> Verdict {
-    match (&ufw, &firewalld) {
-        (Ok(status), _) if status.contains("Status: active") => Verdict::Unknown(
-            "ufw is on; if others can't connect, run `sudo ufw allow 47800/tcp`".to_owned(),
-        ),
-        (_, Ok(state)) if state.trim() == "running" => Verdict::Unknown(
-            "firewalld is on; if others can't connect, run `sudo firewall-cmd --add-port=47800/tcp`"
-                .to_owned(),
-        ),
-        (Ok(_), _) | (_, Ok(_)) => Verdict::Off,
-        (Err(_), Err(_)) => Verdict::Off,
+/// Runs `program` with `args` for at most five seconds and returns what
+/// it printed, or why it failed.
+fn run(program: &Path, args: &[&str]) -> Result<String, String> {
+    match ask(program, args)? {
+        (true, stdout) => Ok(stdout),
+        (false, _) => Err(LAST_STDERR.with(|e| e.take())),
     }
 }
 
-/// Runs `program` with `args` for at most five seconds and returns what
-/// it printed.
-fn run(program: &Path, args: &[&str]) -> Result<String, String> {
+std::thread_local! {
+    /// What the last [`ask`] on this thread printed as errors.
+    static LAST_STDERR: std::cell::Cell<String> = const { std::cell::Cell::new(String::new()) };
+}
+
+/// Runs `program` with `args` for at most five seconds: whether it exited
+/// well and what it printed. A question like `--query-port` answers "no"
+/// with a failing exit.
+fn ask(program: &Path, args: &[&str]) -> Result<(bool, String), String> {
     let name = program.display();
     let mut child = crate::tailscale::command(program)
         .args(args)
@@ -264,11 +391,12 @@ fn run(program: &Path, args: &[&str]) -> Result<String, String> {
     let output = child
         .wait_with_output()
         .map_err(|e| format!("couldn't read {name}'s answer: {e}"))?;
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).trim().to_owned())
-    }
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+    LAST_STDERR.with(|e| e.set(stderr));
+    Ok((
+        output.status.success(),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+    ))
 }
 
 #[cfg(test)]
@@ -338,13 +466,71 @@ mod tests {
             ),
             Verdict::Allowed
         );
+    }
+
+    #[test]
+    fn firewalld_is_asked_about_the_port_and_its_zone() {
+        // Fedora Workstation: the default zone opens 1025-65535, which
+        // `--query-port` counts.
         assert_eq!(
-            parse_linux(Err("not found".into()), Err("not found".into())),
-            Verdict::Off
+            parse_firewalld(Ok((true, "yes\n".into())), "  target: default", None, 47800),
+            Verdict::Allowed
         );
+        // A zone that lets everything in.
+        assert_eq!(
+            parse_firewalld(
+                Ok((false, "no\n".into())),
+                "trusted\n  target: ACCEPT",
+                None,
+                47800
+            ),
+            Verdict::Allowed
+        );
+        let closed = parse_firewalld(Ok((false, "no\n".into())), "  target: default", None, 47800);
+        assert!(closed.is_problem());
+        assert_eq!(
+            closed.command(),
+            Some(
+                "sudo firewall-cmd --permanent --add-port=47800/tcp && sudo firewall-cmd --reload"
+            )
+        );
+        // The command names Tailscale's zone when it has one.
+        let zoned = parse_firewalld(Ok((false, "no".into())), "", Some("home"), 47801);
+        assert!(
+            zoned
+                .command()
+                .unwrap()
+                .contains("--zone=home --add-port=47801/tcp")
+        );
+        // The text doesn't carry the command: it's shown apart, to copy.
+        assert!(!closed.explain().contains("sudo"));
         assert!(matches!(
-            parse_linux(Ok("Status: active\n".into()), Err("x".into())),
+            parse_firewalld(Err("couldn't run".into()), "", None, 47800),
             Verdict::Unknown(_)
         ));
+    }
+
+    #[test]
+    fn ufw_rules_for_the_port() {
+        assert_eq!(parse_ufw(Err("not found".into()), 47800), Verdict::Off);
+        assert_eq!(
+            parse_ufw(Ok("Status: inactive\n".into()), 47800),
+            Verdict::Off
+        );
+        let allowed = "Status: active\n\nTo                         Action      From\n\
+                       --                         ------      ----\n\
+                       47800/tcp                  ALLOW       Anywhere\n";
+        assert_eq!(parse_ufw(Ok(allowed.into()), 47800), Verdict::Allowed);
+        let other = "Status: active\n22/tcp                     ALLOW       Anywhere\n";
+        assert_eq!(
+            parse_ufw(Ok(other.into()), 47800).command(),
+            Some("sudo ufw allow 47800/tcp")
+        );
+        assert!(parse_ufw(Ok(other.into()), 47800).is_problem());
+        let root = parse_ufw(
+            Err("ERROR: You need to be root to run this script".into()),
+            47800,
+        );
+        assert!(matches!(root, Verdict::MaybeClosed { .. }) && !root.is_problem());
     }
 }

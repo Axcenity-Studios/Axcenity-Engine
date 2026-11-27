@@ -450,6 +450,8 @@ fn the_graphics_page_says_when_the_world_needs_more_than_the_memory_budgets() {
     };
     let page = |capabilities: &Capabilities, drawn: Option<&axcenity_render::RenderStats>| {
         let mut settings = GraphicsSettings::preset(Quality::High);
+        // Texture memory is under Advanced, which search opens.
+        find_setting(&ctx, "Texture memory");
         // Tall enough that nothing is scrolled out of sight.
         let input = egui::RawInput {
             screen_rect: Some(egui::Rect::from_min_size(
@@ -492,11 +494,65 @@ fn the_graphics_page_says_when_the_world_needs_more_than_the_memory_budgets() {
     };
     let text = page(&card, Some(&drawn));
     assert!(text.contains("Automatic (4096 MB)"), "{text}");
-    assert!(
-        text.contains("4096 MB budget, 2048 MB for meshes"),
-        "{text}"
-    );
+    assert!(text.contains("Textures 4096 MB · meshes 2048 MB"), "{text}");
     assert!(!text.contains("Textures here take"), "{text}");
+}
+
+/// Every control on the Graphics page has a cost tag beside it, every
+/// searchable Graphics row is one of them, and the page fits a 260-point
+/// column with Advanced open.
+#[test]
+fn every_graphics_row_has_a_cost_tag_and_fits_a_narrow_column() {
+    use super::graphics::{DRAWN_COSTS, DRAWN_ROWS, graphics_page};
+    let ctx = theme::test_context();
+    let mut settings = GraphicsSettings::preset(Quality::High);
+    let capabilities = Capabilities::default();
+    // A row under Advanced, so the fold is drawn open.
+    find_setting(&ctx, "Sun rays");
+    let mut width = 0.0;
+    let _ = crate::theme::run(&ctx, Default::default(), |ui| {
+        ui.set_max_width(260.0);
+        ui.vertical(|ui| {
+            ui.set_max_width(260.0);
+            graphics_page(ui, &mut settings, &capabilities, None);
+            width = ui.min_rect().width();
+        });
+    });
+    let drawn = |key: &str| {
+        ctx.data(|data| data.get_temp::<Vec<String>>(egui::Id::new(key)))
+            .unwrap_or_default()
+    };
+    let rows = drawn(DRAWN_ROWS);
+    assert_eq!(rows, drawn(DRAWN_COSTS), "each row drawn has its cost tag");
+    for row in SEARCHABLE
+        .iter()
+        .filter(|row| row.page == SettingsPage::Graphics)
+    {
+        if matches!(row.name, "Quality" | "Ray tracing" | "In use") {
+            continue;
+        }
+        assert!(
+            rows.iter().any(|drawn| drawn == row.name),
+            "`{}` is a row with a cost tag: {rows:?}",
+            row.name
+        );
+    }
+    assert!(rows.iter().any(|row| row == "Vignette"), "Advanced is open");
+    assert!(width <= 261.0, "the page is {width} points wide");
+    if let Some(folder) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        let mut asked = false;
+        crate::snapshot::snapshot(
+            &folder.join("settings-graphics-narrow.png"),
+            egui::vec2(260.0, 2600.0),
+            vec![Vec::new(); 3],
+            |ui| {
+                if !std::mem::replace(&mut asked, true) {
+                    find_setting(ui.ctx(), "Sun rays");
+                }
+                graphics_page(ui, &mut settings, &capabilities, None);
+            },
+        );
+    }
 }
 
 #[test]

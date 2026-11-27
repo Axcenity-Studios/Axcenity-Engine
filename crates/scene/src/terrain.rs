@@ -34,6 +34,7 @@ use axcenity_render::{
 };
 use axcenity_terrain::materials::{self, MaterialRules};
 use axcenity_terrain::mesh::{self, ChunkMesh, LOD_LEVELS};
+use axcenity_terrain::tiles::{self, Side};
 use axcenity_terrain::{CHUNK_CELLS, Placement};
 
 use crate::draw_list::image_texture;
@@ -422,9 +423,21 @@ impl TerrainCache {
                 lods[cz * chunks_x + cx] = Some(mesh::drawn_lod(&data, cx, cz, lod));
             }
         }
+        // A side of the terrain against a neighbouring tile is drawn at full
+        // detail, as the neighbour's is, so the two meet with no crack.
+        let joined = tiles::neighbours(world, id);
+        let tiled = Side::ALL.map(|side| joined.iter().any(|&(on, _)| on == side));
         let lod_at = |cx: isize, cz: isize| {
-            if cx < 0 || cz < 0 || cx as usize >= chunks_x || cz as usize >= chunks_z {
-                return None;
+            // Which sides of the terrain it's past, in `Side::ALL` order.
+            let past = [
+                cz < 0,
+                cx >= chunks_x as isize,
+                cz >= chunks_z as isize,
+                cx < 0,
+            ];
+            if past.contains(&true) {
+                let against_a_tile = past.iter().zip(tiled).any(|(&past, tiled)| past && tiled);
+                return against_a_tile.then_some(0);
             }
             lods[cz as usize * chunks_x + cx as usize]
         };
@@ -914,6 +927,83 @@ mod tests {
         let near = corners(&items[0]);
         let far = corners(&items[63]);
         assert!(near > far * 4, "{near} {far}");
+    }
+
+    #[test]
+    fn neighbouring_tiles_meet_at_full_detail_along_their_seam() {
+        let (mut world, west) = world_with_terrain();
+        let east = world.duplicate(west).unwrap();
+        world.set_parent(east, Some(world.workspace())).unwrap();
+        let position = Placement::of(world.get(west).unwrap()).unwrap().position;
+        world
+            .set_property(
+                east,
+                "Position",
+                Value::Vector3(axcenity_core::Vector3::new(
+                    position.x + 512.0,
+                    position.y,
+                    position.z,
+                )),
+            )
+            .unwrap();
+        // One landscape over both: the heights follow the world's X and Z.
+        for (id, from) in [(west, -256.0), (east, 256.0)] {
+            let mut data = (**world.terrain(west).unwrap()).clone();
+            let (size_x, _) = data.size();
+            let all = data.bounds();
+            for (i, h) in data.heights_mut_in(all).iter_mut().enumerate() {
+                let x = from + (i % size_x) as f32 * 2.0;
+                let z = (i / size_x) as f32 * 2.0;
+                *h = 0.4 + 0.2 * (x * 0.013).sin() * (z * 0.021).cos();
+            }
+            world.set_terrain(id, Arc::new(data));
+        }
+        assert_eq!(tiles::neighbours(&world, west), vec![(Side::PosX, east)]);
+        let mut cache = TerrainCache::new();
+        cache.detail_distance = 40.0;
+        let mut items = Vec::new();
+        // Far off, so both sides of the seam are coarse but for the seam.
+        cache.draw_all(
+            &world,
+            &Assets::default(),
+            &camera_at(Vec3::new(-250.0, 40.0, -250.0)),
+            &mut items,
+            &mut Vec::new(),
+        );
+        let mut seam: [HashSet<[u32; 3]>; 2] = Default::default();
+        for item in items.iter().filter(|item| item.material.terrain.is_some()) {
+            let Shape::Mesh(mesh) = &item.shape else {
+                continue;
+            };
+            let tile = usize::from(item.transform.w_axis.x > 0.0);
+            for &corner in mesh.positions() {
+                let at = item.transform.transform_point3(Vec3::from(corner));
+                if (at.x - 256.0).abs() < 1e-3 {
+                    seam[tile].insert([at.x.to_bits(), at.y.to_bits(), at.z.to_bits()]);
+                }
+            }
+        }
+        let [west_side, east_side] = seam;
+        assert_eq!(west_side.len(), 257, "every sample along the seam");
+        assert_eq!(west_side, east_side, "the same corners on both sides");
+        // Without a neighbour, the far border is drawn coarse.
+        let far: HashSet<u32> = items
+            .iter()
+            .filter(|item| item.material.terrain.is_some() && item.transform.w_axis.x > 0.0)
+            .filter_map(|item| match &item.shape {
+                Shape::Mesh(mesh) => Some((item.transform, mesh)),
+                _ => None,
+            })
+            .flat_map(|(transform, mesh)| {
+                mesh.positions()
+                    .iter()
+                    .map(move |&p| transform.transform_point3(Vec3::from(p)))
+                    .collect::<Vec<_>>()
+            })
+            .filter(|at| (at.x - 768.0).abs() < 1e-3)
+            .map(|at| at.z.to_bits())
+            .collect();
+        assert!(far.len() < 257, "{}", far.len());
     }
 
     #[test]

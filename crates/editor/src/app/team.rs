@@ -1793,6 +1793,18 @@ impl EditorApp {
                     self.generators = Default::default();
                     self.selection.clear();
                     self.selected = None;
+                    // A Terrain whose data the snapshot replaced (a member's
+                    // copy) is the session's landscape, which the mirrored
+                    // files hold: saving mustn't write it over them. The
+                    // host keeps its own data, so its unsaved terrain edits
+                    // stay unsaved.
+                    if let Some(project) = &mut self.project {
+                        for (id, now) in terrain::terrain_revisions(&self.world) {
+                            if project.saved_terrains.get(&id).map(|s| s.0) != Some(now.0) {
+                                project.saved_terrains.insert(id, now);
+                            }
+                        }
+                    }
                     self.start_team_mirror();
                     self.recover_unsent_edits();
                 }

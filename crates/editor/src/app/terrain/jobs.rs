@@ -75,6 +75,7 @@ impl EditorApp {
             title,
             job,
             erosion: false,
+            tile: None,
         });
     }
 
@@ -147,6 +148,7 @@ impl EditorApp {
             title,
             job,
             erosion: alone,
+            tile: None,
         });
     }
 
@@ -162,7 +164,16 @@ impl EditorApp {
                 }
                 Some(result) => {
                     let running = self.terrain.job.take().expect("checked above");
-                    if let Some(result) = result {
+                    if let Some(side) = running.tile {
+                        if let Some(result) = result {
+                            self.place_terrain_tile(
+                                running.terrain,
+                                side,
+                                result.data,
+                                running.title,
+                            );
+                        }
+                    } else if let Some(result) = result {
                         self.terrain.preview = Some(Preview {
                             terrain: running.terrain,
                             data: Arc::new(result.data),
