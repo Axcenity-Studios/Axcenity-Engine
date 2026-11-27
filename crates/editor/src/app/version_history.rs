@@ -169,7 +169,11 @@ impl EditorApp {
             .iter()
             .find(|version| &version.id == id)
             .map_or_else(String::new, |version| {
-                format!("\"{}\" ({})", version.label, version.when())
+                format!(
+                    "\"{}\" ({})",
+                    version.label,
+                    crate::app::local_when(version)
+                )
             });
         let title = match &restore {
             Restore::Project { .. } => "Restore the project?".to_owned(),
@@ -459,7 +463,7 @@ fn timeline(
                         },
                     );
                     text.append(
-                        &format!("\n{}", version.when()),
+                        &format!("\n{}", crate::app::local_when(version)),
                         0.0,
                         egui::TextFormat {
                             font_id: egui::FontId::proportional(theme::type_scale::SMALL),
@@ -495,7 +499,7 @@ fn change_view(
             .color(palette.text_strong),
     );
     ui.label(
-        egui::RichText::new(version.when())
+        egui::RichText::new(crate::app::local_when(version))
             .size(theme::type_scale::SMALL)
             .color(palette.text_weak),
     );
@@ -633,4 +637,19 @@ fn changed_file(
                 ui.weak(format!("and {} more lines", shown.len() - MAX_DIFF_LINES));
             }
         });
+}
+
+/// When a version was saved, in this computer's time zone ("2026-11-27
+/// 20:45:04"); the project keeps it as UTC seconds (QA-017).
+pub(crate) fn local_when(version: &axcenity_project::Version) -> String {
+    let utc = i64::try_from(version.saved_unix)
+        .ok()
+        .and_then(|secs| chrono::DateTime::from_timestamp(secs, 0));
+    match utc {
+        Some(utc) => utc
+            .with_timezone(&chrono::Local)
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string(),
+        None => version.when(),
+    }
 }

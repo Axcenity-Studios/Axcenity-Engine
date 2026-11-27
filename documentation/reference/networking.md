@@ -43,4 +43,4 @@ Set **Clients** (1 to 8) in the Home tab's Game group before Play to run several
 
 > **Known limits.** No encryption or connect tokens: LAN and trusted direct play only. No relay, matchmaking, lag compensation or replays. Tested with 8 players; larger LAN games haven't been measured. A RemoteEvent message that arrives before a handler is connected is dropped.
 
-More: [Networking](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Engine-Systems/Networking.md) and [World streaming](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Engine-Systems/World-Streaming.md) in the engineering wiki.
+More: [Networking](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Engine-Systems/Networking.md) and [World streaming](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Engine-Systems/World-Streaming.md) in the engineering wiki.

@@ -240,6 +240,11 @@ fn main() -> Result<()> {
         println!("{text}");
         return Ok(());
     }
+    // `--help` or `-h`: the usage, and a clean exit (QA-003).
+    if axcenity_release::help_flag(&all) {
+        println!("{USAGE}");
+        return Ok(());
+    }
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or(axcenity_net::LOG_FILTER),
     )

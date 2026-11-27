@@ -657,6 +657,14 @@ impl Scan {
                         );
                     }
                 }
+                // An animations-only file (takes and no meshes, like the
+                // default character's) is a clip source, not a broken model
+                // (QA-022).
+                Err(_)
+                    if self
+                        .loader
+                        .takes(&path)
+                        .is_some_and(|takes| !takes.is_empty()) => {}
                 Err(err) => self.push_file(
                     FindingKind::ImportFailure,
                     path,
@@ -775,6 +783,10 @@ impl Scan {
             return;
         }
         match kind {
+            // A clip only plays a take from its source: an animations-only
+            // file with no meshes (the default character's) is a good one,
+            // and `take_exists` checks the take (QA-022).
+            AssetKind::Model if matches!(site, Site::ClipSource { .. }) => {}
             AssetKind::Model => self.model_ref(owner, property, path, file, &pick, site),
             AssetKind::Texture => {
                 if self.loader.texture(path).is_none() {

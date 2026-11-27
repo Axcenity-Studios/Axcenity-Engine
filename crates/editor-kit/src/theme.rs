@@ -1211,6 +1211,34 @@ impl Palette {
         self
     }
 
+    /// The fill of a checkbox's box, a radio button and a slider's rail
+    /// (egui's `bg_fill`; buttons use `weak_bg_fill`, which stays
+    /// `control`). An unticked box is the only mark that a setting can be
+    /// switched, so it reaches 3:1 against panels and surfaces in every theme (WCAG
+    /// 1.4.11, QA audit QA-009); `control` alone was about 1.2:1.
+    pub fn toggle_fill(&self) -> Color32 {
+        let toward_fg = if self.dark {
+            Color32::WHITE
+        } else {
+            Color32::BLACK
+        };
+        // The tick is drawn in the text colour on this fill, so it has to
+        // stay apart from that too: the first step that clears 3:1 both
+        // ways, or else the first that clears it against the panels.
+        let boxed = |fill: Color32| contrast(fill, self.panel).min(contrast(fill, self.surface));
+        let mut first = None;
+        for step in 0..=50 {
+            let candidate = mix(self.control, toward_fg, step as f32 / 50.0);
+            if boxed(candidate) >= 3.0 {
+                if contrast(self.text, candidate) >= 3.0 {
+                    return candidate;
+                }
+                first.get_or_insert(candidate);
+            }
+        }
+        first.unwrap_or(self.control)
+    }
+
     /// The outline of a control or field: the border, or with Increase
     /// contrast the strong border, so it reaches 3:1.
     pub fn control_outline(&self) -> Color32 {
@@ -2030,6 +2058,14 @@ pub fn visuals(p: &Palette) -> egui::Visuals {
         // No growing on hover: it shifts edges by a pixel and looks jittery.
         state.expansion = 0.0;
     }
+    // Checkboxes, radio buttons and slider rails fill with `bg_fill`; it
+    // stays visible on every panel (`Palette::toggle_fill`), and lightens
+    // toward the text on hover and press rather than darkening.
+    let toggle = p.toggle_fill();
+    w.inactive.bg_fill = toggle;
+    w.open.bg_fill = toggle;
+    w.hovered.bg_fill = mix(toggle, p.text, 0.15);
+    w.active.bg_fill = mix(toggle, p.text, 0.25);
     // Pressed or focused: the ring is thicker with Increase contrast.
     w.active.bg_stroke.width = p.focus_stroke().width;
     w.noninteractive.corner_radius = corner;
@@ -2619,6 +2655,39 @@ mod tests {
             assert_eq!(quiet.focus_stroke().width, 1.0);
             let visuals = visuals(&p);
             assert_eq!(visuals.widgets.inactive.bg_stroke.color, p.border_strong);
+        }
+    }
+
+    /// QA-009: an unticked checkbox (and a radio button, and a slider's
+    /// rail) must be visible in every theme, with or without Increase
+    /// contrast, and its tick must read on its fill.
+    #[test]
+    fn checkboxes_and_slider_rails_reach_3_to_1_in_every_theme() {
+        for choice in ThemeChoice::ALL {
+            for (system_dark, high) in [(true, false), (false, false), (true, true), (false, true)]
+            {
+                let p = Palette::for_theme(choice, system_dark, Accent::Blue).with_contrast(high);
+                let label = format!("{choice:?}, system_dark {system_dark}, high {high}");
+                let visuals = visuals(&p);
+                let fill = visuals.widgets.inactive.bg_fill;
+                for background in [p.panel, p.surface] {
+                    assert!(
+                        contrast(fill, background) >= 3.0,
+                        "{label}: {:.2}",
+                        contrast(fill, background)
+                    );
+                }
+                let tick = visuals.widgets.inactive.fg_stroke.color;
+                // 3:1 in every theme but Catppuccin Latte, whose mid-grey
+                // text can't clear 3:1 on a box that clears it on the panel.
+                assert!(
+                    contrast(tick, fill) >= 2.3,
+                    "{label}: tick {:.2}",
+                    contrast(tick, fill)
+                );
+                // Buttons keep their own, quieter fill.
+                assert_eq!(visuals.widgets.inactive.weak_bg_fill, p.control, "{label}");
+            }
         }
     }
 

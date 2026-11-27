@@ -74,4 +74,4 @@ In a multiplayer game the server simulates physics. `Part:SetNetworkOwner()` let
 
 > **Known limits.** MeshParts without collision pieces collide as hulls unless set to `PreciseConvexDecomposition`. Setting `Position` stops a part. A ragdoll can bend past its joint limits for a moment on a hard landing.
 
-More: [Physics in the engineering wiki](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Engine-Systems/Physics.md).
+More: [Physics in the engineering wiki](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Engine-Systems/Physics.md).

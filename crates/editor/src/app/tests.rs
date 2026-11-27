@@ -1096,6 +1096,27 @@ fn a_folder_that_fails_to_open_in_the_background_is_reported() {
     assert!(line.text.contains("axcenity.json"), "{}", line.text);
 }
 
+/// QA-011: opening the folder the projects are kept in, rather than one
+/// of them, says so and names the projects inside.
+#[test]
+fn opening_a_folder_of_projects_names_the_projects_inside() {
+    let folder = temp_project("folder-of-projects", &[]);
+    for name in ["Alpha", "Beta"] {
+        std::fs::create_dir_all(folder.join(name)).unwrap();
+        std::fs::write(folder.join(name).join("axcenity.json"), "{}").unwrap();
+    }
+    let app = EditorApp::new(Some(&folder));
+    assert!(app.project.is_none());
+    let line = last_line(&app);
+    assert_eq!(line.kind, OutputKind::Error);
+    assert!(
+        line.text.contains("isn't an Axcenity project") && line.text.contains("`Alpha` and `Beta`"),
+        "{}",
+        line.text
+    );
+    let _ = std::fs::remove_dir_all(folder);
+}
+
 #[test]
 fn a_missing_project_folder_is_reported_in_output() {
     let app = EditorApp::new(Some(&example("no-such-project")));
@@ -2582,4 +2603,40 @@ fn every_frame_waits_for_the_display_only_when_asked() {
     assert!(frames_always_wait_for_the_display(Some("on")));
     assert!(frames_always_wait_for_the_display(Some(" ON ")));
     assert!(frames_always_wait_for_the_display(Some("1")));
+}
+
+/// Close Project waits for the viewport's screenshot to save a thumbnail;
+/// when one never comes (the cloud's software Vulkan never sent one), the
+/// project still closes after a few seconds, without a new thumbnail, rather
+/// than staying open with nothing said (QA-021).
+#[test]
+fn close_project_goes_ahead_when_the_thumbnail_screenshot_never_comes() {
+    with_big_stack(|| {
+        let folder = copy_of_example("part", "close-no-screenshot");
+        let mut app = EditorApp::new(Some(&folder));
+        let ctx = crate::theme::test_context();
+        app.viewport_rect = Some(egui::Rect::from_min_size(
+            egui::pos2(0.0, 0.0),
+            egui::vec2(200.0, 100.0),
+        ));
+        app.close_project();
+        let frame = |app: &mut EditorApp, time: f64| {
+            let input = egui::RawInput {
+                time: Some(time),
+                ..Default::default()
+            };
+            let _ = crate::theme::run(&ctx, input, |ui| {
+                let ctx = ui.ctx().clone();
+                app.start_thumbnail(&ctx);
+                app.finish_thumbnail(&ctx);
+            });
+        };
+        frame(&mut app, 1.0);
+        assert!(app.project.is_some(), "waits for the screenshot first");
+        frame(&mut app, 2.5);
+        assert!(app.project.is_some());
+        frame(&mut app, 5.0);
+        assert!(app.project.is_none(), "closed without a thumbnail");
+        let _ = std::fs::remove_dir_all(folder);
+    });
 }

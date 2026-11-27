@@ -29,7 +29,7 @@ pub mod records;
 pub mod updates;
 pub mod version;
 
-pub use build_info::{BuildInfo, BuildKind, version_flag};
+pub use build_info::{BuildInfo, BuildKind, help_flag, version_flag};
 pub use history::{
     ChangeRef, Comparison, FormatChange, History, HitKind, IssueState, LoadError, Page, Problem,
     QueryError, SearchHit, SearchQuery, TimelineEntry,

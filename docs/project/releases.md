@@ -4,7 +4,7 @@ How a tagged build becomes the installers on [GitHub Releases](https://github.co
 
 ## Version numbers
 
-**The one version is `[workspace.package] version` in the root `Cargo.toml`**, including its pre-release suffix (`0.2.0-alpha.1`). Every crate inherits it, so the editor's About box, the start page, `--version` on the editor, player and server, and the release tag all show the same number. The tag must be `v` plus that version; `axcenity-release check --tag v…` refuses anything else. Between releases, `main` carries the version of the next release, and a local build says so with its commit ("0.2.0-alpha.1 · Development · local build of 1a2b3c4d5").
+**The one version is `[workspace.package] version` in the root `Cargo.toml`**, including its pre-release suffix (`0.2.0-alpha.1`). Every crate inherits it, so the editor's About box, the start page, `--version` on the editor, player and server (each also prints its usage for `--help` or `-h`, `axcenity_release::help_flag`), and the release tag all show the same number. The tag must be `v` plus that version; `axcenity-release check --tag v…` refuses anything else. Between releases, `main` carries the version of the next release, and a local build says so with its commit ("0.2.0-alpha.1 · Development · local build of 1a2b3c4d5").
 
 SemVer 2.0, with one of three pre-release tags. The channel follows from the version and is never written separately:
 

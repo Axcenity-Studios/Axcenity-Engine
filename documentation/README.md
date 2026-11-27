@@ -44,4 +44,4 @@ Features that do not exist yet are never documented as if they were finished.
 
 - **Search** at the top of the Documentation page searches titles, headings, body text, and image descriptions, and shows matching entries in the API Reference.
 - Inline code spans naming an API symbol — such as `Part.Touched`, `Instance:FindFirstChild()`, or `task.wait()` — link straight to their API Reference entry in the editor. Every code block has a **Copy** button.
-- Looking for engine internals, architecture decision records (ADRs), or performance history? Visit the [engineering wiki](https://github.com/MrBearson321/Axcenity-Engine/blob/main/wiki/Home.md) in the source repository.
+- Looking for engine internals, architecture decision records (ADRs), or performance history? Visit the [engineering wiki](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Home.md) in the source repository.

@@ -659,7 +659,8 @@ fn a_plugin_imports_its_kind_of_file_and_hears_of_other_imports() {
 
     // The editor imports images itself, and tells the plugin.
     let image = folder.join("..").join("plugin-importer-bark.png");
-    std::fs::write(&image, b"not checked until drawn").unwrap();
+    // A real image: import refuses one whose content isn't (QA-018).
+    image::RgbImage::new(1, 1).save(&image).unwrap();
     app.import_files(
         vec![image.clone()],
         axcenity_assets::PROJECT_TEXTURES_FOLDER,
