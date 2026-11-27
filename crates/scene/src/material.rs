@@ -1014,8 +1014,9 @@ mod tests {
             ],
         );
         let material = items(&world, &blueprint_assets())[0].material.clone();
-        // The default grey counts as white, so the rest scale from there.
-        assert_eq!(material.base_color, [0.5, 0.25, 1.0]);
+        // The grid is white between its lines, so the part shows its own
+        // Color in edit mode as it does in Play (QA-005).
+        assert_eq!(material.base_color, [0.32, 0.16, 0.64]);
         assert_eq!(material.emissive, [2.0, 0.0, 0.0]);
     }
 

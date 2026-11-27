@@ -209,10 +209,14 @@ What's left in the last run:
 
 ## 10. Remaining issues and what couldn't be verified
 
-**Needs Paul's decision:**
+**Paul's decisions (2026-11-27):**
 
-- **QA-005:** new parts look almost black in edit mode because of the blueprint grid. Possible changes: a lighter grid, or blueprint off for parts from the ribbon.
-- **QA-012 and QA-024:** a new project copies 77 MB, its first open cooks 22 skin textures (about 40 s on the cloud CPU), and a one-part game builds to 136.5 MB. Both come from shipping the whole default character library (ADR-0050). Copying or cooking it on first use would shrink both.
+- **QA-005, fixed:** new parts now show their own colour in edit mode, on a light blueprint grid.
+- **QA-012 and QA-024, measured and left for now.** Paul left these to my judgement, and no cut was both safe and worth it.
+  - A new project's 77 MB is mostly the human base and the default outfit.
+  - A one-part build's 136.5 MB is the 22 skins, cooked (89 MB), plus models shipped both as `.glb` and cooked (43 MB).
+  - Leaving skins out would break `Humanoid:ApplyDescription` at runtime.
+  - Shipping models cooked-only would save about 25 MB, but it needs animation takes in the cooked format first. That's proposed as its own work.
 
 **Open, low:**
 

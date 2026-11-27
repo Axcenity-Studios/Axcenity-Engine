@@ -100,17 +100,39 @@ pub fn install(folder: &Path, palette: usize, number: usize) -> io::Result<Strin
 }
 
 /// The image parts with `BlueprintTexture` on are drawn in while editing:
-/// the Dark family's grid, whose white lines take on the part's Color. It's
-/// built into the editor and never copied into a project.
+/// the Dark family's grid turned light, white between its lines and the
+/// lines darker, so the part's Color multiplies it and a part
+/// looks its own colour in edit mode as in Play (QA-005: on the dark grid a
+/// new grey part looked almost black). It's built into the editor and never
+/// copied into a project.
 pub fn blueprint_image() -> Option<Arc<Image>> {
     static IMAGE: OnceLock<Option<Arc<Image>>> = OnceLock::new();
     IMAGE
         .get_or_init(|| {
-            let rgba = image::load_from_memory(IMAGES[0][0]).ok()?.to_rgba8();
+            let mut rgba = image::load_from_memory(IMAGES[0][0]).ok()?.to_rgba8();
+            for pixel in rgba.pixels_mut() {
+                for channel in &mut pixel.0[..3] {
+                    *channel = lighten(*channel);
+                }
+            }
             let (width, height) = rgba.dimensions();
             Some(Arc::new(Image::new(width, height, rgba.into_raw())))
         })
         .clone()
+}
+
+/// The Dark grid's background brightness, out of 255.
+const DARK_BACKGROUND: f32 = 51.0;
+/// How strongly the light grid keeps the Dark grid's lines: each pixel is
+/// the background over its brightness, to this power, so the faint lines
+/// stay faint and the main ones darkest (about half as bright as white).
+const BLUEPRINT_LINES: f32 = 0.4;
+
+/// One channel of the Dark grid turned light: its background white and its
+/// lines darker the brighter they were.
+fn lighten(channel: u8) -> u8 {
+    let ratio = DARK_BACKGROUND / f32::from(channel).max(DARK_BACKGROUND);
+    (ratio.powf(BLUEPRINT_LINES) * 255.0).round() as u8
 }
 
 /// The thumbnails decoded so far, kept in egui's memory.
@@ -173,6 +195,18 @@ mod tests {
                 assert!(image::load_from_memory(bytes).is_ok());
             }
         }
+    }
+
+    #[test]
+    fn the_blueprint_grid_is_white_between_darker_lines() {
+        // QA-005: the part's Color multiplies the grid, so a light grid
+        // shows the part's own colour in edit mode.
+        let image = blueprint_image().expect("the built-in grid decodes");
+        let red: Vec<u8> = image.rgba().chunks(4).map(|pixel| pixel[0]).collect();
+        let mean = red.iter().map(|&v| f64::from(v)).sum::<f64>() / red.len() as f64 / 255.0;
+        let darkest = f32::from(*red.iter().min().unwrap()) / 255.0;
+        assert!(mean > 0.95, "mostly white: {mean}");
+        assert!((0.45..0.6).contains(&darkest), "its lines show: {darkest}");
     }
 
     fn scratch(test: &str) -> std::path::PathBuf {
