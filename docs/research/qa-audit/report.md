@@ -146,7 +146,7 @@ Full wording in [findings.md](findings.md).
 | QA-015 | Transparency, PlaybackSpeed, Volume, RollOff and others are limited to useful ranges | `transparency_is_limited_to_0_to_1` |
 | QA-016 | "about 4 minutes ago", "1 document" | `the_age_of_a_copy_reads_as_words` |
 | QA-017 | Version History shows local time | used by its tests |
-| QA-014 | A test that overflowed the 2 MB test stack runs on a big stack | itself |
+| QA-014 | 12 editor tests that overflowed the 2 MB test stack (11 Collaborate tests and AutoRecover's prompt; they failed on `main` under nextest on Paul's Linux computer) run on a big stack | themselves |
 | QA-004 | Getting started names the real samples folder; GitHub links follow the renamed account | docs |
 
 The audit also added a per-test runner ([run-each.sh](run-each.sh)) for machines without nextest.
@@ -221,7 +221,7 @@ All runs in the cloud container:
 1. **Decide QA-005 and QA-012/QA-024.** They're what a beginner meets first: a black part, and a large, slow first project and build.
 2. **Run the full suite on a real machine before merging** (`cargo nextest run --workspace`), since the cloud couldn't run render and player in full.
 3. **Give every system picker one fallback.** Route them through one helper that says when no picker opened (the QA-023 check), and offer a typed path where it matters (Import, Back Up).
-4. **Keep the test suite runnable without nextest.** Two tests depended on nextest's 8 MB main-thread stack or on AccessKit being on. The wiki's Testing strategy page now says what plain `cargo test` needs.
+4. **Keep the test suite runnable without nextest.** Twelve tests overflowed the 2 MB test stack (under nextest too) and one depended on AccessKit being on. The wiki's Testing strategy page now says what plain `cargo test` needs.
 5. **Add a "first five minutes" test.** Make a Baseplate project, insert a part, Play, Stop, Build Game, and assert no warnings. Two High findings would have been caught by one test like that; `every_template_passes_asset_check` is the start of it.
 
 ## 12. Ratings

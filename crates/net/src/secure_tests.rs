@@ -274,3 +274,20 @@ fn an_unsecured_server_is_joined_unsecured_unless_it_was_secured_before() {
         "{seen:?}"
     );
 }
+
+#[test]
+fn any_port_gives_the_game_and_its_token_port_one_number_and_a_taken_one_is_refused() {
+    // QA-026: port 0 binds UDP first, then TCP on the same number, which
+    // another program may hold; port 0 tries again, a chosen port doesn't.
+    let held = std::net::TcpListener::bind(("0.0.0.0", 0)).unwrap();
+    let taken = held.local_addr().unwrap().port();
+    let secured = Secured::new(ServerCert::generate());
+    let err = crate::transport::bind_game_and_token_ports(taken, &secured, rules(None))
+        .err()
+        .expect("a chosen port that TCP can't have is refused");
+    assert_eq!(err.kind(), std::io::ErrorKind::AddrInUse);
+
+    let (socket, tokens) =
+        crate::transport::bind_game_and_token_ports(0, &secured, rules(None)).unwrap();
+    assert_eq!(socket.local_addr().unwrap().port(), tokens.port());
+}
