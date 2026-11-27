@@ -8,10 +8,10 @@ Axcenity's core workflow works from start to finish. In the real editor, driven 
 
 The audit found 29 issues: 2 High, 7 Medium and 20 Low. None are Critical (crash, data loss, security). Of the 29:
 
-- 20 are fixed on the branch, each with a regression test where code changed.
+- 21 are fixed, each with a regression test where code changed. QA-005 was fixed after Paul's call.
 - 1 is partly fixed (QA-013).
 - 2 are not product bugs (QA-010, and QA-019, a test-environment limit).
-- 3 need Paul's decision because they are deliberate designs (QA-005, QA-012, QA-024).
+- 2 were measured and left for now with Paul's leave: QA-012 and QA-024. Section 10 says why.
 - 3 are open. They are tests that fail only under load, and they failed on `main` too (QA-025, QA-028, QA-029).
 
 The full test suite (`cargo nextest run --workspace`, 5,680 tests) was then run on Paul's Linux computer (RX 9070 XT):
@@ -242,7 +242,7 @@ What's left in the last run:
 
 ## 11. Recommendations
 
-1. **Decide QA-005 and QA-012/QA-024.** They're what a beginner meets first: a black part, and a large, slow first project and build.
+1. **Shrink builds safely.** Cook animation takes with the model, so a build can ship models cooked-only, which saves about 25 MB on a one-part game (QA-024). The skins have to stay, because scripts can change a character's skin.
 2. **Run the full suite on a real machine before merging** (`cargo nextest run --workspace`), since the cloud couldn't run render and player in full.
 3. **Give every system picker one fallback.** Route them through one helper that says when no picker opened (the QA-023 check), and offer a typed path where it matters (Import, Back Up).
 4. **Keep the test suite runnable without nextest.** Twelve tests overflowed the 2 MB test stack (under nextest too) and one depended on AccessKit being on. The wiki's Testing strategy page now says what plain `cargo test` needs.
@@ -256,7 +256,7 @@ Out of 10, from what this audit ran. Anything left unverified pulls a rating tow
 |---|---|---|
 | Functionality | **7.5** | Every step of the beginner workflow works in the real editor, and the feature set is very broad: scripting, blocks, terrain, animation, UI, Collaborate, building games. Two High bugs sat right on the first-project path. Some areas were checked only by their tests. |
 | Stability | **7** | No crash in any GUI or CLI run. AutoRecover after `kill -9` works, damaged project files open with a message, and the script watchdog works. The full suite passes on a real GPU, apart from two load-sensitive tests. Against that: one hang (QA-021), a damaged settings file wiped silently (QA-020), and 11 tests aborting on `main`. Networking wasn't checked by hand. |
-| Beginner friendliness | **6** | The Learn page, templates, plain-language errors and a working first Play are strong. A new part looks black until Play (QA-005). A new project is 77 MB with a 40 s background cook, and a one-part game is 136 MB. Pickers can fail silently on some Linux desktops. |
+| Beginner friendliness | **6** | The Learn page, templates, plain-language errors and a working first Play are strong. New parts looked black until Play (QA-005, now fixed). A new project is 77 MB with a 40 s background cook, and a one-part game is 136 MB. Pickers can fail silently on some Linux desktops. |
 | UI/UX | **6.5** | The design system is consistent and panels fit narrow columns. But unticked checkboxes were nearly invisible in every theme (QA-009), a dialog's buttons jumped (QA-008), and the ribbon and settings are dense for a newcomer. |
 | Performance | **6** (low confidence) | Not measurable on lavapipe. Earlier PC benchmarks put the XB10k frame at 5.14 ms, slower than s&box (2.05) and Unity (3.11) but faster than Godot (10.27). Memory stayed flat over repeated Play at 2.31 GB. The first open's texture cook and build sizes are heavy. |
 | Settings | **7** | Every page opens and responds, the input settings reset, and a damaged file is now kept and reported. Limits, reset to default and restart notes weren't checked by hand. |
