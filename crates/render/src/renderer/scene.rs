@@ -1,3 +1,4 @@
+use super::lamp_shadows::LampDraw;
 use super::*;
 use rustc_hash::FxHashMap;
 
@@ -1293,7 +1294,10 @@ impl ScenePipeline {
             }
         }
         self.casters_planned = casters.iter().map(Vec::len).sum();
-        let mut view_casters = casters_in_views(&casters, &shadow_view_list);
+        // Swaying casters move with the clock while the wind blows.
+        let windy = glam::Vec2::new(list.wind.x, list.wind.z).length() >= 1e-3;
+        let mut view_casters =
+            casters_in_views(&casters, &shadow_view_list, self.cut_out_cascades, windy);
         cpu.lap(CpuSection::Casters);
         // Water reflecting the screen traces rays too, with the GPU (LE5).
         let water_rays = water_mode.traces_rays(&self.graphics);
@@ -1369,7 +1373,7 @@ impl ScenePipeline {
                     )
                 })
                 .collect();
-            casters_by_view.push((groups, view.left_out));
+            casters_by_view.push((groups, view.left_out, view.still_groups));
             pieces.extend(view.instances.iter().map(Vec::as_slice));
             instance_count += view.instances.iter().map(Vec::len).sum::<usize>() as u32;
         }
@@ -1499,12 +1503,19 @@ impl ScenePipeline {
                 debug_assert!(
                     size.size <= SHADOW_MAP_SIZE && size.cascades as usize <= SHADOW_CASCADES
                 );
-                let (array, layers) =
-                    create_shadow_views(&self.device, "shadow map", size.size, size.cascades);
+                let (texture, array, layers) = create_shadow_layers(
+                    &self.device,
+                    "shadow map",
+                    (size.size, size.cascades),
+                    false,
+                );
                 ShadowMap {
                     size,
                     _alive: self.shadow_maps_alive.clone(),
                     bytes: target_bytes((size.size, size.size, size.cascades), DEPTH_FORMAT, 1),
+                    drawn_from: vec![None; layers.len()],
+                    kept: None,
+                    texture,
                     array,
                     layers,
                 }
@@ -1514,12 +1525,19 @@ impl ScenePipeline {
         if self.spot_shadow_map.as_ref().map(|map| map.size) != spot_map {
             self.spot_shadow_map = spot_map.map(|size| {
                 debug_assert!(size.lights as usize <= MAX_SPOT_SHADOWS);
-                let (array, layers) =
-                    create_shadow_views(&self.device, "spot shadow map", size.size, size.lights);
+                let (texture, array, layers) = create_shadow_layers(
+                    &self.device,
+                    "spot shadow map",
+                    (size.size, size.lights),
+                    true,
+                );
                 ShadowMap {
                     size,
                     _alive: self.spot_shadow_maps_alive.clone(),
                     bytes: target_bytes((size.size, size.size, size.lights), DEPTH_FORMAT, 1),
+                    drawn_from: vec![None; layers.len()],
+                    kept: None,
+                    texture,
                     array,
                     layers,
                 }
@@ -1530,12 +1548,19 @@ impl ScenePipeline {
             self.point_shadow_map = point_map.map(|size| {
                 debug_assert!(size.lights as usize <= MAX_POINT_SHADOWS);
                 let count = size.lights * POINT_SHADOW_FACES;
-                let (array, layers) =
-                    create_shadow_views(&self.device, "point shadow map", size.size, count);
+                let (texture, array, layers) = create_shadow_layers(
+                    &self.device,
+                    "point shadow map",
+                    (size.size, count),
+                    true,
+                );
                 ShadowMap {
                     size,
                     _alive: self.point_shadow_maps_alive.clone(),
                     bytes: target_bytes((size.size, size.size, count), DEPTH_FORMAT, 1),
+                    drawn_from: vec![None; layers.len()],
+                    kept: None,
+                    texture,
                     array,
                     layers,
                 }
@@ -1649,7 +1674,7 @@ impl ScenePipeline {
         let mut counts = FrameCounts {
             items_submitted,
             items_culled: culled + past_cull_distance,
-            shadow_casters_culled: casters_by_view.iter().map(|(_, culled)| culled).sum(),
+            shadow_casters_culled: casters_by_view.iter().map(|(_, culled, _)| culled).sum(),
             sprites_culled,
             decals_drawn: list.decals.len() as u32 - decals_left_out,
             decals_left_out,
@@ -1676,24 +1701,95 @@ impl ScenePipeline {
         let (cascade_casters, lamp_casters) = casters_by_view.split_at(cascades);
         let (spot_casters, point_casters) =
             lamp_casters.split_at(planned_lights.spot_shadows.len());
-        let cascades = self
-            .shadow_map
+        // Each lamp view keeps its layer, draws it, or draws its moving
+        // casters over its kept still ones (renderer/lamp_shadows.rs).
+        let lamp_views = &view_casters[cascades..];
+        let lamp_matrices = (planned_lights.spot_shadows.iter())
+            .map(|spot| spot.view_proj)
+            .chain(
+                planned_lights
+                    .point_shadows
+                    .iter()
+                    .flat_map(|point| point.faces),
+            );
+        let prints: Vec<Option<u64>> = lamp_views
             .iter()
-            .flat_map(|map| map.layers.iter().zip(cascade_casters).enumerate());
-        let spots = self
-            .spot_shadow_map
+            .zip(lamp_matrices)
+            .map(|(view, matrix)| {
+                (!lamp_shadows::redrawn_every_frame()).then(|| {
+                    lamp_shadows::fingerprint(
+                        matrix,
+                        view,
+                        |mesh| self.gpu_mesh(mesh).map(|mesh| mesh.version),
+                        |material| self.cut_out_material(&uses, material).serial,
+                    )
+                })
+            })
+            .collect();
+        let moving: Vec<bool> = lamp_views
             .iter()
-            .flat_map(|map| map.layers.iter().zip(spot_casters).enumerate())
-            .map(|(index, view)| (SHADOW_CASCADES + index, view));
-        let points = self
-            .point_shadow_map
-            .iter()
-            .flat_map(|map| map.layers.iter().zip(point_casters).enumerate())
-            .map(|(index, view)| (SHADOW_CASCADES + MAX_SPOT_SHADOWS + index, view));
+            .map(|view| view.still_groups < view.groups.len())
+            .collect();
+        let spot_count = planned_lights.spot_shadows.len();
+        let spot_plans = lamp_shadows::plan_layers(
+            &self.device,
+            self.spot_shadow_map.as_mut(),
+            &prints[..spot_count],
+            &moving[..spot_count],
+        );
+        let point_plans = lamp_shadows::plan_layers(
+            &self.device,
+            self.point_shadow_map.as_mut(),
+            &prints[spot_count..],
+            &moving[spot_count..],
+        );
+        // Views whose still casters weren't drawn again.
+        let lamp_views_kept = (spot_plans.iter().chain(&point_plans))
+            .filter(|plan| matches!(plan, LampDraw::Kept | LampDraw::Over { still: false }))
+            .count();
+        let mut lamp_shadow_draws = 0;
+        // Each view: its index in `cascade_buffer`, what it does, its map's
+        // texture, kept still casters and layer, and its casters.
+        let cascades = self.shadow_map.iter().flat_map(|map| {
+            let layers = map.layers.iter().zip(cascade_casters).enumerate();
+            layers.map(move |(index, view)| {
+                (
+                    index,
+                    LampDraw::All,
+                    (&map.texture, map.kept.as_ref(), index),
+                    view,
+                )
+            })
+        });
+        let spots = self.spot_shadow_map.iter().flat_map(|map| {
+            let layers = map.layers.iter().zip(spot_casters).enumerate();
+            layers.map(|(index, view)| {
+                (
+                    SHADOW_CASCADES + index,
+                    spot_plans[index],
+                    (&map.texture, map.kept.as_ref(), index),
+                    view,
+                )
+            })
+        });
+        let points = self.point_shadow_map.iter().flat_map(|map| {
+            let layers = map.layers.iter().zip(point_casters).enumerate();
+            layers.map(|(index, view)| {
+                let at = SHADOW_CASCADES + MAX_SPOT_SHADOWS + index;
+                (
+                    at,
+                    point_plans[index],
+                    (&map.texture, map.kept.as_ref(), index),
+                    view,
+                )
+            })
+        });
         let mut cascades_timed = [false; SHADOW_CASCADES];
-        let mut cascade_counts = [(0u32, 0u64); SHADOW_CASCADES];
+        let mut cascade_counts = [(0u32, 0u64, 0u32); SHADOW_CASCADES];
         let mut after_cascades = false;
-        for (index, (layer, (casters, _))) in cascades.chain(spots).chain(points) {
+        for (index, plan, (texture, kept, at), (layer, (casters, _, still))) in
+            cascades.chain(spots).chain(points)
+        {
             // A cascade waiting its turn keeps what it drew: not even cleared.
             if index < SHADOW_CASCADES && !cascade_drawn[index] {
                 continue;
@@ -1707,89 +1803,120 @@ impl ScenePipeline {
                     after_cascades = true;
                 }
             }
-            let (mut view_casters, mut view_triangles) = (0u32, 0u64);
+            let (still_casters, moving_casters) = casters.split_at(*still);
+            // What's drawn into which layer, cleared first or not, with a
+            // copy of the kept still casters into the layer between.
+            let steps: Vec<ShadowStep> = match (plan, kept) {
+                // A lamp's view with nothing changed keeps its layer too.
+                (LampDraw::Kept, _) => continue,
+                (LampDraw::Still, _) => vec![ShadowStep::Draw(layer, true, still_casters)],
+                (LampDraw::Over { still }, Some(kept)) => {
+                    let mut steps = Vec::with_capacity(3);
+                    if still {
+                        steps.push(ShadowStep::Draw(&kept.layers[at], true, still_casters));
+                    }
+                    steps.push(ShadowStep::Copy);
+                    steps.push(ShadowStep::Draw(layer, false, moving_casters));
+                    steps
+                }
+                _ => vec![ShadowStep::Draw(layer, true, casters)],
+            };
+            let (mut view_casters, mut view_triangles, mut view_draws) = (0u32, 0u64, 0u32);
             // Each view with enough casters is a part of its own.
             if casters.len() >= encoders::WORTH_A_PART {
                 encoder.part("shadow view");
             }
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("shadow view"),
-                color_attachments: &[],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: layer,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                ..Default::default()
-            });
-            pass.set_pipeline(&self.shadow_pipeline);
-            let offset = (index as u64 * CASCADE_UNIFORM_STRIDE) as u32;
-            pass.set_bind_group(0, &self.shadow_bind_group, &[offset]);
-            pass.set_bind_group(1, &self.skinning.empty, &[]);
-            pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            // Which caster group's pipeline and material are bound: a
-            // cut-out's are its own, every other caster's the plain ones.
-            let mut bound: Option<u32> = None;
-            // A cut-out's material where this view draws it through its
-            // holes: a lamp's view and the sun's nearest cascades do, and
-            // every cascade for a hair card. Past them it casts whole.
-            let near = index >= SHADOW_CASCADES || index < self.cut_out_cascades;
-            let through = |cut_out: &Option<lighting::CutOutCaster>| {
-                cut_out
-                    .filter(|cut_out| near || cut_out.every_cascade)
-                    .map(|cut_out| cut_out.material)
-            };
-            // See-through items, and parts with `CastShadow` off, cast no shadow.
-            // Whole casters first, then the cut-outs: a shadow map keeps
-            // the nearest depth whatever the order, and a plant's whole
-            // and cut-out parts would otherwise change the pipeline mesh
-            // by mesh.
-            let whole = casters
-                .iter()
-                .filter(|((_, cut_out), _)| through(cut_out).is_none());
-            let cut_outs = casters
-                .iter()
-                .filter(|((_, cut_out), _)| through(cut_out).is_some());
-            for ((mesh, cut_out), instances) in whole.chain(cut_outs) {
-                let Some(mesh) = self.gpu_mesh(*mesh) else {
-                    continue;
-                };
-                let cut_out = &through(cut_out);
-                if *cut_out != bound {
-                    match cut_out {
-                        Some(material) => {
-                            let gpu = uses
-                                .materials
-                                .get(*material as usize)
-                                .and_then(|key| self.materials.get(key))
-                                .and_then(|cached| cached.gpu.as_ref())
-                                .unwrap_or(&self.plain_material);
-                            pass.set_pipeline(&self.shadow_cut_out_pipeline);
-                            pass.set_bind_group(1, &gpu.bind_group, &[]);
-                        }
-                        None => {
-                            pass.set_pipeline(&self.shadow_pipeline);
-                            pass.set_bind_group(1, &self.skinning.empty, &[]);
-                        }
+            for step in steps {
+                let (target, clear, groups) = match step {
+                    ShadowStep::Draw(target, clear, groups) => (target, clear, groups),
+                    ShadowStep::Copy => {
+                        let Some(kept) = kept else { continue };
+                        let layer_of = |texture| wgpu::TexelCopyTextureInfo {
+                            texture,
+                            mip_level: 0,
+                            origin: wgpu::Origin3d {
+                                x: 0,
+                                y: 0,
+                                z: at as u32,
+                            },
+                            aspect: wgpu::TextureAspect::All,
+                        };
+                        let size = texture.size();
+                        encoder.copy_texture_to_texture(
+                            layer_of(&kept.texture),
+                            layer_of(texture),
+                            wgpu::Extent3d {
+                                depth_or_array_layers: 1,
+                                ..size
+                            },
+                        );
+                        continue;
                     }
-                    bound = *cut_out;
+                };
+                let load = if clear {
+                    wgpu::LoadOp::Clear(1.0)
+                } else {
+                    wgpu::LoadOp::Load
+                };
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("shadow view"),
+                    color_attachments: &[],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: target,
+                        depth_ops: Some(wgpu::Operations {
+                            load,
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    }),
+                    ..Default::default()
+                });
+                pass.set_pipeline(&self.shadow_pipeline);
+                let offset = (index as u64 * CASCADE_UNIFORM_STRIDE) as u32;
+                pass.set_bind_group(0, &self.shadow_bind_group, &[offset]);
+                pass.set_bind_group(1, &self.skinning.empty, &[]);
+                pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+                // Which caster group's pipeline and material are bound: a
+                // cut-out's are its own, every other caster's the plain ones.
+                let mut bound: Option<u32> = None;
+                // See-through items, and parts with `CastShadow` off, cast
+                // no shadow. The groups come whole casters first, then
+                // cut-outs by material (`casters_in_views`), so the pipeline
+                // changes once.
+                for ((mesh, cut_out), instances) in groups {
+                    let Some(mesh) = self.gpu_mesh(*mesh) else {
+                        continue;
+                    };
+                    if *cut_out != bound {
+                        match cut_out {
+                            Some(material) => {
+                                let gpu = self.cut_out_material(&uses, *material);
+                                pass.set_pipeline(&self.shadow_cut_out_pipeline);
+                                pass.set_bind_group(1, &gpu.bind_group, &[]);
+                            }
+                            None => {
+                                pass.set_pipeline(&self.shadow_pipeline);
+                                pass.set_bind_group(1, &self.skinning.empty, &[]);
+                            }
+                        }
+                        bound = *cut_out;
+                    }
+                    pass.set_bind_group(2, self.skin_group(mesh), &[]);
+                    pass.set_vertex_buffer(0, mesh.vertices.slice(..));
+                    pass.set_index_buffer(mesh.indices.slice(..), mesh.index_format);
+                    count(mesh, instances);
+                    shadow_casters_drawn += instances.end - instances.start;
+                    view_casters += instances.end - instances.start;
+                    view_triangles += u64::from(mesh.index_count / 3)
+                        * u64::from(instances.end - instances.start);
+                    view_draws += 1;
+                    pass.draw_indexed(0..mesh.index_count, 0, instances.clone());
                 }
-                pass.set_bind_group(2, self.skin_group(mesh), &[]);
-                pass.set_vertex_buffer(0, mesh.vertices.slice(..));
-                pass.set_index_buffer(mesh.indices.slice(..), mesh.index_format);
-                count(mesh, instances);
-                shadow_casters_drawn += instances.end - instances.start;
-                view_casters += instances.end - instances.start;
-                view_triangles +=
-                    u64::from(mesh.index_count / 3) * u64::from(instances.end - instances.start);
-                pass.draw_indexed(0..mesh.index_count, 0, instances.clone());
             }
-            drop(pass);
             if index < SHADOW_CASCADES {
-                cascade_counts[index] = (view_casters, view_triangles);
+                cascade_counts[index] = (view_casters, view_triangles, view_draws);
+            } else {
+                lamp_shadow_draws += view_draws;
             }
         }
         if let Some(timer) = timer
@@ -2366,8 +2493,11 @@ impl ScenePipeline {
             );
         }
         counts.shadow_casters_drawn = shadow_casters_drawn;
-        counts.cascade_casters = cascade_counts.map(|(casters, _)| casters);
-        counts.cascade_triangles = cascade_counts.map(|(_, triangles)| triangles);
+        counts.cascade_casters = cascade_counts.map(|(casters, _, _)| casters);
+        counts.cascade_triangles = cascade_counts.map(|(_, triangles, _)| triangles);
+        counts.cascade_draws = cascade_counts.map(|(_, _, draws)| draws);
+        counts.lamp_shadow_draws = lamp_shadow_draws;
+        counts.lamp_views_kept = lamp_views_kept as u32;
         self.counts = counts;
         match &self.frame_targets.temporal {
             Some(temporal) => {
@@ -2855,9 +2985,12 @@ impl ScenePipeline {
 
     pub(super) fn stats(&self) -> RenderStats {
         let counts = self.counts;
+        // A lamp's map with its kept still casters.
+        let kept =
+            |kept: &Option<lamp_shadows::KeptLayers>| kept.as_ref().map_or(0, |kept| kept.bytes);
         let shadow_bytes = self.shadow_map.as_ref().map_or(0, |map| map.bytes)
-            + self.spot_shadow_map.as_ref().map_or(0, |map| map.bytes)
-            + self.point_shadow_map.as_ref().map_or(0, |map| map.bytes);
+            + (self.spot_shadow_map.as_ref()).map_or(0, |map| map.bytes + kept(&map.kept))
+            + (self.point_shadow_map.as_ref()).map_or(0, |map| map.bytes + kept(&map.kept));
         let sheet_bytes = self.turned_text.sheet.as_ref().map_or(0, |(sheet, _, _)| {
             target_bytes((sheet.width(), sheet.height(), 1), sheet.format(), 1)
         });
@@ -2896,6 +3029,9 @@ impl ScenePipeline {
                 .map_or([None; SHADOW_CASCADES], gpu_timer::GpuTimer::last_cascades),
             cascade_casters: counts.cascade_casters,
             cascade_triangles: counts.cascade_triangles,
+            cascade_draws: counts.cascade_draws,
+            lamp_shadow_draws: counts.lamp_shadow_draws,
+            lamp_views_kept: counts.lamp_views_kept,
             pass_times: self
                 .gpu_timer
                 .as_ref()
@@ -2994,6 +3130,18 @@ impl ScenePipeline {
 
     pub(super) fn gpu_mesh(&self, key: MeshKey) -> Option<&GpuMesh> {
         gpu_mesh_in(&self.meshes, &self.custom_meshes, key)
+    }
+
+    /// The binding a shadow view draws a cut-out caster through: its
+    /// material (`material`, its index in `uses`), or the plain one for a
+    /// caster without holes ([`lighting::CutOutCaster::NO_HOLES`]) or a
+    /// material not bound yet.
+    pub(super) fn cut_out_material(&self, uses: &FrameUses, material: u32) -> &GpuMaterial {
+        uses.materials
+            .get(material as usize)
+            .and_then(|key| self.materials.get(key))
+            .and_then(|cached| cached.gpu.as_ref())
+            .unwrap_or(&self.plain_material)
     }
 
     /// Shapes and uploads the UI text in `ui`, with its rich text runs,
@@ -4023,4 +4171,16 @@ fn create_shadow_bind_group(
             },
         ],
     })
+}
+
+/// One step of drawing a shadow view: casters drawn into a layer (cleared
+/// first, or over what it holds), or a lamp's kept still casters copied
+/// into its layer (renderer/lamp_shadows.rs).
+enum ShadowStep<'a> {
+    Draw(
+        &'a wgpu::TextureView,
+        bool,
+        &'a [(lighting::CasterGroup, Range<u32>)],
+    ),
+    Copy,
 }

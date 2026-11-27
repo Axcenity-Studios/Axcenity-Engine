@@ -1301,6 +1301,11 @@ impl ClassName {
                     // Whether parts around it cast shadows. Off, so worlds
                     // saved without it look as they did.
                     ("Shadows", Value::Bool(false)),
+                    // Studs from the light before anything casts its
+                    // shadows, every way (and past its own part, if it's in
+                    // one): the size of a fixture it sits inside, such as a
+                    // lantern's frame, so that doesn't shadow its own light.
+                    ("ShadowStart", Value::Number(0.0)),
                 ],
                 free_standing_properties(),
             ]
@@ -1319,6 +1324,11 @@ impl ClassName {
                     // Whether parts in the beam cast shadows. Off, so worlds
                     // saved without it look as they did.
                     ("Shadows", Value::Bool(false)),
+                    // Studs from the light before anything casts its
+                    // shadows, every way (and past its own part, if it's in
+                    // one): the size of a fixture it sits inside, such as a
+                    // lantern's frame, so that doesn't shadow its own light.
+                    ("ShadowStart", Value::Number(0.0)),
                 ],
                 free_standing_properties(),
             ]
@@ -1336,6 +1346,11 @@ impl ClassName {
                     // The way its front faces, as a SpotLight's Direction.
                     ("Direction", Value::Vector3(Vector3::new(0.0, -1.0, 0.0))),
                     ("Shadows", Value::Bool(false)),
+                    // Studs from the light before anything casts its
+                    // shadows, every way (and past its own part, if it's in
+                    // one): the size of a fixture it sits inside, such as a
+                    // lantern's frame, so that doesn't shadow its own light.
+                    ("ShadowStart", Value::Number(0.0)),
                 ],
                 free_standing_properties(),
             ]

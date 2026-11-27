@@ -1520,6 +1520,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "If true, parts around the light cast shadows on every side of it. Only the few point lights nearest the camera do, as the graphics settings allow.",
     ),
     (
+        ClassName::PointLight,
+        "ShadowStart",
+        "Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.",
+    ),
+    (
         ClassName::SpotLight,
         "Enabled",
         "If false, the light is off.",
@@ -1549,6 +1554,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::SpotLight,
         "Shadows",
         "If true, parts in the beam cast shadows. Only the few spot lights nearest the camera do, as the graphics settings allow.",
+    ),
+    (
+        ClassName::SpotLight,
+        "ShadowStart",
+        "Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.",
     ),
     (
         ClassName::PointLight,
@@ -1625,6 +1635,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::RectLight,
         "Shadows",
         "If true, parts in front of it cast shadows. Only the few lights nearest the camera do, as the graphics settings allow.",
+    ),
+    (
+        ClassName::RectLight,
+        "ShadowStart",
+        "Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.",
     ),
     (
         ClassName::ReflectionProbe,

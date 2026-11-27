@@ -586,6 +586,46 @@ The runs' ranges are within 1% of their medians, one run excepted (the hero's th
 
 **Not run**: the larger window, the tour, Unity again (its port still ends shadows at 35%), DirectX 12 or another card, the regression check (`axcenity-bench-check`). Tests run: `cargo test -p axcenity-render` (507 passed), the `ui` and `core` crates' library tests, `cargo clippy --workspace --all-targets -- -D warnings`.
 
+## Shadow views by mesh, lamp faces kept, and the porch lamp's lantern (2026-11-26, seventh session)
+
+The sixth session's diagnosis of the owner's Profiler reading at dusk (10,607 draw calls, Shadows 4.10 ms, "z-fighting" on the front door) found three engine causes; the owner asked for all three to be fixed, with the picture kept where it should be. Everything here is from the still tool (`crate-s4`, `SHOT_COUNTS=1`) at 1920 × 1080, the owner's Ultra with TAA (`owner-ultra.json`; ray traced: `owner-rt-all.json`), the eight views of `step6/door-maps` (front, oblique, grazing and yard, by day and at dusk with the six lamps lit as `homestead.server.lua` lights them). Both builds drew a frozen copy of the project (the owner was saving it meanwhile, which made the first comparison wrong); "before" is the same engine built from a worktree at `7956a6b7` with the fifth session's changes. GPU and CPU times are one run each, the CPU's the mean of frames 8 to 31.
+
+### What was changed
+
+- **Each shadow view draws a mesh once** (`lighting::casters_in_views`): it sorts its casters by the material it draws them through and their mesh (one packed key, `caster_order`), not by the scene's order, which starts with the camera's distance band.
+- **A lamp's face is drawn again only where it changed** (`renderer/lamp_shadows.rs`): its still casters' fingerprint is kept with its layer, and the same fingerprint keeps the layer. Swaying plants (the world's wind is 4.5, 0, −2.5) and posed casters move every frame: they're drawn every frame over a copy of the still casters, kept in a second depth array (100 MB at Ultra). Without that split only 5 of the 24 faces were kept, since every lamp reaches plants.
+- **`ShadowStart`** on PointLight, SpotLight and RectLight: studs from the light before anything casts its shadows, for a light inside a fixture that's part of a larger mesh.
+
+### Draws, triangles and time
+
+The same pixels before and after in all sixteen stills (maps and ray traced), and with `AXCENITY_NO_LAMP_SHADOW_KEEP=1`.
+
+| View | Draw calls | Shadow views' draws | Of those, lamp faces' after (faces kept of 24; drawn every frame, without keeping) | Triangles | Shadows (GPU) | Frame's thread (CPU) |
+|---|---|---|---|---|---|---|
+| Front, day | 7,826 → 3,745 | 5,776 → 1,695 | none | 13.0 M | 3.32 → 3.27 ms | 7.01 → 6.46 ms |
+| Oblique, day | 6,957 → 3,701 | 4,751 → 1,495 | none | 10.5 M | 3.21 → 3.18 | 6.33 → 6.18 |
+| Grazing, day | 7,027 → 3,725 | 4,830 → 1,528 | none | 10.9 M | 3.25 → 3.21 | 6.30 → 6.24 |
+| Yard, day | 7,581 → 3,885 | 5,382 → 1,686 | none | 12.5 M | 3.05 → 3.03 | 6.92 → 6.73 |
+| Front, dusk | 10,019 → 4,101 | 7,980 → 2,062 | 246 (24; 2,138) | 18.5 → 12.7 M | 4.80 → 4.02 | 8.28 → 6.71 |
+| Oblique, dusk | 11,957 → 4,613 | 9,754 → 2,410 | 251 (24; 2,143) | 18.6 → 12.7 M | 5.31 → 4.18 | 9.36 → 7.84 |
+| Grazing, dusk | 11,940 → 4,611 | 9,746 → 2,417 | 257 (24; 2,154) | 18.8 → 13.0 M | 5.34 → 4.28 | 9.21 → 7.92 |
+| Yard, dusk | 9,692 → 4,266 | 7,496 → 2,070 | 251 (24; 2,046) | 17.9 → 12.4 M | 4.26 → 3.31 | 7.69 → 7.44 |
+
+- The sorting itself costs the frame's thread 0.1 to 0.2 ms more in the `Casters` section (0.11–0.27 → 0.23–0.46 ms; a tuple key was 0.34–0.70 ms), and the passes' recording and encoding save more than that.
+- Fewer draws save little GPU time by day (0.02 to 0.05 ms): the cascades' time is their triangles, not their draws. At dusk the lamps' faces save 0.78 to 1.12 ms of the Shadows pass, not the 1.4 to 1.5 ms all of them took: the swaying plants are still drawn into every face each frame, after a copy of 24 layers. With every ray traced effect on, the frame's GPU time at dusk is 25.9 → 25.2 ms (front) and 34.3 → 32.6 ms (oblique).
+
+### The porch lamp's lantern
+
+`PorchLight` sits 0.022 studs below the top of its lantern's brass, which is in `House.glb`'s one mesh with the door, so no part's reach can keep it out of the light's shadows: the brass reaches 0.29 studs above the light, 0.76 below and 0.2 to the sides. With `ShadowStart` set on the light in the shots (the project itself isn't changed), a lit plank of the door in the front and oblique views at dusk:
+
+| `ShadowStart` | Shadow maps: brightness, pixel-to-pixel variation | Ray traced: brightness, variation |
+|---|---|---|
+| 0 (as now) | 15.1, 13.1% (the lantern's shadow across the door) | 32.6, 10.9% |
+| 0.35 | 48.7, 8.8% | 48.7, 8.7% |
+| 0.8 | 49.0, 8.7% | 48.9, 8.7% |
+
+0.35 takes the lantern's shadow off the door and makes the ray traced door match the maps; 0.8 changes at most 0.03% of a view's pixels more. What's nearer the light than that no longer shades anything from it, so the lantern's cap no longer shades the porch ceiling above it. Crops: `target/cross-engine/homestead/step7/door-*-shadow-start.png`. The plank gaps are the asset's (left to the owner).
+
 ## What these numbers don't cover
 
 - One scene, one machine, one driver. A scene with many lights, characters or indoor views would exercise other parts of both engines.

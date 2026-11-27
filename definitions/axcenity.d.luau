@@ -3860,6 +3860,8 @@ declare extern type PointLight extends Instance with
 	Range: number
 	--- If true, parts around the light cast shadows on every side of it. Only the few point lights nearest the camera do, as the graphics settings allow.
 	Shadows: boolean
+	--- Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.
+	ShadowStart: number
 	--- Where it is in the world when it isn't inside a part, in studs. Inside a part it works from the part and this isn't used.
 	Position: Vector3
 	--- How it's turned when it isn't inside a part, in degrees, as a part's Orientation. Inside a part it turns with the part.
@@ -3885,6 +3887,8 @@ declare extern type SpotLight extends Instance with
 	Direction: Vector3
 	--- If true, parts in the beam cast shadows. Only the few spot lights nearest the camera do, as the graphics settings allow.
 	Shadows: boolean
+	--- Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.
+	ShadowStart: number
 	--- Where it is in the world when it isn't inside a part, in studs. Inside a part it works from the part and this isn't used.
 	Position: Vector3
 	--- How it's turned when it isn't inside a part, in degrees, as a part's Orientation. Inside a part it turns with the part.
@@ -3912,6 +3916,8 @@ declare extern type RectLight extends Instance with
 	Direction: Vector3
 	--- If true, parts in front of it cast shadows. Only the few lights nearest the camera do, as the graphics settings allow.
 	Shadows: boolean
+	--- Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.
+	ShadowStart: number
 	--- Where it is in the world when it isn't inside a part, in studs. Inside a part it works from the part and this isn't used.
 	Position: Vector3
 	--- How it's turned when it isn't inside a part, in degrees, as a part's Orientation. Inside a part it turns with the part.

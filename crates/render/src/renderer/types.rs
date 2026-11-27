@@ -391,6 +391,19 @@ pub(super) struct ShadowMap<S> {
     pub(super) array: wgpu::TextureView,
     /// One view per layer, to draw into.
     pub(super) layers: Vec<wgpu::TextureView>,
+    /// The texture, which a lamp's layers are copied into.
+    pub(super) texture: wgpu::Texture,
+    /// For a lamp's map, each layer's still casters' fingerprint
+    /// ([`super::lamp_shadows::fingerprint`]) while it holds only them:
+    /// a layer whose view and casters haven't changed since is kept, not
+    /// drawn again. `None` for one not drawn yet, or holding moving
+    /// casters too.
+    pub(super) drawn_from: Vec<Option<u64>>,
+    /// For a lamp's map, its views' still casters drawn alone, layer by
+    /// layer, made once a view has moving casters too
+    /// ([`super::lamp_shadows::LampDraw::Over`]), with the fingerprint each
+    /// kept layer was drawn from.
+    pub(super) kept: Option<super::lamp_shadows::KeptLayers>,
 }
 
 /// One spot light's shadow view, planned for a frame.
@@ -648,6 +661,10 @@ pub(super) struct GpuMaterial {
     pub(super) bind_group: wgpu::BindGroup,
     /// Kept so it lives as long as the bind group.
     pub(super) _maps: wgpu::Buffer,
+    /// This binding's own number among every material binding made, so a
+    /// lamp's kept shadow view can tell a cut-out's binding made again
+    /// (its textures arrived or shrank) from the one it was drawn with.
+    pub(super) serial: u64,
 }
 
 /// The number of textures a material can have: base color, normal,
@@ -1333,6 +1350,12 @@ pub(super) struct FrameCounts {
     /// from an earlier frame).
     pub(super) cascade_casters: [u32; SHADOW_CASCADES],
     pub(super) cascade_triangles: [u64; SHADOW_CASCADES],
+    /// Draw calls into each sun cascade (0 for one kept).
+    pub(super) cascade_draws: [u32; SHADOW_CASCADES],
+    /// Draw calls into lamps' shadow views, and how many of those views
+    /// were kept from an earlier frame (renderer/lamp_shadows.rs).
+    pub(super) lamp_shadow_draws: u32,
+    pub(super) lamp_views_kept: u32,
 }
 
 /// Turned UI text: glyphon only draws text upright, so each turned text is

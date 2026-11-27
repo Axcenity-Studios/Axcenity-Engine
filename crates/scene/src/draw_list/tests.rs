@@ -566,6 +566,52 @@ fn a_point_lights_shadows_start_past_its_own_part_on_each_side() {
     for (near, expected) in near.iter().zip(expected) {
         assert!((near - expected).abs() < 1e-4, "{near:?}");
     }
+
+    // `ShadowStart` keeps what's nearer than it out on every side, and
+    // the part's reach where that's farther.
+    world
+        .set_property(light, "ShadowStart", Value::Number(0.8))
+        .unwrap();
+    let near = shadows(&world).unwrap().near;
+    let expected = [0.8, 0.8, 0.8, 2.1, 0.8, 0.8];
+    for (near, expected) in near.iter().zip(expected) {
+        assert!((near - expected).abs() < 1e-4, "{near:?}");
+    }
+}
+
+#[test]
+fn a_free_standing_lights_shadows_start_at_its_shadow_start() {
+    let mut world = World::new();
+    let point = world.create(ClassName::PointLight).unwrap();
+    let spot = world.create(ClassName::SpotLight).unwrap();
+    for light in [point, spot] {
+        world.set_parent(light, Some(world.workspace())).unwrap();
+        world
+            .set_property(light, "Shadows", Value::Bool(true))
+            .unwrap();
+    }
+    let nears = |world: &World| {
+        let list = build_draw_list(world, &Assets::default(), camera());
+        let point = list.lights.iter().find_map(|light| light.point_shadows);
+        let spot = list.lights.iter().find_map(|light| light.cone?.shadows);
+        (point.unwrap().near, spot.unwrap().near)
+    };
+    assert_eq!(
+        nears(&world),
+        ([0.0; 6], 0.0),
+        "nothing kept out by default"
+    );
+    for light in [point, spot] {
+        world
+            .set_property(light, "ShadowStart", Value::Number(0.35))
+            .unwrap();
+    }
+    assert_eq!(nears(&world), ([0.35; 6], 0.35));
+    // A negative or broken start is none.
+    world
+        .set_property(point, "ShadowStart", Value::Number(-1.0))
+        .unwrap();
+    assert_eq!(nears(&world).0, [0.0; 6]);
 }
 
 fn examples() -> std::path::PathBuf {

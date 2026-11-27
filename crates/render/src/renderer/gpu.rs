@@ -423,6 +423,24 @@ pub(super) fn create_shadow_views(
     size: u32,
     layers: u32,
 ) -> (wgpu::TextureView, Vec<wgpu::TextureView>) {
+    let (_, array, layers) = create_shadow_layers(device, label, (size, layers), false);
+    (array, layers)
+}
+
+/// [`create_shadow_views`]' texture with its views, and with `copies`
+/// one whose layers can be copied to and from (a lamp's map and its kept
+/// still casters, renderer/lamp_shadows.rs).
+pub(super) fn create_shadow_layers(
+    device: &wgpu::Device,
+    label: &str,
+    (size, layers): (u32, u32),
+    copies: bool,
+) -> (wgpu::Texture, wgpu::TextureView, Vec<wgpu::TextureView>) {
+    let copy = if copies {
+        wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST
+    } else {
+        wgpu::TextureUsages::empty()
+    };
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
         size: wgpu::Extent3d {
@@ -434,7 +452,7 @@ pub(super) fn create_shadow_views(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: DEPTH_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | copy,
         view_formats: &[],
     });
     let array = texture.create_view(&wgpu::TextureViewDescriptor {
@@ -453,7 +471,7 @@ pub(super) fn create_shadow_views(
             })
         })
         .collect();
-    (array, layers)
+    (texture, array, layers)
 }
 
 /// The frame's bindings (group 0 in lighting.wgsl): its uniform, lights,
@@ -1189,9 +1207,12 @@ pub(super) fn create_material(
             ),
         ],
     });
+    // Every binding made gets a number of its own, never used again.
+    static MADE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     GpuMaterial {
         bind_group,
         _maps: maps,
+        serial: MADE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
     }
 }
 

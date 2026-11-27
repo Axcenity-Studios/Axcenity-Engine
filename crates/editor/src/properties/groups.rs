@@ -334,6 +334,7 @@ pub(super) const GROUPS: [(&str, &[&str]); 37] = [
             "Height",
             "Direction",
             "Shadows",
+            "ShadowStart",
         ],
     ),
     // Where a light or emitter stands when it isn't in a part.

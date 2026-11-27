@@ -22,6 +22,7 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 
 | Item | PR | Area | Headline (Measured) | Machine |
 |---|---|---|---|---|
+| Shadow views draw each mesh once; lamps' faces kept while their still casters are, moving ones drawn over a kept copy; `ShadowStart` for a lamp in its fixture | 2026-11-26 | Render, scene | Desert Homestead at dusk, Ultra, 1920 × 1080: draw calls 10,019–11,957 → 4,101–4,613, Shadows pass 4.26–5.34 → 3.31–4.28 ms, frame's thread 7.69–9.36 → 6.71–7.92 ms, the same pixels | Desktop (Fedora) |
 | A plant's shadow thins out before it ends, TAA reads last frame through a spline; cut-outs in the near cascades only measured and left off | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080, six views: 199–252 → 196–246 frames a second (Shadows pass 0.07–0.11 ms dearer for 1,700–2,400 more caster draws; the spline 0.01 ms); with ray traced shadows and ambient occlusion 84–116 → 85–117, the crane view 90.9 → 87.5. A picture change, not a speed-up: the shadows' pop is a tenth of what it was, a turning frame a third nearer the settled one | Desktop (Fedora) |
 | Foliage shadows through the leaves' holes, the pipeline-first draw order on by default, a terrain's layers made ready once a frame, the frame's materials found by digest | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080, six views: 187–246 → 200–254 frames a second with the shadows following the leaves (206–273 with whole cards, as before); the frame's thread 3.83–4.71 → 3.53–4.23 ms (Uploads 0.42 → 0.21, Materials 0.54 → 0.33); Shadows pass 0.13–0.42 ms dearer for the holes. Unity HDRP: 227–257 | Desktop (Fedora) |
 | The scene pass tests depth before it lights: solid items with no `discard`, depth started from the prepass's; the motion vectors' instances shared among threads | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080, six views, the stills the same pixel for pixel: 161–225 → 186–246 frames a second (hero 164.8 → 186.5, mailbox 161.4 → 191.3, windmill 225.4 → 246.1); scene pass 1.72–3.52 → 1.38–2.58 ms; the frame's thread 4.17–5.11 → 3.85–4.71 ms (motion history 0.47–0.67 → 0.19–0.25). Unity HDRP: 227–257 | Desktop (Fedora) |
@@ -69,6 +70,22 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | Culling, LOD | graphics Ph. 12–13 | Render | Edge views draw only what's seen; foliage cull distances | Desktop |
 
 ## Entries
+
+### Shadow views by mesh, lamp faces kept, and the porch lamp's lantern (2026-11-26)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | The owner's brief after the sixth session's diagnosis of his Profiler reading (10,607 draw calls, Shadows 4.10 ms, the front door's "z-fighting") |
+| **Evidence** | Measured |
+| **Problem** | 80% of the draw calls at dusk were the shadow views: the sun's cascades drew 12,273 casters in 5,377 draws, and the lamps' 24 faces were cleared and drawn every frame (6 M triangles) though nothing in most of them moved. The porch lamp threw its own lantern across the door |
+| **Root cause** | `casters_in_views` merged a caster only with the one before it, in the scene's order, which starts with the camera's distance band. Nothing kept a lamp's face between frames. `PorchLight` sits 0.022 studs from its lantern's brass, inside `House.glb`'s one mesh, so its own part's reach couldn't keep it out |
+| **Solution** | Each view sorts its casters by one packed key (moving last, drawn-through material, mesh, place). A lamp face keeps its layer while its still casters' fingerprint (matrix, meshes and versions, cut-out bindings, each caster's place and shadow values) is the same; posed casters and swaying ones in wind are drawn every frame over a copy of the still ones from a second depth array. `ShadowStart` on lights: the shadows' near distance every way, maps and rays |
+| **Affected components** | `crates/render` (`casters_in_views`, `caster_order` in `renderer/lighting.rs`; `renderer/lamp_shadows.rs`; the shadow views' loop in `renderer/scene.rs`; `ShadowMap::drawn_from`, `kept`; `GpuMaterial::serial`; `RenderStats::cascade_draws`, `lamp_shadow_draws`, `lamp_views_kept`), `crates/scene` (`light_of`), `crates/core` (`ShadowStart`) |
+| **Before → after** | Eight views, by day and at dusk: draw calls 6,957–11,957 → 3,701–4,613; shadow views' draws 4,751–9,754 → 1,495–2,417; at dusk triangles 17.9–18.8 → 12.4–13.0 M, Shadows pass 4.26–5.34 → 3.31–4.28 ms, frame's thread 7.69–9.36 → 6.71–7.92 ms; by day Shadows within 0.05 ms and the thread 0.06–0.55 ms shorter. A lit plank of the door at dusk with `ShadowStart` 0.35: brightness 15.1 (maps) and 32.6 (rays) → 48.7 both |
+| **Method** | The still tool on a frozen copy of the project, "before" built from a worktree of the same engine; every still compared pixel for pixel (identical, maps and ray traced). CPU: the mean of frames 8 to 31 by `CpuSection`; GPU: one frame's pass times |
+| **Hardware** | Desktop under Fedora |
+| **Trade-offs** | The kept still casters are a second lamp map: 100 MB at Ultra, 12.6 MB at High, only once a lamp's view has moving casters. Sorting costs the `Casters` section 0.1–0.2 ms. The lamps' faces still draw their swaying plants every frame (about 250 draws), so the Shadows pass is 0.8–1.1 ms shorter, not the 1.5 ms all faces took. `ShadowStart` takes everything nearer the light out of its shadows, so the lantern's cap no longer shades the ceiling above it |
+| **Detail** | `benchmarks/cross-engine/homestead/results.md`, "Shadow views by mesh, lamp faces kept, and the porch lamp's lantern"; `docs/rendering/shadows.md`, `docs/rendering/lights.md` |
 
 ### Where a plant's shadow ends, TAA in motion, and the near cascades (2026-11-26)
 

@@ -572,72 +572,150 @@ pub(super) fn cone_bounds(
 }
 
 /// One shadow view's casters: their instance data and how they're drawn.
+#[derive(Default)]
 pub(super) struct ViewCasters {
-    /// Their instances, in pieces (each thread's share).
+    /// Their instances, in the order of `groups` (one piece).
     pub(super) instances: Vec<Vec<InstanceRaw>>,
-    /// Which casters to draw, grouped by mesh (and a cut-out's
-    /// material), counting from the view's first instance.
+    /// Which casters to draw, one group per mesh and cut-out material as
+    /// this view draws them, counting from the view's first instance:
+    /// whole casters first, then cut-outs by material.
     pub(super) groups: Vec<(CasterGroup, Range<u32>)>,
+    /// How many of `groups`, from the first, hold only casters that stay
+    /// still. In a lamp's view the moving ones (posed, or swaying in the
+    /// wind: `lamp_shadows::moves`) come after them, drawn every frame over
+    /// the still ones kept (renderer/lamp_shadows.rs); in the sun's, every
+    /// group counts.
+    pub(super) still_groups: usize,
     /// How many casters were left out.
     pub(super) left_out: u32,
 }
 
-/// Each of `views`' casters, in order. Each view and each share of the
-/// casters is its own job for the CPU's threads.
-pub(super) fn casters_in_views(casters: &[Vec<Caster>], views: &[ShadowView]) -> Vec<ViewCasters> {
+/// Each of `views`' casters, grouped by how they're drawn: every caster of
+/// one mesh and cut-out material in one instanced draw, whole casters
+/// first, then cut-outs by material, so the pipeline and material change
+/// as few times as they can. A shadow map keeps the nearest depth whatever
+/// the order its casters are drawn in, so this draws the same map as the
+/// plan's own order (the camera's distance bands first, which cut each
+/// mesh's casters into a run per band: 5,776 draws in Desert Homestead's
+/// cascades where grouping makes 1,695).
+///
+/// A cut-out casts through its holes in a lamp's view and in the sun's
+/// first `cut_out_cascades` cascades, and whole past them, unless it's a
+/// hair card or near the end of its shadow's reach
+/// ([`CutOutCaster::every_cascade`]). A lamp's view puts the casters that
+/// move every frame last (`windy`: the wind blows, so swaying ones do).
+/// Each view and each share of the casters is its own job for the CPU's
+/// threads.
+pub(super) fn casters_in_views(
+    casters: &[Vec<Caster>],
+    views: &[ShadowView],
+    cut_out_cascades: usize,
+    windy: bool,
+) -> Vec<ViewCasters> {
     let share = worth_sharing(casters.iter().map(Vec::len).sum());
-    map_each(views, share, |view| {
+    let views: Vec<(usize, &ShadowView)> = views.iter().enumerate().collect();
+    map_each(&views, share, |&(index, view)| {
         if matches!(view, ShadowView::Skipped) {
-            return ViewCasters {
-                instances: Vec::new(),
-                groups: Vec::new(),
-                left_out: 0,
-            };
+            return ViewCasters::default();
         }
-        let parts = map_each(casters, share, |casters| {
-            let mut instances = Vec::with_capacity(casters.len());
-            let mut groups: Vec<(CasterGroup, Range<u32>)> = Vec::new();
-            let mut left_out = 0;
-            for caster in casters {
-                if !view.touches(caster.sphere) {
-                    left_out += 1;
-                    continue;
-                }
-                let copy = instances.len() as u32;
-                instances.push(caster.raw);
-                let group = (caster.mesh, caster.cut_out);
-                match groups.last_mut() {
-                    Some((last, range)) if *last == group && range.end == copy => {
-                        range.end = copy + 1;
-                    }
-                    _ => groups.push((group, copy..copy + 1)),
-                }
-            }
-            (instances, groups, left_out)
-        });
-        let mut joined = ViewCasters {
-            instances: Vec::with_capacity(parts.len()),
-            groups: Vec::new(),
-            left_out: 0,
+        let lamp = matches!(view, ShadowView::Lamp(..));
+        let near = lamp || index < cut_out_cascades;
+        // The material it's drawn through in this view, or `None` whole.
+        let drawn = |cut_out: Option<CutOutCaster>| {
+            cut_out
+                .filter(|cut_out| near || cut_out.every_cascade)
+                .map(|cut_out| cut_out.material)
         };
-        let mut count = 0;
-        for (instances, groups, left_out) in parts {
-            joined.left_out += left_out;
-            for (mesh, range) in groups {
-                let range = range.start + count..range.end + count;
-                match joined.groups.last_mut() {
-                    // A group cut in two by where a share of the work ended.
-                    Some((last, joined)) if *last == mesh && joined.end == range.start => {
-                        joined.end = range.end;
-                    }
-                    _ => joined.groups.push((mesh, range)),
+        // Each share's casters that reach the view, with what they're
+        // sorted by: how they're drawn, then where they are among the
+        // casters (`caster_order`).
+        let firsts: Vec<u32> = casters
+            .iter()
+            .scan(0, |first, piece| {
+                let this = *first;
+                *first += piece.len() as u32;
+                Some(this)
+            })
+            .collect();
+        let pieces: Vec<(u32, &Vec<Caster>)> = firsts.into_iter().zip(casters).collect();
+        let parts = map_each(&pieces, share, |&(first, casters)| {
+            let mut kept: Vec<(u128, &Caster)> = Vec::new();
+            let mut left_out = 0;
+            for (at, caster) in casters.iter().enumerate() {
+                if view.touches(caster.sphere) {
+                    let moving = lamp && super::lamp_shadows::moves(&caster.raw, windy);
+                    let material = drawn(caster.cut_out);
+                    let key = caster_order(moving, material, caster.mesh, first + at as u32);
+                    kept.push((key, caster));
+                } else {
+                    left_out += 1;
                 }
             }
-            count += instances.len() as u32;
-            joined.instances.push(instances);
+            (kept, left_out)
+        });
+        let mut left_out = 0;
+        let mut order = Vec::with_capacity(parts.iter().map(|(kept, _)| kept.len()).sum());
+        for (kept, left) in parts {
+            left_out += left;
+            order.extend(kept);
         }
-        joined
+        // Still casters first, and `None` (whole) first among each. Every
+        // caster's key is its own, so the order is the same every frame.
+        order.sort_unstable_by_key(|(key, _)| *key);
+        let mut instances = Vec::with_capacity(order.len());
+        let mut groups: Vec<(CasterGroup, Range<u32>)> = Vec::new();
+        let mut still_groups = 0;
+        let mut last_kind = None;
+        for (key, caster) in order {
+            let copy = instances.len() as u32;
+            instances.push(caster.raw);
+            let kind = key >> ORDER_PLACE_BITS;
+            match groups.last_mut() {
+                Some((_, range)) if last_kind == Some(kind) => range.end = copy + 1,
+                _ => {
+                    groups.push(((caster.mesh, drawn(caster.cut_out)), copy..copy + 1));
+                    if key >> 127 == 0 {
+                        still_groups = groups.len();
+                    }
+                }
+            }
+            last_kind = Some(kind);
+        }
+        ViewCasters {
+            instances: vec![instances],
+            groups,
+            still_groups,
+            left_out,
+        }
     })
+}
+
+/// The bits of [`caster_order`]'s key below how a caster is drawn: its
+/// place among the frame's casters (up to 134 million of them).
+const ORDER_PLACE_BITS: u32 = 27;
+
+/// What a shadow view sorts a caster by, as one number, so sorting
+/// thousands compares little: whether it moves (last), the material it's
+/// drawn through (`None`, whole, first), its mesh, then its place among
+/// the frame's casters (`place`), which makes every key its own. Casters
+/// with the same bits above [`ORDER_PLACE_BITS`] draw together.
+fn caster_order(moving: bool, material: Option<u32>, mesh: MeshKey, place: u32) -> u128 {
+    debug_assert!(place < 1 << ORDER_PLACE_BITS);
+    // 33 bits: 0 for none, else one more than the material's index.
+    let material = material.map_or(0, |material| u128::from(material) + 1);
+    let (kind, custom) = match mesh {
+        MeshKey::Block => (0u128, 0),
+        MeshKey::Sphere => (1, 0),
+        MeshKey::Cylinder => (2, 0),
+        MeshKey::Wedge => (3, 0),
+        MeshKey::CornerWedge => (4, 0),
+        MeshKey::Custom(key) => (5, key),
+    };
+    u128::from(moving) << 127
+        | material << 94
+        | kind << 91
+        | u128::from(custom) << ORDER_PLACE_BITS
+        | u128::from(place & ((1 << ORDER_PLACE_BITS) - 1))
 }
 
 pub(super) fn post_uniform(post: &PostProcessing) -> PostUniform {
@@ -1066,8 +1144,9 @@ impl CutOutCaster {
 }
 
 /// Which casters a shadow view draws together: one mesh, and for a
-/// cut-out its material (see [`Caster::cut_out`]).
-pub(super) type CasterGroup = (MeshKey, Option<CutOutCaster>);
+/// caster that view draws through its holes, its material
+/// ([`CutOutCaster::material`]); `None` casts the whole mesh.
+pub(super) type CasterGroup = (MeshKey, Option<u32>);
 
 /// What a frame draws (see [`plan_draws`]).
 #[derive(Default)]

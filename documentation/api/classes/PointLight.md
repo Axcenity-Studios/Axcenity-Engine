@@ -54,6 +54,14 @@ PointLight.Shadows: boolean
 
 If true, parts around the light cast shadows on every side of it. Only the few point lights nearest the camera do, as the graphics settings allow.
 
+#### ShadowStart
+
+```luau
+PointLight.ShadowStart: number
+```
+
+Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.
+
 #### Position
 
 ```luau

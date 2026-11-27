@@ -101,6 +101,79 @@ fn a_shadow_casting_point_light_shadows_a_part_on_every_side_of_it() {
 }
 
 #[test]
+fn a_still_lamp_keeps_its_shadow_faces_until_its_light_or_a_caster_changes() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let (mut list, shaded) = wall_behind_a_block(Vec3::NEG_Z);
+    let pixel = screen_of(&list, shaded);
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    let lamp = |renderer: &TextureRenderer| {
+        let stats = renderer.stats();
+        (stats.lamp_views_kept, stats.lamp_shadow_draws > 0)
+    };
+    let drawn = frame(&mut renderer, &list);
+    assert_eq!(lamp(&renderer), (0, true), "a new map draws every face");
+    // Nothing changed: all six faces kept, and the same picture.
+    let kept = frame(&mut renderer, &list);
+    assert_eq!(lamp(&renderer), (6, false));
+    assert!(
+        kept == drawn,
+        "a kept face draws what drawing it again would"
+    );
+
+    // The block moves out of the way: the faces that see it are drawn
+    // again, and its shadow leaves the wall.
+    list.items[1].transform.w_axis.x += 6.0;
+    let moved = frame(&mut renderer, &list);
+    let (still, drew) = lamp(&renderer);
+    assert!(drew && still < 6, "{still} kept");
+    assert!(
+        red_at(&moved, pixel) > red_at(&drawn, pixel) + 40,
+        "the moved block's shadow went with it"
+    );
+    let mut fresh = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    assert!(
+        frame(&mut fresh, &list) == moved,
+        "as a renderer drawing it afresh"
+    );
+
+    // The light moves: every face is drawn again.
+    list.lights[0].position.x += 0.25;
+    frame(&mut renderer, &list);
+    assert_eq!(lamp(&renderer), (0, true));
+
+    // A plant swaying in the wind moves every frame: it's drawn every
+    // frame over a kept copy of the still casters (the wall), which aren't
+    // drawn again.
+    list.wind = Vec3::new(8.0, 0.0, 0.0);
+    list.items[1].transform.w_axis.x -= 6.0;
+    list.items[1].sway = Some(crate::Sway {
+        base: -4.0,
+        height: 2.0,
+        strength: 1.0,
+        flutter: 0.0,
+    });
+    frame(&mut renderer, &list);
+    for _ in 0..3 {
+        list.time += 0.4;
+        let swaying = frame(&mut renderer, &list);
+        assert_eq!(lamp(&renderer), (6, true), "only the plant drawn");
+        let mut fresh = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+        assert!(frame(&mut fresh, &list) == swaying, "as drawing them all");
+    }
+    // Without wind it stays still: drawn once more without the copy, then
+    // kept again.
+    list.wind = Vec3::ZERO;
+    frame(&mut renderer, &list);
+    let (still, drew) = lamp(&renderer);
+    assert!(drew && still < 6, "{still} kept");
+    frame(&mut renderer, &list);
+    assert_eq!(lamp(&renderer), (6, false));
+}
+
+#[test]
 fn only_the_nearest_shadow_casting_point_lights_get_shadow_faces() {
     let mut list = list_of(vec![]);
     let point = |z: f32, shadows: bool| Light {

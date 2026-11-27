@@ -71,6 +71,7 @@ mod gpu_particles;
 mod gpu_timer;
 mod grading;
 mod grid;
+mod lamp_shadows;
 mod latency;
 mod lens;
 mod light_probes;
@@ -117,9 +118,9 @@ use glam::Vec3;
 use gpu::mip_levels;
 use gpu::{
     DepthUse, create_frame_bind_group, create_instance_buffer, create_material, create_pipeline,
-    create_pipeline_for, create_shadow_pipeline, create_shadow_views, create_target_texture,
-    create_texture, drawable_size, shader_module, target_bytes, update_custom_mesh,
-    upload_custom_mesh, upload_mesh, upload_texture,
+    create_pipeline_for, create_shadow_layers, create_shadow_pipeline, create_shadow_views,
+    create_target_texture, create_texture, drawable_size, shader_module, target_bytes,
+    update_custom_mesh, upload_custom_mesh, upload_mesh, upload_texture,
 };
 use lighting::{
     DrawPlan, FrameUses, camera_view_projection, casters_in_views, frame_uniform, linear_color,
@@ -222,6 +223,14 @@ pub struct RenderStats {
     /// Casters and triangles drawn into each cascade this frame.
     pub cascade_casters: [u32; SHADOW_CASCADE_COUNT],
     pub cascade_triangles: [u64; SHADOW_CASCADE_COUNT],
+    /// Draw calls into each cascade this frame.
+    pub cascade_draws: [u32; SHADOW_CASCADE_COUNT],
+    /// Draw calls into the shadow views of spot and point lights this
+    /// frame, and how many of those views (a spot light's, or one face of
+    /// a point light's) were kept from an earlier frame because nothing
+    /// they're drawn from changed.
+    pub lamp_shadow_draws: u32,
+    pub lamp_views_kept: u32,
     /// The GPU's time for each pass of the frame `gpu_time` measured, in
     /// [`FramePass::ALL`]'s order: `None` for a pass that frame didn't draw
     /// (see [`RenderStats::pass_time`]).
