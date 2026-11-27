@@ -49,7 +49,8 @@ Axcenity runs at the owner's Ultra settings, `benchmarks/features/owner-ultra.js
 - **Cloud shape and place.** Each engine's own clouds, so a cloud's shadow may lie on the mountains in one picture and not the other.
 - **Terrain detail.** Each engine's own terrain mesh and level of detail. The engine's anti-tiling and height blend are left out of Unity (HDRP's height blend picks one layer instead of mixing).
 - **Units.** One Unity unit is one stud (0.35 m). HDRP's sky and fog read it as a metre; their numbers are set by eye.
-- **Ray tracing.** Unity reports no ray tracing support on this machine (Vulkan under Linux), so only the rasterized configuration can be compared. Axcenity's ray traced configurations are timed alone.
+- **Ray tracing.** Unity traces no rays on this machine, so only the rasterized configuration is compared and Axcenity's ray traced configurations are timed alone. See "Ray tracing" below.
+- **Screen-space reflections** (since 2026-11-26) and the engine's later shading (micro-shadowing, glossy leaves) have no counterpart in the port: Axcenity's cost.
 
 ## The look
 
@@ -84,11 +85,23 @@ The Axcenity runs read the project copies the regression check makes (`target/be
 
 Unity's editor opened the HDRP template with OpenGL on this machine (Fedora, RX 9070 XT, Mesa 26.2), and HDRP does not draw with OpenGL: every HDRP shader is "unsupported", and the editor's log says `Platform StandaloneLinux64 with graphics API OpenGLCore is not supported with HDRP`. The project names Vulkan, but with **Auto Graphics API for Linux** on the editor takes OpenGL all the same. Vulkan itself works (RADV). The fix is per project: Player settings > Other Settings, **Auto Graphics API for Linux** off, Vulkan the only entry (in `ProjectSettings.asset`, `m_Automatic: 0` under `LinuxStandaloneSupport`). `-force-vulkan` on the editor's command line does the same for one start.
 
+## Ray tracing
+
+HDRP traces rays only with DirectX 12, so its ray traced effects need the Windows player, and that player must be built by the **Windows** editor. Unity's Linux editor builds a DirectX 12 player (`unity/setup.sh windows`, `HomesteadImport.BuildWindows`, into `Build-Windows/`), but leaves out every ray tracing shader: the `.raytrace` shaders come out empty and Lit's ray tracing passes aren't compiled (a known Unity issue). The findings are in results.md, "Ray tracing in both engines".
+
+What's ready for a run from the Windows editor:
+
+- `HomesteadImport.BuildWindows` allows ray tracing, screen-space shadows and screen-space reflections in the pipeline asset for that build only, sets DirectX 12 as the only API, and puts the asset back afterwards.
+- `-hs-set rtshadows=4,rtao=2,rtreflections=1` turns on HDRP's traced sun shadows (rays a pixel), traced ambient occlusion (rays a pixel, to 1.5 units) and traced reflections (one ray, Performance mode, surfaces smoother than 0.5, to 800 units). They are set to the work the engine's High does, not to HDRP's High presets, which trace far more. The result's JSON gives `hdrp_ray_tracing` (whether HDRP's ray tracing was live) and `ray_traced`.
+- `run.py --unity-player windows` runs that player through GE-Proton (`~/.local/share/proton-ge/GE-Proton11-14-x86_64`, `HOMESTEAD_PROTON` for another), whose vkd3d-proton turns DXR into Vulkan's ray tracing. It hasn't been run yet. Natively on Windows, run the player with the same arguments `unity_run` gives it.
+
+The engine's side: `--graphics benchmarks/features/owner-rt-shadows-ao.json` (traced shadows and AO at High) or `owner-rt-all.json` (reflections too).
+
 ## Layout
 
 - `dump/`: the program that writes what the engine draws.
 - `export_terrain.py`: the terrains.
 - `unity/Assets/Homestead/Editor/HomesteadImport.cs`: the importer and the player build. `Runtime/HomesteadWorld.cs` spawns the instances with the engine's level-of-detail rules, `HomesteadBench.cs` is the benchmark, `HomesteadCatalog.cs` what the importer hands them.
-- `unity/setup.sh`: copies the scripts in and runs the editor headless.
+- `unity/setup.sh`: copies the scripts in and runs the editor headless (`windows`: the DirectX 12 player with ray tracing allowed).
 - `run.py`, `collect.py`, `ablate.sh`: the runs, the tables, and one feature off at a time.
 - `results.md`: the numbers and what follows from them.

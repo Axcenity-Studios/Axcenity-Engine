@@ -62,6 +62,8 @@ public class HomesteadBench : MonoBehaviour
     Pose[] track = Array.Empty<Pose>();
     float tourTime = -1f;
     Texture2D black;
+    /// The ray traced effects -hs-set turned on, for the result.
+    readonly List<string> traced = new List<string>();
 
     static string Arg(string name)
     {
@@ -194,8 +196,26 @@ public class HomesteadBench : MonoBehaviour
     /// shadows (0 or 1), shadowdistance, ao (intensity, 0 off), contact (0
     /// or 1), contrast, saturation, bloom, skyev (the sky's own exposure,
     /// in stops), aa (0 none, 1 temporal).
+    ///
+    /// Ray traced effects (the Windows DirectX 12 player only; README.md,
+    /// "Ray tracing"), each set to do the work the engine's High does
+    /// rather than to HDRP's own High presets, which trace far more:
+    /// rtshadows (the sun's rays a pixel, the engine's High is 4; 0 the
+    /// shadow maps), rtao (rays a pixel: the engine's High is 8 at half
+    /// size, 2 a full-size pixel; to 1.5 units), rtreflections (1: one
+    /// mirror ray from surfaces smoother than 0.5, to 800 units, as the
+    /// engine's High).
     void Set(string settings)
     {
+        // The camera's frame settings, in case the project's defaults
+        // leave a traced effect's pass out.
+        void Frame(FrameSettingsField field)
+        {
+            var data = view.GetComponent<HDAdditionalCameraData>();
+            data.customRenderingSettings = true;
+            data.renderingPathCustomFrameSettingsOverrideMask.mask[(uint)field] = true;
+            data.renderingPathCustomFrameSettings.SetEnabled(field, true);
+        }
         var profile = volume.profile;
         var sun = RenderSettings.sun != null ? RenderSettings.sun : FindFirstObjectByType<Light>();
         foreach (var pair in settings.Split(','))
@@ -230,6 +250,53 @@ public class HomesteadBench : MonoBehaviour
                     view.GetComponent<HDAdditionalCameraData>().antialiasing = v > 0f
                         ? HDAdditionalCameraData.AntialiasingMode.TemporalAntialiasing
                         : HDAdditionalCameraData.AntialiasingMode.None;
+                    break;
+                case "rtshadows":
+                {
+                    var light = sun.GetComponent<HDAdditionalLightData>();
+                    light.useScreenSpaceShadows = v > 0f;
+                    light.useRayTracedShadows = v > 0f;
+                    light.numRayTracingSamples = Mathf.Max(1, (int)v);
+                    light.filterTracedShadow = true;
+                    if (v > 0f)
+                    {
+                        Frame(FrameSettingsField.RayTracing);
+                        Frame(FrameSettingsField.ScreenSpaceShadows);
+                        traced.Add("shadows " + (int)v);
+                    }
+                    break;
+                }
+                case "rtao":
+                    if (profile.TryGet(out ScreenSpaceAmbientOcclusion rtao) && v > 0f)
+                    {
+                        rtao.rayTracing.value = true;
+                        // Custom values, not a quality level's.
+                        rtao.quality.value = ScalableSettingLevelParameter.LevelCount;
+                        rtao.rayLength = 1.5f;
+                        rtao.sampleCount = (int)v;
+                        rtao.denoise = true;
+                        Frame(FrameSettingsField.RayTracing);
+                        Frame(FrameSettingsField.SSAO);
+                        traced.Add($"ao {rtao.sampleCount} rays to {rtao.rayLength}");
+                    }
+                    break;
+                case "rtreflections":
+                    if (v > 0f)
+                    {
+                        if (!profile.TryGet(out ScreenSpaceReflection reflection)) reflection = profile.Add<ScreenSpaceReflection>(true);
+                        reflection.enabled.value = true;
+                        reflection.tracing.value = RayCastingMode.RayTracing;
+                        reflection.mode.value = UnityEngine.Rendering.HighDefinition.RayTracingMode.Performance;
+                        reflection.quality.value = ScalableSettingLevelParameter.LevelCount;
+                        reflection.minSmoothness = 0.5f;
+                        reflection.smoothnessFadeStart = 0.5f;
+                        reflection.rayLength = 800f;
+                        reflection.fullResolution = true;
+                        reflection.denoise = true;
+                        Frame(FrameSettingsField.RayTracing);
+                        Frame(FrameSettingsField.SSR);
+                        traced.Add($"reflections from smoothness {reflection.minSmoothness} to {reflection.rayLength}");
+                    }
                     break;
                 default: UnityEngine.Debug.LogWarning("-hs-set: no setting " + parts[0]); break;
             }
@@ -315,6 +382,9 @@ public class HomesteadBench : MonoBehaviour
         json.AppendFormat(inv, " \"engine\": \"Unity\", \"version\": \"{0}\", \"pipeline\": \"HDRP\",\n", Application.unityVersion);
         json.AppendFormat(inv, " \"graphics_api\": \"{0}\", \"gpu\": \"{1}\",\n", SystemInfo.graphicsDeviceType, SystemInfo.graphicsDeviceName);
         json.AppendFormat(inv, " \"ray_tracing_supported\": {0},\n", SystemInfo.supportsRayTracing ? "true" : "false");
+        var pipeline = RenderPipelineManager.currentPipeline as HDRenderPipeline;
+        json.AppendFormat(inv, " \"hdrp_ray_tracing\": {0}, \"ray_traced\": \"{1}\",\n",
+            pipeline != null && pipeline.rayTracingSupported ? "true" : "false", string.Join("; ", traced));
         json.AppendFormat(inv, " \"drawn_at\": [{0}, {1}], \"fullscreen\": {2},\n", Screen.width, Screen.height, Screen.fullScreen ? "true" : "false");
         json.AppendFormat(inv, " \"instances\": {0}, \"load_ms\": {1:F0}, \"set\": \"{2}\",\n", world.Count, loadMs, Arg("-hs-set") ?? "");
         json.AppendFormat(inv, " \"frames\": {0}, \"seconds\": {1:F3}, \"measure_start_unix\": {2:F3},\n", frames, seconds, startedUnix);

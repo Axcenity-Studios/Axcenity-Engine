@@ -675,6 +675,66 @@ public static class HomesteadImport
             EditorApplication.Exit(1);
         }
     }
+
+    /// The Windows player with HDRP's ray tracing allowed: DirectX 12 is
+    /// the only API HDRP traces rays with (Unity's Vulkan has none), so on
+    /// Linux it runs through Proton, whose vkd3d-proton turns DXR into
+    /// Vulkan's ray tracing (README.md, "Ray tracing"). The pipeline asset
+    /// allows ray tracing and screen-space shadows (which the sun's traced
+    /// shadows are drawn into) only for this build and is put back after,
+    /// so the Linux player stays as it was measured. Which effects are
+    /// traced is chosen per run (HomesteadBench's -hs-set rtshadows, rtao,
+    /// rtreflections).
+    [MenuItem("Homestead/Build the Windows player (ray tracing)")]
+    public static void BuildWindows()
+    {
+        var asset = (HDRenderPipelineAsset)GraphicsSettings.defaultRenderPipeline;
+        string[] switches = { "supportRayTracing", "hdShadowInitParams.supportScreenSpaceShadows", "supportSSR" };
+        var before = new Dictionary<string, bool>();
+        void Allow(bool on)
+        {
+            var serialized = new SerializedObject(asset);
+            foreach (string path in switches)
+            {
+                var property = serialized.FindProperty("m_RenderPipelineSettings." + path);
+                if (property == null)
+                {
+                    Debug.LogWarning("no HDRP setting " + path);
+                    continue;
+                }
+                if (on) before[path] = property.boolValue;
+                property.boolValue = on || before[path];
+            }
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+        }
+
+        var target = BuildTarget.StandaloneWindows64;
+        PlayerSettings.SetUseDefaultGraphicsAPIs(target, false);
+        PlayerSettings.SetGraphicsAPIs(target, new[] { GraphicsDeviceType.Direct3D12 });
+        Allow(true);
+        BuildReport report;
+        try
+        {
+            report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { Root + "/Homestead.unity" },
+                locationPathName = "Build-Windows/DesertHomesteadHDRP.exe",
+                target = target,
+                options = BuildOptions.None,
+            });
+        }
+        finally
+        {
+            Allow(false);
+        }
+        Debug.Log("HOMESTEAD_BUILD windows " + report.summary.result + ", " + report.summary.totalErrors + " errors");
+        if (report.summary.result != BuildResult.Succeeded)
+        {
+            EditorApplication.Exit(1);
+        }
+    }
 }
 
 /// Reads each image of the dump as what it is, by the end of its name:

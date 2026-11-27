@@ -57,6 +57,9 @@ public class HomesteadWorld : MonoBehaviour
                     renderer.motionVectorGenerationMode = MotionVectorGenerationMode.Camera;
                     renderer.lightProbeUsage = LightProbeUsage.Off;
                     renderer.reflectionProbeUsage = ReflectionProbeUsage.BlendProbes;
+                    // Nothing moves, so the ray traced scene keeps each
+                    // instance's place (only used where rays are traced).
+                    renderer.rayTracingMode = UnityEngine.Experimental.Rendering.RayTracingMode.Static;
                     child.SetActive(false);
                 }
             }

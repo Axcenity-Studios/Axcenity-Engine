@@ -253,6 +253,21 @@ The `Clouds` pass is 0.04 to 0.30 ms at 1920 × 1080 (HDRP's clouds: 0.30) and t
 
 **By what is drawn** (the second step: `DrawnPart`, stamps between draws; hero view, a line through 960 × 540, 1920 × 1080 and 2560 × 1405): the GPU's frame is 3.75 ms whatever the window's size plus 1.09 ms for each million pixels. Of the fixed part: shadows 1.07, the prepass 0.51, the scattered items in the scene pass 0.82, other items 0.47, volumetric fog 0.38. By the pixel: the terrain 0.35 ms a million pixels, items 0.19, the dust's sprites 0.16 (0.34 ms at 1920 × 1080, which the Unity port doesn't draw). The cut-out surfaces' depth is drawn in the prepass and again in the scene pass (0.12 to 0.18 ms).
 
+### Ray tracing in both, and where they stand (2026-11-27)
+
+The owner asked for ray traced runs in both engines. HDRP traces rays only with DirectX 12, and Unity's Linux editor builds a Windows player without its ray tracing shaders (empty `.raytrace` shaders, Lit's ray tracing passes not compiled; a known Unity issue). So Unity's ray traced numbers need the Windows editor; the port and `run.py` are ready for it. Same machine and method, `f01da632`, 1920 × 1080, frames a second, the median of three runs:
+
+| View | Axcenity Ultra | Unity HDRP | Axcenity, traced shadows and AO | Axcenity, everything traced |
+|---|---|---|---|---|
+| hero | 178.3 | 237.0 | 109.5 | 108.6 |
+| mailbox | 178.3 | 232.2 | 93.8 | 93.2 |
+| porch | 218.7 | 236.5 | 131.7 | 131.1 |
+| truck | 203.1 | 227.1 | 144.0 | 141.7 |
+| windmill | 225.4 | 258.4 | 108.1 | 108.8 |
+| crane | 182.3 | 251.0 | 107.6 | 108.0 |
+
+Traced shadows and AO meet the owner's 90 in every view (84 to 117 on 2026-11-26). Traced AO is now their largest cost (2.55 to 2.86 ms), ahead of the sun's rays (1.79 to 2.79). Rasterized, the views are 7 to 10% slower than on 2026-11-26: the scene pass's shading is 0.17 to 0.40 ms heavier across everything it draws (f01da632's `lighting.wgsl`), plus 0.05 for screen-space reflections, none of which the port draws. Details: `benchmarks/cross-engine/homestead/results.md`, "Ray tracing in both engines".
+
 ## Raw data
 
 `benchmarks/results/2026-11-10-desktop-9950x3d.jsonl` holds one JSON line per run of the 2026-11-10 before/after comparison.

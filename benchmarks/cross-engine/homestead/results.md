@@ -17,6 +17,7 @@ Measured 2026-11-25 on the owner's desktop: Ryzen 9 9950X3D, Radeon RX 9070 XT (
 - **The frame's thread is the next limit.** It takes 4.0 to 5.0 ms (200 to 250 frames a second at most), 1.9 ms of it for the plants' 9,500 items. Unity's main thread takes 1.5 to 1.7 ms. With the clouds gone the windmill view is already limited by the thread, at 233 frames a second.
 - **Axcenity is ahead on what it uses**: 1.1 to 2.1 cores' worth of CPU time against Unity's 3.6 to 6.8, 2.6 to 2.9 GB of video memory against 3.8 to 4.3 GB, volumetric fog at 0.38 ms against 0.88 ms, and it starts in 2.9 seconds against 4.2. It uses more memory (2.45 GB against 1.47 GB).
 - **Unity cannot trace rays here.** Its player reports no ray tracing support with Vulkan under Linux, so only the rasterized configuration is compared. Axcenity's ray traced configurations run at 77 to 78 frames a second in the same views at 1080p.
+- **2026-11-27, ray tracing in both**: HDRP traces rays only with DirectX 12, and Unity's Linux editor builds a Windows player without its ray tracing shaders, so Unity's numbers need the Windows editor (the port is ready for it). Axcenity with traced shadows and AO is 94 to 144 frames a second, over the 90 target in all six views. Rasterized, Unity is 1.08 to 1.38 times faster ("Ray tracing in both engines" below).
 - **The pictures are close** (`~/Projects/Unity Projects/Desert Homestead HDRP/Comparison/all-views.jpg`): the same framing, plants, terrain paint and lighting direction in all six views. What differs is listed under "Appearance".
 
 ## Frame rate
@@ -730,6 +731,68 @@ A frame that traces nothing while an effect is on no longer frees the ray traced
 `Workspace/Lights/PorchLight` in the owner's project (`~/Projects/Axcenity Projects/Desert Homestead/world.json`) has `ShadowStart` 0.35, the value the seventh session's door crops were taken at. `LampTable` and `LampBedroom` are unchanged.
 
 **Not run**: the editor itself (the drags are the still tool's `vary` and new `stamp` options, which do what the editor does to the world but not its undo recording), DirectX 12 or another card, the regression check. Tests run: `cargo test -p axcenity-render` (515 passed, 8 ignored), the ray tracing and water tests with `debug-views`, `axcenity-core`, `axcenity-terrain` and `axcenity-scene` library tests, the editor's terrain and legend tests, `cargo clippy --workspace --all-targets -- -D warnings`.
+
+## Ray tracing in both engines, and where they stand (2026-11-27)
+
+The owner asked for a ray traced setup in Unity and in the engine, both timed with ray tracing on and off. Same machine, `target/release/axcenity-player` built at f01da632, Unity's Linux player as on 2026-11-25, the six still views at 1920 × 1080, three runs each pinned to the V-cache cores (median shown, range in brackets), every run limited by the GPU (100% load). Runs: `target/cross-engine/homestead/runs/day27-*`.
+
+### Why Unity traces no rays here
+
+Three separate walls, each checked:
+
+1. **HDRP traces rays only with DirectX 12** (Windows and some consoles). Unity's own feature table lists HDRP ray tracing on Linux as "No", and its Vulkan page says ray tracing isn't implemented for Vulkan. No project setting, Player setting or command-line flag turns it on. So the Linux player reports `SystemInfo.supportsRayTracing` false. That was correct, not a broken install.
+2. **The Windows DirectX 12 player can be built here**: Windows Build Support (Mono) was installed through Unity Hub. `HomesteadImport.BuildWindows` (`unity/setup.sh windows`) builds `Build-Windows/` in 3.5 minutes with ray tracing allowed in the pipeline asset, and the asset is put back afterwards.
+3. **But the Linux editor doesn't compile ray tracing shaders.** In that build every `.raytrace` shader is 0.0 kB, and Lit's ray tracing passes (`IndirectDXR`, `ForwardDXR`, `VisibilityDXR` and the rest) aren't compiled at all; only its raster `RayTracingPrepass` is. Unity has an open issue for this ("macOS/Ubuntu: multiple shader errors when switching to Windows build platform": the platform doesn't support ray tracing shader compilation). Running that player through Proton (vkd3d-proton turns DXR into Vulkan ray tracing on RADV) would give a working DirectX 12 device with no ray tracing shaders.
+
+So HDRP's ray traced numbers need the Windows editor to build the player. The one clean way is the owner's Windows install on this machine: build with `HomesteadImport.BuildWindows` there, and run with the `-hs-set` switches below. The engine can be timed beside it on the same OS.
+
+### What is ready for that run
+
+- **The Unity port** (`HomesteadBench`'s `-hs-set`) gets `rtshadows=4`, `rtao=2` and `rtreflections=1`. Each is set to the work the engine's High does, not to HDRP's High presets: HDRP's High AO traces 8 rays 20 m long, and its High reflections trace every surface however rough. The sun traces 4 rays a pixel (screen-space shadows on, denoised). AO traces 2 rays a full-size pixel to 1.5 units, as many as the engine's 8 at half size. Reflections are one mirror ray (Performance mode) from surfaces smoother than 0.5, to 800 units (the engine's Ultra ray tracing distance). The camera's frame settings for those passes are forced on. The instances are `RayTracingMode.Static`, as nothing moves. The result's JSON says whether HDRP's ray tracing was live (`hdrp_ray_tracing`) and what was traced (`ray_traced`).
+- **`run.py --unity-player windows`** runs `Build-Windows/DesertHomesteadHDRP.exe` through GE-Proton 11-14 (`~/.local/share/proton-ge`), with its own prefix. Paths are given as `Z:` paths, and the sensors follow the game's process, not Proton's wrapper. It hasn't been run: running Proton was refused by this session's permission check, and without ray tracing shaders it could only time the raster frame through a translation layer.
+
+### The frame rates
+
+Rasterized, the owner's Ultra (`owner-ultra.json`) against Unity's Linux Vulkan player:
+
+| View | Axcenity | Unity HDRP | Unity ÷ Axcenity | Axcenity GPU ms | Unity GPU ms |
+|---|---|---|---|---|---|
+| hero | 178.3 (137) [178–179] | 237.0 (218) | 1.33× | 5.44 | 4.12 |
+| mailbox | 178.3 (155) [175–179] | 232.2 (209) | 1.30× | 5.44 | 4.18 |
+| porch | 218.7 (159) [215–219] | 236.5 (226) | 1.08× | 4.40 | 4.12 |
+| truck | 203.1 (157) [200–204] | 227.1 (199) | 1.12× | 4.75 | 4.29 |
+| windmill | 225.4 (162) [223–225] | 258.4 (223) | 1.15× | 4.27 | 3.75 |
+| crane | 182.3 (150) [181–182] | 251.0 (224) | 1.38× | 5.31 | 3.89 |
+
+Axcenity with ray tracing (Unity: none possible here):
+
+| View | Ultra | Traced shadows and AO (`owner-rt-shadows-ao.json`) | Everything traced (`owner-rt-all.json`) | Target |
+|---|---|---|---|---|
+| hero | 178.3 | 109.5 (105) [108–110] | 108.6 (103) | 90 / 60 |
+| mailbox | 178.3 | 93.8 (90) [93–94] | 93.2 (89) | 90 / 60 |
+| porch | 218.7 | 131.7 (123) [130–132] | 131.1 (125) | 90 / 60 |
+| truck | 203.1 | 144.0 (129) [142–144] | 141.7 (132) | 90 / 60 |
+| windmill | 225.4 | 108.1 (103) [107–108] | 108.8 (104) | 90 / 60 |
+| crane | 182.3 | 107.6 (104) [108–108] | 108.0 (104) | 90 / 60 |
+
+- **The 90 target for traced shadows and AO is met in all six views** (94 to 144). On 2026-11-26 they were 84 to 117, with the crane view at 87.5 and the mailbox at 84.5. With everything traced, the views are 93 to 142, against 60 (100 for this project): the mailbox view is under 100.
+- **Where the traced frame goes** (hero, windmill, crane): ambient occlusion 2.55 to 2.86 ms (0.05 with screen space), the sun's rays 1.79 to 2.79 ms, the acceleration structures 0.47 to 0.76 ms, reflections 0.07 to 0.23 ms. The sun's cascades go from 1.2 to 1.3 ms down to 0.4 to 0.5 ms, because the near cascades aren't drawn under rays. **Traced AO is now the largest ray traced cost**, more than the shadows, at half size: the next thing to profile on this track.
+- The traced frames are even: 1% lows within 4 to 10% of the averages, against 13 to 28% at raster Ultra (Unity's: 4 to 14%).
+
+### Rasterized: slower than on 2026-11-26, and why
+
+The raster views are 7 to 10% slower than the fourth session's table (hero 196.1 → 178.3, windmill 245.5 → 225.4; the fifth to eighth sessions didn't time the six views). Against that session's runs (`t5-default`), the GPU frame is 0.36 to 0.56 ms longer: the scene pass 0.17 to 0.40 ms, spread over everything it draws (terrain +0.11 to +0.19, items +0.08 to +0.10, scattered items +0.10 to +0.12), the sun's shadows +0.06 to +0.11, and the new screen-space reflections pass 0.05. That pattern is heavier per-pixel shading, not one draw gone wrong: `lighting.wgsl` grew by 300 lines in f01da632 (micro-shadowing, glossy leaves, the reflections' wet ground and sky visibility). Which of those costs what isn't measured here. Unity's port has none of them and no screen-space reflections, so a part of the raster gap is features Unity isn't drawing in this comparison.
+
+### Against Unity, what else was read
+
+| | Axcenity Ultra | Axcenity traced shadows and AO | Unity HDRP |
+|---|---|---|---|
+| Video memory (process) | 2.87 to 2.97 GB | 3.38 to 3.47 GB | 3.84 to 3.85 GB |
+| CPU time used | 2.1 to 2.8 cores | 1.5 to 2.5 cores | 4.9 to 6.7 cores |
+| Card power | 273 to 300 W | 297 to 302 W | 242 to 269 W |
+| Frame's thread (Unity: main thread) | 3.62 to 4.46 ms | 5.55 to 6.54 ms | 1.53 to 1.66 ms |
+
+**Not run**: HDRP's ray tracing (above), the tour, 2560 × 1405, the regression check (`axcenity-bench-check`), the Windows DirectX 12 player through Proton. No engine code was changed.
 
 ## What these numbers don't cover
 
