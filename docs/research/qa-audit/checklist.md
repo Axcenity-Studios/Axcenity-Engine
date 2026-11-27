@@ -30,7 +30,7 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
-| 2.1 | Header menus: File, Edit, View, Debug, Help, Build Game | Not started | | |
+| 2.1 | Header menus: File, Edit, View, Debug, Help, Build Game | Partially functional | Run (GUI), cloud | File menu items checked (New, Open, Save, Version History, Checkpoint, Import, Build Game, Close Project); Close Project hung (QA-021, fixed). Edit, View, Debug, Help menus opened but not every item run |
 | 2.2 | Ribbon tabs and their buttons | Not started | | |
 | 2.3 | Keyboard shortcuts (Ctrl+S, Ctrl+Z/Y, Ctrl+D, Del, F2, F5, Ctrl+K, tool keys) | Passed | Run (GUI), cloud | Ctrl+S, Ctrl+Z, Ctrl+D, Delete, F2 checked |
 | 2.4 | Universal search / command palette (Ctrl+K), Quick Open | Not started | | |
@@ -67,8 +67,8 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
-| 5.1 | Import: glTF/GLB, FBX, OBJ, images, audio | Not started | | |
-| 5.2 | Import of a missing, empty or corrupt file | Passed | Run (GUI), cloud | Corrupt FBX: Console names the file and says it isn't valid FBX; the rest loads |
+| 5.1 | Import: glTF/GLB, FBX, OBJ, images, audio | Passed | Run (GUI) and Run (CLI, MCP `asset_import`), cloud | OBJ through File > Import (GTK picker); glTF/GLB, PNG, WAV through the same import code. FBX through the corrupt-asset fixture only |
+| 5.2 | Import of a missing, empty or corrupt file | Passed after fix | Run (GUI) and Run (CLI), cloud | Corrupt FBX reported; empty/random `.glb` refused; damaged PNG/WAV were copied in silently (QA-018, fixed) |
 | 5.3 | Assets panel: browse, search, rename, delete, drag into the scene | Not started | | |
 | 5.4 | Check Assets: missing references, fixes | Not started | | |
 | 5.5 | Toolbox (online sources) | Not started | | |
@@ -80,7 +80,7 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 |---|---|---|---|---|
 | 6.1 | Play, Pause, Stop; edits discarded on Stop | Passed | Run (GUI), cloud | Play autosaves first; Stop restores the world |
 | 6.2 | Play with a script error | Passed | Run (CLI), cloud | `axcenity-server` on fixtures: syntax error and nil index reported with `scripts/Script.server.lua:2` |
-| 6.3 | Play repeatedly (start/stop many times) | Not started | | |
+| 6.3 | Play repeatedly (start/stop many times) | Passed | Run (GUI), cloud | Three Play/Stop runs: editor memory 2.31 GB after each |
 | 6.4 | Multi-client Play | Not started | | |
 | 6.5 | Developer console (F9) | Not started | | |
 
@@ -88,7 +88,7 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
-| 7.1 | New Script, script tab, save, completion, diagnostics | Not started | | |
+| 7.1 | New Script, script tab, save, completion, diagnostics | Partially functional | Run (GUI), cloud | New Script from the Script tab, typed, saved with Ctrl+S, ran in Play. Completion and diagnostics need luau-lsp (the editor offers a 5 MB download; not taken offline) |
 | 7.2 | Runtime errors reported with file and line | Passed | Run (CLI), cloud | File and line, with a stack line |
 | 7.3 | Infinite loop watchdog | Passed | Run (CLI), cloud | `while true do end` stopped after 3 s with advice to add `task.wait()` |
 | 7.4 | Blocks editor and Graph view | Not started | | |
@@ -119,13 +119,13 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 | 9.5 | Restart-required settings say so | Not started | | |
 | 9.6 | Settings > This project (project settings) | Not started | | |
 | 9.7 | Input window (File > Input…) | Not started | | |
-| 9.8 | Damaged editor settings file | Not started | | |
+| 9.8 | Damaged editor settings file | Passed after fix | Run (GUI), cloud | A truncated `app.ron` reset every setting silently (QA-020, fixed) |
 
 ## 10. Save, load and recovery
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
-| 10.1 | Save, reopen, everything kept | Passed | Run (GUI), cloud | Renames and copies kept after quit and reopen |
+| 10.1 | Save, reopen, everything kept | Passed | Run (GUI), cloud | Renames and copies kept after quit and reopen; the beginner project reopened from Recent with its part, model and script |
 | 10.2 | AutoRecover after a kill | Passed after fix | Run (GUI), cloud | Snapshot after 2 min, `kill -9`, reopen offers Recover; recovered parts back. Wording QA-016 |
 | 10.3 | Version History, checkpoints, restore | Passed after fix | Run (GUI), cloud | Checkpoint with a message, restore to an older save (Before restore kept). Times QA-017 |
 | 10.4 | Back Up Project | Not started | | |
@@ -136,7 +136,7 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
-| 11.1 | Build Game for this OS (`--build-game` and the menu) | Passed | Run (CLI), cloud | `--build-game` on `part`: 1.6 s, report written. From a debug editor it copies the 830 MB debug player |
+| 11.1 | Build Game for this OS (`--build-game` and the menu) | Passed after fix | Run (CLI) and Run (GUI), cloud | `--build-game` and File > Build Game > For this OS (9.2 s, 136.5 MB). A new project's first build listed 84 false Asset Check problems (QA-022, fixed). No picker, no build from the menu (QA-023) |
 | 11.2 | The built game runs | Partially functional | Run (CLI), cloud | The built game starts and runs its script ("Hello world!"); its window stayed black for the minute watched on lavapipe: check on real GPU |
 | 11.3 | Build Game for another OS | Not started | | |
 
@@ -144,7 +144,7 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
-| 12.1 | Host and join on one computer (player) | Not started | | |
+| 12.1 | Host and join on one computer (player) | Unable to verify | Run (CLI), cloud | Host started and the joiner connected far enough to say "Joining", then the host was killed for memory (two software-GPU players plus tests). Needs the Linux box or PC |
 | 12.2 | Dedicated server, headless | Passed | Run (CLI), cloud | `axcenity-server` hosts with encryption and reports the UPnP failure in plain words |
 | 12.3 | Collaborate session on one computer | Not started | | |
 | 12.4 | Two-computer LAN / Tailscale | Not started | | |
@@ -153,15 +153,15 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 
 | # | Step | Status | How / where | Notes |
 |---|---|---|---|---|
-| 13.1 | Launch for the first time | Passed | Run (GUI), cloud | See 1.1 |
-| 13.2 | Create a new project | Not started | | |
-| 13.3 | Create and configure a scene | Not started | | |
-| 13.4 | Import assets | Not started | | |
-| 13.5 | Create and manipulate objects | Not started | | |
-| 13.6 | Configure properties | Not started | | |
-| 13.7 | Add game behaviour (script) | Not started | | |
-| 13.8 | Configure project settings | Not started | | |
-| 13.9 | Run and test | Not started | | |
-| 13.10 | Save and close | Not started | | |
-| 13.11 | Reopen, check persistence | Not started | | |
-| 13.12 | Build / export | Not started | | |
+| 13.1 | Launch for the first time | Passed | Run (GUI), cloud | Fresh settings folder: start screen |
+| 13.2 | Create a new project | Passed | Run (GUI), cloud | Baseplate, typed name, default location `~/Axcenity Projects`, Enter |
+| 13.3 | Create and configure a scene | Passed | Run (GUI), cloud | Lighting > ClockTime slider to night and back (undo) |
+| 13.4 | Import assets | Passed | Run (GUI), cloud | File > Import… cube.obj through the GTK picker |
+| 13.5 | Create and manipulate objects | Passed | Run (GUI), cloud | Ribbon Block lands on the spawn pad. It looks black until Play (QA-005) |
+| 13.6 | Configure properties | Passed | Run (GUI), cloud | Lighting and Part properties |
+| 13.7 | Add game behaviour (script) | Passed | Run (GUI), cloud | Script ribbon > Script inside the part; four typed lines; ran in Play ("Spinning Part", colour changes) |
+| 13.8 | Configure project settings | Partially functional | Run (GUI), cloud | Settings > This project opened earlier (9.6); not changed in this run |
+| 13.9 | Run and test | Passed | Run (GUI), cloud | F5 Play, character spawned on the pad, Stop restored the world |
+| 13.10 | Save and close | Passed after fix | Run (GUI), cloud | Saved; Close Project hung (QA-021) until fixed |
+| 13.11 | Reopen, check persistence | Passed | Run (GUI), cloud | Reopened from Recent: 6 objects, 1 script |
+| 13.12 | Build / export | Passed after fix | Run (GUI), cloud | Build Game > For this OS: built, but with 84 false problems (QA-022, fixed) |

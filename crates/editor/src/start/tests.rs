@@ -1700,6 +1700,7 @@ fn new_projects_buttons_stay_put_when_a_line_appears() {
     let mut start = StartScreen::default();
     start.new_project(Template::Baseplate);
     let ctx = theme::test_context();
+    ctx.enable_accesskit();
     let mut projects = Vec::new();
     let mut clock = 0.0;
     let mut create_button = |start: &mut StartScreen| {

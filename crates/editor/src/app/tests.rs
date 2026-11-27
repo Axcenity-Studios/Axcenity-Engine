@@ -2620,7 +2620,7 @@ fn close_project_goes_ahead_when_the_thumbnail_screenshot_never_comes() {
             egui::vec2(200.0, 100.0),
         ));
         app.close_project();
-        let mut frame = |app: &mut EditorApp, time: f64| {
+        let frame = |app: &mut EditorApp, time: f64| {
             let input = egui::RawInput {
                 time: Some(time),
                 ..Default::default()
