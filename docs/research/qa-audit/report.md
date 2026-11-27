@@ -6,11 +6,11 @@ Paul's brief of 2026-11-27. Branch `qa-audit` from `main` at `cf132127` (version
 
 Axcenity's core workflow works from start to finish. In the real editor, driven by mouse and keyboard, a first-time user can make a project, build a scene, import a model, write a script, play, save, reopen and build a game that runs. None of the GUI runs crashed. Recovery is solid: a project killed with `kill -9` comes back through AutoRecover, and damaged project files open with a clear message instead of failing.
 
-The audit found 24 issues: 2 High, 5 Medium and 17 Low. No Critical ones (crash, data loss, security). Of the 24:
+The audit found 24 issues: 2 High, 6 Medium and 16 Low. No Critical ones (crash, data loss, security). Of the 24:
 
-- 19 are fixed on the branch, each with a regression test where code changed.
+- 18 are fixed on the branch, each with a regression test where code changed.
 - 1 is partly fixed (QA-013).
-- 3 are not bugs or are test-environment limits (QA-010, QA-014's cause, QA-019).
+- 2 are not product bugs (QA-010, and QA-019, a test-environment limit).
 - 3 need Paul's decision because they are deliberate designs (QA-005, QA-012, QA-024).
 
 The two High issues were both on a beginner's first path:
