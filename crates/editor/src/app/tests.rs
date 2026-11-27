@@ -1096,6 +1096,27 @@ fn a_folder_that_fails_to_open_in_the_background_is_reported() {
     assert!(line.text.contains("axcenity.json"), "{}", line.text);
 }
 
+/// QA-011: opening the folder the projects are kept in, rather than one
+/// of them, says so and names the projects inside.
+#[test]
+fn opening_a_folder_of_projects_names_the_projects_inside() {
+    let folder = temp_project("folder-of-projects", &[]);
+    for name in ["Alpha", "Beta"] {
+        std::fs::create_dir_all(folder.join(name)).unwrap();
+        std::fs::write(folder.join(name).join("axcenity.json"), "{}").unwrap();
+    }
+    let app = EditorApp::new(Some(&folder));
+    assert!(app.project.is_none());
+    let line = last_line(&app);
+    assert_eq!(line.kind, OutputKind::Error);
+    assert!(
+        line.text.contains("isn't an Axcenity project") && line.text.contains("`Alpha` and `Beta`"),
+        "{}",
+        line.text
+    );
+    let _ = std::fs::remove_dir_all(folder);
+}
+
 #[test]
 fn a_missing_project_folder_is_reported_in_output() {
     let app = EditorApp::new(Some(&example("no-such-project")));
@@ -2582,4 +2603,20 @@ fn every_frame_waits_for_the_display_only_when_asked() {
     assert!(frames_always_wait_for_the_display(Some("on")));
     assert!(frames_always_wait_for_the_display(Some(" ON ")));
     assert!(frames_always_wait_for_the_display(Some("1")));
+}
+
+/// Close Project never waits for a thumbnail: the picture is drawn by its
+/// own renderer and saved when it's ready, so a close goes ahead at once,
+/// also where no picture can be drawn (the cloud's software Vulkan once
+/// sent no screenshot and the project stayed open, QA-021).
+#[test]
+fn close_project_goes_ahead_without_waiting_for_the_thumbnail() {
+    with_big_stack(|| {
+        let folder = copy_of_example("part", "close-no-screenshot");
+        let mut app = EditorApp::new(Some(&folder));
+        app.close_project();
+        app.start_thumbnail(None);
+        assert!(app.project.is_none(), "closed without a thumbnail");
+        let _ = std::fs::remove_dir_all(folder);
+    });
 }

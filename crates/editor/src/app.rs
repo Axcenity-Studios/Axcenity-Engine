@@ -118,6 +118,7 @@ mod ui_selection;
 mod update_install;
 mod updates;
 mod version_history;
+pub(crate) use version_history::local_when;
 mod viewport_bar;
 mod wake_log;
 mod welcome;
@@ -1235,6 +1236,31 @@ impl EditorApp {
 
     /// Restores the settings saved by [`eframe::App::save`] (none in tests, or
     /// on the first run) and applies the look.
+    /// When the settings file at `path` is there but gave nothing (eframe
+    /// couldn't parse it: cut short by a crash or a full disk, or edited by
+    /// hand), keeps a copy beside it and says the settings are back to their
+    /// defaults, before the first save writes over it (QA-020). Every save
+    /// writes the appearance, so a file read whole always has it.
+    pub fn check_settings_file(&mut self, path: &Path, storage: Option<&dyn eframe::Storage>) {
+        let read = storage.is_some_and(|storage| storage.get_string(APPEARANCE_KEY).is_some());
+        let written = std::fs::metadata(path).is_ok_and(|file| file.len() > 0);
+        if read || !written {
+            return;
+        }
+        let backup = path.with_extension("ron.damaged");
+        let kept = match std::fs::copy(path, &backup) {
+            Ok(_) => format!("The damaged file is kept as `{}`.", backup.display()),
+            Err(err) => format!("A copy of it couldn't be kept ({err})."),
+        };
+        self.output.warning(format!(
+            "The editor's settings file `{}` couldn't be read, so recent projects, \
+             appearance, layout and shortcuts are back to their defaults. {kept}",
+            path.display()
+        ));
+        self.toasts
+            .warning("Your editor settings couldn't be read and were reset.");
+    }
+
     pub fn load_settings(&mut self, ctx: &egui::Context, storage: Option<&dyn eframe::Storage>) {
         // Tests never look at, or tidy, the real app data.
         if !cfg!(test) {
@@ -1266,6 +1292,10 @@ impl EditorApp {
                 start::remember(&mut self.recent, link);
             }
             self.recent.truncate(start::MAX_TRACKED);
+            // New Project offers the folder the last project is in.
+            if let Some(folder) = self.recent.first().and_then(|link| link.folder.parent()) {
+                self.start.suggest_parent(folder.to_owned());
+            }
             if let Some(text) = storage.get_string(LAYOUT_KEY) {
                 self.layout = Layout::from_text(&text);
             }

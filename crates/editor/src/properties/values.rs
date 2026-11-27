@@ -12,6 +12,30 @@ pub(super) fn is_ui_transparency(name: &str) -> bool {
     )
 }
 
+/// How fast a number property drags and the values it may be typed or
+/// dragged to, for the properties that have limits.
+pub(super) fn number_limits(name: &str) -> Option<(f64, std::ops::RangeInclusive<f64>)> {
+    Some(match name {
+        // These only make sense from 0 to 1 (a part's Transparency too:
+        // 5 or -1 was taken as typed, QA-015).
+        "Metalness" | "Roughness" | "AmbientOcclusionStrength" | "Volume" | "Transparency" => {
+            (0.01, 0.0..=1.0)
+        }
+        "PlaybackSpeed" => (0.01, 0.01..=20.0),
+        "RollOffMinDistance" | "RollOffMaxDistance" => (1.0, 0.0..=100_000.0),
+        "NormalStrength" | "EmissiveStrength" | "TextSize" => (0.01, 0.0..=f64::INFINITY),
+        "DesignWidth" | "DesignHeight" => (1.0, 1.0..=10_000.0),
+        // A ColorCorrectionEffect's split toning balance and curve.
+        "Balance" | "Curve" => (0.01, -1.0..=1.0),
+        "CurvePivot" => (0.01, 0.0..=1.0),
+        // An Atmosphere's height fog.
+        "FogDensity" => (0.01, 0.0..=100.0),
+        "FogFalloff" => (0.5, 0.1..=10_000.0),
+        "FogStart" => (1.0, 0.0..=f64::INFINITY),
+        _ => return None,
+    })
+}
+
 /// Draws the control for a property's value and returns its new value if
 /// the user changed it this frame.
 pub(super) fn value_edit(ui: &mut egui::Ui, name: &str, value: Value) -> Option<Value> {
@@ -101,27 +125,9 @@ pub(super) fn value_edit(ui: &mut egui::Ui, name: &str, value: Value) -> Option<
             .then_some(Value::Number(number)),
         Value::Number(mut number) => {
             let mut drag = egui::DragValue::new(&mut number).max_decimals(MAX_DECIMALS);
-            drag = match name {
-                // These only make sense from 0 to 1.
-                "Metalness" | "Roughness" | "AmbientOcclusionStrength" | "Volume" => {
-                    drag.speed(0.01).range(0.0..=1.0)
-                }
-                "PlaybackSpeed" => drag.speed(0.01).range(0.01..=20.0),
-                "RollOffMinDistance" | "RollOffMaxDistance" => {
-                    drag.speed(1.0).range(0.0..=100_000.0)
-                }
-                "NormalStrength" | "EmissiveStrength" | "TextSize" => {
-                    drag.speed(0.01).range(0.0..=f64::INFINITY)
-                }
-                "DesignWidth" | "DesignHeight" => drag.speed(1.0).range(1.0..=10_000.0),
-                // A ColorCorrectionEffect's split toning balance and curve.
-                "Balance" | "Curve" => drag.speed(0.01).range(-1.0..=1.0),
-                "CurvePivot" => drag.speed(0.01).range(0.0..=1.0),
-                // An Atmosphere's height fog.
-                "FogDensity" => drag.speed(0.01).range(0.0..=100.0),
-                "FogFalloff" => drag.speed(0.5).range(0.1..=10_000.0),
-                "FogStart" => drag.speed(1.0).range(0.0..=f64::INFINITY),
-                _ => drag.speed(0.1),
+            drag = match number_limits(name) {
+                Some((speed, range)) => drag.speed(speed).range(range),
+                None => drag.speed(0.1),
             };
             // `clamp_existing_to_range(false)`: only clamp what the user
             // types or drags, never a value that was already there, so just

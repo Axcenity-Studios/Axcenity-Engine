@@ -128,6 +128,11 @@ fn main() -> Result<()> {
         println!("{text}");
         return Ok(());
     }
+    // `--help` or `-h`: the usage, and a clean exit (QA-003).
+    if axcenity_release::help_flag(&all) {
+        println!("{USAGE}");
+        return Ok(());
+    }
     // `--bench` reports its launch times (first frame, assets loaded) from here.
     let launched = Instant::now();
     // Show warnings and errors by default. `wgpu_hal` relays harmless graphics

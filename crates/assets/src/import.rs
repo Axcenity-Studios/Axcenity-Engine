@@ -33,6 +33,11 @@ pub enum ImportError {
     NotAGradingFile,
     #[error("could not read it")]
     Read(#[source] io::Error),
+    /// The extension is right but the content isn't (an empty file, a
+    /// download that stopped, a renamed file): caught before it's copied,
+    /// so the project never gets a file that can't load (QA-018).
+    #[error("it isn't a valid {kind} file ({why})")]
+    Damaged { kind: &'static str, why: String },
     #[error(transparent)]
     Model(#[from] ModelError),
     #[error("could not copy `{}` into the project", path.display())]
@@ -203,6 +208,11 @@ fn import_file(
             .collect();
         return Some(Ok(parts.join("/")));
     }
+    // A file from outside is checked before it's copied; one already in the
+    // project is the project's own, and Asset Check reports it.
+    if let Err(why) = check_content(file, fallback_name) {
+        return Some(Err(why));
+    }
     let name = file
         .file_name()
         .and_then(|name| safe_file_name(&name.to_string_lossy()))
@@ -354,6 +364,54 @@ fn copy(from: &Path, to: &Path) -> Result<(), ImportError> {
     }
     fs::copy(from, to).map_err(error)?;
     Ok(())
+}
+
+/// Whether `file` holds what its kind says, read from its start: an image's
+/// header for a texture, the format's signature for a sound. Other kinds
+/// (skies, lookup tables) are checked where they're decoded.
+fn check_content(file: &Path, kind: &str) -> Result<(), ImportError> {
+    let damaged = |why: String| ImportError::Damaged {
+        kind: if kind == "texture" { "image" } else { "sound" },
+        why,
+    };
+    match kind {
+        "texture" => image::ImageReader::open(file)
+            .map_err(ImportError::Read)?
+            .with_guessed_format()
+            .map_err(ImportError::Read)?
+            .into_dimensions()
+            .map(|_| ())
+            .map_err(|err| damaged(err.to_string())),
+        "sound" => {
+            let mut start = [0u8; 12];
+            let read = {
+                use std::io::Read;
+                let mut opened = fs::File::open(file).map_err(ImportError::Read)?;
+                opened.read(&mut start).map_err(ImportError::Read)?
+            };
+            if sound_signature(&start[..read]) {
+                Ok(())
+            } else if read == 0 {
+                Err(damaged("the file is empty".to_owned()))
+            } else {
+                Err(damaged(
+                    "it doesn't start like a WAV, OGG, MP3 or FLAC file".to_owned(),
+                ))
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Whether `start` (a file's first 12 bytes) begins like a sound the
+/// engine plays: WAV (`RIFF` … `WAVE`), OGG (`OggS`), FLAC (`fLaC`) or
+/// MP3 (an `ID3` tag or a frame's sync bits).
+fn sound_signature(start: &[u8]) -> bool {
+    start.starts_with(b"OggS")
+        || start.starts_with(b"fLaC")
+        || start.starts_with(b"ID3")
+        || (start.len() >= 12 && start.starts_with(b"RIFF") && &start[8..12] == b"WAVE")
+        || (start.len() >= 2 && start[0] == 0xFF && start[1] & 0xE0 == 0xE0)
 }
 
 #[cfg(test)]
@@ -568,5 +626,61 @@ mod tests {
             Err(ImportError::NotAModel)
         ));
         assert!(!project.join(MODELS_FOLDER).exists());
+    }
+    /// An image or sound whose content isn't what its extension says (an
+    /// empty file, random bytes, text) is refused before it's copied, with
+    /// the reason, so the project never gets a file that can't load
+    /// (QA-018). Real ones still import.
+    #[test]
+    fn a_damaged_image_or_sound_is_refused_and_not_copied() {
+        let source = temp_folder("import-damaged-source");
+        let project = temp_folder("import-damaged");
+        image::RgbaImage::new(2, 2)
+            .save(source.join("good.png"))
+            .unwrap();
+        fs::write(source.join("noise.png"), [7u8; 300]).unwrap();
+        fs::write(source.join("empty.jpg"), b"").unwrap();
+        let mut wav = b"RIFF\0\0\0\0WAVEfmt ".to_vec();
+        wav.extend([0u8; 32]);
+        fs::write(source.join("good.wav"), wav).unwrap();
+        fs::write(source.join("fake.wav"), b"not a wave").unwrap();
+        fs::write(source.join("empty.ogg"), b"").unwrap();
+
+        assert_eq!(
+            import_texture(&project, &source.join("good.png"), PROJECT_TEXTURES_FOLDER).unwrap(),
+            "assets/textures/good.png"
+        );
+        assert_eq!(
+            import_audio(&project, &source.join("good.wav")).unwrap(),
+            "assets/audio/good.wav"
+        );
+        for bad in ["noise.png", "empty.jpg"] {
+            let err =
+                import_texture(&project, &source.join(bad), PROJECT_TEXTURES_FOLDER).unwrap_err();
+            assert!(matches!(err, ImportError::Damaged { .. }), "{bad}: {err}");
+            assert!(
+                err.to_string().starts_with("it isn't a valid image file"),
+                "{err}"
+            );
+            assert!(
+                !project.join("assets/textures").join(bad).exists(),
+                "{bad} copied"
+            );
+        }
+        for bad in ["fake.wav", "empty.ogg"] {
+            let err = import_audio(&project, &source.join(bad)).unwrap_err();
+            assert!(
+                err.to_string().starts_with("it isn't a valid sound file"),
+                "{err}"
+            );
+            assert!(
+                !project.join("assets/audio").join(bad).exists(),
+                "{bad} copied"
+            );
+        }
+        assert!(sound_signature(b"OggS\0\0"));
+        assert!(sound_signature(b"ID3\x04"));
+        assert!(sound_signature(&[0xFF, 0xFB, 0x90]));
+        assert!(!sound_signature(b"RIFF\0\0\0\0AVI "));
     }
 }

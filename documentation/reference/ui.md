@@ -64,4 +64,4 @@ The hotbar, leaderboard, chat window, proximity prompts, dialogue box and quest 
 
 > **Known limits.** No UI on a part's surface (use BillboardGui). The CSS is a subset: no grid layout, animations (`@keyframes`) or media queries.
 
-More: [UI in the engineering wiki](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Engine-Systems/UI.md).
+More: [UI in the engineering wiki](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Engine-Systems/UI.md).

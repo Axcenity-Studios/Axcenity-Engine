@@ -81,7 +81,7 @@ impl Template {
     pub fn details(self) -> &'static str {
         match self {
             Template::Baseplate => {
-                "A grey 40 × 40 baseplate to build on, under a sky, with a character to play as."
+                "A grey 40 × 40 baseplate to build on, under a sky, with a character to play as and a pad it spawns on."
             }
             Template::Empty => {
                 "An empty world under a sky, with a character to play as, for starting from nothing."
@@ -209,6 +209,15 @@ pub(super) const BASEPLATE_WORLD: &str = r#"{
           "Size": [40, 1, 40],
           "Color": [0.35, 0.37, 0.4]
         }
+      },
+      {
+        "class": "SpawnLocation",
+        "name": "SpawnLocation",
+        "properties": {
+          "Position": [0, 0.5, 0],
+          "Size": [6, 1, 6],
+          "Duration": 0
+        }
       }
     ]
   },
@@ -309,6 +318,9 @@ pub(crate) fn make_project_folder(parent: &Path, name: &str) -> Result<PathBuf, 
             "the project needs a name",
         )));
     }
+    // The folder it goes in is made if it isn't there yet (the default
+    // "Axcenity Projects", or a typed one).
+    fs::create_dir_all(parent).map_err(SaveError::new(parent))?;
     // `create_dir` (not `_all`) fails if the folder is already there.
     fs::create_dir(&folder).map_err(SaveError::new(&folder))?;
     Ok(folder)

@@ -51,6 +51,6 @@ Each frame takes the same steps, in the same order, in every program: receive ne
 
 The engineering wiki in the source repository describes each system's design, the decisions behind it (with their reasons) and its measured performance:
 
-- [Architecture overview](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Architecture/Architecture-Overview.md)
-- [System inventory](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Architecture/System-Inventory.md), with each system's status
-- [Architecture decisions](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Architecture/Architecture-Decisions/ADR-Index.md)
+- [Architecture overview](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Architecture/Architecture-Overview.md)
+- [System inventory](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Architecture/System-Inventory.md), with each system's status
+- [Architecture decisions](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Architecture/Architecture-Decisions/ADR-Index.md)

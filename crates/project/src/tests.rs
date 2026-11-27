@@ -257,7 +257,14 @@ fn every_template_makes_a_project_that_loads_cleanly() {
         match template {
             Template::Empty => assert_eq!(parts, 0),
             Template::Baseplate => {
-                assert_eq!(parts, 1);
+                // The baseplate and the pad the character spawns on.
+                assert_eq!(parts, 2);
+                assert!(
+                    project
+                        .world
+                        .find_first_child(project.world.workspace(), "SpawnLocation")
+                        .is_some()
+                );
                 let plate = project
                     .world
                     .find_first_child(project.world.workspace(), "Baseplate")
@@ -454,6 +461,22 @@ fn the_time_of_day_and_an_atmosphere_save_with_the_world() {
             .is_some(),
         "{text}"
     );
+    fs::remove_dir_all(parent).unwrap();
+}
+
+/// QA-002: New Project offers "Axcenity Projects", which isn't there on a
+/// first run, and a typed location may not be there either.
+#[test]
+fn a_new_project_makes_the_folder_it_goes_in() {
+    let parent = temp_folder("new-project-parent");
+    let missing = parent.join("Axcenity Projects").join("Games");
+    let folder = create_project(&missing, "First").unwrap();
+    assert_eq!(folder, missing.join("First"));
+    load(&folder).unwrap();
+    // A file where the folder should be is still refused.
+    let file = parent.join("a file");
+    fs::write(&file, "").unwrap();
+    assert!(create_project(&file, "Second").is_err());
     fs::remove_dir_all(parent).unwrap();
 }
 
@@ -1032,4 +1055,24 @@ fn a_chosen_picture_is_noted_in_the_manifest_and_taken_out_again() {
     let text = fs::read_to_string(folder.join(MANIFEST_FILE)).unwrap();
     assert!(!text.contains("chosen_picture"), "{text}");
     let _ = fs::remove_dir_all(&parent);
+}
+
+/// A project fresh from each template passes Asset Check, so its first
+/// Build Game doesn't list problems the user didn't make. The default
+/// character's clips play takes from an animations-only `.glb`, which once
+/// gave 84 "it has no triangles to draw" findings (QA-022).
+#[test]
+fn every_template_passes_asset_check() {
+    let parent = temp_folder("templates-asset-check");
+    for template in Template::ALL {
+        let folder = create_project_from(&parent, template.name(), template).unwrap();
+        let project = load(&folder).unwrap();
+        let report = crate::check_assets(&folder, &project.world);
+        assert!(
+            report.findings.is_empty(),
+            "{template:?}: {:#?}",
+            report.findings.iter().take(5).collect::<Vec<_>>()
+        );
+    }
+    let _ = fs::remove_dir_all(parent);
 }

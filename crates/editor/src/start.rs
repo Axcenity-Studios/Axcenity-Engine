@@ -477,11 +477,19 @@ impl StartScreen {
         self.reload_user_templates();
         self.dialog = Some(Dialog::New {
             name: String::new(),
-            parent: self.last_parent.clone(),
+            parent: self.last_parent.clone().or_else(default_projects_folder),
             template,
             user_template: None,
             error: None,
         });
+    }
+
+    /// The folder New Project offers until one is picked: where the most
+    /// recent project is. A folder picked this session wins.
+    pub fn suggest_parent(&mut self, folder: PathBuf) {
+        if self.last_parent.is_none() {
+            self.last_parent = Some(folder);
+        }
     }
 
     /// Where the user's own templates are saved and listed from.

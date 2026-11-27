@@ -52,11 +52,22 @@ impl EditorApp {
         if self.unsaved() && !self.save() {
             return;
         }
+        let asked = std::time::Instant::now();
         let Some(destination) = rfd::FileDialog::new()
             .set_title("Build game: choose a folder")
             .set_directory(&folder)
             .pick_folder()
         else {
+            if super::pickers::picker_never_opened(asked) {
+                self.output.warning(format!(
+                    "Build Game couldn't open a folder picker: this desktop has no XDG \
+                     desktop portal or zenity. Install one, or build from a terminal with \
+                     `axcenity-editor --build-game \"{}\" <folder>`.",
+                    folder.display()
+                ));
+                self.toasts
+                    .warning("No folder picker opened: see the Console.");
+            }
             return;
         };
         self.export_game_to(&destination, target);

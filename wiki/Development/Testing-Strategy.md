@@ -49,6 +49,11 @@ After a dependency change, `cargo hakari generate` first. After a script API cha
 - For parallel code, prove the output doesn't depend on thread count.
 - Never pass `std::env::temp_dir()` itself to `Assets::new` in a test (it scans the whole temp folder); use a fresh subfolder.
 - Keep single tests short; nextest marks a test SLOW after 30 s and kills it after 2 minutes.
+- Write drawing tests to pass under plain `cargo test` too: a test thread has a 2 MB stack (wrap a deep frame in `with_big_stack`), and layout tests that read widget rectangles need `ctx.enable_accesskit()`.
+
+## Without nextest
+
+nextest runs each test in its own process. Plain `cargo test` runs a crate's tests in one process, and the editor, render and player binaries then grow past 13 GB, which a 15 GB machine kills (QA audit 2026-11-27, QA-019; not a product leak). Where nextest can't be installed, run those three crates one test per process: list them with `--list --format terse`, then run each with `--exact` a few at a time (`docs/research/qa-audit/run-each.sh`).
 
 ## Known noise
 

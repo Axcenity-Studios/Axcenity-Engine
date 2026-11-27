@@ -514,7 +514,8 @@ fn every_way_in_opens_the_same_dialog_for_a_model() {
     // Dropped on the window, with an image from outside the project and a
     // second model.
     let image = folder.join("..").join("import-ways-in-dropped.png");
-    fs::write(&image, b"not checked until drawn").unwrap();
+    // A real image: import checks the content (QA-018).
+    image::RgbImage::new(1, 1).save(&image).unwrap();
     let ctx = crate::theme::test_context();
     let dropped = [&props, &image, &example_model()].map(|path| dropped_file(path));
     let input = egui::RawInput {
@@ -615,7 +616,7 @@ fn each_material_gets_a_surface_appearance_with_its_maps_as_changed_in_the_dialo
     assert_eq!(maps.material, "Sandstone");
     // A roughness map picked from outside the project, read from green.
     let picked = folder.join("..").join("import-surface-rough.png");
-    fs::write(&picked, b"not checked until drawn").unwrap();
+    image::RgbImage::new(1, 1).save(&picked).unwrap();
     maps.set_file(Slot::Roughness, Some(MapFile::Picked(picked.clone())));
     *maps.channel_mut(Slot::Roughness).unwrap() = Channel::Green;
     app.import_chosen(&dialog);
@@ -1466,4 +1467,12 @@ impl egui::DroppedFile for Dropped {
 
 fn dropped_file(path: &Path) -> egui::DroppedFileHandle {
     std::sync::Arc::new(Dropped(path.to_path_buf()))
+}
+
+#[test]
+fn a_picker_that_stayed_open_a_while_was_cancelled_not_missing() {
+    // QA-023: only an empty answer that comes back at once can mean that no
+    // picker opened; one after a second is the person cancelling.
+    let asked = Instant::now() - Duration::from_secs(1);
+    assert!(!super::pickers::picker_never_opened(asked));
 }

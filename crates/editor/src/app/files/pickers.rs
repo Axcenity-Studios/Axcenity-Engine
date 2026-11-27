@@ -297,3 +297,20 @@ impl EditorApp {
         }
     }
 }
+
+/// How soon a picker that came back empty counts as one that never opened.
+const PICKER_NEVER_OPENED: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// Whether a system picker asked at `asked` that came back with nothing
+/// most likely never opened (QA-023). On Linux, rfd needs an XDG desktop
+/// portal or `zenity`; without them it returns at once, just as if the
+/// person had cancelled, and logs the failure only.
+pub(in crate::app) fn picker_never_opened(asked: std::time::Instant) -> bool {
+    cfg!(target_os = "linux") && asked.elapsed() < PICKER_NEVER_OPENED && !zenity_on_path()
+}
+
+fn zenity_on_path() -> bool {
+    std::env::var_os("PATH").is_some_and(|paths| {
+        std::env::split_paths(&paths).any(|folder| folder.join("zenity").is_file())
+    })
+}

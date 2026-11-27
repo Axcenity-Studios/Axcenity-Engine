@@ -11,6 +11,10 @@ tags: [history]
 
 Architecture-level changes, newest first. Not every commit: the ones that changed how the engine is built, how it performs, or a decision. Git history (`git log --first-parent origin/main`) and PR descriptions have the rest.
 
+## 2026-11-27
+
+- **Whole-engine QA audit** (branch `qa-audit`, record in `docs/research/qa-audit/`): fixes from runtime testing, among them Close Project no longer waits forever for its thumbnail, Asset Check no longer reports a new project's animation clips as broken models, images and sounds are checked before import, a damaged editor settings file is kept and reported, and the New Project location can be typed. Findings QA-001 to QA-024.
+
 ## 2026-11-14
 
 - **Showcase feature benchmark**: `axcenity-test --make-showcase` builds a benchmark scene from the owner's Overgrown Carriage (plus shadow-casting lamps, terrain water, clouds, sun rays, fixed camera views), the player's `--graphics <file>` holds a run to a settings file (including hardware ray tracing), and `benchmarks/baselines.json` runs it through every preset and each ray traced effect, with crowd, streaming and 8-player runs added. No numbers recorded yet. See [Benchmarking](../Performance/Benchmarking.md).

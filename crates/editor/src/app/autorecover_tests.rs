@@ -180,6 +180,11 @@ fn with_autorecover_off_nothing_is_written() {
 /// only let go by choosing Discard.
 #[test]
 fn the_recover_prompt_draws_and_escape_keeps_it() {
+    // Three editors at once: more than a 2 MiB test thread holds.
+    with_big_stack(recover_prompt_draws_and_escape_keeps_it);
+}
+
+fn recover_prompt_draws_and_escape_keeps_it() {
     let (app, folder) = unsaved_work("autorecover-prompt");
     std::mem::forget(app);
     age_snapshot(&folder);
@@ -219,4 +224,16 @@ fn the_recover_prompt_draws_and_escape_keeps_it() {
     assert!(axcenity_project::recovery_info(&folder).is_some());
     drop(app);
     let _ = std::fs::remove_dir_all(folder);
+}
+
+/// The prompt says "about 1 minute ago" and "about 4 minutes ago", not
+/// "minute(s)" (QA-016).
+#[test]
+fn the_age_of_a_copy_reads_as_words() {
+    use super::autorecover::age_in_words;
+    assert_eq!(age_in_words(30), "less than a minute ago");
+    assert_eq!(age_in_words(60), "about 1 minute ago");
+    assert_eq!(age_in_words(250), "about 4 minutes ago");
+    assert_eq!(age_in_words(3600), "about 1 hour ago");
+    assert_eq!(age_in_words(3 * 86_400), "about 3 days ago");
 }

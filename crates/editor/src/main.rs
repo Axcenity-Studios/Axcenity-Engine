@@ -183,6 +183,28 @@ fn wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
     }
 }
 
+/// What `axcenity-editor --help` prints.
+fn usage() -> String {
+    format!(
+        "usage: axcenity-editor [<project folder>] [{host} | {join} <invite link>]\n\
+         \x20      axcenity-editor {studio}\n\
+         \x20      axcenity-editor {build} <project folder> <output folder> [--target windows|macos|linux] [--profile <name>]\n\
+         \x20      axcenity-editor {cook} <project folder>\n\
+         \x20      {movie}\n\
+         \x20      axcenity-editor {mcp} <project folder>   (an MCP server for AI clients)\n\
+         \x20      axcenity-editor --version [--json]\n\
+         example: cargo run -p axcenity-editor -- crates/samples/projects/touched\n\
+         With no folder the editor opens on the start screen.",
+        host = app::team::HOST_FLAG,
+        join = app::team::JOIN_FLAG,
+        studio = character_workspace::FLAG,
+        build = build_game::BUILD_FLAG,
+        cook = cooking::COOK_FLAG,
+        movie = movie::cli::USAGE.trim_start_matches("usage: "),
+        mcp = app::mcp::FLAG,
+    )
+}
+
 fn main() -> eframe::Result {
     axcenity_release::console::attach_parent_console();
     // `--version` (and `--version --json`): this build's version, channel,
@@ -193,6 +215,11 @@ fn main() -> eframe::Result {
         .collect();
     if let Some(text) = axcenity_release::version_flag("axcenity-editor", &all) {
         println!("{text}");
+        return Ok(());
+    }
+    // `--help` or `-h`: the ways to start the editor, then exit (QA-003).
+    if axcenity_release::help_flag(&all) {
+        println!("{}", usage());
         return Ok(());
     }
     // Same logging defaults as the player: warnings and errors, minus
@@ -287,6 +314,9 @@ fn main() -> eframe::Result {
         std::process::exit(2);
     }
 
+    // eframe names its settings folder after the app ID when there is
+    // one; keep the settings where they have always been, under APP_ID.
+    let settings_file = eframe::storage_dir(APP_ID).map(|folder| folder.join("app.ron"));
     let options = eframe::NativeOptions {
         // The viewport draws with wgpu, so egui must too (they share the GPU device).
         renderer: eframe::Renderer::Wgpu,
@@ -309,9 +339,7 @@ fn main() -> eframe::Result {
         // Always open at the size above, in the middle of the screen. A
         // remembered size can outgrow a monitor (or span two) and stick.
         persist_window: false,
-        // eframe names its settings folder after the app ID when there is
-        // one; keep the settings where they have always been, under APP_ID.
-        persistence_path: eframe::storage_dir(APP_ID).map(|folder| folder.join("app.ron")),
+        persistence_path: settings_file.clone(),
         centered: true,
         wgpu_options: wgpu_options(),
         ..Default::default()
@@ -326,6 +354,9 @@ fn main() -> eframe::Result {
             theme::install(ctx);
             let mut app = EditorApp::new(None);
             app.set_window_icon(window_icon());
+            if let Some(file) = &settings_file {
+                app.check_settings_file(file, creation_context.storage);
+            }
             app.load_settings(ctx, creation_context.storage);
             app.set_global_assets(global_assets::default_folder());
             app.set_characters_folder(character_workspace::default_folder());

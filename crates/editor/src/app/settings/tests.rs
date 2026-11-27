@@ -908,3 +908,46 @@ fn viewport_overlays_stay_behind_settings_and_theme_cards_stay_inside() {
         }
     }
 }
+
+/// A settings file eframe couldn't read (cut short by a crash) is kept as
+/// `app.ron.damaged`, and the Console says the settings were reset; a file
+/// that was read, or none at all, says nothing (QA-020).
+#[test]
+fn a_damaged_settings_file_is_kept_and_reported() {
+    let folder = std::env::temp_dir().join(format!("axcenity-settings-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&folder);
+    std::fs::create_dir_all(&folder).unwrap();
+    let file = folder.join("app.ron");
+    let warnings = |app: &EditorApp| {
+        app.output
+            .lines()
+            .iter()
+            .filter(|line| line.text.contains("settings file"))
+            .count()
+    };
+
+    // No file yet (a first launch): nothing to say.
+    let mut app = EditorApp::new(None);
+    app.check_settings_file(&file, Some(&MemoryStorage::default()));
+    assert_eq!(warnings(&app), 0);
+
+    // Read whole: its appearance is there.
+    std::fs::write(&file, "{\"appearance\": \"{}\"}").unwrap();
+    let mut read = MemoryStorage::default();
+    eframe::Storage::set_string(&mut read, "appearance", "{}".to_owned());
+    app.check_settings_file(&file, Some(&read));
+    assert_eq!(warnings(&app), 0);
+
+    // Cut short: eframe gave nothing back.
+    std::fs::write(&file, "{\n    \"appearance\": \"{\\\"theme").unwrap();
+    app.check_settings_file(&file, Some(&MemoryStorage::default()));
+    assert_eq!(warnings(&app), 1);
+    let line = &app.output.lines().last().unwrap().text;
+    assert!(line.contains("back to their defaults"), "{line}");
+    assert!(line.contains("app.ron.damaged"), "{line}");
+    assert_eq!(
+        std::fs::read_to_string(folder.join("app.ron.damaged")).unwrap(),
+        std::fs::read_to_string(&file).unwrap()
+    );
+    let _ = std::fs::remove_dir_all(&folder);
+}

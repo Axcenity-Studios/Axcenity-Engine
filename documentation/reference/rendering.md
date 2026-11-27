@@ -58,4 +58,4 @@ TAA (temporal anti-aliasing) and **real-time global illumination** are overrides
 
 > **Known limits.** Overlapping see-through objects can blend in the wrong order (they're sorted by their centres). Rect lights are lit from a representative point. glTF vertex colours and emissive strength aren't read.
 
-More: [Rendering in the engineering wiki](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Engine-Systems/Rendering.md).
+More: [Rendering in the engineering wiki](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Engine-Systems/Rendering.md).

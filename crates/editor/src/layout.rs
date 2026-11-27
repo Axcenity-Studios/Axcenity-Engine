@@ -844,9 +844,11 @@ fn default_dock() -> DockState<Pane> {
     let tree = dock.main_surface_mut();
     let [scene, explorer] = tree.split_right(NodeIndex::root(), 0.78, vec![Pane::Explorer]);
     tree.split_below(explorer, 0.45, vec![Pane::Properties, Pane::Terrain]);
+    // 0.8: at 1600 × 900 the Console then shows three or four lines of
+    // output under its filter bar, not one (QA audit, QA-007).
     tree.split_below(
         scene,
-        0.85,
+        0.8,
         vec![Pane::Console, Pane::Assets, Pane::Profiler],
     );
     dock

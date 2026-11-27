@@ -78,4 +78,4 @@ Skinning runs on the GPU: twenty walking characters cost about 0.4 ms of CPU dra
 
 > **Known limits.** Animation in glTF files isn't imported; use FBX. Ragdolls can overshoot their joint limits on hard landings.
 
-More: [Animation in the engineering wiki](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Engine-Systems/Animation.md).
+More: [Animation in the engineering wiki](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Engine-Systems/Animation.md).
