@@ -279,8 +279,18 @@ impl EditorApp {
             return;
         }
         if self.project.is_none() {
-            self.start
-                .set_notice("Open a project, then drop files on it to import them.".to_owned());
+            // A project folder dropped on the start screen opens, as Open
+            // Project… would (also the way in where no folder picker works).
+            if let Some(folder) = files.iter().find(|file| file.is_dir()) {
+                let folder = folder.clone();
+                self.begin_open(ctx, &folder);
+                return;
+            }
+            self.start.set_notice(
+                "Drop a project folder here to open it. To import files, open a project, \
+                 then drop them on it."
+                    .to_owned(),
+            );
         } else if self.playing() {
             self.output
                 .error("Press Stop before importing files.".to_owned());

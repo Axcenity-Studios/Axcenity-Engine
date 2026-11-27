@@ -494,6 +494,9 @@ impl StartScreen {
                     }
                     ui.add_space(10.0);
                     field_label(ui, &palette, "Location");
+                    // Typed or browsed: a folder can be typed where the
+                    // system's folder picker isn't available (a Linux desktop
+                    // without a portal or zenity, where Browse does nothing).
                     ui.horizontal(|ui| {
                         if ui
                             .add(widgets::button(
@@ -503,26 +506,35 @@ impl StartScreen {
                                 &palette,
                             ))
                             .clicked()
-                            && let Some(folder) = rfd::FileDialog::new()
-                                .set_title("Choose where to make the project")
-                                .pick_folder()
                         {
-                            *parent = Some(folder);
-                        }
-                        match parent {
-                            Some(parent) => ui.add(
-                                egui::Label::new(
-                                    RichText::new(parent.display().to_string())
-                                        .color(palette.text_secondary),
-                                )
-                                .truncate(),
-                            ),
-                            None => {
-                                ui.label(RichText::new("No folder chosen").color(palette.text_weak))
+                            let mut picker = rfd::FileDialog::new()
+                                .set_title("Choose where to make the project");
+                            if let Some(start) = parent.as_deref().filter(|p| p.is_dir()) {
+                                picker = picker.set_directory(start);
                             }
-                        };
+                            if let Some(folder) = picker.pick_folder() {
+                                *parent = Some(folder);
+                            }
+                        }
+                        let mut typed = parent
+                            .as_ref()
+                            .map(|parent| parent.display().to_string())
+                            .unwrap_or_default();
+                        if ui
+                            .add(
+                                dialog::text_field(&mut typed)
+                                    .hint_text("The folder to make the project in"),
+                            )
+                            .changed()
+                        {
+                            *parent = (!typed.is_empty()).then(|| PathBuf::from(typed));
+                        }
                     });
-                    if let Some(parent) = parent.as_deref()
+                    let location = parent
+                        .as_deref()
+                        .map(project_location)
+                        .filter(|folder| !folder.as_os_str().is_empty());
+                    if let Some(parent) = &location
                         && !name.trim().is_empty()
                     {
                         ui.label(
@@ -535,14 +547,27 @@ impl StartScreen {
                         );
                     }
                     error_line(ui, &palette, error.as_deref());
-                    let ready = parent.is_some() && !name.trim().is_empty();
+                    let ready = location.is_some() && !name.trim().is_empty();
+                    // Say why Create Project can't be pressed yet.
+                    if !ready && error.is_none() {
+                        let missing = if name.trim().is_empty() {
+                            "Type a name for the project."
+                        } else {
+                            "Choose or type where to make it."
+                        };
+                        ui.label(
+                            RichText::new(missing)
+                                .size(type_scale::SMALL)
+                                .color(palette.text_weak),
+                        );
+                    }
                     // The name is the only thing typed, so Enter there creates.
                     let (create, cancel) = dialog_buttons(
                         ui,
                         (icons::PLUS, "Create Project", dialog::Kind::Main, ready),
                         dialog::Enter::FromField,
                     );
-                    if create && let Some(parent) = parent.as_deref() {
+                    if create && let Some(parent) = location.as_deref() {
                         let made = match user_template {
                             Some(file) => axcenity_project::create_project_from_template_file(
                                 parent, name, file,
@@ -963,4 +988,34 @@ pub(super) fn import_template(folder: &Path, file: &Path) -> Result<PathBuf, Str
     }
     std::fs::copy(file, &copy).map_err(|err| err.to_string())?;
     Ok(copy)
+}
+
+/// The folder New Project offers before one is picked: "Axcenity Projects"
+/// in the user's Documents folder, or in their home folder when there's no
+/// Documents. It's made when the first project is.
+pub(super) fn default_projects_folder() -> Option<PathBuf> {
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        .filter(|home| !home.is_empty())
+        .map(PathBuf::from)?;
+    let documents = home.join("Documents");
+    let base = if documents.is_dir() { documents } else { home };
+    Some(base.join("Axcenity Projects"))
+}
+
+/// A typed location as a folder: surrounding spaces dropped, and a
+/// leading `~` as the home folder.
+pub(super) fn project_location(typed: &Path) -> PathBuf {
+    let text = typed.to_string_lossy();
+    let text = text.trim();
+    let home = || std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" });
+    if text == "~" {
+        if let Some(home) = home() {
+            return PathBuf::from(home);
+        }
+    } else if let Some(rest) = text.strip_prefix("~/").or_else(|| text.strip_prefix("~\\"))
+        && let Some(home) = home()
+    {
+        return PathBuf::from(home).join(rest);
+    }
+    PathBuf::from(text)
 }

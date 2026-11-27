@@ -457,6 +457,22 @@ fn the_time_of_day_and_an_atmosphere_save_with_the_world() {
     fs::remove_dir_all(parent).unwrap();
 }
 
+/// QA-002: New Project offers "Axcenity Projects", which isn't there on a
+/// first run, and a typed location may not be there either.
+#[test]
+fn a_new_project_makes_the_folder_it_goes_in() {
+    let parent = temp_folder("new-project-parent");
+    let missing = parent.join("Axcenity Projects").join("Games");
+    let folder = create_project(&missing, "First").unwrap();
+    assert_eq!(folder, missing.join("First"));
+    load(&folder).unwrap();
+    // A file where the folder should be is still refused.
+    let file = parent.join("a file");
+    fs::write(&file, "").unwrap();
+    assert!(create_project(&file, "Second").is_err());
+    fs::remove_dir_all(parent).unwrap();
+}
+
 #[test]
 fn a_new_project_loads_and_its_settings_can_change() {
     let parent = temp_folder("new-project");

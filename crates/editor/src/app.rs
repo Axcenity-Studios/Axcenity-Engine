@@ -1264,6 +1264,10 @@ impl EditorApp {
                 start::remember(&mut self.recent, link);
             }
             self.recent.truncate(start::MAX_TRACKED);
+            // New Project offers the folder the last project is in.
+            if let Some(folder) = self.recent.first().and_then(|link| link.folder.parent()) {
+                self.start.suggest_parent(folder.to_owned());
+            }
             if let Some(text) = storage.get_string(LAYOUT_KEY) {
                 self.layout = Layout::from_text(&text);
             }
