@@ -1038,3 +1038,23 @@ fn hello_streaming_example_loads_with_streaming_on() {
     let settings = axcenity_core::streaming::Settings::of(&project.world).unwrap();
     assert_eq!(settings.target_radius, 400.0);
 }
+
+/// A project fresh from each template passes Asset Check, so its first
+/// Build Game doesn't list problems the user didn't make. The default
+/// character's clips play takes from an animations-only `.glb`, which once
+/// gave 84 "it has no triangles to draw" findings (QA-022).
+#[test]
+fn every_template_passes_asset_check() {
+    let parent = temp_folder("templates-asset-check");
+    for template in Template::ALL {
+        let folder = create_project_from(&parent, template.name(), template).unwrap();
+        let project = load(&folder).unwrap();
+        let report = crate::check_assets(&folder, &project.world);
+        assert!(
+            report.findings.is_empty(),
+            "{template:?}: {:#?}",
+            report.findings.iter().take(5).collect::<Vec<_>>()
+        );
+    }
+    let _ = fs::remove_dir_all(parent);
+}

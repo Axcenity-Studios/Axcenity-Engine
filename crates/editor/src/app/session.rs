@@ -1401,7 +1401,9 @@ impl EditorApp {
                     folder,
                     area,
                     then_close,
+                    asked_at: ctx.input(|input| input.time),
                 });
+                ctx.request_repaint_after(std::time::Duration::from_secs_f64(THUMBNAIL_WAIT));
             }
             _ if then_close => self.finish_closing_project(),
             _ => {}
@@ -1415,7 +1417,22 @@ impl EditorApp {
                 _ => None,
             })
         });
-        let (Some(image), Some(shot)) = (screenshot, self.thumbnail.take()) else {
+        let Some(image) = screenshot else {
+            // Still waiting, or it isn't coming: then the project goes
+            // without a new thumbnail, and a close goes ahead.
+            let now = ctx.input(|input| input.time);
+            if let Some(shot) = self
+                .thumbnail
+                .take_if(|shot| now - shot.asked_at > THUMBNAIL_WAIT)
+            {
+                log::warn!("no screenshot for the project thumbnail; going on without one");
+                if shot.then_close {
+                    self.finish_closing_project();
+                }
+            }
+            return;
+        };
+        let Some(shot) = self.thumbnail.take() else {
             return;
         };
         let png = thumbnail::encode(&image, shot.area, ctx.pixels_per_point());

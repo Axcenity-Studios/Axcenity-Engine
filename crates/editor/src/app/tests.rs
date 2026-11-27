@@ -2604,3 +2604,39 @@ fn every_frame_waits_for_the_display_only_when_asked() {
     assert!(frames_always_wait_for_the_display(Some(" ON ")));
     assert!(frames_always_wait_for_the_display(Some("1")));
 }
+
+/// Close Project waits for the viewport's screenshot to save a thumbnail;
+/// when one never comes (the cloud's software Vulkan never sent one), the
+/// project still closes after a few seconds, without a new thumbnail, rather
+/// than staying open with nothing said (QA-021).
+#[test]
+fn close_project_goes_ahead_when_the_thumbnail_screenshot_never_comes() {
+    with_big_stack(|| {
+        let folder = copy_of_example("part", "close-no-screenshot");
+        let mut app = EditorApp::new(Some(&folder));
+        let ctx = crate::theme::test_context();
+        app.viewport_rect = Some(egui::Rect::from_min_size(
+            egui::pos2(0.0, 0.0),
+            egui::vec2(200.0, 100.0),
+        ));
+        app.close_project();
+        let mut frame = |app: &mut EditorApp, time: f64| {
+            let input = egui::RawInput {
+                time: Some(time),
+                ..Default::default()
+            };
+            let _ = crate::theme::run(&ctx, input, |ui| {
+                let ctx = ui.ctx().clone();
+                app.start_thumbnail(&ctx);
+                app.finish_thumbnail(&ctx);
+            });
+        };
+        frame(&mut app, 1.0);
+        assert!(app.project.is_some(), "waits for the screenshot first");
+        frame(&mut app, 2.5);
+        assert!(app.project.is_some());
+        frame(&mut app, 5.0);
+        assert!(app.project.is_none(), "closed without a thumbnail");
+        let _ = std::fs::remove_dir_all(folder);
+    });
+}

@@ -959,7 +959,14 @@ struct ThumbnailShot {
     area: egui::Rect,
     /// Close the project once it's saved.
     then_close: bool,
+    /// When it was asked for (`egui::InputState::time`): a screenshot that
+    /// never comes (a driver that can't read the frame back) gives up after
+    /// [`THUMBNAIL_WAIT`], so Close Project still closes (QA-021).
+    asked_at: f64,
 }
+
+/// How long, in seconds, a project thumbnail's screenshot is waited for.
+const THUMBNAIL_WAIT: f64 = 3.0;
 
 /// The answers to "Save changes?".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
