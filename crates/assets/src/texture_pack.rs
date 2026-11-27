@@ -381,7 +381,8 @@ mod tests {
             .iter()
             .map(|name| {
                 let file = downloads.join(name);
-                fs::write(&file, name.as_bytes()).unwrap();
+                // A real image: import checks the content (QA-018).
+                image::RgbImage::new(1, 1).save(&file).unwrap();
                 file
             })
             .collect();
@@ -419,7 +420,7 @@ mod tests {
 
         // A map of the same material brought in later joins its folder.
         let more = downloads.join("leafy_grass_diff_2k.jpg");
-        fs::write(&more, b"colour").unwrap();
+        image::RgbImage::new(1, 1).save(&more).unwrap();
         let import = import_textures(&project, &[more], "assets/images", "assets/textures");
         assert_eq!(
             import.files[0].1.as_ref().unwrap(),

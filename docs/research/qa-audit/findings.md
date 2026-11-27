@@ -21,6 +21,8 @@ Every issue the audit found. IDs are permanent (QA-001…). **Severity**: Critic
 | QA-015 | Low | Properties | A part's Transparency took any typed number (5, -1), though only 0 to 1 means anything | Run (GUI), cloud | Fixed: limited to 0–1 like Metalness (`number_limits`), test `transparency_is_limited_to_0_to_1` |
 | QA-016 | Low | Wording | The AutoRecover prompt said "about 4 minute(s) ago" and the Console "the world and 1 document(s)"; Collaborate messages still say "change(s)" | Run (GUI), cloud | Fixed for AutoRecover (test `the_age_of_a_copy_reads_as_words`); Collaborate's left as is |
 | QA-017 | Low | Version History | Times show in UTC ("2026-11-27 20:45:04 UTC"), not the computer's local time | Run (GUI), cloud | Fixed: shown in local time (`app::local_when`); the project still keeps UTC seconds |
+| QA-018 | Medium | Import | An image or sound was imported by its extension alone: random bytes named `noise.png` or a text file named `fake.wav` were copied into the project and reported as imported, failing only later when drawn or played. An empty `.glb` said "EOF while parsing a value at line 1 column 0" | Run (CLI, MCP `asset_import`), cloud | Fixed for images and sounds: the header is checked before copying (`check_content`), test `a_damaged_image_or_sound_is_refused_and_not_copied`. The glTF parser's wording is left |
+| QA-019 | Low | Tests | The editor, render and player test binaries grow past 13 GB when all their tests run in one process (`cargo test`), so the 15 GB cloud container kills them; nextest's process per test hides it | Automated, cloud | Open: see whether a renderer or editor leaks per instance (checked in the GUI with repeated Play/Stop) |
 
 ## Details
 
