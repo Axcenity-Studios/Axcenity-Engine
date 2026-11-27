@@ -1067,7 +1067,8 @@ pub struct Sun {
 ///   nearer than `start` studs, all fog from `end` on, straight between.
 /// - **Height fog** (an Atmosphere's): `density` of the light is lost per
 ///   stud at and below `height`, thinning by `e` every `falloff` studs above
-///   it. Its sun scatters in it, brightest looking toward the sun, which is
+///   it, from `height_start` studs from the camera on (nearer is clear of
+///   it). Its sun scatters in it, brightest looking toward the sun, which is
 ///   what the graphics settings' volumetric fog shadows (sun shafts).
 ///
 /// The sky is fogged as if it were [`Fog::SKY_DISTANCE`] studs away.
@@ -1084,6 +1085,9 @@ pub struct Fog {
     pub density: f32,
     pub height: f32,
     pub falloff: f32,
+    /// How many studs from the camera height fog starts: the way nearer is
+    /// clear of it (0: from the camera).
+    pub height_start: f32,
     /// How much of the sun's light the height fog scatters toward the
     /// camera (0 none, 1 all of it), and how much of that goes forward,
     /// away from the sun (0 the same every way, toward 1 a tight glow
@@ -1248,6 +1252,7 @@ impl Default for Fog {
             density: 0.0,
             height: 0.0,
             falloff: 50.0,
+            height_start: 0.0,
             sun_scattering: 0.0,
             forward_scattering: 0.0,
             dust: DustBoxes::default(),
@@ -1329,8 +1334,9 @@ pub const MAX_PALETTE_COLORS: usize = 64;
 
 /// Changes to the finished picture's colors, made after tone mapping on
 /// sRGB-encoded values (as the screen shows them), in this order:
-/// brightness, contrast, saturation, tint, the lookup table, posterizing
-/// and the palette (`docs/rendering/post.md`). The default changes nothing.
+/// brightness, contrast, the curve, saturation, split toning, tint, the
+/// lookup table, posterizing and the palette (`docs/rendering/post.md`).
+/// The default changes nothing.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ColorGrading {
     /// Added to every channel: -1 is black, 1 is white.
@@ -1342,6 +1348,23 @@ pub struct ColorGrading {
     pub saturation: f32,
     /// sRGB, multiplying every color. White changes nothing.
     pub tint: [f32; 3],
+    /// Split toning (sRGB): the dark colors multiplied by `shadow_tint`,
+    /// the light ones by `highlight_tint`, each first scaled to the
+    /// brightness of white so it shifts the hue and leaves the brightness.
+    /// White changes nothing.
+    pub shadow_tint: [f32; 3],
+    pub highlight_tint: [f32; 3],
+    /// Where split toning's shadows end and highlights begin: above 0 more
+    /// of the picture takes the highlight tint, below it the shadow tint
+    /// (-1 to 1).
+    pub balance: f32,
+    /// An S-curve on each channel (-1 to 1): above 0 it deepens what's
+    /// darker than `curve_pivot` and lifts what's lighter, rolling into
+    /// black and white without clipping; below 0 it flattens toward the
+    /// pivot. 0 changes nothing.
+    pub curve: f32,
+    /// The shade (sRGB, 0 to 1) the curve turns about, which it keeps.
+    pub curve_pivot: f32,
     /// A table every color is looked up in.
     pub lookup: Option<ColorLookup>,
     /// How many levels each channel is cut down to, 2 or more. 0 (or 1)
@@ -1359,6 +1382,11 @@ impl Default for ColorGrading {
             contrast: 0.0,
             saturation: 0.0,
             tint: [1.0; 3],
+            shadow_tint: [1.0; 3],
+            highlight_tint: [1.0; 3],
+            balance: 0.0,
+            curve: 0.0,
+            curve_pivot: 0.5,
             lookup: None,
             posterize: 0,
             palette: Vec::new(),
@@ -2016,9 +2044,11 @@ impl Sway {
         self.reach() * (1.0 - (-speed.max(0.0) / SWAY_WIND).exp())
     }
 
-    /// Whether the item doesn't move at all.
+    /// Whether the item doesn't move at all: neither leans nor flutters.
     pub fn is_still(&self) -> bool {
-        !(self.strength > 0.0 && self.height.abs() > 0.0 && self.base.is_finite())
+        !((self.strength > 0.0 || self.flutter > 0.0)
+            && self.height.abs() > 0.0
+            && self.base.is_finite())
     }
 }
 
@@ -2313,6 +2343,10 @@ pub struct Material {
     /// How much light from behind passes through it, from 0 (none) to 1,
     /// for thin things like leaves. Only the standard shading has it.
     pub translucency: f32,
+    /// A leaf (`translucency` above 0) with a sheen of its own, such as
+    /// ivy: lit as a leaf even when it hangs, at its own roughness rather
+    /// than a leaf's least.
+    pub glossy_leaf: bool,
     /// A line around its silhouette (an inverted hull), for solid items.
     /// Water and terrain ignore it.
     pub outline: Option<Outline>,
@@ -2638,6 +2672,7 @@ impl Default for Material {
             water: None,
             shading: Shading::Standard,
             translucency: 0.0,
+            glossy_leaf: false,
             outline: None,
         }
     }

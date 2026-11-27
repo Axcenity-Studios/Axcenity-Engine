@@ -555,6 +555,50 @@ fn water_fills_the_cells_under_the_brush_at_its_level_and_undoes() {
     assert!(!data.has_water());
 }
 
+/// The Water brush held still stamps every 0.05 s: a stamp that changes no
+/// cell marks no chunk as changed (each mark rebuilt the chunk's water mesh
+/// and its neighbours'), and one that changes a few marks only theirs.
+#[test]
+fn a_water_stamp_that_changes_nothing_marks_no_chunk() {
+    let (mut data, placement) = flat(0.2);
+    let brush = Brush {
+        radius: 6.0,
+        falloff: 0.0,
+        ..Brush::default()
+    };
+    let fill = Operation::Water {
+        level: 25.0,
+        erase: false,
+    };
+    let middle = Vec3::new(0.0, 20.0, 0.0);
+    apply(&mut data, &placement, &brush, &fill, middle);
+    let (chunks_x, chunks_z) = data.chunk_counts();
+    let versions = |data: &TerrainData| {
+        (0..chunks_z)
+            .flat_map(|cz| (0..chunks_x).map(move |cx| (cx, cz)))
+            .map(|(cx, cz)| data.chunk_water_version(cx, cz))
+            .collect::<Vec<_>>()
+    };
+    let painted = versions(&data);
+    let rect = apply(&mut data, &placement, &brush, &fill, middle);
+    assert!(rect.is_empty(), "nothing to change: {rect:?}");
+    assert_eq!(versions(&data), painted);
+    // Erasing a dry corner changes nothing either.
+    let erase = Operation::Water {
+        level: 0.0,
+        erase: true,
+    };
+    let corner = placement.to_world_xz(&data, Vec2::new(4.0, 4.0));
+    apply(
+        &mut data,
+        &placement,
+        &brush,
+        &erase,
+        Vec3::new(corner.x, 0.0, corner.y),
+    );
+    assert_eq!(versions(&data), painted);
+}
+
 #[test]
 fn water_brush_falloff_blends_existing_water_levels_smoothly() {
     let (mut data, placement) = flat(0.2);

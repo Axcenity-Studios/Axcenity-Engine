@@ -281,6 +281,24 @@ pub(super) fn graphics_page(
                 });
             ui.end_row();
 
+            found_label(ui, "Screen-space reflections");
+            let label = |on: Option<bool>| match on {
+                Some(on) => on_off(on).to_owned(),
+                None => format!("Preset ({})", on_off(preset.screen_space_reflections())),
+            };
+            egui::ComboBox::from_id_salt("screen space reflections")
+                .selected_text(label(settings.screen_space_reflections))
+                .show_ui(ui, |ui| {
+                    for choice in [None, Some(true), Some(false)] {
+                        ui.selectable_value(
+                            &mut settings.screen_space_reflections,
+                            choice,
+                            label(choice),
+                        );
+                    }
+                });
+            ui.end_row();
+
             found_label(ui, "Real-time GI");
             let label = |on: Option<bool>| match on {
                 Some(on) => on_off(on).to_owned(),
@@ -600,6 +618,22 @@ fn in_use_section(
                         },
                         effective.contact_shadows,
                         settings.contact_shadows.is_some(),
+                    );
+                    row(
+                        ui,
+                        "Screen-space reflections",
+                        if effective.screen_space_reflections {
+                            "On"
+                        } else {
+                            "Off"
+                        },
+                        if effective.screen_space_reflections {
+                            "What's on screen, in smooth and wet surfaces"
+                        } else {
+                            ""
+                        },
+                        effective.screen_space_reflections,
+                        settings.screen_space_reflections.is_some(),
                     );
                     match effective.ambient_occlusion {
                         AmbientOcclusion::Off => row(
@@ -1136,6 +1170,41 @@ fn ray_tracing_section(
                             );
                         }
                     });
+                    ui.end_row();
+
+                    found_label(ui, "Ray traced shadow resolution");
+                    let label = |resolution: Option<RayShadowResolution>| match resolution {
+                        Some(resolution) => resolution.label().to_owned(),
+                        None => {
+                            format!("Preset ({})", preset.ray_traced_shadow_resolution().label())
+                        }
+                    };
+                    ui.add_enabled_ui(
+                        capabilities.ray_queries
+                            && settings.ray_traced_shadows() != RayTracedShadows::Off,
+                        |ui| {
+                            egui::ComboBox::from_id_salt("ray traced shadow resolution")
+                                .selected_text(label(settings.ray_traced_shadow_resolution))
+                                .show_ui(ui, |ui| {
+                                    for choice in std::iter::once(None)
+                                        .chain(RayShadowResolution::ALL.map(Some))
+                                    {
+                                        ui.selectable_value(
+                                            &mut settings.ray_traced_shadow_resolution,
+                                            choice,
+                                            label(choice),
+                                        );
+                                    }
+                                })
+                                .response
+                                .on_hover_text(
+                                    "Full traces the sun's rays from every pixel. Half traces one \
+                                     pixel of each 2 × 2 (a different one each frame under TAA) \
+                                     and fills the rest from those on the same surface: about a \
+                                     quarter of the rays. Full at Ultra, Half below.",
+                                );
+                        },
+                    );
                     ui.end_row();
 
                     found_label(ui, "Ray traced ambient occlusion");

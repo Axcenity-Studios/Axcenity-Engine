@@ -829,6 +829,7 @@ pub(super) struct OcclusionPasses {
 /// while ambient occlusion is on.
 pub(super) struct OcclusionTargets {
     /// Solid items' depth, at the scene's size, kept for reading.
+    pub(super) depth_texture: wgpu::Texture,
     pub(super) depth_view: wgpu::TextureView,
     /// Their view-space normals, at the scene's size.
     pub(super) normal_view: wgpu::TextureView,
@@ -1256,6 +1257,11 @@ pub(super) struct ScenePipeline {
     /// Hardware ray tracing's acceleration structures, while something
     /// traces rays (renderer/ray_tracing.rs).
     pub(super) ray_scene: Option<Box<super::ray_tracing::RayScene>>,
+    /// The ray traced scene kept, with its meshes' BLASes, through frames
+    /// that trace nothing while a ray traced effect is still on (so water,
+    /// the sun or a light probe volume coming back builds none of them
+    /// again), and freed once every effect is off.
+    pub(super) parked_ray_scene: Option<Box<super::ray_tracing::RayScene>>,
     /// The posing pass (CO8): every animated item morphed and skinned once
     /// a frame into the posed corners every pass reads.
     pub(super) posing: super::posing::Posing,
@@ -1273,6 +1279,10 @@ pub(super) struct ScenePipeline {
     /// Ray traced reflections' pass, while drawn (renderer/ray_reflections.rs),
     /// and the one blank entry bound in its place otherwise.
     pub(super) ray_reflections: Option<Box<super::ray_reflections::RayReflections>>,
+    /// Screen-space reflections' pass, while drawn
+    /// (renderer/screen_reflections.rs), its buffer bound in the frame's
+    /// place 18 while ray traced reflections aren't drawn.
+    pub(super) screen_reflections: Option<Box<super::screen_reflections::ScreenReflections>>,
     pub(super) no_ray_reflections: wgpu::Buffer,
     /// Storage buffer for `DrawList::weather_field` (sky-visibility roof
     /// heights, manual interior/exterior paint overrides, and snow footprint
@@ -1306,6 +1316,9 @@ pub(super) struct ScenePipeline {
     pub(super) freed_for_budget: u64,
     /// While streaming: the thread that uploads what comes into range.
     pub(super) uploader: Option<super::uploads::Uploader>,
+    /// Snow skirts made on a worker while frames are shown
+    /// (`one_frame_ahead`; `snow_caps.rs`).
+    pub(super) skirts: super::snow_caps::Skirts,
     /// When the last few seconds' frames started, oldest first, so what
     /// was drawn lately is kept for [`KEEP_UNDRAWN_SECONDS`] however fast
     /// frames come.

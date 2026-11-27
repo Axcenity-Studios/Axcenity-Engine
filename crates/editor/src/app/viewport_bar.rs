@@ -12,7 +12,7 @@ use super::EditorApp;
 use crate::profiler::RenderCost;
 use crate::theme::{self, icons};
 use crate::viewport::ViewMode;
-use axcenity_render::{CpuSection, DebugView};
+use axcenity_render::{CpuSection, DebugView, FramePass, SHADOW_CASCADE_COUNT};
 
 /// How tall the bar is, in points; the legend and tool panels under it start below.
 pub(crate) const HEIGHT: f32 = 30.0;
@@ -90,6 +90,12 @@ struct LogWindow {
     gpu_frames: u32,
     /// The viewport's drawing, section by section (`CpuSection::ALL`).
     sections_ms: [f32; CpuSection::COUNT],
+    /// The GPU's time by pass (`FramePass::ALL`) and by sun cascade, summed
+    /// over the frames that had a reading; a pass or cascade a frame didn't
+    /// draw adds nothing, so a far cascade drawn one frame in eight shows
+    /// as an eighth of its time.
+    passes_ms: [f32; FramePass::COUNT],
+    cascades_ms: [f32; SHADOW_CASCADE_COUNT],
     /// The newest frame's counts: items drawn, draw calls, and the items
     /// in the ray traced scene.
     counts: (u32, u32, u32),
@@ -105,6 +111,8 @@ impl LogWindow {
             gpu_ms: 0.0,
             gpu_frames: 0,
             sections_ms: [0.0; CpuSection::COUNT],
+            passes_ms: [0.0; FramePass::COUNT],
+            cascades_ms: [0.0; SHADOW_CASCADE_COUNT],
             counts: (0, 0, 0),
         }
     }
@@ -144,6 +152,14 @@ impl ViewportBar {
                 if let Some(gpu) = gpu_ms {
                     log.gpu_ms += gpu;
                     log.gpu_frames += 1;
+                    let ms =
+                        |time: Option<Duration>| time.map_or(0.0, |t| t.as_secs_f32() * 1000.0);
+                    for (sum, time) in log.passes_ms.iter_mut().zip(render.stats.pass_times) {
+                        *sum += ms(time);
+                    }
+                    for (sum, time) in log.cascades_ms.iter_mut().zip(render.stats.cascade_times) {
+                        *sum += ms(time);
+                    }
                 }
                 log.counts = (
                     render.stats.items_drawn,
@@ -321,6 +337,27 @@ impl ViewportBar {
             .filter(|(_, ms)| *ms >= 0.05)
             .map(|(section, ms)| format!("{} {ms:.2}", section.name()))
             .collect();
+        // Then the GPU's frame by pass and the sun's cascades, as `--bench`
+        // prints them, over a twentieth of a millisecond.
+        let gpu_frames = log.gpu_frames.max(1) as f32;
+        let passes: Vec<String> = FramePass::ALL
+            .into_iter()
+            .zip(log.passes_ms)
+            .map(|(pass, sum)| (pass.label().to_owned(), sum / gpu_frames))
+            .chain(
+                log.cascades_ms
+                    .iter()
+                    .enumerate()
+                    .map(|(index, sum)| (format!("cascade {}", index + 1), sum / gpu_frames)),
+            )
+            .filter(|(_, ms)| *ms >= 0.05)
+            .map(|(name, ms)| format!("{name} {ms:.2}"))
+            .collect();
+        let line = if passes.is_empty() {
+            line
+        } else {
+            format!("{line}\n  GPU, ms: {}", passes.join(", "))
+        };
         let line = if sections.is_empty() {
             line
         } else {

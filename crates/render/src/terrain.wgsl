@@ -232,6 +232,8 @@ fn fs_terrain(in: TerrainOut) -> @location(0) vec4<f32> {
     var roughness = 0.9;
     var metalness = 0.0;
     var occlusion = 1.0;
+    // How high the layers' height maps stand here (0.5 with none blended).
+    var height = 0.5;
     if count > 0u {
         var samples: array<LayerSample, 8>;
         var shares = array<f32, 8>(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
@@ -261,6 +263,7 @@ fn fs_terrain(in: TerrainOut) -> @location(0) vec4<f32> {
         roughness = 0.0;
         metalness = 0.0;
         occlusion = 0.0;
+        height = 0.0;
         for (var i = 0u; i < count; i++) {
             let share = shares[i] / total;
             if share <= 0.0 {
@@ -273,6 +276,7 @@ fn fs_terrain(in: TerrainOut) -> @location(0) vec4<f32> {
             metalness += share * s.surface.g * layer.surface.x;
             roughness += share * s.surface.r * layer.surface.y;
             occlusion += share * s.surface.b;
+            height += share * s.surface.a;
         }
         if dot(blended_normal, blended_normal) > 1e-8 {
             shading_normal = normalize(blended_normal);
@@ -302,9 +306,14 @@ fn fs_terrain(in: TerrainOut) -> @location(0) vec4<f32> {
         metalness = 0.0;
     }
 
+    // Water gathers first where the layers' height maps are low (cracks,
+    // the hollows between stones) or their occlusion is dark.
+    let cavity = saturate(max((TERRAIN_CAVITY.x - height) * TERRAIN_CAVITY.y,
+        (1.0 - clamp(occlusion, 0.0, 1.0)) * TERRAIN_CAVITY.z));
     var color = light_ground(in.world_position, n, shading_normal, in.clip_position.xy,
         base_color, clamp(metalness, 0.0, 1.0), clamp(roughness, 0.04, 1.0),
-        clamp(occlusion, 0.0, 1.0) * screen_occlusion(in.clip_position.xy), vec3<f32>(0.04));
+        clamp(occlusion, 0.0, 1.0) * screen_occlusion(in.clip_position.xy), vec3<f32>(0.04),
+        cavity);
     if view == 4u {
         // Lines along the grid of samples, the same width on screen.
         let to_line = abs(fract(grid - 0.5) - 0.5) / max(grid_width, vec2<f32>(0.0001));
@@ -313,6 +322,10 @@ fn fs_terrain(in: TerrainOut) -> @location(0) vec4<f32> {
     }
     return vec4<f32>(fogged(frame.fog, frame.camera_position.xyz, in.world_position, color), 1.0);
 }
+
+// A layer's height under x counts as low for water to gather in, by y for
+// each step lower, and its occlusion map's darkness times z.
+const TERRAIN_CAVITY: vec3<f32> = vec3<f32>(0.62, 2.2, 1.6);
 
 // How smooth the water on the ground must be for ray traced reflections to
 // trace it: about half of it under a puddle.
@@ -324,7 +337,7 @@ fn fs_terrain_prepass(in: TerrainOut) -> @location(0) vec4<f32> {
     // Marked rough (1 plus the roughness, as `fs_prepass` does), so ray
     // traced reflections (ray_reflections.wgsl) leave terrain to the probes,
     // but for its puddles, which mirror what stands over them.
-    let weather = weathered_prepass(in.world_position, normalize(in.normal), 0.999);
+    let weather = weathered_prepass_on(in.world_position, normalize(in.normal), 0.999, true);
     var normal = prepass_normal(weather.normal);
     // A film of water leaves the ground too rough to trace; a puddle doesn't.
     normal.w = 1.0 + select(0.999, weather.roughness, weather.roughness < TERRAIN_MIRRORS);

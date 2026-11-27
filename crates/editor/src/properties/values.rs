@@ -114,6 +114,13 @@ pub(super) fn value_edit(ui: &mut egui::Ui, name: &str, value: Value) -> Option<
                     drag.speed(0.01).range(0.0..=f64::INFINITY)
                 }
                 "DesignWidth" | "DesignHeight" => drag.speed(1.0).range(1.0..=10_000.0),
+                // A ColorCorrectionEffect's split toning balance and curve.
+                "Balance" | "Curve" => drag.speed(0.01).range(-1.0..=1.0),
+                "CurvePivot" => drag.speed(0.01).range(0.0..=1.0),
+                // An Atmosphere's height fog.
+                "FogDensity" => drag.speed(0.01).range(0.0..=100.0),
+                "FogFalloff" => drag.speed(0.5).range(0.1..=10_000.0),
+                "FogStart" => drag.speed(1.0).range(0.0..=f64::INFINITY),
                 _ => drag.speed(0.1),
             };
             // `clamp_existing_to_range(false)`: only clamp what the user

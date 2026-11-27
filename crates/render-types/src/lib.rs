@@ -12,8 +12,8 @@ pub use graphics::{
     AmbientOcclusion, AntiAliasing, Capabilities, CloudQuality, DecalLimits, DepthOfFieldQuality,
     EffectiveGraphics, EnvironmentMapSize, GraphicsSettings, MotionBlurQuality, POINT_SHADOW_FACES,
     PointShadowMapSize, Quality, RAY_TRACING_DISTANCE_RANGE, RENDER_SCALE_RANGE,
-    RayTracedAmbientOcclusion, RayTracedGlobalIllumination, RayTracedReflections, RayTracedShadows,
-    RealtimeGiTier, ReflectionQuality, ShadowMapSize, ShadowQuality, SpotShadowMapSize,
-    TEXTURE_BUDGET_RANGE, TextureQuality,
+    RayShadowResolution, RayTracedAmbientOcclusion, RayTracedGlobalIllumination,
+    RayTracedReflections, RayTracedShadows, RealtimeGiTier, ReflectionQuality, ShadowMapSize,
+    ShadowQuality, SpotShadowMapSize, TEXTURE_BUDGET_RANGE, TextureQuality,
 };
 pub use graphics::{MESH_BUDGET_SHARE, texture_budget_for, whole_gib};

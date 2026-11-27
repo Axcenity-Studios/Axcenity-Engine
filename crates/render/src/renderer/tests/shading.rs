@@ -644,3 +644,78 @@ fn a_normal_mapped_surface_keeps_a_clean_terminator_under_a_grazing_sun() {
     // deciding alone).
     assert!(noise < 31.0, "noise across the terminator: {noise}");
 }
+
+/// A grey square facing the camera with an ambient occlusion map of one
+/// value (`open`, or none), lit by the sun alone `tilt` degrees off its
+/// normal: its middle's brightness (0 to 255).
+fn lit_by_the_sun_with_its_occlusion(open: Option<u8>, tilt: f32) -> u8 {
+    let Some((device, queue)) = test_device() else {
+        return 0;
+    };
+    let mut material = Material {
+        base_color: [0.6; 3],
+        roughness: 0.9,
+        ..Material::default()
+    };
+    if let Some(open) = open {
+        material.maps.occlusion = Some(crate::ChannelMap {
+            texture: Arc::new(Pixel(0x0cc1_u64 + u64::from(open), [open, open, open, 255])),
+            channel: crate::Channel::Red,
+            invert: false,
+        });
+        material.maps.occlusion_strength = 1.0;
+    }
+    let mut list = list_of(vec![DrawItem {
+        shape: Shape::Mesh(Arc::new(Square)),
+        transform: Mat4::from_scale_rotation_translation(
+            Vec3::splat(6.0),
+            glam::Quat::IDENTITY,
+            Vec3::new(0.0, 0.0, -4.0),
+        ),
+        material,
+        ..item(Shape::Block, Vec3::ZERO, 1.0)
+    }]);
+    list.sky.environment_intensity = 0.0;
+    list.ambient.intensity = 0.0;
+    list.shadows.enabled = false;
+    list.sun.intensity = 3.0;
+    let tilt = tilt.to_radians();
+    list.sun.direction = Vec3::new(tilt.sin(), 0.0, tilt.cos());
+    let mut renderer = TextureRenderer::new(&device, &queue, 32, 32);
+    renderer.set_graphics(&GraphicsSettings {
+        anti_aliasing: Some(AntiAliasing::Off),
+        ambient_occlusion: Some(AmbientOcclusion::Off),
+        ..GraphicsSettings::preset(Quality::High)
+    });
+    renderer.render(&list).unwrap();
+    renderer.read_pixels()[(16 * 32 + 16) * 4]
+}
+
+#[test]
+fn a_surfaces_occlusion_map_shades_slanting_sunlight_in_its_cracks() {
+    if test_device().is_none() {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    }
+    // Micro-shadowing (`micro_shadow`): open (or with no map at all) and
+    // with the sun straight on, the map changes nothing of the sun's light.
+    let plain_grazing = lit_by_the_sun_with_its_occlusion(None, 78.0);
+    let plain_straight = lit_by_the_sun_with_its_occlusion(None, 0.0);
+    assert_eq!(
+        lit_by_the_sun_with_its_occlusion(Some(255), 78.0),
+        plain_grazing
+    );
+    let crack_straight = lit_by_the_sun_with_its_occlusion(Some(128), 0.0);
+    assert!(
+        crack_straight.abs_diff(plain_straight) <= 1,
+        "straight on: {crack_straight} against {plain_straight}"
+    );
+    // In a crack, light at a slant is shaded by the relief round it.
+    let crack_grazing = lit_by_the_sun_with_its_occlusion(Some(128), 78.0);
+    eprintln!("grazing sun: {plain_grazing} open, {crack_grazing} in a crack");
+    assert!(plain_grazing > 20, "lit at a slant: {plain_grazing}");
+    assert!(
+        u32::from(crack_grazing) * 2 < u32::from(plain_grazing),
+        "{crack_grazing} against {plain_grazing}"
+    );
+}

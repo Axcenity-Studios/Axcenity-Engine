@@ -158,6 +158,9 @@ pub(super) const RAY_REFLECTIONS_SHADER: &str = concat!(
     include_str!("../ray_cut_outs.wgsl"),
     include_str!("../ray_reflections.wgsl")
 );
+/// Screen-space reflections' pass (`screen_reflections.wgsl`,
+/// renderer/screen_reflections.rs), on its own.
+pub(super) const SCREEN_REFLECTIONS_SHADER: &str = include_str!("../screen_reflections.wgsl");
 /// Ray traced GI's pass traced in software (RL3, renderer/ray_soft.rs) on
 /// a GPU without ray queries: the same, with its rays walking
 /// `ray_soft.wgsl`'s BVHs.
@@ -864,9 +867,27 @@ pub(super) fn upload_custom_mesh(
     skinning: &Skinning,
     source: &dyn MeshSource,
 ) -> Option<GpuMesh> {
+    upload_custom_mesh_with(device, bytes, skinning, source, true)
+}
+
+/// [`upload_custom_mesh`], with its snow skirt (`snow_caps.rs`) only when
+/// `with_skirt`: a renderer whose frames are shown makes it on a worker
+/// instead ([`super::snow_caps::Skirts`]) and adds it when it's ready, as
+/// for a mesh of 200,000 triangles it takes tens of milliseconds.
+pub(super) fn upload_custom_mesh_with(
+    device: &wgpu::Device,
+    bytes: &GpuBytes,
+    skinning: &Skinning,
+    source: &dyn MeshSource,
+    with_skirt: bool,
+) -> Option<GpuMesh> {
     let vertices = custom_vertices(source)?;
     let indices = source.indices();
-    let skirt = super::snow_caps::skirt(&vertices, indices);
+    let skirt = if with_skirt {
+        super::snow_caps::skirt(&vertices, indices)
+    } else {
+        Vec::new()
+    };
     let mut mesh = upload_buffers(
         device,
         bytes,
@@ -911,7 +932,7 @@ pub(super) fn update_custom_mesh(
 /// too, with no warning: there is nothing of it to draw (a part of a
 /// garment that lies wholly under another one has its corners left and
 /// every triangle taken out).
-fn custom_vertices(source: &dyn MeshSource) -> Option<Vec<Vertex>> {
+pub(super) fn custom_vertices(source: &dyn MeshSource) -> Option<Vec<Vertex>> {
     let positions = source.positions();
     let normals = source.normals();
     let uvs = source.uvs();
@@ -948,6 +969,15 @@ fn vertex_bounds(vertices: &[Vertex]) -> Bounds {
     Bounds::around(vertices.iter().map(|vertex| Vec3::from(vertex.position)))
 }
 
+/// A mesh's index buffer, as every pass and ray tracing read it.
+pub(super) fn index_buffer(device: &wgpu::Device, name: &str, indices: &[u8]) -> wgpu::Buffer {
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some(name),
+        contents: indices,
+        usage: wgpu::BufferUsages::INDEX | MESH_READ | super::ray_tracing::blas_input(device),
+    })
+}
+
 pub(super) fn upload_buffers(
     device: &wgpu::Device,
     bytes: &GpuBytes,
@@ -973,11 +1003,7 @@ pub(super) fn upload_buffers(
             | MESH_READ
             | super::ray_tracing::blas_input(device),
     });
-    let indices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some(name),
-        contents: indices,
-        usage: wgpu::BufferUsages::INDEX | MESH_READ | super::ray_tracing::blas_input(device),
-    });
+    let indices = index_buffer(device, name, indices);
     GpuMesh {
         bounds: vertex_bounds(corners),
         _bytes: bytes.count(vertices.size() + indices.size()),

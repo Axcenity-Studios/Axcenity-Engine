@@ -34,7 +34,8 @@ struct Fog {
     // rgb: the sun's light the height fog scatters, w: how much of it goes
     // forward (Henyey-Greenstein g).
     sun: vec4<f32>,
-    // xyz: toward the sun.
+    // xyz: toward the sun, w: how many studs from the camera height fog
+    // starts (the way nearer is clear of it).
     sun_direction: vec4<f32>,
     // x: how many of `dust` are drawn, y: where the ray traced air (LE3,
     // ray_shadows.wgsl's `cs_air`) starts in `ray_shadow_mask`, in u32s
@@ -188,16 +189,20 @@ fn fog_column(fog: Fog, y: f32) -> f32 {
 fn fog_transmittance(fog: Fog, eye: vec3<f32>, dir: vec3<f32>, distance: f32) -> f32 {
     var through = 1.0;
     // Height fog: its density, which changes only with height, taken along
-    // the way. Nearly level, the density halfway stands for the rest.
-    if fog.height.x > 0.0 {
-        let rise = dir.y * distance;
+    // the way from where it starts. Nearly level, the density halfway
+    // stands for the rest.
+    let start = min(fog.sun_direction.w, distance);
+    let way = distance - start;
+    if fog.height.x > 0.0 && way > 0.0 {
+        let begin = eye.y + dir.y * start;
+        let rise = dir.y * way;
         var mean: f32;
         if abs(rise) < 0.01 * max(fog.height.z, 0.001) {
-            mean = fog_thickness(fog, eye.y + 0.5 * rise);
+            mean = fog_thickness(fog, begin + 0.5 * rise);
         } else {
-            mean = (fog_column(fog, eye.y + rise) - fog_column(fog, eye.y)) / rise;
+            mean = (fog_column(fog, begin + rise) - fog_column(fog, begin)) / rise;
         }
-        through = exp(-fog.height.x * max(mean, 0.0) * distance);
+        through = exp(-fog.height.x * max(mean, 0.0) * way);
     }
     // Distance fog: straight from its start to its end.
     let span = max(fog.distance.y - fog.distance.x, 0.001);

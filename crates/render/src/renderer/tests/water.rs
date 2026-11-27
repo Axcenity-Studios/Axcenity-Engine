@@ -469,7 +469,7 @@ fn ray_traced_water_reflects_what_is_off_the_screen() {
     let mirrored = Vec3::new(0.0, -10.0, -10.0);
 
     let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
-    renderer.set_graphics(&graphics(Quality::High));
+    renderer.set_graphics(&traced_graphics(Quality::High));
     assert!(WaterMode::of(&list, renderer.graphics()).traces_rays(renderer.graphics()));
     let [traced] = pixels_of(&mut renderer, &list, [mirrored]);
     assert!(renderer.scene.water.traced().is_some());
@@ -477,7 +477,7 @@ fn ray_traced_water_reflects_what_is_off_the_screen() {
 
     // Without ray queries: only the screen's reflection, which can't see it.
     let mut plain = TextureRenderer::new(&device, &queue, SIZE, SIZE);
-    plain.set_graphics(&graphics(Quality::High));
+    plain.set_graphics(&traced_graphics(Quality::High));
     plain.limit_capabilities(&crate::Capabilities {
         ray_queries: false,
         ..*plain.capabilities()
@@ -490,10 +490,47 @@ fn ray_traced_water_reflects_what_is_off_the_screen() {
     );
 
     // Medium reflects only the sky, and traces nothing.
-    renderer.set_graphics(&graphics(Quality::Medium));
+    renderer.set_graphics(&traced_graphics(Quality::Medium));
     let [medium] = pixels_of(&mut renderer, &list, [mirrored]);
     assert!(renderer.scene.water.traced().is_none());
     assert!(medium[0] + 40 < traced[0], "{medium:?} vs {traced:?}");
+}
+
+/// `quality`'s preset with ray traced reflections on (Medium), which water's
+/// rays (LE5) go with.
+fn traced_graphics(quality: Quality) -> GraphicsSettings {
+    GraphicsSettings {
+        ray_traced_reflections: Some(crate::RayTracedReflections::Medium),
+        ..graphics(quality)
+    }
+}
+
+/// Every ray traced effect is its own setting, off at every preset
+/// (ADR-0025): a device that can ray trace, with ray traced reflections
+/// off, draws water reflecting the screen without building a ray traced
+/// scene for it (Desert Homestead's river cost 3.2 ms of GPU and 3.1 ms of
+/// the frame's thread that way, 2026-11-26).
+#[test]
+fn water_traces_no_rays_while_ray_traced_reflections_are_off() {
+    let Some((device, queue)) = ray_test_device() else {
+        eprintln!("skipped: no graphics adapter with ray queries on this machine");
+        return;
+    };
+    let list = open_water(false, true);
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    for quality in [Quality::High, Quality::Ultra] {
+        renderer.set_graphics(&graphics(quality));
+        let mode = WaterMode::of(&list, renderer.graphics());
+        assert_eq!(mode, WaterMode::Reflected);
+        assert!(!mode.traces_rays(renderer.graphics()), "{quality:?}");
+        renderer.render(&list).unwrap();
+        assert!(renderer.scene.water.traced().is_none(), "{quality:?}");
+        assert_eq!(
+            renderer.stats().ray_tracing,
+            crate::RayTracingStats::default(),
+            "{quality:?}: no ray traced scene"
+        );
+    }
 }
 
 /// An open sea, as terrain water draws it: 64-stud squares of the water

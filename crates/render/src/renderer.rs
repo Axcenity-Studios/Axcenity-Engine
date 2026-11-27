@@ -78,6 +78,7 @@ mod light_probes;
 mod lighting;
 mod lod;
 mod occlusion;
+mod occlusion_probe;
 mod parallel;
 #[cfg(feature = "debug-views")]
 mod path_tracer;
@@ -89,12 +90,14 @@ mod probes;
 mod ray_ao;
 mod ray_cut_outs;
 mod ray_gi;
+mod ray_groups;
 mod ray_reflections;
 mod ray_shadows;
 mod ray_soft;
 mod ray_sway;
 mod ray_tracing;
 mod realtime_gi;
+mod screen_reflections;
 mod skinning;
 mod snow_caps;
 mod sprites;
@@ -119,8 +122,8 @@ use gpu::mip_levels;
 use gpu::{
     DepthUse, create_frame_bind_group, create_instance_buffer, create_material, create_pipeline,
     create_pipeline_for, create_shadow_layers, create_shadow_pipeline, create_shadow_views,
-    create_target_texture, create_texture, drawable_size, shader_module, target_bytes,
-    update_custom_mesh, upload_custom_mesh, upload_mesh, upload_texture,
+    create_target_texture, create_texture, drawable_size, index_buffer, shader_module,
+    target_bytes, update_custom_mesh, upload_custom_mesh_with, upload_mesh, upload_texture,
 };
 use lighting::{
     DrawPlan, FrameUses, camera_view_projection, casters_in_views, frame_uniform, linear_color,

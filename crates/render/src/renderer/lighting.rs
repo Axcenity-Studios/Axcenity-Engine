@@ -121,8 +121,8 @@ pub(super) fn frame_uniform(
     let shadows = shadow_setup(
         list,
         shadows_drawn(list.shadows, graphics),
-        sun_direction,
-        aspect,
+        (sun_direction, aspect),
+        cascades_under_rays(list, graphics, aspect),
     );
     let sky = &list.sky;
     let environment = if sky.environment_intensity.is_finite() {
@@ -769,6 +769,72 @@ pub(super) fn cascade_ends(distance: f32, count: usize) -> [f32; SHADOW_CASCADES
     })
 }
 
+/// Where ray traced sun shadows stop being used whole and start blending
+/// into the shadow maps, as a share of their reach (`sun_visibility` in
+/// lighting.wgsl, `cell_sun_visibility` in volumetric_fog.wgsl).
+pub(super) const RAY_SHADOW_BLEND_START: f32 = 0.85;
+
+/// A cascade's view that covers nothing: every point lands past its far
+/// depth, which every lookup of the maps skips.
+const COVERS_NOTHING: Mat4 = Mat4::from_cols(
+    glam::Vec4::ZERO,
+    glam::Vec4::ZERO,
+    glam::Vec4::ZERO,
+    glam::Vec4::new(0.0, 0.0, 2.0, 1.0),
+);
+
+/// How many of the sun's nearest cascades this frame's ray traced shadows
+/// make unneeded (0 without them): those whose whole slice of the view,
+/// to its far corners, lies within the distance where the traced shadow
+/// is used whole ([`RAY_SHADOW_BLEND_START`] of its reach). The last
+/// cascade is always drawn. What still reads the maps there (light through
+/// a leaf, see-through surfaces, the edges the traced mask leaves out, the
+/// sky over a reflection) reads the next cascade, a coarser one.
+/// `AXCENITY_NO_CASCADE_SKIP` draws them all, to compare.
+pub(super) fn cascades_under_rays(
+    list: &DrawList,
+    graphics: &EffectiveGraphics,
+    aspect: f32,
+) -> usize {
+    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *OFF.get_or_init(|| std::env::var_os("AXCENITY_NO_CASCADE_SKIP").is_some()) {
+        return 0;
+    }
+    let (Some(rays), Some((settings, map))) = (
+        super::ray_shadows::RayShadowPlan::of(list, graphics),
+        shadows_drawn(list.shadows, graphics),
+    ) else {
+        return 0;
+    };
+    let cascades = map.cascades as usize;
+    let distance = settings.distance.clamp(NEAR_PLANE * 4.0, FAR_PLANE);
+    let camera = &list.camera;
+    let tan_half = (camera.fov_y_degrees.to_radians() * 0.5).tan();
+    // How much further a slice's far corner is than its far end.
+    let corner = (1.0 + tan_half * tan_half * (1.0 + aspect * aspect)).sqrt();
+    let whole = rays.reach * RAY_SHADOW_BLEND_START;
+    cascade_ends(distance, cascades)
+        .into_iter()
+        .take(cascades.saturating_sub(1))
+        .take_while(|end| end * corner <= whole)
+        .count()
+}
+
+/// The views of the sun's `cascades` (the frame's, as many as are drawn)
+/// that the frame keeps items for: not the first `under_rays`
+/// ([`cascades_under_rays`]), whose views cover nothing, and as a frustum
+/// would take in the whole world (a plane with no direction rejects nothing
+/// wide).
+pub(super) fn cascade_views(
+    cascades: &[[[f32; 4]; 4]],
+    under_rays: usize,
+) -> impl Iterator<Item = super::culling::Frustum> + '_ {
+    cascades
+        .iter()
+        .skip(under_rays)
+        .map(|matrix| super::culling::Frustum::of(Mat4::from_cols_array_2d(matrix)))
+}
+
 /// The sun's views of the shadow cascades and the shadow values for the
 /// shader. Each cascade covers one slice of the view, so the nearest
 /// shadows get the most texels per stud and are the sharpest. The area of
@@ -776,11 +842,13 @@ pub(super) fn cascade_ends(distance: f32, count: usize) -> [f32; SHADOW_CASCADES
 /// the map's scale, and its position is snapped to whole texels so shadow
 /// edges don't shimmer as the camera moves. `drawn` is the shadows as
 /// drawn and their map (see [`shadows_drawn`]), or `None` when they're off.
+/// The first `under_rays` cascades ([`cascades_under_rays`]) cover nothing
+/// and the first one drawn takes their slices too, from the camera on.
 pub(super) fn shadow_setup(
     list: &DrawList,
     drawn: Option<(Shadows, ShadowMapSize)>,
-    sun_direction: Vec3,
-    aspect: f32,
+    (sun_direction, aspect): (Vec3, f32),
+    under_rays: usize,
 ) -> ShadowSetup {
     let mut setup = ShadowSetup {
         cascades: [Mat4::IDENTITY; SHADOW_CASCADES],
@@ -811,6 +879,10 @@ pub(super) fn shadow_setup(
     let mut slice_near = NEAR_PLANE;
     let ends = cascade_ends(distance, cascades);
     for (index, far) in ends.into_iter().take(cascades).enumerate() {
+        if index < under_rays {
+            setup.cascades[index] = COVERS_NOTHING;
+            continue;
+        }
         let (center, radius) = slice_sphere(slice_near, far, k2);
         let sphere_center = camera.position + forward * center;
         slice_near = far;
@@ -1276,9 +1348,22 @@ pub(super) fn plan_draws(
         )
         .collect();
     let keep_seen = seen.is_some();
+    // Only while the occlusion probe measures (`occlusion_probe.rs`).
+    let occluders = super::occlusion_probe::image();
     let parts = map_parts(&ordered, |part| {
-        plan_part(part, draws, uses, view, &bounds, keep_seen)
+        plan_part(
+            part,
+            draws,
+            uses,
+            view,
+            occluders.as_deref(),
+            &bounds,
+            keep_seen,
+        )
     });
+    if occluders.is_some() {
+        super::occlusion_probe::count(parts.iter().map(|part| part.hidden).sum());
+    }
     join_plan(parts, seen, draws.len())
 }
 
@@ -1313,6 +1398,8 @@ struct PlanPart<'a> {
     batches: Vec<(BatchKind, Batch)>,
     casters: Vec<Caster>,
     culled: u32,
+    /// Of `culled`, those the occlusion probe hid.
+    hidden: u32,
     lod_items: [u32; crate::LOD_LEVELS],
     seen: Vec<CullingBounds>,
     skins: Vec<SkinUse<'a>>,
@@ -1326,6 +1413,7 @@ fn plan_part<'a>(
     draws: &[Draw<'a>],
     uses: &FrameUses,
     view: &Frustum,
+    occluders: Option<&super::occlusion_probe::DepthImage>,
     bounds: &(impl Fn(MeshKey, Option<&Skin>) -> Bounds + Sync),
     keep_seen: bool,
 ) -> PlanPart<'a> {
@@ -1354,7 +1442,11 @@ fn plan_part<'a>(
         let (center, radius) = shape_bounds.sphere(item.transform);
         // A swaying plant reaches past where it rests.
         let sphere = (center, radius + item.sway.map_or(0.0, |sway| sway.reach()));
-        let visible = view.touches(sphere);
+        let mut visible = view.touches(sphere);
+        if visible && occluders.is_some_and(|depth| depth.hides(sphere)) {
+            visible = false;
+            part.hidden += 1;
+        }
         if keep_seen {
             part.seen.push(CullingBounds {
                 center: sphere.0,
@@ -1867,7 +1959,8 @@ fn shading_uniform(material: &Material) -> ([f32; 4], [f32; 4]) {
             [
                 SHADING_STANDARD,
                 material.translucency.clamp(0.0, 1.0),
-                0.0,
+                // shader.wgsl's `glossy_leaf`.
+                if material.glossy_leaf { 1.0 } else { 0.0 },
                 0.0,
             ],
             [0.0; 4],

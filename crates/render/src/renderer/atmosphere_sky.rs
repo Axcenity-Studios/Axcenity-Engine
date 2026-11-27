@@ -36,7 +36,17 @@ pub(super) struct SkyLook {
     /// True when `image` is an atmosphere's, which has no sun, moon or
     /// stars of its own.
     pub scattered: bool,
+    /// The color around the horizon that height fog fades into (linear
+    /// light): the sky drawn there, so far things melt into it. That's
+    /// `colors[1]`, unless a creator's sky image is drawn (above Low
+    /// reflection quality), whose band just above the horizon it is.
+    pub fog_horizon: Vec3,
 }
+
+/// How high above the horizon the band of a creator's sky image that
+/// height fog fades into reaches, in degrees: the sky seen behind far
+/// things.
+const HORIZON_BAND_DEGREES: f32 = 6.0;
 
 /// Keeps an atmosphere's air and sky between frames.
 #[derive(Default)]
@@ -48,12 +58,40 @@ pub(super) struct AtmosphereSky {
     sky: Option<(u64, Option<SkyImage>, [Vec3; 3])>,
     /// How many times a sky has been worked out, for tests.
     pub(super) skies: u32,
+    /// A creator's sky image's band above the horizon, by its key.
+    image_horizon: Option<(u64, Vec3)>,
 }
 
 impl AtmosphereSky {
     /// What `sky` looks like, with an image for the environment maps when
     /// `maps` (the reflection quality is above Low).
     pub(super) fn look(&mut self, sky: &Sky, maps: bool) -> SkyLook {
+        let mut look = self.drawn(sky, maps);
+        match (&look.image, look.scattered) {
+            // A creator's picture is drawn only with the maps; it dims at
+            // night as the frame dims it (`picture_light` in scene.rs).
+            (Some(image), false) if maps => {
+                let horizon = match self.image_horizon {
+                    Some((key, horizon)) if key == image.key => horizon,
+                    _ => {
+                        let horizon = band_above_horizon(image);
+                        self.image_horizon = Some((image.key, horizon));
+                        horizon
+                    }
+                };
+                let daylight = if sky.daylight.is_finite() {
+                    sky.daylight.clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+                look.fog_horizon = horizon * daylight;
+            }
+            _ => self.image_horizon = None,
+        }
+        look
+    }
+
+    fn drawn(&mut self, sky: &Sky, maps: bool) -> SkyLook {
         let ground = linear_color(sky.ground_color);
         let Some(atmosphere) = &sky.atmosphere else {
             self.air = None;
@@ -69,6 +107,7 @@ impl AtmosphereSky {
                 colors,
                 image: sky.image.clone(),
                 scattered: false,
+                fog_horizon: colors[1],
             };
         };
         // A sky image is drawn in place of the atmosphere's.
@@ -96,14 +135,44 @@ impl AtmosphereSky {
                 colors: *colors,
                 image: Some(own.clone()),
                 scattered: false,
+                fog_horizon: colors[1],
             },
             None => SkyLook {
                 colors: *colors,
                 image: image.clone(),
                 scattered: image.is_some(),
+                fog_horizon: colors[1],
             },
         }
     }
+}
+
+/// The average of `image` (equirectangular, rows from straight up) from
+/// the horizon to [`HORIZON_BAND_DEGREES`] above it: at least its row
+/// just above the horizon.
+fn band_above_horizon(image: &SkyImage) -> Vec3 {
+    let (width, height) = (image.width as usize, image.height as usize);
+    if width == 0 || image.rgb.len() < width * height * 3 {
+        return Vec3::ZERO;
+    }
+    // Row r's middle is 90° − (r + ½) × 180° / height up.
+    let up = |row: usize| 90.0 - (row as f32 + 0.5) * 180.0 / height as f32;
+    let above = height.saturating_sub(1) / 2;
+    let rows: Vec<usize> = (0..height)
+        .filter(|&row| (0.0..=HORIZON_BAND_DEGREES).contains(&up(row)))
+        .collect();
+    let rows = if rows.is_empty() { vec![above] } else { rows };
+    let mut sum = Vec3::ZERO;
+    for &row in &rows {
+        for column in 0..width {
+            let at = (row * width + column) * 3;
+            let pixel = Vec3::from_slice(&image.rgb[at..at + 3]);
+            if pixel.is_finite() {
+                sum += pixel.max(Vec3::ZERO);
+            }
+        }
+    }
+    sum / (rows.len() * width) as f32
 }
 
 /// Different for every sky an atmosphere draws (and every sky image's key,
@@ -283,6 +352,49 @@ mod tests {
         let look = sky.look(&both, true);
         assert_eq!(look.image.unwrap().key, 7);
         assert!(!look.scattered);
+    }
+
+    #[test]
+    fn height_fog_fades_into_a_creators_sky_image_around_the_horizon() {
+        // Rows of 10° each from straight up: blue sky, a grey band just
+        // above the horizon, green ground below.
+        let rows = 18;
+        let mut rgb = Vec::new();
+        for row in 0..rows {
+            let color = match row {
+                0..=7 => [0.1, 0.2, 0.9],
+                8 => [0.5, 0.5, 0.5],
+                _ => [0.0, 0.6, 0.0],
+            };
+            rgb.extend([color, color].concat());
+        }
+        let own = SkyImage {
+            key: 9,
+            width: 2,
+            height: rows,
+            rgb: Arc::new(rgb),
+        };
+        let mut sky = AtmosphereSky::default();
+        let mut both = atmosphere_sky(Vec3::new(0.2, 1.0, 0.1));
+        both.image = Some(own.clone());
+        let look = sky.look(&both, true);
+        assert_eq!(look.fog_horizon, Vec3::splat(0.5), "the picture's horizon");
+        assert_ne!(look.fog_horizon, look.colors[1]);
+        // At Low the colors are drawn, and the fog takes theirs.
+        let low = sky.look(&both, false);
+        assert_eq!(low.fog_horizon, low.colors[1]);
+        // At dusk the picture dims, and so does its fog.
+        both.daylight = 0.5;
+        assert_eq!(sky.look(&both, true).fog_horizon, Vec3::splat(0.25));
+        // Without an atmosphere, the same; an atmosphere's own sky keeps
+        // its horizon.
+        let plain = Sky {
+            image: Some(own),
+            ..Sky::default()
+        };
+        assert_eq!(sky.look(&plain, true).fog_horizon, Vec3::splat(0.5));
+        let scattered = sky.look(&atmosphere_sky(Vec3::new(0.2, 1.0, 0.1)), true);
+        assert_eq!(scattered.fog_horizon, scattered.colors[1]);
     }
 
     #[test]

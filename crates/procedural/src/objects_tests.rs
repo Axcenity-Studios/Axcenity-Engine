@@ -235,3 +235,49 @@ fn blend_levels_and_paints_the_ground_under_a_footprint_and_fades_out_around_it(
         assert_eq!(paint(x, z), 0);
     }
 }
+
+#[test]
+fn a_walking_character_remakes_no_chunks() {
+    // A character controller anchors the parts it moves (kinematic), so its
+    // root part is anchored and colliding like a wall. It isn't ground
+    // cover's business: moving it every frame remade the chunks round it
+    // every frame, and the scene rebuilt the terrain's foliage each time.
+    let mut world = World::new();
+    let land = terrain(&mut world, |_, _| 10.0);
+    trees(&mut world, land);
+    let workspace = world.workspace();
+    for (controller, name) in [
+        (ClassName::ThirdPersonController, "Walker"),
+        (ClassName::Humanoid, "Villager"),
+    ] {
+        let model = world.create(ClassName::Model).unwrap();
+        world.set_parent(model, Some(workspace)).unwrap();
+        world.set_name(model, name).unwrap();
+        let root = part(
+            &mut world,
+            Vec3::new(0.0, 13.0, 0.0),
+            Vec3::new(2.0, 5.0, 1.0),
+            0.0,
+        );
+        world.set_parent(root, Some(model)).unwrap();
+        let brain = world.create(controller).unwrap();
+        world.set_parent(brain, Some(model)).unwrap();
+    }
+    let mut scatter = TerrainScatter::default();
+    scatter.update(&mut world);
+    assert_eq!(scatter.update(&mut world), 0);
+    let walkers = world.all_below(workspace, |class| class == ClassName::Part);
+    for step in 1..=5 {
+        for &root in &walkers {
+            let at = Vector3::new(step as f32 * 3.0, 13.0, step as f32 * 2.0);
+            set(&mut world, root, "Position", Value::Vector3(at));
+        }
+        assert_eq!(scatter.update(&mut world), 0, "step {step}");
+    }
+    // Plants grow where the characters stand: they don't keep anything off.
+    let near = plants(&world, land)
+        .into_iter()
+        .filter(|p| p.length() < 1.0)
+        .count();
+    assert!(near <= 1, "{near}");
+}

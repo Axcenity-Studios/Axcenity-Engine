@@ -35,6 +35,57 @@ fn nothing_is_built_while_nothing_traces_rays() {
     );
 }
 
+/// A frame that traces nothing while a ray traced effect is still on (ray
+/// traced shadows, with the world's shadows off for a moment, as water
+/// leaving the list did for its reflections) keeps the meshes' BLASes, so
+/// the next frame that traces builds none of them again: Desert Homestead
+/// spent 4,026 ms building its 1,495. With every effect off they're freed.
+#[test]
+fn a_frame_that_traces_nothing_keeps_the_meshes_built_while_an_effect_is_on() {
+    let Some((device, queue)) = ray_test_device() else {
+        return skipped();
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, 32, 32);
+    let traced = crate::GraphicsSettings {
+        ray_traced_shadows: Some(crate::RayTracedShadows::High),
+        ..crate::GraphicsSettings::default()
+    };
+    renderer.set_graphics(&traced);
+    let mut list = list_of(vec![
+        big_block(),
+        item(Shape::Sphere, Vec3::new(2.0, 0.0, -4.0), 1.0),
+    ]);
+    list.shadows.enabled = true;
+    renderer.render(&list).unwrap();
+    let first = renderer.stats().ray_tracing;
+    assert_eq!((first.meshes, first.meshes_built), (2, 2), "{first:?}");
+
+    // Nothing traces: the frame shows no ray traced scene...
+    list.shadows.enabled = false;
+    renderer.render(&list).unwrap();
+    assert_eq!(
+        renderer.stats().ray_tracing,
+        crate::RayTracingStats::default()
+    );
+    // ...but the next one that traces has its meshes built already.
+    list.shadows.enabled = true;
+    renderer.render(&list).unwrap();
+    let back = renderer.stats().ray_tracing;
+    assert_eq!((back.meshes, back.meshes_built), (2, 0), "{back:?}");
+    assert_eq!(back.instances, 2);
+
+    // Every ray traced effect off: freed, and built afresh when one is
+    // turned on again.
+    renderer.set_graphics(&crate::GraphicsSettings::default());
+    renderer.render(&list).unwrap();
+    assert!(renderer.scene.ray_scene.is_none());
+    assert!(renderer.scene.parked_ray_scene.is_none());
+    renderer.set_graphics(&traced);
+    renderer.render(&list).unwrap();
+    let again = renderer.stats().ray_tracing;
+    assert_eq!((again.meshes, again.meshes_built), (2, 2), "{again:?}");
+}
+
 #[cfg(feature = "debug-views")]
 mod ray_hits {
     use super::*;
@@ -100,8 +151,8 @@ mod ray_hits {
         const SIZE: usize = 128;
         let mut renderer = TextureRenderer::new(&device, &queue, SIZE as u32, SIZE as u32);
         renderer.set_debug_view(Some(DebugView::RayHits));
-        // Three poles side by side, 40 to 50 studs from the camera, in one
-        // 32-stud square of the ground.
+        // Three poles side by side, about 24 studs from the camera (inside
+        // `SWAY_DISTANCE`), in one 32-stud square of the ground.
         const ACROSS: [f32; 3] = [4.0, 10.0, 16.0];
         let poles = ACROSS
             .map(|x| DrawItem {
@@ -121,9 +172,9 @@ mod ray_hits {
             .to_vec();
         let mut list = list_of(poles);
         list.camera = Camera {
-            position: Vec3::new(10.0, 4.0, 50.0),
+            position: Vec3::new(10.0, 4.0, 28.0),
             look_at: Vec3::new(10.0, 4.0, 4.0),
-            fov_y_degrees: 30.0,
+            fov_y_degrees: 40.0,
         };
         // Each pole's color, low on it where the wind hardly moves it.
         let mut colors = |list: &DrawList| {
@@ -387,8 +438,71 @@ mod sun_shadows {
             // No shadow maps, so any shadow seen is ray traced.
             shadow_quality: Some(ShadowQuality::Off),
             ray_traced_shadows: Some(shadows),
+            // Every pixel traced (High's preset is Half).
+            ray_traced_shadow_resolution: Some(crate::RayShadowResolution::Full),
             ..crate::GraphicsSettings::default()
         }
+    }
+
+    #[test]
+    fn half_resolution_traces_a_quarter_of_the_pixels_and_shades_like_full() {
+        let Some((device, queue)) = ray_test_device() else {
+            return skipped();
+        };
+        // The presets: every pixel at Ultra, one of each 2 × 2 below.
+        let preset =
+            |quality| crate::GraphicsSettings::preset(quality).ray_traced_shadow_resolution();
+        assert_eq!(
+            preset(crate::Quality::Ultra),
+            crate::RayShadowResolution::Full
+        );
+        assert_eq!(
+            preset(crate::Quality::High),
+            crate::RayShadowResolution::Half
+        );
+        let half = |shadows| crate::GraphicsSettings {
+            ray_traced_shadow_resolution: Some(crate::RayShadowResolution::Half),
+            ..traced(shadows)
+        };
+        let mut list = shadowed_wall();
+        let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+        for softness in [0.0, 1.0] {
+            list.shadows.softness = softness;
+            renderer.set_graphics(&traced(RayTracedShadows::High));
+            let full = middle_row(&mut renderer, &list);
+            renderer.set_graphics(&half(RayTracedShadows::High));
+            let filled = middle_row(&mut renderer, &list);
+            assert!(renderer.scene.ray_shadows.is_some());
+            let (low, high) = (*full.iter().min().unwrap(), *full.iter().max().unwrap());
+            assert!(high > low + 40, "a shadow falls across the row: {full:?}");
+            // The same shadow, its edge within a pixel or two of where
+            // every pixel's rays put it.
+            let off = full
+                .iter()
+                .zip(&filled)
+                .filter(|(a, b)| a.abs_diff(**b) > 24)
+                .count();
+            assert!(
+                off <= 3,
+                "softness {softness}: {off} pixels apart\nfull   {full:?}\nfilled {filled:?}"
+            );
+            let mean = |row: &[u8]| row.iter().map(|&v| f32::from(v)).sum::<f32>() / 64.0;
+            assert!(
+                (mean(&full) - mean(&filled)).abs() < 4.0,
+                "softness {softness}: full {full:?}\nfilled {filled:?}"
+            );
+        }
+        // A caster that casts nothing leaves the filled wall lit as every
+        // pixel's rays do, so the fill reads what was traced this frame
+        // (the caster itself is still in the row).
+        list.items[1].casts_shadow = false;
+        let lit = middle_row(&mut renderer, &list);
+        renderer.set_graphics(&traced(RayTracedShadows::High));
+        let full = middle_row(&mut renderer, &list);
+        assert!(
+            full.iter().zip(&lit).all(|(a, b)| a.abs_diff(*b) <= 24),
+            "full {full:?}\nfilled {lit:?}"
+        );
     }
 
     /// The red channel along the middle row of a 64 × 64 frame.
@@ -800,6 +914,147 @@ mod sun_shadows {
             "the card's foot is in its shadow: {foot:?} vs {lit:?}"
         );
     }
+
+    /// Settings that trace sun shadows far (no shadow maps): `reach` studs.
+    fn traced_far(reach: f32) -> crate::GraphicsSettings {
+        crate::GraphicsSettings {
+            ray_tracing_distance: Some(reach),
+            ..traced(RayTracedShadows::Low)
+        }
+    }
+
+    /// `list` seen from `back` studs in front of its wall, narrowly, so the
+    /// middle pixel is still the wall's.
+    fn seen_from(mut list: DrawList, back: f32) -> DrawList {
+        list.camera = Camera {
+            position: Vec3::new(0.0, 0.0, back),
+            look_at: Vec3::new(0.0, 0.0, -10.0),
+            fov_y_degrees: 6.0,
+        };
+        list.shadows.distance = 500.0;
+        list
+    }
+
+    /// The wall's blocker as a cut-out card `size` big, wholly cut out
+    /// (alpha 0) or not at all (255).
+    fn card(size: Vec3, alpha: u8, key: u64) -> DrawList {
+        let mut list = shadowed_wall();
+        let blocker = &mut list.items[1];
+        blocker.transform = Mat4::from_scale_rotation_translation(
+            size,
+            glam::Quat::IDENTITY,
+            blocker.transform.w_axis.truncate(),
+        );
+        blocker.material.alpha_cutoff = 0.5;
+        blocker.material.base_color_texture =
+            Some(std::sync::Arc::new(AlphaTexture::new(key, alpha)));
+        list
+    }
+
+    /// Past `HOLES_REACH` a cut-out's every hit counts: a card cut out
+    /// wholly shades as if it weren't (a far leaf card ends a shadow ray
+    /// at the first leaf), while up close rays pass through its holes.
+    #[test]
+    fn past_the_holes_reach_a_cut_outs_holes_stop_letting_rays_through() {
+        let Some((device, queue)) = ray_test_device() else {
+            return skipped();
+        };
+        let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+        renderer.set_graphics(&traced_far(500.0));
+        // Bigger than a small plant (whose shadow would end first), and
+        // narrow, so it isn't in front of the middle pixel itself.
+        let holes = card(Vec3::new(2.5, 10.0, 0.5), 0, 11);
+        let mut open = shadowed_wall();
+        open.items.truncate(1);
+        let near = middle_of(&mut renderer, &seen_from(holes.clone(), 20.0));
+        let open_near = middle_of(&mut renderer, &seen_from(open.clone(), 20.0));
+        assert!(
+            near[0].abs_diff(open_near[0]) <= 6,
+            "up close rays pass through its holes: {near:?} vs {open_near:?}"
+        );
+        let far = middle_of(&mut renderer, &seen_from(holes, 90.0));
+        let open_far = middle_of(&mut renderer, &seen_from(open, 90.0));
+        assert!(
+            far[0] + 40 < open_far[0],
+            "far off its card shades whole: {far:?} vs {open_far:?}"
+        );
+    }
+
+    /// A small plant's ray traced shadow ends at `SMALL_PLANT_SHADOW_REACH`:
+    /// a small whole card shades the wall up close and not from far off,
+    /// where a big one still does.
+    #[test]
+    fn a_small_plants_ray_traced_shadow_ends_sooner_than_a_big_ones() {
+        let Some((device, queue)) = ray_test_device() else {
+            return skipped();
+        };
+        let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+        renderer.set_graphics(&traced_far(500.0));
+        let small = card(Vec3::new(2.0, 2.0, 0.5), 255, 12);
+        let big = card(Vec3::new(2.5, 10.0, 0.5), 255, 12);
+        let mut open = shadowed_wall();
+        open.items.truncate(1);
+        let open_near = middle_of(&mut renderer, &seen_from(open.clone(), 20.0));
+        let open_far = middle_of(&mut renderer, &seen_from(open, 90.0));
+        let small_near = middle_of(&mut renderer, &seen_from(small.clone(), 20.0));
+        let small_far = middle_of(&mut renderer, &seen_from(small, 90.0));
+        let big_far = middle_of(&mut renderer, &seen_from(big, 90.0));
+        assert!(
+            small_near[0] + 40 < open_near[0],
+            "{small_near:?} vs {open_near:?}"
+        );
+        assert!(
+            small_far[0].abs_diff(open_far[0]) <= 6,
+            "past its reach a small plant casts none: {small_far:?} vs {open_far:?}"
+        );
+        assert!(big_far[0] + 40 < open_far[0], "{big_far:?} vs {open_far:?}");
+    }
+
+    /// Small still items grouped into one BLAS (renderer/ray_groups.rs)
+    /// shade exactly as when traced as instances of their own, and the
+    /// group is built again only when one of them changes.
+    #[test]
+    fn a_grouped_blocker_shades_exactly_as_one_traced_on_its_own() {
+        let Some((device, queue)) = ray_test_device() else {
+            return skipped();
+        };
+        let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
+        renderer.set_graphics(&traced(RayTracedShadows::Low));
+        // Alone the blocker is too few to group.
+        let alone = shadowed_wall();
+        let own = middle_of(&mut renderer, &alone);
+        assert_eq!(renderer.stats().ray_tracing.groups, 0);
+        // Four small blocks above it, on the same square of ground and out
+        // of the middle's way to the sun, group it with them.
+        let mut list = shadowed_wall();
+        for up in [3.0, 6.0, 9.0, 12.0] {
+            list.items.push(DrawItem {
+                transform: Mat4::from_translation(Vec3::new(4.0, up, -6.0)),
+                ..big_block()
+            });
+        }
+        let grouped = middle_of(&mut renderer, &list);
+        let stats = renderer.stats().ray_tracing;
+        assert!(stats.groups >= 1 && stats.grouped >= 5, "{stats:?}");
+        assert_eq!(
+            (stats.groups_built, stats.instances),
+            (stats.groups, 6),
+            "{stats:?}"
+        );
+        assert_eq!(grouped, own, "the same shadow grouped or not");
+
+        // Nothing changed: kept, and the TLAS too.
+        renderer.render(&list).unwrap();
+        let kept = renderer.stats().ray_tracing;
+        assert_eq!(kept.groups_built, 0, "{kept:?}");
+        assert!(!kept.rebuilt, "{kept:?}");
+        // One moves a little: its group is built again.
+        list.items[5].transform = Mat4::from_translation(Vec3::new(4.5, 12.0, -6.0));
+        renderer.render(&list).unwrap();
+        let moved = renderer.stats().ray_tracing;
+        assert_eq!(moved.groups_built, 1, "{moved:?}");
+        assert!(moved.rebuilt);
+    }
 }
 
 /// Ray traced ambient occlusion (RT3, renderer/ray_ao.rs).
@@ -875,18 +1130,25 @@ mod lamp_shadows {
             return skipped();
         };
         let mut renderer = TextureRenderer::new(&device, &queue, 64, 64);
-        renderer.set_graphics(&traced());
-        for (kind, lamp) in lamps() {
-            let mut list = lamp_lit_wall(lamp);
-            let shaded = middle_of(&mut renderer, &list);
-            assert!(renderer.scene.spot_shadow_map.is_none());
-            assert!(renderer.scene.point_shadow_map.is_none());
-            list.items[1].casts_shadow = false;
-            let lit = middle_of(&mut renderer, &list);
-            assert!(
-                lit[0] > shaded[0] + 40,
-                "{kind}: shaded {shaded:?}, lit {lit:?}"
-            );
+        // Every pixel traced, and one of each 2 × 2 with the lamps' bits
+        // filled in for the rest.
+        for resolution in crate::RayShadowResolution::ALL {
+            renderer.set_graphics(&crate::GraphicsSettings {
+                ray_traced_shadow_resolution: Some(resolution),
+                ..traced()
+            });
+            for (kind, lamp) in lamps() {
+                let mut list = lamp_lit_wall(lamp);
+                let shaded = middle_of(&mut renderer, &list);
+                assert!(renderer.scene.spot_shadow_map.is_none());
+                assert!(renderer.scene.point_shadow_map.is_none());
+                list.items[1].casts_shadow = false;
+                let lit = middle_of(&mut renderer, &list);
+                assert!(
+                    lit[0] > shaded[0] + 40,
+                    "{kind} at {resolution:?}: shaded {shaded:?}, lit {lit:?}"
+                );
+            }
         }
     }
 
@@ -1598,4 +1860,86 @@ fn a_grouped_item_out_of_view_still_casts_its_ray_traced_shadow_into_it() {
         (grouped - listed).abs() < 2.0,
         "the grouped block shades the wall as the listed one does: {grouped} against {listed}"
     );
+}
+
+/// What ray traced shadows leave the shadow maps and the slots to do
+/// (2026-11-27).
+mod reaches {
+    use super::*;
+    use crate::RayTracedShadows;
+
+    #[test]
+    fn a_small_plants_traced_shadow_thins_out_before_its_reach() {
+        use super::super::super::ray_tracing::{
+            SMALL_PLANT_SHADOW_FADE as FADE, SMALL_PLANT_SHADOW_REACH as REACH, small_plant_shadow,
+        };
+        assert_eq!(small_plant_shadow(0.0), 1.0);
+        assert_eq!(small_plant_shadow(REACH - FADE), 1.0);
+        assert!((small_plant_shadow(REACH - FADE / 2.0) - 0.5).abs() < 1e-5);
+        assert_eq!(small_plant_shadow(REACH), 0.0);
+        assert_eq!(small_plant_shadow(REACH + 100.0), 0.0);
+    }
+
+    /// Ultra's four cascades at a 300-stud shadow distance end about 22,
+    /// 51, 110 and 300 studs along the view. Traced shadows used whole to
+    /// 221 studs (85% of 260) make those cascades unneeded whose far
+    /// corners are nearer: how far a corner is depends on the view's
+    /// width.
+    #[test]
+    fn ray_traced_shadows_leave_out_the_cascades_wholly_within_their_reach() {
+        use super::super::super::lighting::{cascades_under_rays, frame_uniform};
+        let gpu = crate::Capabilities {
+            ray_queries: true,
+            ..crate::Capabilities::default()
+        };
+        let settings = |rays, reach| crate::GraphicsSettings {
+            shadow_quality: Some(ShadowQuality::Ultra),
+            shadow_distance: Some(300.0),
+            ray_traced_shadows: Some(rays),
+            ray_tracing_distance: Some(reach),
+            ..crate::GraphicsSettings::default()
+        };
+        let mut list = list_of(Vec::new());
+        list.shadows.distance = 300.0;
+        list.camera.fov_y_degrees = 70.0;
+        let (wide, usual) = (1996.0 / 703.0, 16.0 / 9.0);
+        let on = settings(RayTracedShadows::High, 260.0).effective(&gpu);
+        assert_eq!(cascades_under_rays(&list, &on, wide), 2);
+        assert_eq!(cascades_under_rays(&list, &on, usual), 3);
+        let short = settings(RayTracedShadows::High, 100.0).effective(&gpu);
+        assert_eq!(cascades_under_rays(&list, &short, wide), 1);
+        // The last cascade is always drawn.
+        let long = settings(RayTracedShadows::High, 5000.0).effective(&gpu);
+        assert_eq!(cascades_under_rays(&list, &long, usual), 3);
+        // Without traced shadows, or a GPU that traces, every one is drawn.
+        let off = settings(RayTracedShadows::Off, 260.0).effective(&gpu);
+        assert_eq!(cascades_under_rays(&list, &off, wide), 0);
+        let no_rays =
+            settings(RayTracedShadows::High, 260.0).effective(&crate::Capabilities::default());
+        assert_eq!(cascades_under_rays(&list, &no_rays, wide), 0);
+
+        // The ones left out cover nothing, and the first drawn one covers
+        // the camera's own surroundings.
+        let uniform = frame_uniform(&list, wide, &on);
+        let covers = |cascade: usize, point: Vec3| {
+            let light = Mat4::from_cols_array_2d(&uniform.cascades[cascade]) * point.extend(1.0);
+            (0.0..=1.0).contains(&light.z) && light.x.abs() <= 1.0 && light.y.abs() <= 1.0
+        };
+        let beside = list.camera.position + Vec3::new(0.5, -1.0, 0.0);
+        assert!(!covers(0, beside) && !covers(1, beside));
+        assert!(covers(2, beside));
+
+        // Nor does the frame keep items for them: as a frustum, a view
+        // that covers nothing takes in what's far behind the camera, which
+        // made the frame resolve every item of Overgrown Street.
+        use super::super::super::lighting::cascade_views;
+        let behind = (list.camera.position + Vec3::new(0.0, 0.0, 2000.0), 15.0);
+        let left_out = super::super::super::culling::Frustum::of(Mat4::from_cols_array_2d(
+            &uniform.cascades[0],
+        ));
+        assert!(left_out.touches(behind), "the hazard");
+        let views: Vec<_> = cascade_views(&uniform.cascades, 2).collect();
+        assert_eq!(views.len(), 2);
+        assert!(views.iter().all(|view| !view.touches(behind)));
+    }
 }

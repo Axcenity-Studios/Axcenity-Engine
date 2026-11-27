@@ -73,6 +73,7 @@ fn crate_at_centre(collide: bool) -> FoliageInstance {
         yaw: 0.0,
         scale: 1.0,
         collide,
+        shadow: true,
         lean: 0.0,
         sink: 0.0,
     }

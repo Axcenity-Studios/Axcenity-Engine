@@ -127,8 +127,10 @@ fn fs_decal(in: DecalOut) -> @location(0) vec4<f32> {
         discard;
     }
     let base_color = picture.rgb * in.color.rgb;
-    let lit = light_surface(world, n, n, in.clip_position.xy, base_color, 0.0, DECAL_ROUGHNESS,
-        screen_occlusion(in.clip_position.xy), vec3<f32>(0.04), true, false);
+    // Wet, a film of water only: no puddles or gathered water of its own
+    // (lying in them, its leaves and grime glittered pale).
+    let lit = light_surface_low(world, n, n, in.clip_position.xy, base_color, 0.0, DECAL_ROUGHNESS,
+        screen_occlusion(in.clip_position.xy), vec3<f32>(0.04), true, false, -1.0, false);
     let seen = fogged(frame.fog, frame.camera_position.xyz, world, lit);
     // Premultiplied, so the blend paints it over the surface by `alpha`.
     return vec4<f32>(seen * alpha, alpha);

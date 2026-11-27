@@ -1,11 +1,13 @@
 //! The world's fog (graphics Phase 25): an Atmosphere's height fog, or
 //! else Lighting's distance fog (`FogStart`, `FogEnd`, `FogColor`).
 //!
-//! An Atmosphere's fog is densest at the bottom of the air and thins with
-//! height; its `Offset` lifts the world above that bottom, so the higher
-//! it is, the thinner the fog. Far things fade into the sky's color around
-//! the horizon, and the sun glows in it. With an Atmosphere, Lighting's own
-//! fog is left out.
+//! An Atmosphere's fog is densest at and below its `FogHeight` and thins by
+//! `e` every `FogFalloff` studs above it (exponential height fog); its
+//! `Offset` lifts the world above that bottom, so the higher it is, the
+//! thinner the fog. `FogDensity` scales it without changing the sky, and
+//! `FogStart` keeps the way nearer the camera clear of it. Far things fade
+//! into the sky's color around the horizon, and the sun glows in it. With
+//! an Atmosphere, Lighting's own fog is left out.
 
 use axcenity_core::{Instance, Value, World};
 use axcenity_render::Fog;
@@ -16,8 +18,13 @@ const NO_FOG_END: f64 = 100_000.0;
 /// stud at the bottom of its air: half of it over 500 studs.
 const EARTH_FOG_DENSITY: f64 = std::f64::consts::LN_2 / 500.0;
 const EARTH_DENSITY: f64 = 0.395;
-/// An Atmosphere's fog thins by `e` every this many studs up.
-const FOG_FALLOFF: f32 = 50.0;
+/// An Atmosphere's fog thins by `e` every this many studs up, unless its
+/// `FogFalloff` says otherwise.
+const FOG_FALLOFF: f64 = 50.0;
+/// The thinnest and thickest layer `FogFalloff` gives, in studs: under a
+/// tenth of a stud the layer is a flat sheet anyway.
+const LEAST_FALLOFF: f64 = 0.1;
+const MOST_FALLOFF: f64 = 10_000.0;
 /// How far below the world an Offset of 1 puts the bottom of the air, in
 /// studs: five falloffs, so almost no fog is left.
 const OFFSET_DEPTH: f64 = 250.0;
@@ -59,14 +66,22 @@ pub(crate) fn atmosphere_fog(atmosphere: &Instance) -> Fog {
         Some(Value::Number(value)) if value.is_finite() => value.clamp(0.0, most),
         _ => default,
     };
+    let any_number = |name, default: f64| match atmosphere.property(name) {
+        Some(Value::Number(value)) if value.is_finite() => *value,
+        _ => default,
+    };
     let density = number_of("Density", EARTH_DENSITY, 1.0) / EARTH_DENSITY;
     let haze = number_of("Haze", 0.0, 10.0);
     let glare = number_of("Glare", 0.0, 10.0);
+    let thicker = number_of("FogDensity", 1.0, 100.0);
+    let base = any_number("FogHeight", 0.0) - number_of("Offset", 0.0, 1.0) * OFFSET_DEPTH;
+    let falloff = any_number("FogFalloff", FOG_FALLOFF).clamp(LEAST_FALLOFF, MOST_FALLOFF);
     Fog {
         color: None,
-        density: (EARTH_FOG_DENSITY * density * (1.0 + haze)) as f32,
-        height: (-number_of("Offset", 0.0, 1.0) * OFFSET_DEPTH) as f32,
-        falloff: FOG_FALLOFF,
+        density: (EARTH_FOG_DENSITY * density * (1.0 + haze) * thicker) as f32,
+        height: base as f32,
+        falloff: falloff as f32,
+        height_start: number_of("FogStart", 0.0, f64::MAX) as f32,
         sun_scattering: SUN_SCATTERING,
         forward_scattering: (FORWARD_SCATTERING + GLARE_FORWARD * glare) as f32,
         ..Fog::default()
@@ -127,7 +142,8 @@ mod tests {
         );
         assert_eq!(earth.color, None, "the sky's color");
         assert!((earth.density as f64 - EARTH_FOG_DENSITY).abs() < 1e-9);
-        assert_eq!((earth.height, earth.falloff), (0.0, FOG_FALLOFF));
+        assert_eq!((earth.height, earth.falloff), (0.0, FOG_FALLOFF as f32));
+        assert_eq!(earth.height_start, 0.0, "from the camera");
         assert!(earth.sun_scattering > 0.0);
 
         set(&mut world, atmosphere, "Haze", Value::Number(3.0));
@@ -146,5 +162,42 @@ mod tests {
 
         set(&mut world, atmosphere, "Density", Value::Number(0.0));
         assert!(!fog_in(&world).is_drawn(), "no air, no fog");
+    }
+
+    #[test]
+    fn an_atmospheres_fog_takes_its_own_height_falloff_start_and_density() {
+        let mut world = World::new();
+        let lighting = world.lighting();
+        let atmosphere = world.create(ClassName::Atmosphere).unwrap();
+        world.set_parent(atmosphere, Some(lighting)).unwrap();
+        let earth = fog_in(&world);
+        set(&mut world, atmosphere, "FogHeight", Value::Number(-4.0));
+        set(&mut world, atmosphere, "FogFalloff", Value::Number(12.0));
+        set(&mut world, atmosphere, "FogStart", Value::Number(30.0));
+        set(&mut world, atmosphere, "FogDensity", Value::Number(2.5));
+        let shaped = fog_in(&world);
+        assert_eq!(
+            (shaped.height, shaped.falloff, shaped.height_start),
+            (-4.0, 12.0, 30.0)
+        );
+        assert!(
+            (shaped.density / earth.density - 2.5).abs() < 1e-5,
+            "FogDensity thickens the fog alone: {shaped:?}"
+        );
+        // Offset still lifts the world above the fog's own height.
+        set(&mut world, atmosphere, "Offset", Value::Number(0.2));
+        assert_eq!(fog_in(&world).height, -54.0);
+        // A falloff of 0 is a thin flat sheet, never a division by 0; a
+        // start before the camera starts at it; FogDensity 0 is no fog with
+        // the air (and its sky) kept.
+        set(&mut world, atmosphere, "FogFalloff", Value::Number(0.0));
+        set(&mut world, atmosphere, "FogStart", Value::Number(-10.0));
+        let flat = fog_in(&world);
+        assert_eq!(
+            (flat.falloff, flat.height_start),
+            (LEAST_FALLOFF as f32, 0.0)
+        );
+        set(&mut world, atmosphere, "FogDensity", Value::Number(0.0));
+        assert!(!fog_in(&world).is_drawn(), "FogDensity 0: no fog");
     }
 }

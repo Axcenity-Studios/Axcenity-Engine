@@ -86,6 +86,17 @@ struct FoliageRecord {
     /// Studs lowered into the ground; left out when 0.
     #[serde(default, skip_serializing_if = "is_zero")]
     sink: f32,
+    /// Whether it casts a shadow; left out when it does.
+    #[serde(default = "casts", skip_serializing_if = "is_true")]
+    shadow: bool,
+}
+
+fn casts() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 fn is_zero(value: &f32) -> bool {
@@ -215,11 +226,22 @@ fn foliage_record(instance: &FoliageInstance) -> FoliageRecord {
         collide: instance.collide,
         lean: instance.lean,
         sink: instance.sink,
+        shadow: instance.shadow,
     }
 }
 
-fn decode_foliage(bytes: &[u8]) -> Result<Vec<FoliageInstance>, String> {
+/// The painted plants in a `foliage.json`, at most [`MAX_FOLIAGE_INSTANCES`]
+/// of them. `notes` gets a line when some are left out for that.
+fn decode_foliage(bytes: &[u8], notes: &mut Vec<String>) -> Result<Vec<FoliageInstance>, String> {
     let file: FoliageFile = serde_json::from_slice(bytes).map_err(|error| error.to_string())?;
+    let written = file.instances.len();
+    if written > MAX_FOLIAGE_INSTANCES {
+        notes.push(format!(
+            "`{FOLIAGE_FILE}` has {written} painted plants, but a terrain keeps at most \
+             {MAX_FOLIAGE_INSTANCES}, so the last {} were left out (a ScatterRule places more)",
+            written - MAX_FOLIAGE_INSTANCES
+        ));
+    }
     let mut instances = Vec::new();
     for record in file.instances {
         if instances.len() >= MAX_FOLIAGE_INSTANCES {
@@ -251,14 +273,26 @@ fn decode_foliage(bytes: &[u8]) -> Result<Vec<FoliageInstance>, String> {
             } else {
                 0.0
             },
+            shadow: record.shadow,
         });
     }
     Ok(instances)
 }
 
 /// A terrain from its files, read by `read` (which gives `None` for a
-/// missing file).
-pub fn decode(mut read: impl FnMut(&str) -> Option<Vec<u8>>) -> Result<TerrainData, FileError> {
+/// missing file). What it had to leave out without failing goes unreported:
+/// [`decode_reporting`] says.
+pub fn decode(read: impl FnMut(&str) -> Option<Vec<u8>>) -> Result<TerrainData, FileError> {
+    decode_reporting(read, &mut Vec::new())
+}
+
+/// [`decode`], adding a line to `notes` for each thing it left out but loaded
+/// without: painted plants past [`MAX_FOLIAGE_INSTANCES`], or a `foliage.json`
+/// it couldn't read (the terrain then loads with no painted plants).
+pub fn decode_reporting(
+    mut read: impl FnMut(&str) -> Option<Vec<u8>>,
+    notes: &mut Vec<String>,
+) -> Result<TerrainData, FileError> {
     let manifest = read(MANIFEST_FILE).ok_or(FileError::Missing {
         file: MANIFEST_FILE,
     })?;
@@ -297,10 +331,13 @@ pub fn decode(mut read: impl FnMut(&str) -> Option<Vec<u8>>) -> Result<TerrainDa
     let mut data = TerrainData::from_parts(manifest.size_x, manifest.size_z, image.values, paint)
         .map_err(|error| invalid(MANIFEST_FILE)(error.to_string()))?;
     data.generation = manifest.generation.map(|value| value.to_string());
-    if let Some(bytes) = read(FOLIAGE_FILE)
-        && let Ok(foliage) = decode_foliage(&bytes)
-    {
-        data.load_foliage(foliage);
+    if let Some(bytes) = read(FOLIAGE_FILE) {
+        match decode_foliage(&bytes, notes) {
+            Ok(foliage) => data.load_foliage(foliage),
+            Err(error) => notes.push(format!(
+                "`{FOLIAGE_FILE}` couldn't be read ({error}), so the terrain has no painted plants"
+            )),
+        }
     }
     if let Some(bytes) = read(HOLES_FILE) {
         let image = decode_image(&bytes).map_err(invalid(HOLES_FILE))?;
@@ -459,6 +496,7 @@ mod tests {
             yaw: 0.4,
             scale: 1.1,
             collide: true,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         });
@@ -572,26 +610,83 @@ mod tests {
             yaw: 0.0,
             scale: 1.0,
             collide: true,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         });
+        // One that casts no shadow (a ScatterRule's or palette item's
+        // `CastShadow` off).
+        let shadowless = axcenity_core::FoliageInstance {
+            shadow: false,
+            ..data.foliage()[0].clone()
+        };
+        data.foliage_mut().push(shadowless);
         let files: HashMap<&str, Vec<u8>> = encode(&data).into_iter().collect();
         let loaded = decode(|name| files.get(name).cloned()).unwrap();
         assert_eq!(loaded.foliage(), data.foliage());
         assert!(loaded.foliage()[0].collide);
+        assert!(loaded.foliage()[0].shadow && !loaded.foliage()[1].shadow);
+        // Only the one that casts none says so in the file.
+        let written = String::from_utf8(files[FOLIAGE_FILE].clone()).unwrap();
+        assert_eq!(written.matches("\"shadow\"").count(), 1, "{written}");
 
         let text = br#"{
   "instances": [
     { "kind": "prop", "name": "Crate", "x": 0.0, "z": 0.0, "yaw": 0.0, "scale": 1.0 }
   ]
 }"#;
-        let old = decode_foliage(text).unwrap();
+        let old = decode_foliage(text, &mut Vec::new()).unwrap();
         assert_eq!(old.len(), 1);
         assert!(!old[0].collide);
+        assert!(old[0].shadow);
         assert_eq!((old[0].lean, old[0].sink), (0.0, 0.0));
         assert_eq!(
             old[0].source,
             axcenity_core::FoliageSource::Prop(axcenity_core::FoliageProp::Crate)
+        );
+    }
+
+    #[test]
+    fn foliage_past_the_limit_is_left_out_and_reported() {
+        let record =
+            r#"{ "kind": "prop", "name": "Crate", "x": 1.0, "z": 1.0, "yaw": 0.0, "scale": 1.0 }"#;
+        let written = MAX_FOLIAGE_INSTANCES + 5;
+        let text = format!("{{\"instances\": [{}]}}", vec![record; written].join(","));
+        let mut notes = Vec::new();
+        let kept = decode_foliage(text.as_bytes(), &mut notes).unwrap();
+        assert_eq!(kept.len(), MAX_FOLIAGE_INSTANCES);
+        assert_eq!(notes.len(), 1, "{notes:?}");
+        assert!(
+            notes[0].contains(&written.to_string()) && notes[0].contains("the last 5"),
+            "{notes:?}"
+        );
+
+        // At the limit there is nothing to say.
+        let text = format!("{{\"instances\": [{}]}}", [record; 3].join(","));
+        let mut notes = Vec::new();
+        assert_eq!(
+            decode_foliage(text.as_bytes(), &mut notes).unwrap().len(),
+            3
+        );
+        assert!(notes.is_empty());
+    }
+
+    #[test]
+    fn an_unreadable_foliage_file_loads_the_terrain_bare_and_says_so() {
+        let data = TerrainData::flat(9, 9, 0.0).unwrap();
+        let mut files: HashMap<&str, Vec<u8>> = encode(&data).into_iter().collect();
+        files.insert(FOLIAGE_FILE, b"{ not json".to_vec());
+        let mut notes = Vec::new();
+        let loaded = decode_reporting(|name| files.get(name).cloned(), &mut notes).unwrap();
+        assert!(loaded.foliage().is_empty());
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].contains(FOLIAGE_FILE), "{notes:?}");
+        // `decode` loads it the same way, quietly.
+        assert!(
+            decode(|name| files.get(name).cloned())
+                .unwrap()
+                .foliage()
+                .is_empty()
         );
     }
 
@@ -605,6 +700,7 @@ mod tests {
             yaw: 0.5,
             scale: 1.2,
             collide: false,
+            shadow: true,
             lean,
             sink,
         };

@@ -21,6 +21,7 @@ fn settings(anti_aliasing: AntiAliasing, motion_blur: MotionBlurQuality) -> Grap
         motion_blur: Some(motion_blur),
         ambient_occlusion: Some(AmbientOcclusion::Off),
         contact_shadows: Some(false),
+        screen_space_reflections: Some(false),
         volumetric_fog: Some(false),
         ..GraphicsSettings::preset(Quality::High)
     }

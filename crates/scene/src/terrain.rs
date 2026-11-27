@@ -1155,6 +1155,74 @@ mod tests {
         );
     }
 
+    /// Dragging the flood's `WaterLevel` over painted water rebuilds a
+    /// chunk's painted mesh only when the level crosses one of its cells,
+    /// and then under the same key with a new version, so the renderer
+    /// rewrites its copy (and its ray traced BLAS) in place. Each frame of a
+    /// drag used to give 22 chunks new keys, which the renderer and the ray
+    /// traced scene kept (2026-11-26).
+    #[test]
+    fn dragging_the_water_level_keeps_each_painted_chunks_mesh() {
+        let (mut world, terrain) = world_with_terrain();
+        let ground = {
+            let data = world.terrain(terrain).unwrap();
+            -32.0 + data.height(48, 48) * 128.0
+        };
+        // Three cells 3 studs over the ground and one 1 stud over it.
+        let height_of = |y: f32| (y + 32.0) / 128.0;
+        let data = world.terrain_mut(terrain).unwrap();
+        let all = data.bounds();
+        let water = data.water_mut_in(all);
+        for (x, z) in [(48, 48), (49, 48), (48, 49)] {
+            water[z * 257 + x] = height_of(ground + 3.0);
+        }
+        water[49 * 257 + 49] = height_of(ground + 1.0);
+        world
+            .set_property(terrain, "Water", Value::Bool(true))
+            .unwrap();
+        let mut cache = TerrainCache::new();
+        let assets = Assets::default();
+        let camera = camera_at(Vec3::new(0.0, 50.0, 0.0));
+        let mut painted_at = |world: &mut World, level: f32| {
+            world
+                .set_property(terrain, "WaterLevel", Value::Number(f64::from(level)))
+                .unwrap();
+            let mut items = Vec::new();
+            cache.draw_all(world, &assets, &camera, &mut items, &mut Vec::new());
+            let painted: Vec<_> = water_items(&items)
+                .into_iter()
+                .filter_map(|item| match &item.shape {
+                    Shape::Mesh(mesh) if mesh.key() != axcenity_render::water_surface().key() => {
+                        Some(mesh.clone())
+                    }
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(painted.len(), 1, "one chunk of painted water at {level}");
+            painted[0].clone()
+        };
+        let first = painted_at(&mut world, ground - 20.0);
+        assert_eq!(first.indices().len(), 4 * 2 * 2 * 6);
+        // A drag below every painted cell: nothing to build.
+        for step in 1..=10 {
+            let again = painted_at(&mut world, ground - 20.0 + 0.05 * step as f32);
+            assert!(Arc::ptr_eq(&first, &again), "rebuilt at step {step}");
+        }
+        // Over the low cell: built again, under the same key.
+        let crossed = painted_at(&mut world, ground + 2.0);
+        assert_eq!(crossed.key(), first.key());
+        assert_ne!(crossed.version(), first.version());
+        assert_eq!(
+            crossed.indices().len(),
+            3 * 2 * 2 * 6,
+            "the low cell is flooded"
+        );
+        // Back under it: as it was.
+        let back = painted_at(&mut world, ground - 19.0);
+        assert_eq!(back.key(), first.key());
+        assert_eq!(back.indices().len(), first.indices().len());
+    }
+
     #[test]
     fn painted_water_feathers_exposed_outer_edges_and_blends_adjacent_levels() {
         let (mut world, terrain) = world_with_terrain();

@@ -395,6 +395,7 @@ impl ScenePipeline {
             white_texture,
             plain_material,
             uploader: None,
+            skirts: Default::default(),
             frame_clock: std::collections::VecDeque::new(),
             custom_meshes: FxHashMap::default(),
             textures: FxHashMap::default(),
@@ -416,11 +417,13 @@ impl ScenePipeline {
             lods: LodStates::default(),
             clusters: clusters::Clusters::default(),
             ray_scene: None,
+            parked_ray_scene: None,
             posing_generation: posing.generation,
             posing,
             ray_shadows: None,
             no_ray_shadows,
             ray_reflections: None,
+            screen_reflections: None,
             no_ray_reflections,
             weather_field,
             weather_field_capacity,
@@ -643,6 +646,10 @@ impl ScenePipeline {
                 &self.targets_alive,
             );
             self.history.valid = false;
+            // Last frame's picture went with them.
+            if let Some(pass) = &mut self.screen_reflections {
+                pass.previous = None;
+            }
             // The frame bindings held the old occlusion texture, and so did
             // the traced clouds'.
             self.cloud_trace.forget_target();
@@ -874,7 +881,7 @@ impl ScenePipeline {
         };
         frame_uniform.fog = fog::FogRaw::new(
             &list.fog,
-            sky.colors[1],
+            sky.fog_horizon,
             sky_average,
             glam::Vec3::from_slice(&frame_uniform.sun_direction[..3]),
             glam::Vec3::from_slice(&frame_uniform.sun_radiance[..3]),
@@ -1061,6 +1068,45 @@ impl ScenePipeline {
                 }
                 None
             };
+        // Screen-space reflections, while drawn and ray traced ones aren't
+        // (renderer/screen_reflections.rs): what they find on the screen is
+        // bound in the frame's place 18, as ray traced reflections are. Not
+        // on the first frame drawn into these targets: there is no last
+        // frame's picture to read.
+        let screen_reflection_uniform = if screen_reflections::marched(&self.graphics)
+            && self.frame_targets.occlusion.is_some()
+        {
+            let size = self.frame_targets.size;
+            if !self
+                .screen_reflections
+                .as_ref()
+                .is_some_and(|pass| pass.fits(size))
+            {
+                self.screen_reflections = Some(Box::new(
+                    screen_reflections::ScreenReflections::new(&self.device, size),
+                ));
+                self.bind_frame();
+            }
+            let matrices = lighting::camera_matrices(&list.camera, aspect);
+            self.screen_reflections.as_ref().and_then(|pass| {
+                // On from the first frame, for the sky's shading: with no
+                // last frame to read, the pass's buffer is cleared instead.
+                frame_uniform.ray_reflections = pass.frame_values();
+                // Its steps start at a different offset each frame only while
+                // TAA averages them (as the shading's noise).
+                let step = frame_uniform.noise[0] as u64;
+                pass.uniform(drawn_view_proj, matrices, step)
+            })
+        } else {
+            if self.screen_reflections.take().is_some() {
+                self.bind_frame();
+            }
+            None
+        };
+        // This frame's picture is next frame's to read.
+        if let Some(pass) = &mut self.screen_reflections {
+            pass.previous = Some(view_proj);
+        }
         if let Some(field) = list
             .weather_field
             .as_ref()
@@ -1108,7 +1154,7 @@ impl ScenePipeline {
                 None => self.weather_prints_uploaded = None,
             }
         }
-        let cascade_drawn = self.schedule_cascades(list, &mut frame_uniform);
+        let cascade_drawn = self.schedule_cascades(list, &mut frame_uniform, aspect);
         self.queue
             .write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame_uniform));
         // The sun's cascades, then the spot lights' views, then the point
@@ -1191,11 +1237,12 @@ impl ScenePipeline {
                 .push(Frustum::of(camera_view_projection(&list.camera, aspect)));
             let cascades = shadows_drawn(list.shadows, &self.graphics)
                 .map_or(0, |(_, size)| size.cascades as usize);
-            reach.views.extend(
-                frame_uniform.cascades[..cascades]
-                    .iter()
-                    .map(|matrix| Frustum::of(glam::Mat4::from_cols_array_2d(matrix))),
-            );
+            // Not the cascades ray traced shadows leave out.
+            let under_rays = super::lighting::cascades_under_rays(list, &self.graphics, aspect);
+            reach.views.extend(super::lighting::cascade_views(
+                &frame_uniform.cascades[..cascades],
+                under_rays,
+            ));
             // Ray traced shadows' rays toward the sun, where the shadow
             // maps reach less far than they do (or aren't drawn).
             if let Some(rays) = ray_shadows::RayShadowPlan::of(list, &self.graphics)
@@ -1602,8 +1649,9 @@ impl ScenePipeline {
         mark(&mut encoder, FramePass::AccelerationStructures);
         let path_traced = self.path_traced();
         cpu.lap(CpuSection::Interface);
+        let may_trace = self.may_trace_rays();
         let tracing = ray_tracing::prepare_scene(
-            &mut self.ray_scene,
+            (&mut self.ray_scene, &mut self.parked_ray_scene, may_trace),
             (
                 (&self.device, &self.queue),
                 &self.meshes,
@@ -2085,6 +2133,28 @@ impl ScenePipeline {
                 bytemuck::bytes_of(&[0.0f32; 4]),
             );
         }
+        mark(&mut encoder, FramePass::ScreenReflections);
+        let screen_reflections_drawn = match (
+            &self.screen_reflections,
+            &screen_reflection_uniform,
+            &self.frame_targets.occlusion,
+        ) {
+            (Some(pass), Some(uniform), Some(prepass)) => {
+                pass.march(
+                    (&self.device, &self.queue),
+                    &mut encoder,
+                    (prepass, &self.frame_targets.hdr_view),
+                    uniform,
+                );
+                true
+            }
+            // No last frame to read: nothing is found on the screen.
+            (Some(pass), None, _) => {
+                encoder.clear_buffer(&pass.buffer, 0, None);
+                false
+            }
+            _ => false,
+        };
         mark(&mut encoder, FramePass::VolumetricFog);
         if let Some(fog) = &self.volumetric_fog {
             fog.scatter(&mut encoder);
@@ -2467,6 +2537,16 @@ impl ScenePipeline {
         cpu.lap(CpuSection::Submit);
         self.wait_for_frame_before(submitted);
         cpu.skip();
+        if super::occlusion_probe::reads_on(self.frame)
+            && let Some(targets) = &self.frame_targets.occlusion
+        {
+            super::occlusion_probe::read(
+                &self.device,
+                &self.queue,
+                &targets.depth_texture,
+                view_proj,
+            );
+        }
         if timed && let Some(timer) = &mut self.gpu_timer {
             let shadows = self.shadow_map.is_some()
                 || self.spot_shadow_map.is_some()
@@ -2482,6 +2562,7 @@ impl ScenePipeline {
                     ray_shadows_drawn,
                     ray_gi_drawn,
                     ray_reflections_drawn,
+                    screen_reflections_drawn,
                     self.volumetric_fog.is_some(),
                     self.gpu_particles.is_some(),
                     self.cloud_trace.traced(),
@@ -2534,6 +2615,7 @@ impl ScenePipeline {
         &mut self,
         list: &DrawList,
         uniform: &mut FrameUniform,
+        aspect: f32,
     ) -> [bool; SHADOW_CASCADES] {
         let mut drawn = [true; SHADOW_CASCADES];
         let Some((_, size)) = shadows_drawn(list.shadows, &self.graphics) else {
@@ -2542,7 +2624,15 @@ impl ScenePipeline {
         let cascades = size.cascades as usize;
         let map_fits = self.shadow_map.as_ref().map(|map| map.size) == Some(size);
         let heavy = self.casters_planned > HEAVY_SHADOW_CASTERS;
+        // The nearest cascades that ray traced shadows make unneeded cover
+        // nothing (`shadow_setup`) and aren't drawn.
+        let under_rays = super::lighting::cascades_under_rays(list, &self.graphics, aspect);
         for (index, drawn) in drawn.iter_mut().enumerate().take(cascades) {
+            if index < under_rays {
+                *drawn = false;
+                self.cascades_drawn[index] = None;
+                continue;
+            }
             let takes_turns = heavy && map_fits && cascades >= 3 && index >= cascades - 2;
             let its_turn = (self.frame as usize + index).is_multiple_of(2);
             // A cascade reaches half the map's width from the camera: it
@@ -2743,10 +2833,12 @@ impl ScenePipeline {
             .ray_shadows
             .as_ref()
             .map_or(&self.no_ray_shadows, |shadows| &shadows.mask);
-        let ray_reflections = self
-            .ray_reflections
-            .as_ref()
-            .map_or(&self.no_ray_reflections, |reflections| &reflections.buffer);
+        // Ray traced reflections, or screen-space ones in their place.
+        let ray_reflections = match (&self.ray_reflections, &self.screen_reflections) {
+            (Some(traced), _) => &traced.buffer,
+            (None, Some(screen)) => &screen.buffer,
+            (None, None) => &self.no_ray_reflections,
+        };
         let bind = |layout, prepass_depth, occlusion| {
             create_frame_bind_group(
                 &self.device,
@@ -3087,6 +3179,10 @@ impl ScenePipeline {
                 + self.realtime_gi.as_ref().map_or(0, |gi| gi.bytes())
                 + self.ray_gi.as_ref().map_or(0, |gi| gi.bytes())
                 + self.ray_reflections.as_ref().map_or(0, |pass| pass.bytes())
+                + self
+                    .screen_reflections
+                    .as_ref()
+                    .map_or(0, |pass| pass.bytes())
                 + self.soft_scene.as_ref().map_or(0, |soft| soft.bytes())
                 + self.volumetric_fog.as_ref().map_or(0, |fog| fog.bytes())
                 + self.water.copy.as_ref().map_or(0, |copy| copy.bytes),
@@ -3315,6 +3411,22 @@ impl ScenePipeline {
     pub(super) fn upload_new(&mut self, list: &DrawList, draws: &[Draw], uses: &FrameUses) {
         let frame = self.frame;
         let arrived = self.finish_background_uploads();
+        // Skirts made on a worker join their meshes: the indices again, the
+        // skirt's after them (the mesh's own are the same, so nothing built
+        // from the old buffer is out of date).
+        for made in self.skirts.made() {
+            if let Some(Cached { gpu: Some(gpu), .. }) = self.custom_meshes.get_mut(&made.key)
+                && gpu.version == made.version
+                && made.indices.len() > gpu.index_count as usize
+            {
+                gpu.indices =
+                    index_buffer(&self.device, "mesh", bytemuck::cast_slice(&made.indices));
+                gpu.cap_index_count = made.indices.len() as u32;
+                gpu._bytes = self
+                    .mesh_bytes
+                    .count(gpu.vertices.size() + gpu.indices.size());
+            }
+        }
         // Terrain chunks and painted terrain water meshes are small and rebuilt
         // live as the camera moves or the user paints: each goes up right away,
         // like terrain weights. Left to the background upload thread, a chunk
@@ -3360,15 +3472,23 @@ impl ScenePipeline {
                         uploader.mesh(source);
                         continue;
                     }
+                    // A renderer whose frames are shown makes the skirt
+                    // away from the frame; an offline one (tests, stills)
+                    // draws the frame asked for with it.
+                    let later = self.one_frame_ahead;
                     slot.insert(Cached {
-                        gpu: upload_custom_mesh(
+                        gpu: upload_custom_mesh_with(
                             &self.device,
                             &self.mesh_bytes,
                             &self.skinning,
                             source.as_ref(),
+                            !later,
                         ),
                         last_drawn: frame,
                     });
+                    if later {
+                        self.skirts.request(Arc::clone(source));
+                    }
                 }
             }
         }
@@ -3975,7 +4095,9 @@ fn frame_layout_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         },
         wgpu::BindGroupLayoutEntry {
             binding: 7,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            // Water's corners read the scene's copy here too (how deep it
+            // is under them), so its waves calm at the shore.
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: true },
                 view_dimension: wgpu::TextureViewDimension::D2,
@@ -3985,7 +4107,7 @@ fn frame_layout_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         },
         wgpu::BindGroupLayoutEntry {
             binding: 8,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
             count: None,
         },
@@ -4071,6 +4193,7 @@ fn targets_used(
         graphics.ambient_occlusion != crate::AmbientOcclusion::Off
             || ray_ao::traced(graphics)
             || ray_reflections::traced(graphics)
+            || screen_reflections::marched(graphics)
             || graphics.contact_shadows
             || graphics.volumetric_fog
             || graphics.ray_traced_shadows != crate::RayTracedShadows::Off

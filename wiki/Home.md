@@ -88,10 +88,11 @@ The engine's persistent engineering memory: what exists, why it exists, how it w
 
 | Date | Page | Change |
 |---|---|---|
+| 2026-11-27 | Rendering, Optimization log, Profiling | Overgrown Street: occlusion culling measured and left unbuilt (hidden items are 5–10% of the prepass and scene), plants that cast no shadow (`CastShadow`), half-resolution traced shadows below Ultra, micro-shadowing in cracks, glossy ivy, baked probes |
+| 2026-11-26 | Animation | Characters turn smoothly under a TurnSpeed, a Humanoid's Speed parameter drives a walk-to-run blend tree (with a speed per child), and a third-person camera zoomed all the way in sees from the character's eyes |
+| 2026-11-26 | Rendering, Optimization log, Known limitations | Screen-space reflections and sky visibility on reflections at High and Ultra; wet ground gathers water in its cracks and low spots; snow no longer lies with no cover (the white blotches on wet asphalt) |
+| 2026-11-26 | Rendering, Known limitations | Leaves under an overcast sky: crowns no longer go black under ambient occlusion, the sky glows through them from behind, and grass is darker where it meets the ground |
+| 2026-11-26 | Lighting and atmosphere, Rendering | Exponential height fog creators shape (an Atmosphere's `FogDensity`, `FogHeight`, `FogFalloff`, `FogStart`) and split toning with an S-curve in `ColorCorrectionEffect`, for Overgrown Street's grade |
 | 2026-11-25 | ADR-0051, Rendering, Memory architecture, Optimization log | Undrawn meshes and textures stay on the GPU within memory budgets in the player and the editor's viewport: cutting back to a seen view no longer stalls a frame. The budgets follow the card's memory, and the Graphics settings say when a world needs more |
-| 2026-11-25 | Optimization log, Benchmark history, Known bottlenecks | Desert Homestead ran at 11 frames a second: fog boxes copied whole for every pixel (GPU frame 110 → 12.4 ms on High at 1440p) and the atmosphere's sky image on one thread; what is left is listed as open |
-| 2026-11-25 | ADR-0050, Characters, Character Data, Animation, System inventory | The engine ships one character family, the human base on MakeHuman's body: the realistic and stylized packages are removed, the default humanoid's model is the base's default body, a project's library holds what its characters name, and the starter animations are Quaternius's 84 takes alone (the keyed ones retired) |
-| 2026-11-25 | ADR-0049, Animation, Known limitations | The starter animations are Quaternius's Universal Animation Library (CC0), baked onto the Humanoid skeleton: 84 captured takes beside 15 keyed ones |
-| 2026-11-25 | ADR-0047, Characters, Known limitations | The human base's underwear and the shoes' socks no longer come through outfits (whole cover maps on MakeHuman's clothes), and the feminine frame's elbows are no longer notched (body shapes posed about their own joints) |
 
 Keep the five newest rows here; the full list is [Documentation history](Changelog/Documentation-History.md).

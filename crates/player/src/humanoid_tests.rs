@@ -523,6 +523,96 @@ fn a_humanoid_plays_its_animators_idle_walk_run_jump_and_fall_states() {
     let _ = std::fs::remove_dir_all(&folder);
 }
 
+/// An Animator with a Number parameter `Speed` is kept at how fast its
+/// Humanoid walks, eased; a Walk that's a blend tree by Speed plays for
+/// running too, so walk mixes into run instead of switching state.
+#[test]
+fn a_humanoid_keeps_its_animators_speed_and_a_blended_walk_plays_while_it_runs() {
+    let folder =
+        std::env::temp_dir().join(format!("axcenity-humanoid-speed-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).unwrap();
+    let states: Vec<String> = ["Idle", "Run", "Jump", "Fall"]
+        .iter()
+        .map(|name| {
+            format!(
+                r#"{{ "name": "{name}", "motion": {{ "clip": "" }}, "speed": 1.0, "position": [0.0, 0.0] }}"#
+            )
+        })
+        .chain([r#"{ "name": "Walk", "motion": { "blend_tree": { "parameter": "Speed", "children": [
+            { "clip": "", "threshold": 16.0 }, { "clip": "", "threshold": 32.0, "speed": 1.3 } ] } },
+            "speed": 1.0, "position": [0.0, 0.0] }"#
+            .to_owned()])
+        .collect();
+    std::fs::write(
+        folder.join("hero.statemachine.json"),
+        format!(
+            r#"{{ "format_version": 2, "default_state": "Idle",
+                "parameters": [{{ "type": "Number", "name": "Speed", "default": 0.0 }}],
+                "states": [{}] }}"#,
+            states.join(", ")
+        ),
+    )
+    .unwrap();
+    let mut world = World::new();
+    floor(&mut world);
+    character(&mut world, "Player", -20.0, 20.0);
+    let (npc, _) = character(&mut world, "NPC", 0.0, 0.0);
+    make(&mut world, ClassName::Humanoid, "Humanoid", npc, Vec::new());
+    let body = world.find_first_child(npc, "Body").unwrap();
+    let animator = make(
+        &mut world,
+        ClassName::Animator,
+        "Animator",
+        body,
+        vec![(
+            "StateMachine",
+            Value::String("hero.statemachine.json".to_owned()),
+        )],
+    );
+    let mut game = Game::new(world, Assets::new(&folder));
+    let speed = |game: &Game| match game
+        .world
+        .animator(animator)
+        .unwrap()
+        .parameters
+        .get("Speed")
+    {
+        Some(axcenity_core::Parameter::Number(value)) => *value,
+        other => panic!("{other:?}"),
+    };
+    let state = |game: &Game| game.world.animator(animator).unwrap().current_state.clone();
+    for _ in 0..20 {
+        game.frame();
+    }
+    assert!(speed(&game).abs() < 1e-3, "standing: {}", speed(&game));
+    // Running: Speed eases up to RunSpeed (32), and Walk plays throughout.
+    game.run(
+        r#"
+        workspace.NPC.ThirdPersonController.Movement = "Run"
+        workspace.NPC.Humanoid:MoveTo(Vector3.new(0, 0, -28))
+        "#,
+    );
+    let mut speeds = Vec::new();
+    for _ in 0..40 {
+        game.frame();
+        speeds.push(speed(&game));
+        if speeds.len() > 2 {
+            assert_ne!(state(&game), "Run", "a blended Walk covers running");
+        }
+    }
+    assert_eq!(state(&game), "Walk");
+    assert!(
+        (speed(&game) - 32.0).abs() < 0.5,
+        "running: {}",
+        speed(&game)
+    );
+    // Eased: it rose over a few frames, not in one (the first frame
+    // settles the NPC before it walks).
+    let moving = speeds.iter().find(|&&s| s > 0.0).copied().unwrap_or(0.0);
+    assert!(moving > 0.0 && moving < 10.0, "{speeds:?}");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
 /// With a Land state that goes back to Idle by itself (the default
 /// character's), a Humanoid that comes down standing still plays it, and
 /// is in Idle again when it has played; one that comes down moving goes

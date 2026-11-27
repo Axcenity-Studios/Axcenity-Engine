@@ -691,6 +691,46 @@ The same pixels before and after in all sixteen stills (maps and ray traced), an
 
 0.35 takes the lantern's shadow off the door and makes the ray traced door match the maps; 0.8 changes at most 0.03% of a view's pixels more. What's nearer the light than that no longer shades anything from it, so the lantern's cap no longer shades the porch ceiling above it. Crops: `target/cross-engine/homestead/step7/door-*-shadow-start.png`. The plank gaps are the asset's (left to the owner).
 
+## Water: rays only with ray traced reflections, the ray scene kept, the editor's drags, the river's waves (2026-11-26, eighth session)
+
+The owner picked four fixes from the seventh session's water report. Same machine, the still tool (`crate-s4`, and a "before" built from a worktree of `ff769d90`) on the frozen copy of the project in `target/cross-engine/homestead/step8/project`, 1920 × 1080, the owner's Ultra with TAA (`benchmarks/features/owner-ultra.json`), pinned to the V-cache cores. CPU is the frame's thread, frames 8 and on; GPU one frame's pass times. Shots, logs and pictures: `target/cross-engine/homestead/step9/`.
+
+### The river view
+
+| River view (water in view) | GPU before → after | Frame's thread before → after | Ray scene |
+|---|---|---|---|
+| No ray-query device | 9.58 → 9.50 ms | 4.15 → 4.17 ms | none |
+| Ray-query device, every ray traced effect off | 13.31 → 9.90 | 9.26 → 4.18 (RayScene 3.12 → 0) | 23,532 instances → none |
+| Ray traced reflections Medium | 13.34 → 13.21 | 9.61 → 9.56 | the same |
+| Every ray traced effect on | 28.34 → 28.70 | 10.00 → 9.97 | the same |
+
+Water traced rays on any device with ray queries, whatever the settings (`WaterMode::traces_rays`); now it needs ray traced reflections on, like every effect (ADR-0025). With them on the river costs what it did. The away and low views move alike (away, effects off: GPU 10.27 → 7.73, thread 6.91 → 3.61). The scene pass with the new waves is within 0.1 ms of before in every row.
+
+A frame that traces nothing while an effect is on no longer frees the ray traced scene: it's parked with its BLASes (`parked_ray_scene`), so water, the sun or a light probe volume coming back builds none of the 1,495 meshes again (the 4,026 ms first frame); freed once every effect is off. Shown by a test (`a_frame_that_traces_nothing_keeps_the_meshes_built_while_an_effect_is_on`), not timed here: with the gate, water is no longer the only thing tracing in any of these views.
+
+### The editor's drags
+
+| Shot (frames 12 and on) | Raster device | Ray-query device, effects off | Ray traced reflections Medium |
+|---|---|---|---|
+| `WaterLevel` dragged, flooding on | 28.8 → 15.6 ms a frame (Uploads 15.35 → 0.26) | 39.0 → 15.6 | 39.1 → 25.8 (ray scene 1,561 → 2,155 meshes over the drag → 1,517 throughout) |
+| Water brush held still (a stamp every 0.05 s) | 27.0 → 19.3 (draw list 7.16 → 0.93) | 36.0 → 19.0 | 36.2 → 28.5 |
+| Water brush stroke (a stamp a frame) | 43.0 → 19.6 (draw list 19.62 → 0.94) | 52.2 → 19.6 | 52.5 → 29.4 |
+
+- **The level drag**: a painted chunk's water mesh took a new key each time it was built, and the flood's level was in what it was built from, so every frame of a drag built 22 new meshes, uploaded them and left the old ones in the renderer and the ray traced scene. Now the key is the chunk's and the build is its version (rewritten in place, its BLAS too), and a chunk is built again only when the level crosses one of its painted cells (how many it covers is all the level changes of it).
+- **The brush**: each stamp bumped the terrain's `revision`, which painted foliage is keyed by, so a Water stroke built the whole terrain's painted foliage again every frame (the 20 ms draw list). Foliage now follows `revision_apart_from_water`. A stamp also marked every chunk under the brush as changed whether a cell changed or not; it now writes and marks only the cells that change, and a chunk's mesh reads its neighbours only through the ring of cells around it. With that the stroke costs what a still frame does, so nothing is deferred or throttled (that would only make the water lag the brush).
+- **Slider undo**: not a fault. A Terrain Studio slider's frames already merge into one undo step until the pointer is let go (`History::record`'s open gesture, sealed in `app.rs`); `dragging_a_water_slider_is_one_undo_step` now says so.
+
+### The waves and the shore
+
+- **Repetition**: the wave set at `water.wgsl`'s `water_waves` already had non-harmonic lengths and wide turns (the seventh session's "±0.6 rad" was out of date); the stripes came from one wave ruling the rest (heights 1, 0.54, 0.31, 0.19). Variation now moves the set from that even one (0: every crest alike, as before, 99% of the test sea's pixels unchanged) to a spread one: four moving waves of comparable height at the same root-mean-square roughness, lengths 1 : 0.773 : 0.587 : 0.411 (no small-fraction ratios), within ±35° of the direction plus a cross swell 75° off it. The ripples' two noise layers are turned (37°, −65°) off the noise lattice, and the normal's tilt flattens by up to 40% from 6 to 40 wave lengths away. Crops: `step9/crop-water.png` (before above), `ba-water.jpg`, `ba-low.jpg`. The near river loses its long thin parallel stripes; some fine parallel lines remain on the far stretch.
+- **The shore**: a corner's waves are scaled by the water's depth under it, from the scene copy (`water_depth_under`, `water_shore`: none at the shore, all from four times `WaveHeight` down), and the pixel's normal calms with them; from Medium reflection quality up (Low has no copy). In the low view the swell no longer rises over the far bank.
+
+### `ShadowStart` on the porch lamp
+
+`Workspace/Lights/PorchLight` in the owner's project (`~/Projects/Axcenity Projects/Desert Homestead/world.json`) has `ShadowStart` 0.35, the value the seventh session's door crops were taken at. `LampTable` and `LampBedroom` are unchanged.
+
+**Not run**: the editor itself (the drags are the still tool's `vary` and new `stamp` options, which do what the editor does to the world but not its undo recording), DirectX 12 or another card, the regression check. Tests run: `cargo test -p axcenity-render` (515 passed, 8 ignored), the ray tracing and water tests with `debug-views`, `axcenity-core`, `axcenity-terrain` and `axcenity-scene` library tests, the editor's terrain and legend tests, `cargo clippy --workspace --all-targets -- -D warnings`.
+
 ## What these numbers don't cover
 
 - One scene, one machine, one driver. A scene with many lights, characters or indoor views would exercise other parts of both engines.

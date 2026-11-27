@@ -58,6 +58,9 @@ Dated whole-frame numbers, **never overwritten**: add a row or a section when yo
 | 2026-11-10 | `39dd258` | Temperate Wet Patch | 5.279 | 820 | 2,064 |
 
 | 2026-11-11 | `15965da` | Abandoned Farmhouse | 5.399 | 212 | 1,579 |
+| 2026-11-27 | `ff769d90` + uncommitted (old rules → still groups, distances, cascades) | Overgrown Street, owner's settings with ray tracing, 1996 × 703, pinned | 50.4 → 43.9 shown (19.8 → 22.8 fps); thread 43.5 → 30.1, GPU 50.2 → 43.5 | | |
+| 2026-11-27 | `ff769d90` + uncommitted (before → CastShadow off for ground cover, probes, micro-shadowing) | Overgrown Street, owner's settings, 1996 × 703, pinned, two rounds | non-RT 37.0 → 37.9 fps (GPU 26.5 → 25.9); RT 22.9 → 24.5 fps (GPU 43.3 → 40.3); RT with Half traced shadows 27.6 fps (GPU 32.8) | | |
+| 2026-11-27 | `ff769d90` + uncommitted (the same engines, regression check) | Desert Homestead, owner's Ultra / every ray traced effect, 1996 × 998, pinned, two rounds | Ultra 174.7 / 175.0 → 175.1 / 173.6 fps; RT 96.8 / 97.1 → 96.8 / 96.9 fps; GPU 5.41–5.44 and 9.95–9.97 ms both | | |
 | 2026-11-11 | `15965da` | General Store Roadside | 4.092 | 446 | 1,581 |
 | 2026-11-11 | `15965da` | Temperate Wet Patch | 5.14 | 268 | 1,399 |
 | 2026-11-11 | `15965da` | Temperate Dry Patch, Ultra 2560×1440 | 11.043 (GPU 10.9, GPU-bound) | 282 | 1,559 |

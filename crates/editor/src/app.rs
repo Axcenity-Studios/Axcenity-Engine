@@ -416,6 +416,10 @@ pub struct EditorApp {
     play_from_start: bool,
     /// Bake Probes was clicked: the bake starts on the next frame.
     bake_probes_asked: bool,
+    /// `AXCENITY_BAKE_PROBES=1`: once the project is open, its textures
+    /// in and a few frames drawn, Bake Probes; once that's done, save and
+    /// close (`probe_bake::BakeAndClose`).
+    bake_and_close: probe_bake::BakeAndClose,
     /// The probe bake in progress, a little each frame
     /// (`app/probe_bake.rs`).
     probe_bake: Option<Box<probe_bake::ProbeBake>>,
@@ -1140,6 +1144,7 @@ impl EditorApp {
             play_from_start: false,
             stale_light_probes: None,
             bake_probes_asked: false,
+            bake_and_close: probe_bake::BakeAndClose::Off,
             probe_bake: None,
             constraint_tool: None,
             importing: None,
@@ -1832,6 +1837,7 @@ impl EditorApp {
             .min(MAX_FRAME_SECONDS);
         self.plugins_frame(seconds);
         self.plugin_shortcuts(ctx);
+        self.bake_and_close_frame(ctx);
         if self.bake_probes_asked {
             self.bake_probes_asked = false;
             self.start_probe_bake();

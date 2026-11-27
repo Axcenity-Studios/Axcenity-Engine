@@ -29,6 +29,7 @@ fn settings(anti_aliasing: AntiAliasing, occlusion: AmbientOcclusion) -> Graphic
         motion_blur: Some(MotionBlurQuality::Off),
         ambient_occlusion: Some(occlusion),
         contact_shadows: Some(occlusion != AmbientOcclusion::Off),
+        screen_space_reflections: Some(occlusion != AmbientOcclusion::Off),
         volumetric_fog: Some(false),
         ..GraphicsSettings::preset(Quality::High)
     }

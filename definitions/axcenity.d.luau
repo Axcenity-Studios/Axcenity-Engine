@@ -3961,6 +3961,14 @@ declare extern type Atmosphere extends Instance with
 	Glare: number
 	--- Adds dust and haze to the air, from 0 to 10: a paler horizon, a wider glow around the sun, a dimmer, redder sun, and thicker fog (1 + Haze times as thick).
 	Haze: number
+	--- How many times thicker the height fog is than Density and Haze make it, from 0 (no fog, the sky kept) to 100, leaving the sky and the sun's color as they are. 1 by default.
+	FogDensity: number
+	--- The height in studs (world Y) at and below which the fog is thickest; above it, it thins by FogFalloff. Offset lowers it further, by up to 250 studs. 0 by default.
+	FogHeight: number
+	--- How many studs above FogHeight the fog thins by about two thirds (e): small values keep it low to the ground as a mist, large ones spread it up the sky. 50 by default, at least 0.1.
+	FogFalloff: number
+	--- How many studs from the camera the fog starts: nearer is clear of it, so the foreground keeps its contrast. 0 by default.
+	FogStart: number
 	[string]: any
 end
 
@@ -4031,6 +4039,16 @@ declare extern type ColorCorrectionEffect extends Instance with
 	Saturation: number
 	--- Multiplies every color. White (the default) changes nothing.
 	TintColor: Color3
+	--- Split toning: tints the dark colors, keeping their brightness (a pale blue cools the shadows). White (the default) changes nothing.
+	ShadowTint: Color3
+	--- Split toning: tints the light colors, keeping their brightness. White (the default) changes nothing.
+	HighlightTint: Color3
+	--- Where ShadowTint gives way to HighlightTint, from -1 (more of the picture takes the shadow tint) to 1 (more takes the highlight tint). 0 by default.
+	Balance: number
+	--- An S-curve on each color channel, from -1 to 1: above 0 it deepens what's darker than CurvePivot and lifts what's lighter, easing into black and white without clipping; below 0 it flattens colors toward the pivot. 0 (the default) changes nothing.
+	Curve: number
+	--- The shade, from 0 (black) to 1 (white), that Curve turns about and keeps. 0.5 by default.
+	CurvePivot: number
 	--- A lookup table in the project every color is looked up in: a .cube file, or a strip image of N squares of N × N pixels side by side (such as 256 × 16). "" for none.
 	LookupTable: string
 	--- How many levels each color channel is cut down to, 2 or more, for a flat, poster look. 0 (the default) leaves them smooth.
@@ -4772,7 +4790,7 @@ declare extern type Terrain extends Instance with
 	WaterColor: Color3
 	--- How many studs of water light crosses before only about a third of what's under it still shows. Bigger is clearer.
 	WaterClarity: number
-	--- How high the biggest wave rises above the water's surface at rest, in studs.
+	--- How high the biggest wave rises above the water's surface at rest, in studs. With more WaveVariation the waves share it more evenly, and they calm where the water is shallow.
 	WaveHeight: number
 	--- How long the biggest wave is from crest to crest, in studs.
 	WaveLength: number
@@ -4882,9 +4900,11 @@ declare extern type ThirdPersonController extends Instance with
 	PlatformStand: boolean
 	--- If true, the character turns about the middle of its body to face the way it walks (a first-person one, the way the camera looks). It's taken to face -Z when Play starts.
 	AutoRotate: boolean
+	--- The fastest the character turns to face the way it walks, in degrees a second (720). Each step turns it part of the way that's left, so it eases into a turn and settles at the end, and a turn started goes on to the end after the keys are let go. 0 turns it at once. A camera at the eyes (a first-person one, or a third-person one zoomed all the way in) turns the character with the camera at once.
+	TurnSpeed: number
 	--- How far behind the character the camera sits during Play, in studs. The mouse wheel zooms it between CameraMinZoomDistance and CameraMaxZoomDistance and keeps the zoom here.
 	CameraDistance: number
-	--- The closest the mouse wheel zooms the camera, in studs (at least 0.5). Set it to CameraMaxZoomDistance to lock the distance.
+	--- The closest the mouse wheel zooms the camera, in studs (at least 0.5). At 0.5, zooming all the way in puts the camera at the character's eyes (first person: the eye bones of a skinned body, and the mouse looks round without a button); set it higher to keep the camera behind the character. Set it to CameraMaxZoomDistance to lock the distance.
 	CameraMinZoomDistance: number
 	--- The farthest the mouse wheel zooms the camera out, in studs.
 	CameraMaxZoomDistance: number
@@ -4929,6 +4949,8 @@ declare extern type FirstPersonController extends Instance with
 	PlatformStand: boolean
 	--- If true, the character turns about the middle of its body to face the way it walks (a first-person one, the way the camera looks). It's taken to face -Z when Play starts.
 	AutoRotate: boolean
+	--- The fastest the character turns to face the way it walks, in degrees a second (720). Each step turns it part of the way that's left, so it eases into a turn and settles at the end, and a turn started goes on to the end after the keys are let go. 0 turns it at once. A camera at the eyes (a first-person one, or a third-person one zoomed all the way in) turns the character with the camera at once.
+	TurnSpeed: number
 	--- How far above the character's feet its eyes are, in studs. The camera sits there during Play.
 	EyeHeight: number
 	--- Fires when the character sits down (true and the Seat) or stands up (false and the Seat it left).
@@ -6143,6 +6165,8 @@ declare extern type ScatterRule extends Instance with
 	ScaleRange: Vector2
 	--- If true, parts and characters bump into what it places, as into painted foliage marked solid. False by default.
 	CanCollide: boolean
+	--- If false, what it places casts no shadow, in the shadow maps or ray traced: for ground cover too small for its shadow to show (fine grass, weeds, leaf litter), which contact shadows still ground. Changing it makes its plants again. True by default.
+	CastShadow: boolean
 	--- 0 to 1: how far what it places leans with the ground's slope. 0 (the default) stands straight up, as trees grow; 1 stands square to the ground, as rocks and grass on a hillside do.
 	AlignToSlope: number
 	--- Studs what it places sinks into the ground (at scale 1; a bigger one sinks more), so a trunk or rock on a slope doesn't show its base. 0 by default.

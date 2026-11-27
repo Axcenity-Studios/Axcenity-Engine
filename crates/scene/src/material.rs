@@ -103,6 +103,7 @@ pub(crate) fn variant_material(standard: &StandardMaterial, assets: &Assets) -> 
         uv_offset: standard.offset,
         double_sided: standard.double_sided,
         translucency: 0.0,
+        glossy_leaf: false,
         terrain: None,
         surface_shader: standard
             .shader
@@ -411,10 +412,15 @@ pub(crate) fn model_sway(material: &ModelMaterial, transform: Mat4) -> Option<Sw
 }
 
 /// The sway of what fills the 1×1×1 box at `transform`: standing on the
-/// bottom of the box, or (`hangs`) hanging from its top.
+/// bottom of the box, or (`hangs`) hanging from its top. Leaves that only
+/// flutter (ivy on a wall, which mustn't lean) move too.
 pub(crate) fn box_sway(strength: f32, flutter: f32, hangs: bool, transform: Mat4) -> Option<Sway> {
-    // `filter` leaves out a NaN too.
-    let strength = Some(strength).filter(|&sway| sway > 0.0)?;
+    // `> 0.0` leaves out a NaN too.
+    let strength = if strength > 0.0 { strength } else { 0.0 };
+    let flutters = flutter > 0.0;
+    if strength == 0.0 && !flutters {
+        return None;
+    }
     // Half the box's height: how far up each of its axes reaches.
     let half_height =
         0.5 * (transform.x_axis.y.abs() + transform.y_axis.y.abs() + transform.z_axis.y.abs());
@@ -666,6 +672,27 @@ mod tests {
         assert_eq!(hung, Sway::hanging(9.0, 8.0, 0.4, 0.2));
         assert!(hung.height < 0.0 && !hung.is_still(), "{hung:?}");
         assert!((hung.reach() - sway.reach()).abs() < 1e-5);
+    }
+
+    #[test]
+    fn leaves_that_only_flutter_still_move() {
+        // Ivy on a wall: its leaves shiver, but the wall doesn't lean.
+        let ivy = ModelMaterial {
+            sway: 0.0,
+            flutter: 0.3,
+            ..ModelMaterial::default()
+        };
+        let box_of_it = Mat4::from_scale_rotation_translation(
+            Vec3::new(4.0, 8.0, 1.0),
+            Default::default(),
+            Vec3::new(0.0, 4.0, 0.0),
+        );
+        let sway = model_sway(&ivy, box_of_it).expect("it flutters");
+        assert_eq!((sway.strength, sway.flutter), (0.0, 0.3));
+        assert!(!sway.is_still() && sway.reach() > 0.0, "{sway:?}");
+        let curtain = ModelMaterial { hangs: true, ..ivy };
+        let hung = model_sway(&curtain, box_of_it).expect("it flutters");
+        assert!(hung.height < 0.0 && !hung.is_still(), "{hung:?}");
     }
     use crate::build_draw_list;
 

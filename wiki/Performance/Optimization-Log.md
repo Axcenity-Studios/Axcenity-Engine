@@ -22,6 +22,10 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 
 | Item | PR | Area | Headline (Measured) | Machine |
 |---|---|---|---|---|
+| Occlusion culling measured (not built); ScatterRule `CastShadow` off for Overgrown Street's ground cover; half-resolution traced shadows as a setting; probes, micro-shadowing and glossy leaves | 2026-11-27 | Render, terrain, project | Overgrown Street, 1996 × 703, pinned: non-RT 37.0 → 37.9 fps (casters 60,778 → 29,273, shadows 11.5 → 10.7 ms); RT 22.9 → 24.5 fps (traced shadows 16.1 → 12.8 ms), 27.6 at the Half setting (5.5 ms). Occlusion would hide 14k–33k of 57k items for 5–10% of prepass and scene | Desktop (Fedora) |
+| Ray traced scene: small still items grouped into BLASes, swaying plants bent within 32 studs, cascades left out under traced shadows, small plants' traced shadows to 55 studs and holes to 60; the GPU timer timing every frame | 2026-11-27 | Render | Overgrown Street with ray tracing, 1996 × 703, pinned: 19.8 → 22.8 fps (1% low 18.6 → 20.1); thread 43.5 → 30.1 ms, GPU 50.2 → 43.5 ms; debug editor 18.4 → 24.7 fps | Desktop (Fedora) |
+| Screen-space reflections, sky visibility on the sky's reflection, the wetness mask | 2026-11-26 | Render | Overgrown Street (Wetness 0.5), Ultra, 2560 × 1405: Screen-space reflections pass 0.077–0.078 ms, Scene pass 9.41 → 10.32–10.38 ms; as shown 43.4 → 41.4–41.5 frames a second (noisy) | Desktop |
+| Water traces rays only with ray traced reflections on; the ray traced scene parked, not freed, through frames without rays; painted water rebuilt in place and only when the flood crosses it; a Water stroke no longer rebuilds the foliage | 2026-11-26 | Render, scene, terrain | Desert Homestead's river view, Ultra, 1920 × 1080, ray-query device with every ray traced effect off: GPU 13.3 → 9.9 ms, frame's thread 9.26 → 4.18 ms (the same as a device without ray queries). The editor's `WaterLevel` drag 28.8 → 15.6 ms a frame (Uploads 15.35 → 0.26), a Water brush stroke 43.0 → 19.6 (draw list 19.6 → 0.9) | Desktop (Fedora) |
 | Shadow views draw each mesh once; lamps' faces kept while their still casters are, moving ones drawn over a kept copy; `ShadowStart` for a lamp in its fixture | 2026-11-26 | Render, scene | Desert Homestead at dusk, Ultra, 1920 × 1080: draw calls 10,019–11,957 → 4,101–4,613, Shadows pass 4.26–5.34 → 3.31–4.28 ms, frame's thread 7.69–9.36 → 6.71–7.92 ms, the same pixels | Desktop (Fedora) |
 | A plant's shadow thins out before it ends, TAA reads last frame through a spline; cut-outs in the near cascades only measured and left off | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080, six views: 199–252 → 196–246 frames a second (Shadows pass 0.07–0.11 ms dearer for 1,700–2,400 more caster draws; the spline 0.01 ms); with ray traced shadows and ambient occlusion 84–116 → 85–117, the crane view 90.9 → 87.5. A picture change, not a speed-up: the shadows' pop is a tenth of what it was, a turning frame a third nearer the settled one | Desktop (Fedora) |
 | Foliage shadows through the leaves' holes, the pipeline-first draw order on by default, a terrain's layers made ready once a frame, the frame's materials found by digest | 2026-11-26 | Render | Desert Homestead, Ultra, 1920 × 1080, six views: 187–246 → 200–254 frames a second with the shadows following the leaves (206–273 with whole cards, as before); the frame's thread 3.83–4.71 → 3.53–4.23 ms (Uploads 0.42 → 0.21, Materials 0.54 → 0.33); Shadows pass 0.13–0.42 ms dearer for the holes. Unity HDRP: 227–257 | Desktop (Fedora) |
@@ -70,6 +74,70 @@ Every significant optimization: the problem, its root cause, the fix, and what i
 | Culling, LOD | graphics Ph. 12–13 | Render | Edge views draw only what's seen; foliage cull distances | Desktop |
 
 ## Entries
+
+### Hidden geometry measured, plants without shadows, half-resolution traced shadows (2026-11-27)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | The owner's performance and visual brief for Overgrown Street (uncommitted on `homestead-shadows-and-thread`), with his decisions: measure before any GPU-driven or Hi-Z rewrite; shadow cuts only as choices; probes and a refit grade; glossy ivy and micro-shadowing |
+| **Evidence** | Measured |
+| **Problem** | Overgrown Street at 37 fps without ray tracing and 23 with it (1996 × 703, the owner's Ultra). The brief proposed indirect drawing, two-phase Hi-Z, and shadow cuts |
+| **Root cause** | Not draw calls (6,500 a frame; the thread is 4 ms of a 26.5 ms GPU frame) and mostly not hidden items: `AXCENITY_OCCLUSION_PROBE` (a read-back of the prepass depth that leaves out what lies behind it) hides 14,400–32,700 draws in four views yet saves only 5–10% of the prepass and scene (37.2 → 39.2 fps), below the threshold `docs/rendering/performance.md` sets, so no HZB was built. What costs is shadow work through leaf cards: 60,778 casters, and 16 ms of traced shadows |
+| **Solution** | A ScatterRule's `CastShadow` (default on; on each `FoliageInstance` as `shadow`, kept in `foliage.json` and `.axscatter` only when off), turned off by the project for five small ground-cover rules; `GraphicsSettings::ray_traced_shadow_resolution` (Full at Ultra, Half below unless chosen): one ray per 2 × 2 block, which pixel turning each frame, and a fill pass (`cs_fill`) that takes the nearest traced neighbours on the same plane and facing |
+| **Affected components** | `core/src/terrain.rs`, `procedural/src/terrain_scatter.rs`, `terrain/src/files.rs`, `project/src/scatter_palettes.rs`, `scene/src/foliage.rs`, `render-types/src/graphics.rs`, `render/src/renderer/ray_shadows.rs`, `ray_shadows.wgsl`, `renderer/occlusion_probe.rs` |
+| **Before → after** | Two alternating rounds: non-RT 37.0/36.8 → 37.9/37.9 fps, GPU 26.5 → 25.9 ms, shadows 11.5 → 10.7 ms; RT 22.9/22.9 → 24.5/24.6 fps, GPU 43.3 → 40.3, traced shadows 16.1 → 12.8; at Half 27.7/27.6 fps, traced shadows 5.5 ms. The new engine alone on the old project: the same frame rates (micro-shadowing and glossy leaves cost nothing measurable); the probes add 0.2 ms to the scene pass |
+| **Method** | Release player `--bench 300`, 1996 × 703, the owner's graphics, pinned to CPUs 0-7,16-23; old and new engine on frozen copies of the old and new project; stills of four views from the still tool compared pixel by pixel |
+| **Hardware** | Desktop (Ryzen 9 9950X3D, RX 9070 XT, Fedora) |
+| **Trade-offs** | Plants with `CastShadow` off cast no shadow at all with ray traced shadows on (contact shadows are skipped where rays trace); without ray tracing contact shadows still ground them. Half resolution is softer at a shadow's edge on thin casters; Ultra stays Full. Probes darken the street under the canopy (ungraded luma 0.27 → 0.15), so the project's grade was refit |
+| **Detail** | `docs/rendering/performance.md`, "Overgrown Street's draws and hidden items" and "Overgrown Street: plants without shadows"; `docs/rendering/ray-tracing.md` |
+
+### The ray traced scene by groups, and what traced shadows leave the maps (2026-11-27)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | Paul's report: Overgrown Street at 16 to 18 fps in the editor with ray tracing (uncommitted on `homestead-shadows-and-thread`) |
+| **Evidence** | Measured |
+| **Problem** | The editor seemed slow against the player (43.7 fps), but the player at the editor's settings and viewport was 19 fps: both drew 57,000 items and traced 113,000. The frame's thread spent 14.5 ms on the ray scene and 10 ms in wgpu's submit and encoding; the GPU 16.5 ms on ray traced shadows and 11.3 on shadow maps. Along the way: the GPU timer had read only every other frame, of one parity, so with far cascades taking turns runs differed by 5 ms (editor 30.3, player 24.2, both really 26 to 28) |
+| **Root cause** | One TLAS instance per item (each walked by our code and twice by wgpu); every traced plant's item read each frame to decide its sway though the bending budget ran out at 26 studs; the item loop on one thread; all four cascades drawn though traced shadows are used whole to 221 studs |
+| **Solution** | Small still items (≤ 256 triangles) grouped into one BLAS per square of ground, their own meshes placed by transform (`renderer/ray_groups.rs`), built only when their items change; bending within 32 studs only; the item loop and the groups' fingerprints on the renderer's threads; the nearest cascades wholly inside the traced reach not drawn and not taken as views; and, the owner's choice, small plants' traced shadows to 55 studs and cut-outs' holes to 60. The GPU timer reads back through four buffers |
+| **Affected components** | `crates/render/src/renderer/ray_tracing.rs`, `ray_groups.rs`, `lighting.rs`, `scene.rs`, `gpu_timer.rs` |
+| **Before → after** | Player, two alternating rounds: as shown 19.8 → 22.8 fps, 1% low 18.6 → 20.1; thread 43.5 → 30.1 ms (ray scene 14.6 → 8.6, submit 6.3 → 1.3, encoding 3.8 → 2.3); GPU 50.2 → 43.5 ms (shadow maps 11.5 → 5.3, ray traced shadows 16.6 → 16.2). Debug editor 18.4 → 24.7 fps |
+| **Method** | Release player `--bench 300` at 1996 × 703 with the owner's graphics, pinned to CPUs 0-7,16-23, old rules by `AXCENITY_NO_RAY_GROUPS`, `AXCENITY_NO_RAY_REACHES`, `AXCENITY_NO_CASCADE_SKIP`; each change alone by lifting it; laps timed inside `RayScene::prepare`; four stills (the still tool with the scene's ScatterRules made) compared pixel by pixel |
+| **Hardware** | Desktop (Ryzen 9 9950X3D, RX 9070 XT, Fedora) |
+| **Trade-offs** | Grouped BLASes trace about 1.1 ms slower on the GPU and hold their items' triangles (5.4 M in Overgrown Street). The holes' distance darkens what's past 60 studs (a view over the canopy: mean −2.2 levels, 5% of pixels by more than 8; eye height −0.5) with an edge where it starts; the small plants' distance measured nothing. Everything else changes no pixel by more than 3 levels |
+| **Detail** | `docs/rendering/performance.md`, "Overgrown Street with ray tracing"; `docs/rendering/ray-tracing.md` |
+
+### Screen-space reflections and the wetness mask (2026-11-26)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | Paul's request from the Overgrown Street showcase: wet ground that reads as wet, not matte, with no white blotches |
+| **Evidence** | Measured |
+| **Problem** | With any `Wetness` the street's asphalt showed soft white blotches, so the scene ran dry and matte. Without ray tracing, a wet surface reflected only the probes and the sky's image, which nothing stands in front of. |
+| **Root cause** | The blotches were snow: `snow_lying`'s ragged edge added up to 0.45 of snow on level ground with no cover at all, and the weather code runs it whenever any weather is on (found with debug colours on the stills: the blotches were terrain pixels lit as diffuse, not reflections). The matte look: no screen-space reflections, no sky visibility for reflections. |
+| **Solution** | Snow comes in over the first 0.1 of cover. A screen-space reflection pass (`renderer/screen_reflections.rs`, High and Ultra) marches the prepass's depth and reads last frame's picture into frame binding 18; while it's on, `sky_open_along` shades the sky's share of a reflection where the sun's shadow maps show something close over the way it leaves. Water gathers in cracks and low spots first (height and occlusion maps, world noise; roughness 0.05–0.25). |
+| **Affected components** | `crates/render` (`screen_reflections.rs`, `screen_reflections.wgsl`, `lighting.wgsl`, `terrain.wgsl`, `shader.wgsl`, `decal.wgsl`, `scene.rs`, `gpu_timer.rs`), `crates/render-types` (`GraphicsSettings::screen_space_reflections`), editor settings and benchmark rows |
+| **Before → after** | Overgrown Street copy at Wetness 0.5, Ultra (MSAA, the preset), 2560 × 1405, `--bench 600`, two runs each, other agents' builds idle but the machine shared: SSR off 43.4 / 43.4 FPS as shown, Scene pass 9.411 / 9.405 ms (median); SSR on 41.4 / 41.5 FPS, Scene pass 10.315 / 10.384 ms, the SSR pass 0.077 / 0.078 ms. So about 1 ms a frame, nearly all of it the scene pass's four shadow-map reads a pixel for the sky's shading. Both bound by the GPU's shadows (cascade 4 drawn every other frame) |
+| **Method** | Release player, `--quality Ultra --graphics {"screen_space_reflections": false}` for off; GPU medians from timestamps |
+| **Hardware** | Desktop under Fedora (RX 9070 XT, radv) |
+| **Trade-offs** | Reflections a frame late (last frame's picture); the sky's shading is a heuristic from the sun's shadow maps |
+| **Detail** | `docs/rendering/reflections.md`, `docs/rendering/weather.md` |
+
+### Water's rays, the parked ray scene, and the editor's water drags (2026-11-26)
+
+| | |
+|---|---|
+| **Roadmap item / PR** | The owner's pick of four fixes from the seventh session's water report |
+| **Evidence** | Measured |
+| **Problem** | With every ray traced effect off, a device with ray queries paid the whole ray traced scene for water (+3.2 ms GPU, +3.1 ms of the frame's thread); a frame without rays freed the scene, so its return rebuilt every BLAS (4 s in Desert Homestead). Dragging `WaterLevel` over painted water uploaded 22 new meshes a frame and kept the old ones in the renderer and the ray traced scene; a Water brush stroke cost 20 ms a frame |
+| **Root cause** | `WaterMode::traces_rays` asked only for ray queries. `prepare_scene` freed the scene whenever nothing traced. A painted chunk's mesh key held what it was built from, the flood's level among it. Every water stamp bumped `TerrainData::revision`, which keys the painted foliage, and marked every chunk under the brush |
+| **Solution** | Water traces with ray traced reflections on (ADR-0025). The scene is parked through frames without rays while an effect is on, freed when none is, and a parked scene drops BLASes of meshes leaving the GPU. A painted chunk keeps one key and changes its version, rebuilt only when the flood crosses one of its levels, and reads its neighbours only through the ring of cells around it. Foliage follows `revision_apart_from_water`; a stamp writes and marks only the cells it changes |
+| **Affected components** | `crates/render` (`renderer/water.rs`, `renderer/ray_tracing.rs` `prepare_scene`, `may_trace_rays`, `forget_meshes`, `RayTracingStats::meshes_built`, `renderer/undrawn.rs`), `crates/scene` (`terrain_water.rs`, `foliage.rs`), `crates/terrain` (`brush.rs`), `crates/core` (`TerrainData::revision_apart_from_water`) |
+| **Before → after** | River view, effects off on a ray-query device: GPU 13.31 → 9.90 ms, thread 9.26 → 4.18; with ray traced reflections Medium or every effect on, unchanged (13.3, 28.3–28.7 ms). `WaterLevel` drag: 28.8 → 15.6 ms a frame (39.0 → 15.6 on a ray-query device, 39.1 → 25.8 with ray traced reflections, the ray scene steady at 1,517 meshes instead of +22 a frame). Water brush held 27.0 → 19.3, stroke 43.0 → 19.6 |
+| **Method** | The still tool on a frozen copy of the project, "before" from a worktree of `ff769d90`, pinned; its `vary` option for the slider and a new `stamp` option for the brush. CPU: frames 8 and on by `CpuSection`; GPU: one frame's pass times |
+| **Hardware** | Desktop under Fedora |
+| **Trade-offs** | A parked scene holds its BLASes' memory while an effect is on and nothing traces (until a mesh leaves the GPU or every effect is turned off). The same change gave the waves a spread set with variation and calmed them at the shore by the scene copy's depth (Medium and up): a picture change, its GPU cost within 0.1 ms |
+| **Detail** | `benchmarks/cross-engine/homestead/results.md`, "Water: rays only with ray traced reflections…"; `docs/rendering/water.md`, `docs/rendering/ray-tracing.md`, `docs/terrain.md` |
 
 ### Shadow views by mesh, lamp faces kept, and the porch lamp's lantern (2026-11-26)
 

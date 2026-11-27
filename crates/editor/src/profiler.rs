@@ -577,6 +577,10 @@ impl Profiler {
                     millis(summary.cpu_peak)
                 ),
             );
+            // The CPU time is the game's steps below plus the viewport
+            // drawing the frame, usually the larger part in a big scene
+            // (its sections are in `AXCENITY_FRAME_LOG`'s lines).
+            row(ui, "Rendering CPU", millis(summary.render_cpu));
             row(ui, "GPU time", gpu_text(summary.gpu, summary.gpu_timing));
         });
         grid.section("Memory", |ui| {

@@ -23,7 +23,9 @@ const SWAY_WIND: f32 = 20.0;
 fn swayed_at(world: vec3<f32>, sway: vec4<f32>, clock: vec4<f32>) -> vec3<f32> {
     let wind = clock.yw;
     let speed = length(wind);
-    if sway.z <= 0.0 || speed < 1e-3 {
+    // Still: no lean and no flutter (fract(sway.w); its whole part is the
+    // decal role), or no wind.
+    if (sway.z <= 0.0 && fract(sway.w) <= 0.0) || speed < 1e-3 {
         return world;
     }
     let up = clamp((world.y - sway.x) * sway.y, 0.0, 1.0);

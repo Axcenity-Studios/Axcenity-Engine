@@ -24,7 +24,7 @@ use bytemuck::{Pod, Zeroable};
 use super::gpu::{self, create_pipeline, target_bytes};
 use super::lighting::linear_color;
 use super::types::HDR_FORMAT;
-use crate::{DrawList, EffectiveGraphics, ReflectionQuality, Water};
+use crate::{DrawList, EffectiveGraphics, RayTracedReflections, ReflectionQuality, Water};
 
 /// The copy's format: light in rgb, distance in a (filterable, so the
 /// water shader reads it through the occlusion slot's sampler).
@@ -70,10 +70,13 @@ impl WaterMode {
     }
 
     /// Whether its reflections are traced by rays (LE5): it reflects the
-    /// screen and the GPU traces rays (Settings > Graphics > Hardware ray
-    /// tracing).
+    /// screen, the GPU traces rays (Settings > Graphics > Hardware ray
+    /// tracing) and ray traced reflections are on. Like every ray traced
+    /// effect, it's never paid for while its setting is off (ADR-0025).
     pub(super) fn traces_rays(self, graphics: &EffectiveGraphics) -> bool {
-        self == WaterMode::Reflected && graphics.ray_queries
+        self == WaterMode::Reflected
+            && graphics.ray_queries
+            && graphics.ray_traced_reflections != RayTracedReflections::Off
     }
 }
 
@@ -240,9 +243,11 @@ impl WaterPass {
         }
     }
 
-    /// Makes or frees what traces water's reflections (LE5): `rays` is the
-    /// ray traced scene's TLAS and surfaces, and how far rays reach, while
-    /// they're traced this frame. `layouts` as for [`WaterPass::new`].
+    /// Makes or unbinds what traces water's reflections (LE5): `rays` is
+    /// the ray traced scene's TLAS and surfaces, and how far rays reach,
+    /// while they're traced this frame. A frame without them drops only the
+    /// bindings: the pipeline stays, so water coming back into the list
+    /// doesn't make its shader again. `layouts` as for [`WaterPass::new`].
     pub(super) fn trace(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -250,7 +255,9 @@ impl WaterPass {
         rays: Option<(&wgpu::Tlas, &wgpu::Buffer, f32)>,
     ) {
         let Some((tlas, surfaces, reach)) = rays else {
-            self.traced = None;
+            if let Some(traced) = &mut self.traced {
+                traced.group = None;
+            }
             return;
         };
         let samples = self.samples;

@@ -174,6 +174,14 @@ ScatterRule.CanCollide: boolean
 
 If true, parts and characters bump into what it places, as into painted foliage marked solid. False by default.
 
+#### CastShadow
+
+```luau
+ScatterRule.CastShadow: boolean
+```
+
+If false, what it places casts no shadow, in the shadow maps or ray traced: for ground cover too small for its shadow to show (fine grass, weeds, leaf litter), which contact shadows still ground. Changing it makes its plants again. True by default.
+
 #### AlignToSlope
 
 ```luau

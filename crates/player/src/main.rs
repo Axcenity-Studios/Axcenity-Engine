@@ -769,6 +769,9 @@ struct App {
     /// `UserInputService.MouseBehavior` and `MouseIconEnabled` as last
     /// applied to the cursor.
     mouse: (MouseBehavior, bool),
+    /// Whether the cursor is held for looking because the camera is zoomed
+    /// in to the eyes (`Controllers::zoomed_to_eyes`), as last applied.
+    eyes_look: bool,
     /// False while another window has the keyboard.
     focused: bool,
     /// True while the right mouse button is held, when moving the mouse turns the camera.
@@ -904,6 +907,7 @@ impl App {
             input: PlayerInput::new(map),
             held_keys: BTreeSet::new(),
             mouse: (MouseBehavior::Default, true),
+            eyes_look: false,
             focused: true,
             looking: false,
             look_dx: 0.0,
@@ -1336,9 +1340,14 @@ impl App {
             return self.pointer;
         };
         let (behavior, icon) = self.sim.scripts.mouse();
-        let (lock, visible) = input::cursor_mode(behavior, icon, self.looking);
-        if (behavior, icon) != self.mouse {
+        // Zoomed in to the eyes, the mouse looks round: the cursor is held
+        // and hidden as while the right button is.
+        let eyes = self.sim.characters.zoomed_to_eyes(&self.sim.world)
+            && !self.sim.scripts.camera_scripted();
+        let (lock, visible) = input::cursor_mode(behavior, icon, self.looking || eyes);
+        if (behavior, icon) != self.mouse || eyes != self.eyes_look {
             self.mouse = (behavior, icon);
+            self.eyes_look = eyes;
             capture_mouse(window, lock != CursorLock::Free && self.focused);
             window.set_cursor_visible(visible);
         }
@@ -1705,6 +1714,8 @@ mod skinning_tests;
 
 #[cfg(test)]
 mod default_humanoid_tests;
+#[cfg(test)]
+mod eyes_tests;
 
 #[cfg(test)]
 mod shader_tests;

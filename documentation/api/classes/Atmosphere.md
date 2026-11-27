@@ -62,3 +62,35 @@ Atmosphere.Haze: number
 
 Adds dust and haze to the air, from 0 to 10: a paler horizon, a wider glow around the sun, a dimmer, redder sun, and thicker fog (1 + Haze times as thick).
 
+#### FogDensity
+
+```luau
+Atmosphere.FogDensity: number
+```
+
+How many times thicker the height fog is than Density and Haze make it, from 0 (no fog, the sky kept) to 100, leaving the sky and the sun's color as they are. 1 by default.
+
+#### FogHeight
+
+```luau
+Atmosphere.FogHeight: number
+```
+
+The height in studs (world Y) at and below which the fog is thickest; above it, it thins by FogFalloff. Offset lowers it further, by up to 250 studs. 0 by default.
+
+#### FogFalloff
+
+```luau
+Atmosphere.FogFalloff: number
+```
+
+How many studs above FogHeight the fog thins by about two thirds (e): small values keep it low to the ground as a mist, large ones spread it up the sky. 50 by default, at least 0.1.
+
+#### FogStart
+
+```luau
+Atmosphere.FogStart: number
+```
+
+How many studs from the camera the fog starts: nearer is clear of it, so the foreground keeps its contrast. 0 by default.
+

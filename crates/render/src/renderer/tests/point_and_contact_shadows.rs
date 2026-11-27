@@ -369,6 +369,7 @@ fn contact_shadows_alone_draw_the_prepass_but_not_ambient_occlusion() {
     let settings = |occlusion, contact| GraphicsSettings {
         ambient_occlusion: Some(occlusion),
         contact_shadows: Some(contact),
+        screen_space_reflections: Some(false),
         ..with_shadows(ShadowQuality::Off)
     };
     use crate::AmbientOcclusion::{High, Off};

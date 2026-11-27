@@ -41,6 +41,12 @@ fn hello_particles_looks_the_same_with_gpu_particles_allowed() {
     let mut frames = Vec::new();
     for compute in [true, false] {
         let mut renderer = TextureRenderer::new(&device, &queue, 160, 90);
+        // Screen-space reflections need compute shaders too: off in both,
+        // so only the particles' path is compared.
+        renderer.set_graphics(&axcenity_render::GraphicsSettings {
+            screen_space_reflections: Some(false),
+            ..axcenity_render::GraphicsSettings::default()
+        });
         if !compute {
             renderer.limit_capabilities(&Capabilities {
                 compute_shaders: false,

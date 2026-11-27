@@ -562,6 +562,23 @@ fn a_gltf_materials_extras_say_how_it_moves_in_the_wind() {
         (false, 0.5)
     );
     assert_eq!(hangs(r#"{"axcenity_sway": 0.5}"#), (false, 0.5));
+
+    // A glossy leaf says so the same way.
+    let glossy = |extras: &str| {
+        let raw = serde_json::value::RawValue::from_string(extras.to_owned()).unwrap();
+        let material = super::wind_of(&Some(raw));
+        (material.glossy_leaf, material.flutter)
+    };
+    assert_eq!(
+        glossy(r#"{"axcenity_flutter": 0.05, "axcenity_glossy_leaf": true}"#),
+        (true, 0.05)
+    );
+    assert_eq!(
+        glossy(r#"{"axcenity_flutter": 0.05, "axcenity_glossy_leaf": 1}"#),
+        (true, 0.05)
+    );
+    assert_eq!(glossy(r#"{"axcenity_flutter": 0.05}"#), (false, 0.05));
+    assert!(!super::wind_of(&None).glossy_leaf);
 }
 
 #[test]

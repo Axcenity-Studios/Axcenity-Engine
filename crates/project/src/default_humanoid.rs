@@ -116,6 +116,8 @@ impl End {
 const JOG_SPEED: f64 = 5.36;
 const SPRINT_SPEED: f64 = 8.25;
 const CROUCH_WALK_SPEED: f64 = 0.75;
+/// The library's own walk, metres a second (`Stroll`, below).
+const STROLL_SPEED: f64 = 0.97;
 /// Studs per metre, as a `f64` for the speeds below.
 const STUDS: f64 = 5.0 / 1.75;
 
@@ -363,11 +365,15 @@ pub fn default_humanoid_animation_files() -> Vec<(String, String)> {
         if let Some(next) = state.end.next() {
             entry["returns"] = serde_json::json!({ "to": next, "when": "finished", "blend": 0.2 });
         }
+        if state.name == "Walk" {
+            entry["motion"] = locomotion();
+            entry["speed"] = serde_json::json!(1.0);
+        }
         states.push(entry);
     }
     let machine = serde_json::json!({
         "format_version": 2,
-        "parameters": [],
+        "parameters": [{ "type": "Number", "name": "Speed", "default": 0.0 }],
         "default_state": "Idle",
         "states": states,
         "transitions": [],
@@ -377,6 +383,31 @@ pub fn default_humanoid_animation_files() -> Vec<(String, String)> {
         pretty(&machine),
     ));
     files
+}
+
+/// The default Walk's motion: a blend tree by `Speed` (the Humanoid keeps
+/// it at how fast the feet go) from the library's walk (the Stroll state's
+/// take, at its own 2.8 studs a second) through Walk's take at `WalkSpeed`
+/// (16) to Run's at `RunSpeed` (32), each played as fast as its state is,
+/// so the strides keep up with the ground at every speed between and the
+/// character eases from a walk into a run (2026-11-26). All three put the
+/// left foot forward at the start of their cycle, so they mix in step.
+fn locomotion() -> serde_json::Value {
+    let clip = |name: &str| format!("{DEFAULT_HUMANOID_CLIPS_FOLDER}/{name}.anim.json");
+    let speed = |name: &str| {
+        STATES
+            .iter()
+            .find(|state| state.name == name)
+            .map_or(1.0, |state| state.speed)
+    };
+    serde_json::json!({ "blend_tree": {
+        "parameter": "Speed",
+        "children": [
+            { "clip": clip("Stroll"), "threshold": STROLL_SPEED * STUDS },
+            { "clip": clip("Walk"), "threshold": 16.0, "speed": speed("Walk") },
+            { "clip": clip("Run"), "threshold": 32.0, "speed": speed("Run") },
+        ],
+    }})
 }
 
 fn pretty(value: &serde_json::Value) -> String {
@@ -501,6 +532,7 @@ pub fn default_character(world: &mut World, position: Vector3) -> InstanceId {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axcenity_anim::files::Motion;
     use axcenity_anim::{ClipFile, StateMachineFile};
 
     /// The JSON chunk of a GLB file.
@@ -549,6 +581,15 @@ mod tests {
         for state in ["Idle", "Walk", "Run", "Jump", "Fall", "Sit"] {
             assert!(machine.state(state).is_some(), "{state}");
         }
+        // Walk blends walking into running by the Humanoid's Speed.
+        let Motion::BlendTree(tree) = &machine.state("Walk").unwrap().motion else {
+            panic!("Walk is a blend tree");
+        };
+        assert_eq!(tree.parameter, "Speed");
+        let thresholds: Vec<f64> = tree.children.iter().map(|c| c.threshold).collect();
+        assert!((thresholds[0] - 2.77).abs() < 0.01, "{thresholds:?}");
+        assert_eq!(thresholds[1..], [16.0, 32.0]);
+        assert!(tree.children[2].speed > tree.children[1].speed);
         // Every take of the file can be played by a state, but the
         // versions with root motion (clips of a creator's own).
         assert_eq!(takes.len(), 86);

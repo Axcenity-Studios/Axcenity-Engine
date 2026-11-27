@@ -571,7 +571,12 @@ fn apply_one(
         } else {
             placement.height_of(*level).clamp(0.0, 1.0)
         };
-        let water = data.water_mut_in(rect);
+        // Each cell's new level first, from the levels as they are; only
+        // the cells that change are written, so a stamp that changes
+        // nothing (the brush held still over water it has filled) marks no
+        // chunk as changed, and nothing is built again for it.
+        let current = data.water();
+        let mut changes = Vec::new();
         let mut index = 0;
         for z in rect.z0..rect.z1 {
             for x in rect.x0..rect.x1 {
@@ -580,24 +585,45 @@ fn apply_one(
                 if weight <= 0.0 {
                     continue;
                 }
-                let cell = &mut water[z * size_x + x];
-                if *erase {
+                let cell = current
+                    .get(z * size_x + x)
+                    .copied()
+                    .unwrap_or(axcenity_core::NO_WATER);
+                let level = if *erase {
                     // Only erase where the brush has meaningful coverage so
                     // feathered brush borders don't chop out distant cells.
                     if weight >= 0.25 {
-                        *cell = axcenity_core::NO_WATER;
+                        axcenity_core::NO_WATER
+                    } else {
+                        cell
                     }
-                } else if *cell >= 0.0 && weight < 1.0 {
+                } else if cell >= 0.0 && weight < 1.0 {
                     // Smoothly blend water levels at brush falloff borders when
                     // painting over existing water, avoiding harsh vertical steps.
                     let blend = (weight * brush.strength).clamp(0.0, 1.0);
-                    *cell += (target - *cell) * blend;
+                    cell + (target - cell) * blend
                 } else {
-                    *cell = target;
+                    target
+                };
+                if level.to_bits() != cell.to_bits() {
+                    changes.push((x, z, level));
                 }
             }
         }
-        return rect;
+        let Some(changed) = changes
+            .iter()
+            .fold(None, |bounds: Option<SampleRect>, &(x, z, _)| {
+                let one = SampleRect::new(x, z, x + 1, z + 1);
+                Some(bounds.map_or(one, |bounds| bounds.union(one)))
+            })
+        else {
+            return SampleRect::default();
+        };
+        let water = data.water_mut_in(changed);
+        for (x, z, level) in changes {
+            water[z * size_x + x] = level;
+        }
+        return changed;
     }
 
     if !operation.sculpts() {

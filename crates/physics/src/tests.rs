@@ -757,6 +757,7 @@ fn a_part_lands_on_colliding_foliage_and_falls_through_visual_foliage() {
             yaw: 0.0,
             scale: 1.0,
             collide,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         });

@@ -242,7 +242,17 @@ pub(super) const GROUPS: [(&str, &[&str]); 37] = [
     ("Fog", &["FogColor", "FogStart", "FogEnd"]),
     (
         "Atmosphere",
-        &["Density", "Offset", "Decay", "Glare", "Haze"],
+        &[
+            "Density",
+            "Offset",
+            "Decay",
+            "Glare",
+            "Haze",
+            "FogDensity",
+            "FogHeight",
+            "FogFalloff",
+            "FogStart",
+        ],
     ),
     ("Clouds", &["Cover", "Density", "Speed", "Direction"]),
     (
@@ -271,6 +281,11 @@ pub(super) const GROUPS: [(&str, &[&str]); 37] = [
             "Contrast",
             "Saturation",
             "TintColor",
+            "ShadowTint",
+            "HighlightTint",
+            "Balance",
+            "Curve",
+            "CurvePivot",
             "LookupTable",
             "Posterize",
             "Palette",
@@ -404,6 +419,7 @@ pub(super) const GROUPS: [(&str, &[&str]); 37] = [
             "Crouch",
             "CrouchHeight",
             "CrouchSpeedScale",
+            "TurnSpeed",
             "CameraDistance",
             "CameraMinZoomDistance",
             "CameraMaxZoomDistance",
@@ -541,6 +557,7 @@ pub fn is_advanced(class: ClassName, name: &str) -> bool {
             "MoveDirection",
             "PlatformStand",
             "Sit",
+            "TurnSpeed",
         ]
     } else {
         match class {

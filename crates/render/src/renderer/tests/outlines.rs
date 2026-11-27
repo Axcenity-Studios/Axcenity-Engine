@@ -15,6 +15,7 @@ fn renderer(device: &wgpu::Device, queue: &wgpu::Queue, aa: AntiAliasing) -> Tex
         anti_aliasing: Some(aa),
         ambient_occlusion: Some(AmbientOcclusion::Off),
         contact_shadows: Some(false),
+        screen_space_reflections: Some(false),
         volumetric_fog: Some(false),
         ..GraphicsSettings::preset(Quality::High)
     });

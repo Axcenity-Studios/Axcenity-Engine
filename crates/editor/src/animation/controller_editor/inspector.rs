@@ -509,6 +509,7 @@ impl ControllerDoc {
                 Motion::Clip(clip) if !clip.is_empty() => vec![BlendChild {
                     clip: clip.clone(),
                     threshold: 0.0,
+                    speed: 1.0,
                 }],
                 _ => Vec::new(),
             };
@@ -1034,11 +1035,13 @@ impl ControllerDoc {
                 .fold(6.0_f64, f64::max);
             let mut remove = None;
             egui::Grid::new("tree children")
-                .num_columns(4)
+                .num_columns(5)
                 .spacing([6.0, 4.0])
                 .show(ui, |ui| {
                     ui.weak("Clip");
                     ui.weak("Threshold");
+                    ui.weak("Speed")
+                        .on_hover_text("Plays this clip this many times as fast, so its stride keeps up with its threshold");
                     ui.weak("Share");
                     ui.end_row();
                     for (c, child) in tree.children.iter_mut().enumerate() {
@@ -1050,6 +1053,12 @@ impl ControllerDoc {
                             );
                             ui.add(egui::DragValue::new(&mut child.threshold).speed(0.05));
                         });
+                        ui.add(
+                            egui::DragValue::new(&mut child.speed)
+                                .speed(0.01)
+                                .range(0.05..=10.0)
+                                .suffix("×"),
+                        );
                         let share = weights.as_ref().and_then(|w| w.get(c)).copied().unwrap_or(0.0);
                         ui.add(
                             egui::ProgressBar::new(share as f32)
@@ -1075,6 +1084,7 @@ impl ControllerDoc {
                     tree.children.push(BlendChild {
                         clip: String::new(),
                         threshold,
+                        speed: 1.0,
                     });
                 }
                 if ui
@@ -1123,6 +1133,7 @@ impl ControllerDoc {
                 .map(|(word, threshold)| BlendChild {
                     clip: clip_named(clips, word, folder.as_deref()).unwrap_or_default(),
                     threshold,
+                    speed: 1.0,
                 })
                 .collect();
             self.file.states[index].motion = Motion::BlendTree(BlendTree {

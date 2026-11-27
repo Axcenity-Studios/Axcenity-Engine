@@ -337,6 +337,21 @@ fn generated_foliage_is_never_saved_and_goes_with_its_rules() {
             .all(|(name, _)| *name != axcenity_terrain::files::FOLIAGE_FILE)
     );
 
+    // They cast shadows until the rule's `CastShadow` is turned off, which
+    // makes them again.
+    assert!(
+        world
+            .terrain(land)
+            .unwrap()
+            .generated_foliage()
+            .all(|i| i.shadow)
+    );
+    set(&mut world, trees, "CastShadow", Value::Bool(false));
+    assert!(scatter.update(&mut world) > 0);
+    let data = world.terrain(land).unwrap();
+    assert!(data.generated_count() > 100);
+    assert!(data.generated_foliage().all(|i| !i.shadow && i.collide));
+
     // Switched off, its plants go.
     set(&mut world, trees, "Enabled", Value::Bool(false));
     scatter.update(&mut world);

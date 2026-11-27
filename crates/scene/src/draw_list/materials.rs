@@ -289,6 +289,7 @@ pub(super) fn model_material(material: &ModelMaterial) -> Material {
         uv_offset: material.uv_offset,
         double_sided: material.double_sided,
         translucency: material.translucency,
+        glossy_leaf: material.glossy_leaf,
         terrain: None,
         shading: match material.shading {
             ModelShading::Standard => Shading::Standard,

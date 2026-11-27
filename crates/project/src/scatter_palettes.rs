@@ -259,6 +259,9 @@ struct ItemRecord {
     max_scale: f32,
     #[serde(default)]
     collide: bool,
+    /// Left out while it casts a shadow (the default).
+    #[serde(default = "casts", skip_serializing_if = "is_true")]
+    shadow: bool,
     /// Degrees of random turn, 0 to 360.
     #[serde(default = "full_turn")]
     rotation: f32,
@@ -442,6 +445,14 @@ fn full_turn() -> f32 {
     360.0
 }
 
+fn casts() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
 impl From<&ScatterItem> for ItemRecord {
     fn from(item: &ScatterItem) -> Self {
         Self {
@@ -451,6 +462,7 @@ impl From<&ScatterItem> for ItemRecord {
             min_scale: item.min_scale,
             max_scale: item.max_scale,
             collide: item.collide,
+            shadow: item.shadow,
             rotation: item.rotation,
             align_to_slope: item.align_to_slope,
             sink: item.sink,
@@ -471,6 +483,7 @@ impl ItemRecord {
             min_scale: finite(self.min_scale, 1.0),
             max_scale: finite(self.max_scale, 1.0),
             collide: self.collide,
+            shadow: self.shadow,
             rotation: finite(self.rotation, 360.0).clamp(0.0, 360.0),
             align_to_slope: finite(self.align_to_slope, 0.0).clamp(0.0, 1.0),
             sink: finite(self.sink, 0.0),
@@ -558,6 +571,7 @@ mod tests {
                 min_scale: 0.5,
                 max_scale: 2.0,
                 collide: true,
+                shadow: false,
                 rotation: 45.0,
                 align_to_slope: 0.75,
                 sink: 0.3,
@@ -578,6 +592,9 @@ mod tests {
         let text = palette.to_json();
         assert!(text.contains("\"prop:Rock\""), "{text}");
         assert!(text.contains("\"assets/models/Fern.glb\""), "{text}");
+        // Only the item that casts no shadow says so.
+        assert_eq!(text.matches("\"shadow\": false").count(), 1, "{text}");
+        assert!(!text.contains("\"shadow\": true"), "{text}");
         assert_eq!(ScatterPalette::from_json(&text).unwrap(), palette);
     }
 
@@ -649,6 +666,7 @@ mod tests {
     fn an_old_palette_reads_with_open_masks_and_no_decals_and_saves_as_the_same_file() {
         let read = ScatterPalette::from_json(OLD_FILE).unwrap();
         assert_eq!(read.items.len(), 2);
+        assert!(read.items.iter().all(|item| item.shadow));
         assert!(read.items.iter().all(|item| item.mask.is_open()));
         assert!(
             read.items

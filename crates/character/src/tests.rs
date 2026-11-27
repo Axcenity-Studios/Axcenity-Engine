@@ -782,7 +782,18 @@ fn a_first_person_controller_moves_exactly_like_a_third_person_one() {
     for (name, build, inputs, crossed) in courses {
         let third = course(ClassName::ThirdPersonController, build, &inputs);
         let first = course(ClassName::FirstPersonController, build, &inputs);
-        assert_eq!(first, third, "{name}");
+        // The third-person one eases round to walk backward, about the
+        // middle of its box: that's rounding, not a move.
+        let near = |a: Vector3, b: Vector3| {
+            (a.x - b.x).abs() < 1e-5 && (a.y - b.y).abs() < 1e-5 && (a.z - b.z).abs() < 1e-5
+        };
+        assert_eq!(first.len(), third.len(), "{name}");
+        for (frame, (a, b)) in first.iter().zip(&third).enumerate() {
+            assert!(
+                near(a.0, b.0) && a.1 == b.1,
+                "{name}, frame {frame}: {a:?} against {b:?}"
+            );
+        }
         assert!(crossed(&first), "{name}: ended at {:?}", last(&first));
     }
 }
@@ -885,11 +896,84 @@ fn the_wheel_zooms_the_third_person_camera_between_its_limits() {
         assert!((zoomed(&world, &controllers) - 8.0).abs() < 1e-3);
     }
 
-    // Fully in, the camera comes to half a stud from where it looks.
-    set(&mut world, controller, "CameraMinZoomDistance", 0.0);
+    // A closest zoom over half a stud keeps the camera behind.
+    set(&mut world, controller, "CameraMinZoomDistance", 1.0);
     set(&mut world, controller, "CameraMaxZoomDistance", 128.0);
     run(&mut world, &mut controllers, wheel(100.0), 1);
-    assert!((zoomed(&world, &controllers) - 0.5).abs() < 1e-3);
+    assert!((zoomed(&world, &controllers) - 1.0).abs() < 1e-3);
+    assert!(!controllers.zoomed_to_eyes(&world));
+
+    // Fully in (half a stud), the camera goes to the eyes: a body with no
+    // eye bones sees from the point the camera looked at.
+    set(&mut world, controller, "CameraMinZoomDistance", 0.0);
+    run(&mut world, &mut controllers, wheel(100.0), 1);
+    assert!(controllers.zoomed_to_eyes(&world));
+    assert!(zoomed(&world, &controllers) < 1e-3);
+    // Out again, it's behind the character.
+    run(&mut world, &mut controllers, wheel(-1.0), 1);
+    assert!(!controllers.zoomed_to_eyes(&world));
+    assert!((zoomed(&world, &controllers) - 1.5).abs() < 1e-3);
+}
+
+#[test]
+fn zoomed_in_to_the_eyes_the_character_turns_with_the_camera_at_once() {
+    let (mut world, controller, body) = standing();
+    set(&mut world, controller, "CameraDistance", 0.5);
+    let mut controllers = Controllers::default();
+    let look = MoveInput {
+        look_dx: -300.0,
+        ..MoveInput::default()
+    };
+    run(&mut world, &mut controllers, look, 1);
+    let turned = orientation(&world, body).y;
+    let looked = (300.0_f32 * 0.003).to_degrees();
+    assert!((turned - looked).abs() < 1e-3, "{turned} against {looked}");
+    let view = controllers.view(&world).unwrap();
+    assert!((view.orientation.y - looked).abs() < 1e-3);
+}
+
+/// Right (D) held, with no camera turned: the way to walk is +X.
+fn right() -> MoveInput {
+    MoveInput {
+        right: true,
+        ..MoveInput::default()
+    }
+}
+
+#[test]
+fn a_character_eases_round_to_the_way_it_walks_and_finishes_the_turn() {
+    let (mut world, _controller, body) = standing();
+    let mut controllers = Controllers::default();
+    // A step turns part of the way, no faster than TurnSpeed (720° a
+    // second: 12° a frame).
+    run(&mut world, &mut controllers, right(), 1);
+    let first = orientation(&world, body).y;
+    assert!(
+        (-12.001..-1.0).contains(&first),
+        "first frame turned {first}"
+    );
+    let mut last = first;
+    for _ in 0..3 {
+        run(&mut world, &mut controllers, right(), 1);
+        let now = orientation(&world, body).y;
+        assert!(now < last && last - now <= 12.001, "{last} to {now}");
+        last = now;
+    }
+    // Let go, it goes on round to face +X, and settles there.
+    run(&mut world, &mut controllers, MoveInput::default(), 40);
+    let settled = orientation(&world, body).y;
+    assert!((settled + 90.0).abs() < 1e-3, "settled at {settled}");
+    run(&mut world, &mut controllers, MoveInput::default(), 5);
+    assert_eq!(orientation(&world, body).y, settled);
+}
+
+#[test]
+fn a_turn_speed_of_zero_turns_at_once() {
+    let (mut world, controller, body) = standing();
+    set(&mut world, controller, "TurnSpeed", 0.0);
+    let mut controllers = Controllers::default();
+    run(&mut world, &mut controllers, right(), 1);
+    assert!((orientation(&world, body).y + 90.0).abs() < 1e-3);
 }
 
 fn set_movement(world: &mut World, controller: InstanceId, name: &str) {

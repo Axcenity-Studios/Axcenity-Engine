@@ -1085,6 +1085,12 @@ fn item_settings(ui: &mut egui::Ui, item: &mut ScatterItem) {
         );
         ui.checkbox(&mut item.collide, "Solid");
         ui.end_row();
+        field(ui, "Shadow").on_hover_text(
+            "Off, it casts no shadow (shadow maps and ray traced): for ground cover too small \
+             for its shadow to show, which contact shadows still ground.",
+        );
+        ui.checkbox(&mut item.shadow, "Casts shadow");
+        ui.end_row();
         field(ui, "Rotation").on_hover_text(
             "How far each copy is turned at random about its up axis: 0 faces them all the same way.",
         );

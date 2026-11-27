@@ -455,6 +455,7 @@ fn bench_terrain_with_foliage() {
             yaw: random.next() * 360.0,
             scale: 0.8 + random.next() * 0.4,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         })

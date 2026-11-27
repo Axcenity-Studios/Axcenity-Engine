@@ -105,6 +105,8 @@ enum CompiledMotion {
         parameter: String,
         /// Each child's threshold and clip.
         children: Vec<(f64, Option<Clip>)>,
+        /// Each child's speed (above 0), in the same order.
+        rates: Vec<f64>,
     },
     Space {
         parameters: [String; 2],
@@ -163,6 +165,7 @@ impl CompiledState {
             CompiledMotion::Tree {
                 parameter,
                 children,
+                ..
             } => {
                 let thresholds: Vec<f64> = children.iter().map(|(t, _)| *t).collect();
                 Some(blend_weights(&thresholds, number(parameters, parameter)))
@@ -176,6 +179,44 @@ impl CompiledState {
                 Some(blend_space_weights(&points, value))
             }
         }
+    }
+}
+
+impl CompiledState {
+    /// How long one pass of its motion is now, in seconds, before the
+    /// state's speed: its clips' lengths by their shares, each over its
+    /// blend tree speed. 1 with nothing to play.
+    fn length(&self, parameters: &Parameters) -> f64 {
+        let playing: Vec<(f64, f64)> = match &self.motion {
+            CompiledMotion::Tree {
+                children, rates, ..
+            } => {
+                let weights = self.weights(parameters).unwrap_or_default();
+                children
+                    .iter()
+                    .zip(rates)
+                    .zip(weights)
+                    .filter(|(_, weight)| *weight > 0.0)
+                    .filter_map(|(((_, clip), rate), weight)| {
+                        Some((clip.as_ref()?.duration() / rate, weight))
+                    })
+                    .collect()
+            }
+            _ => self
+                .playing(parameters)
+                .into_iter()
+                .map(|(clip, weight)| (clip.duration(), weight))
+                .collect(),
+        };
+        let total: f64 = playing.iter().map(|(_, weight)| weight).sum();
+        if playing.is_empty() || total <= 0.0 {
+            return 1.0;
+        }
+        playing
+            .iter()
+            .map(|(length, weight)| length * weight)
+            .sum::<f64>()
+            / total
     }
 }
 
@@ -254,6 +295,17 @@ impl Compiled {
                                     let threshold =
                                         if child.threshold.is_finite() { child.threshold } else { 0.0 };
                                     (threshold, bind(&state.name, &child.clip, &mut problems))
+                                })
+                                .collect(),
+                            rates: tree
+                                .children
+                                .iter()
+                                .map(|child| {
+                                    if child.speed.is_finite() && child.speed > 0.0 {
+                                        child.speed.max(1e-3)
+                                    } else {
+                                        1.0
+                                    }
                                 })
                                 .collect(),
                         }
@@ -445,16 +497,7 @@ impl Compiled {
             return 1.0;
         };
         let speed = compiled.speed.abs().max(1e-3);
-        let playing = compiled.playing(parameters);
-        let length = if playing.is_empty() {
-            1.0
-        } else {
-            playing
-                .iter()
-                .map(|(clip, weight)| clip.duration() * weight)
-                .sum()
-        };
-        length.max(1.0 / 60.0) / speed
+        compiled.length(parameters).max(1.0 / 60.0) / speed
     }
 
     /// Whether `state`'s motion loops (its main clip's; a state with nothing

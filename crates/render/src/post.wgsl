@@ -37,6 +37,13 @@ struct Grading {
     tint: vec4<f32>,
     // x: the lookup table's size (0 none), y: how many palette colors.
     counts: vec4<f32>,
+    // Split toning. rgb: the shadow tint scaled to white's brightness, w:
+    // the balance (-1 to 1, above 0 more of the picture is highlights).
+    shadows: vec4<f32>,
+    // rgb: the highlight tint scaled likewise, w: 1 if split toning is on.
+    highlights: vec4<f32>,
+    // x: the S-curve's power (0: no curve), y: the shade it turns about.
+    curve: vec4<f32>,
     // sRGB.
     palette: array<vec4<f32>, 64>,
 }
@@ -310,14 +317,44 @@ fn looked_up(color: vec3<f32>) -> vec3<f32> {
     return mix(mix(r0, r1, f.y), mix(r2, r3, f.y), f.z);
 }
 
-// The finished, sRGB-encoded `input` graded: brightness, contrast,
-// saturation, tint, the lookup table, posterizing, then the palette.
+// An S-curve on each channel of `color` (0 to 1) of power `k` about
+// `pivot`, which it keeps: below it a power toe from black, above it the
+// same mirrored into white, meeting at the pivot with slope `k` on both
+// sides. Above a power of 1 it deepens shadows and lifts highlights,
+// rolling into black and white (slope 0 there) rather than clipping; below
+// 1 it flattens toward the pivot.
+fn s_curve(color: vec3<f32>, k: f32, pivot: f32) -> vec3<f32> {
+    let x = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
+    let low = pivot * pow(x / pivot, vec3<f32>(k));
+    let high = 1.0 - (1.0 - pivot) * pow((1.0 - x) / (1.0 - pivot), vec3<f32>(k));
+    return select(high, low, x < vec3<f32>(pivot));
+}
+
+// Split toning: dark colors multiplied by the shadow tint, light ones by
+// the highlight tint (each scaled to white's brightness, so the hue shifts
+// and the brightness stays), blended by brightness, which the balance
+// shifts.
+fn split_toned(color: vec3<f32>) -> vec3<f32> {
+    let light = dot(clamp(color, vec3<f32>(0.0), vec3<f32>(1.0)), vec3<f32>(0.2126, 0.7152, 0.0722));
+    let highlight = smoothstep(0.0, 1.0, clamp(light + 0.5 * grading.shadows.w, 0.0, 1.0));
+    return color * mix(grading.shadows.rgb, grading.highlights.rgb, highlight);
+}
+
+// The finished, sRGB-encoded `input` graded: brightness, contrast, the
+// S-curve, saturation, split toning, tint, the lookup table, posterizing,
+// then the palette.
 fn graded(input: vec3<f32>) -> vec3<f32> {
     let values = grading.values;
     var color = input + values.x;
     color = (color - 0.5) * (1.0 + values.y) + 0.5;
+    if grading.curve.x > 0.0 {
+        color = s_curve(color, grading.curve.x, grading.curve.y);
+    }
     let grey = dot(color, vec3<f32>(0.2126, 0.7152, 0.0722));
     color = mix(vec3<f32>(grey), color, 1.0 + values.z);
+    if grading.highlights.w > 0.5 {
+        color = split_toned(color);
+    }
     color = clamp(color * grading.tint.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
     if grading.counts.x > 1.5 {
         color = clamp(looked_up(color), vec3<f32>(0.0), vec3<f32>(1.0));

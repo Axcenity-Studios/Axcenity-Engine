@@ -55,6 +55,9 @@ fn settings(realtime_gi: bool) -> GraphicsSettings {
     GraphicsSettings {
         shadow_quality: Some(ShadowQuality::Medium),
         realtime_gi: Some(realtime_gi),
+        // They read last frame's picture, so a first frame differs from
+        // the next (tests/screen_reflections.rs).
+        screen_space_reflections: Some(false),
         ..GraphicsSettings::default()
     }
 }

@@ -339,7 +339,8 @@ impl FoliageSource {
 /// whether physics treats it as solid. `lean` (0 upright, 1 square to the
 /// ground) tilts it with the slope and `sink` (studs) lowers it into the
 /// ground; scatter rules (procedural worlds PW5) and the Scatter pane's
-/// palette items set them.
+/// palette items set them. `shadow` off, it casts no shadow, in the shadow
+/// maps or ray traced (a ScatterRule's or a palette item's `CastShadow`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct FoliageInstance {
     pub source: FoliageSource,
@@ -350,6 +351,7 @@ pub struct FoliageInstance {
     pub collide: bool,
     pub lean: f32,
     pub sink: f32,
+    pub shadow: bool,
 }
 
 impl FoliageInstance {
@@ -429,8 +431,13 @@ pub struct TerrainData {
     /// Bumped each time generated foliage changes (it isn't saved, so it
     /// doesn't bump `revision`).
     generated_version: u64,
+    /// Bumped by those changes that add or take away colliding foliage, so
+    /// a collider is only built again for them.
+    generated_collide_version: u64,
     /// Bumped by every change, to tell whether the terrain needs saving.
     revision: u64,
+    /// How many of those bumps were the painted water's alone.
+    water_revisions: u64,
     /// The generator settings (JSON) of the last generated landscape, saved
     /// with the terrain so the result can be made again.
     pub generation: Option<String>,
@@ -453,7 +460,9 @@ impl Clone for TerrainData {
             water_versions: self.water_versions.clone(),
             generated: self.generated.clone(),
             generated_version: self.generated_version,
+            generated_collide_version: self.generated_collide_version,
             revision: self.revision,
+            water_revisions: self.water_revisions,
             generation: self.generation.clone(),
         }
     }
@@ -531,7 +540,9 @@ impl TerrainData {
             water_versions: vec![1; chunks],
             generated: vec![GeneratedChunk::default(); chunks],
             generated_version: 0,
+            generated_collide_version: 0,
             revision: 0,
+            water_revisions: 0,
             generation: None,
         })
     }
@@ -539,6 +550,19 @@ impl TerrainData {
     /// This terrain's number: no other terrain data has had it.
     pub fn uid(&self) -> u64 {
         self.uid
+    }
+
+    /// A copy that keeps this one's [`uid`](Self::uid): for a change to the
+    /// generated foliage alone ([`World::terrain_generated_mut`]), which
+    /// leaves the heights, paint, water and painted foliage, and so
+    /// everything built from them by uid and revision, as they were.
+    ///
+    /// [`World::terrain_generated_mut`]: crate::World::terrain_generated_mut
+    pub fn clone_keeping_identity(&self) -> Self {
+        Self {
+            uid: self.uid,
+            ..self.clone()
+        }
     }
 
     /// Samples along X and along Z.
@@ -619,7 +643,12 @@ impl TerrainData {
         instances: Vec<FoliageInstance>,
     ) {
         let (chunks_x, _) = self.chunk_counts();
-        self.generated[cz * chunks_x + cx] = GeneratedChunk {
+        let slot = &mut self.generated[cz * chunks_x + cx];
+        let collides = |list: &[FoliageInstance]| list.iter().any(|instance| instance.collide);
+        if collides(&slot.instances) || collides(&instances) {
+            self.generated_collide_version += 1;
+        }
+        *slot = GeneratedChunk {
             key,
             instances: instances.into(),
         };
@@ -629,6 +658,9 @@ impl TerrainData {
     /// Forgets all generated foliage (it's made again when next asked).
     pub fn clear_generated(&mut self) {
         if self.generated.iter().any(|chunk| chunk.key != 0) {
+            if self.generated_foliage().any(|instance| instance.collide) {
+                self.generated_collide_version += 1;
+            }
             self.generated.fill(GeneratedChunk::default());
             self.generated_version += 1;
         }
@@ -637,6 +669,13 @@ impl TerrainData {
     /// Changes each time generated foliage does.
     pub fn generated_version(&self) -> u64 {
         self.generated_version
+    }
+
+    /// Changes each time generated foliage that collides comes or goes: a
+    /// collider built from this terrain is current while it and the
+    /// [`revision`](Self::revision) are.
+    pub fn generated_collide_version(&self) -> u64 {
+        self.generated_collide_version
     }
 
     /// Puts loaded foliage on this terrain without counting as an edit.
@@ -1008,6 +1047,7 @@ impl TerrainData {
                 yaw: instance.yaw,
                 scale: instance.scale,
                 collide: instance.collide,
+                shadow: instance.shadow,
                 lean: instance.lean,
                 sink: instance.sink,
             })
@@ -1018,6 +1058,13 @@ impl TerrainData {
     /// Bumped by every change.
     pub fn revision(&self) -> u64 {
         self.revision
+    }
+
+    /// Bumped by every change but the painted water's: what sits on the
+    /// ground (painted foliage) is built again by it, and a Water brush
+    /// stroke leaves it alone.
+    pub fn revision_apart_from_water(&self) -> u64 {
+        self.revision - self.water_revisions
     }
 
     /// Chunks along X and along Z.
@@ -1078,6 +1125,7 @@ impl TerrainData {
             return;
         }
         self.revision += 1;
+        self.water_revisions += 1;
         let (chunks_x, chunks_z) = self.chunk_counts();
         let next = self.newest_version() + 1;
         let first = |sample: usize, chunks: usize| (sample / CHUNK_CELLS).min(chunks - 1);
@@ -1272,6 +1320,7 @@ mod tests {
             data.chunk_height_version(1, 1),
             data.chunk_water_version(1, 1),
         );
+        let (revision, ground) = (data.revision(), data.revision_apart_from_water());
         let rect = SampleRect::new(33, 33, 36, 35);
         let (size_x, _) = data.size();
         let levels = data.water_mut_in(rect);
@@ -1280,9 +1329,15 @@ mod tests {
                 levels[z * size_x + x] = 0.6;
             }
         }
-        // Only the water counts it: the ground isn't built again.
+        // Only the water counts it: the ground isn't built again, nor what
+        // sits on it (painted foliage follows `revision_apart_from_water`),
+        // though the terrain is saved.
         assert!(data.chunk_water_version(1, 1) > water);
         assert_eq!(data.chunk_height_version(1, 1), heights);
+        assert!(data.revision() > revision);
+        assert_eq!(data.revision_apart_from_water(), ground);
+        data.foliage_mut();
+        assert_eq!(data.revision_apart_from_water(), ground + 1);
         assert_eq!(data.chunk_water_version(0, 0), 1);
         assert!(data.has_water());
         assert_eq!(data.water_at(33, 33), Some(0.6));
@@ -1357,6 +1412,7 @@ mod tests {
             yaw: 0.5,
             scale: 1.0,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         }

@@ -25,6 +25,8 @@ const CORNER_WAVES: u32 = 4u;
 const ALL_WAVES: u32 = 7u;
 // How many steps a screen-space reflection takes, each longer than the last.
 const REFLECTION_STEPS: u32 = 24u;
+// A depth that keeps the waves whole, for water whose depth isn't known.
+const WATER_DEEP: f32 = 1e6;
 
 // A water material's values: `WaterRaw` in renderer/water.rs, in the
 // material's `params`.
@@ -101,11 +103,21 @@ fn water_noise(p: vec2<f32>) -> vec3<f32> {
 // waves. All of it is smooth and its slopes go into the normal, so the
 // lighting follows the shape.
 fn water_waves(rest: vec2<f32>, time: f32, look: WaterLook, count: u32, cell: f32) -> Waves {
-    // Irrational-ratio angles and wavelengths so wave trains never lock into a
-    // repeating lattice.
-    var turns = array<f32, 7>(0.0, 0.58, -0.87, 1.34, -1.93, 2.47, 0.94);
-    var lengths = array<f32, 7>(1.0, 0.618, 0.407, 0.263, 0.131, 0.082, 0.051);
-    var heights = array<f32, 7>(1.0, 0.54, 0.31, 0.19, 0.085, 0.052, 0.032);
+    // Variation moves the waves from an even set (0: one wave rules, each
+    // next shorter and lower by about the golden ratio, every crest alike)
+    // to a spread one (1), in which no wave rules the others: the four the
+    // corners move by are of comparable height (the same overall roughness,
+    // root mean square), so no single crest runs across the water in
+    // parallel stripes; their lengths are in ratios far from any small
+    // fraction (no two meet again within many crests); they spread over
+    // about ±35° of the direction, and the fourth is a cross swell 75° off
+    // it. The three pixel-only waves are chop from wider still.
+    var even_turns = array<f32, 7>(0.0, 0.58, -0.87, 1.34, -1.93, 2.47, 0.94);
+    var even_lengths = array<f32, 7>(1.0, 0.618, 0.407, 0.263, 0.131, 0.082, 0.051);
+    var even_heights = array<f32, 7>(1.0, 0.54, 0.31, 0.19, 0.085, 0.052, 0.032);
+    var spread_turns = array<f32, 7>(0.0, 0.47, -0.61, 1.31, -1.07, 2.21, -2.63);
+    var spread_lengths = array<f32, 7>(1.0, 0.773, 0.587, 0.411, 0.229, 0.157, 0.089);
+    var spread_heights = array<f32, 7>(0.78, 0.66, 0.52, 0.36, 0.13, 0.075, 0.042);
     var mixes = array<f32, 7>(0.0, 2.13, 4.07, 1.17, 5.23, 3.11, 0.67);
 
     if look.height <= 1e-6 {
@@ -113,6 +125,14 @@ fn water_waves(rest: vec2<f32>, time: f32, look: WaterLook, count: u32, cell: f3
     }
 
     let variation = clamp(look.variation, 0.0, 1.0);
+    var turns: array<f32, 7>;
+    var lengths: array<f32, 7>;
+    var heights: array<f32, 7>;
+    for (var i = 0u; i < ALL_WAVES; i++) {
+        turns[i] = mix(even_turns[i], spread_turns[i], variation);
+        lengths[i] = mix(even_lengths[i], spread_lengths[i], variation);
+        heights[i] = mix(even_heights[i], spread_heights[i], variation);
+    }
     // Noise per stud: patches about three of the biggest waves across.
     let scale = 1.0 / (look.length * 3.0);
     let main_dir = vec2<f32>(cos(look.direction), sin(look.direction));
@@ -201,20 +221,25 @@ fn water_waves(rest: vec2<f32>, time: f32, look: WaterLook, count: u32, cell: f3
         let fade_b = clamp((cap_len_b / max(cell, 1e-6) - 2.0) * 0.5, 0.0, 1.0);
         let gust = smoothstep(-0.25, 0.65, swell_a.x * 0.7 + swell_b.x * 0.3);
         let cap_strength = min(look.height / max(look.length, 0.5), 0.18) * variation * gust;
+        // Each layer reads its noise turned (37° and -65° from the world's
+        // axes), so neither lines up with the lattice, the waves or the
+        // other; its slopes are turned back.
+        let turn_a = mat2x2<f32>(0.799, 0.602, -0.602, 0.799);
+        let turn_b = mat2x2<f32>(0.423, -0.906, 0.906, 0.423);
         if fade_a > 0.0 && cap_strength > 0.0 {
             let freq_a = 1.0 / cap_len_a;
-            let uv_a = rest * freq_a + (main_dir * 0.42 + perp_dir * 0.27) * t
+            let uv_a = turn_a * (rest * freq_a) + (main_dir * 0.42 + perp_dir * 0.27) * t
                 + vec2<f32>(warp_a.x, warp_b.x) * 0.45;
             let r_a = water_noise(uv_a);
-            let s_a = r_a.yz * (cap_strength * 0.55 * fade_a);
+            let s_a = transpose(turn_a) * r_a.yz * (cap_strength * 0.55 * fade_a);
             normal -= vec3<f32>(s_a.x, 0.0, s_a.y);
         }
         if fade_b > 0.0 && cap_strength > 0.0 {
             let freq_b = 1.0 / cap_len_b;
-            let uv_b = rest * freq_b + (main_dir * 0.31 - perp_dir * 0.49) * t
+            let uv_b = turn_b * (rest * freq_b) + (main_dir * 0.31 - perp_dir * 0.49) * t
                 + vec2<f32>(warp_b.x, -warp_a.x) * 0.35 + vec2<f32>(29.3, -14.7);
             let r_b = water_noise(uv_b);
-            let s_b = r_b.yz * (cap_strength * 0.35 * fade_b);
+            let s_b = transpose(turn_b) * r_b.yz * (cap_strength * 0.35 * fade_b);
             normal -= vec3<f32>(s_b.x, 0.0, s_b.y);
         }
     }
@@ -246,8 +271,13 @@ fn vs_water(vertex: VertexIn, instance: InstanceIn) -> WaterOut {
     let edge_mask = clamp(2.0 + vertex.tangent.w, 0.0, 1.0);
     // The grid's spacing in studs, the coarser way.
     let cell = max(length(model[0].xyz), length(model[2].xyz)) / WATER_GRID_CELLS;
-    let waves = water_waves(rest.xz, frame.clock.x, water_look(), CORNER_WAVES, cell);
-    let world = rest + waves.offset * edge_mask;
+    let look = water_look();
+    let waves = water_waves(rest.xz, frame.clock.x, look, CORNER_WAVES, cell);
+    // Where it's shallow the waves calm to nothing at the shore, rather
+    // than rising over the banks.
+    let up = normalize(normal_matrix * vertex.normal);
+    let calm = water_shore(water_depth_under(rest, up), look);
+    let world = rest + waves.offset * edge_mask * calm;
     var out: WaterOut;
     out.clip_position = frame.view_proj * vec4<f32>(world, 1.0);
     out.world_position = world;
@@ -276,6 +306,37 @@ fn screen_point(world: vec3<f32>) -> vec3<f32> {
     }
     let ndc = clip.xy / clip.w;
     return vec3<f32>(ndc * vec2<f32>(0.5, -0.5) + 0.5, clip.w);
+}
+
+// How deep the water is straight down from `point` on its surface (`up`
+// its still normal), in studs, from the copy of the solid scene: how far
+// the ground behind it on the screen is past it, along the view, leaned
+// by the view's slope (as foam reads it). `WATER_DEEP` where that isn't
+// known: without the copy (Low), or with something in front of the point.
+// A point off the screen reads the screen's nearest edge.
+fn water_depth_under(point: vec3<f32>, up: vec3<f32>) -> f32 {
+    if frame.reflection_probes.z == 0u {
+        return WATER_DEEP;
+    }
+    let at = screen_point(point);
+    if at.z <= 0.0 {
+        return WATER_DEEP;
+    }
+    let eye = frame.camera_position.xyz;
+    let dist = distance(eye, point);
+    let behind = scene_copy(clamp(at.xy, vec2<f32>(0.0), vec2<f32>(1.0))).a;
+    if behind < dist - 0.05 {
+        return WATER_DEEP;
+    }
+    let v = (eye - point) / max(dist, 1e-4);
+    return (behind - dist) * max(abs(dot(v, up)), 0.05);
+}
+
+// How much of the waves' height water `depth` studs deep keeps: none at the
+// shore, all from about four times the waves' height down (waves feel the
+// bottom and flatten as they reach the shallows).
+fn water_shore(depth: f32, look: WaterLook) -> f32 {
+    return smoothstep(0.0, max(look.height * 4.0, 0.2), depth);
 }
 
 // What's seen reflected from `origin` along `dir` among what's on the
@@ -335,9 +396,15 @@ fn fs_water(in: WaterOut) -> @location(0) vec4<f32> {
     let look = water_look();
     let time = frame.clock.x;
     let up = normalize(in.up);
-    let n = water_waves(in.rest, time, look, ALL_WAVES, footprint).normal;
+    let waves = water_waves(in.rest, time, look, ALL_WAVES, footprint).normal;
     let eye = frame.camera_position.xyz;
     let dist = length(eye - in.world_position);
+    // The surface's slopes calm with its corners at the shore (a little
+    // ripple stays), and far off, where a pixel spans many ripples, they
+    // average out toward the still surface.
+    let calm = max(water_shore(water_depth_under(in.world_position, up), look), 0.25);
+    let far = 1.0 - 0.4 * smoothstep(look.length * 6.0, look.length * 40.0, dist);
+    let n = normalize(mix(up, waves, calm * far));
     let v = (eye - in.world_position) / max(dist, 1e-4);
     let f0 = vec3<f32>(WATER_F0);
     let reflectance = ambient_specular(f0, WATER_ROUGHNESS, max(dot(n, v), 1e-4));

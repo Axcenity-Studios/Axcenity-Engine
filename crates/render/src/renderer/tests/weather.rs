@@ -62,6 +62,17 @@ fn floor_pixels(pixels: &[u8]) -> Vec<u32> {
         .collect()
 }
 
+/// Screen-space reflections read last frame's picture, so a frame drawn
+/// right after a change isn't yet settled: the tests here that compare
+/// single frames draw without them (tests/screen_reflections.rs covers
+/// them).
+fn without_screen_reflections(renderer: &mut TextureRenderer) {
+    renderer.set_graphics(&crate::GraphicsSettings {
+        screen_space_reflections: Some(false),
+        ..crate::GraphicsSettings::default()
+    });
+}
+
 fn median(mut values: Vec<u32>) -> u32 {
     values.sort_unstable();
     values[values.len() / 2]
@@ -74,6 +85,7 @@ fn wet_surfaces_are_darker_and_glossier() {
         return;
     };
     let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    without_screen_reflections(&mut renderer);
     let mut list = block_on_floor();
     let dry_wall = brightness(pixel_at(&mut renderer, &list, WALL));
     let dry_floor = floor_pixels(&renderer.read_pixels());
@@ -141,6 +153,7 @@ fn clear_weather_draws_the_same_frame_and_weather_adds_no_cost() {
         return;
     };
     let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    without_screen_reflections(&mut renderer);
     let mut list = block_on_floor();
     renderer.render(&list).unwrap();
     let clear = renderer.read_pixels();
@@ -277,6 +290,7 @@ fn falling_rain_rings_the_water_and_wet_surfaces_are_still_without_it() {
         return;
     };
     let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    without_screen_reflections(&mut renderer);
     let mut list = block_on_floor();
     let mut frame_at = |list: &mut DrawList, time: f32| {
         list.time = time;
@@ -1200,6 +1214,290 @@ fn weather_looks_cost() {
             frames[frames.len() / 2],
             mean,
             frames[frames.len() * 99 / 100],
+        );
+    }
+}
+
+/// A unit cube with each face's own corners and normals (a caller's mesh,
+/// faceted, so every edge needs a skirt under snow).
+struct FacetedCube;
+
+impl FacetedCube {
+    fn corners() -> (Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<u32>) {
+        let mut positions = Vec::new();
+        let mut normals = Vec::new();
+        let mut indices = Vec::new();
+        for axis in 0..3 {
+            for side in [-1.0f32, 1.0] {
+                let mut normal = [0.0; 3];
+                normal[axis] = side;
+                let (u, v) = ((axis + 1) % 3, (axis + 2) % 3);
+                let first = positions.len() as u32;
+                for (a, b) in [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)] {
+                    let mut p = [0.0; 3];
+                    p[axis] = 0.5 * side;
+                    p[u] = a;
+                    p[v] = b;
+                    positions.push(p);
+                    normals.push(normal);
+                }
+                let quad = if side > 0.0 {
+                    [0, 1, 2, 0, 2, 3]
+                } else {
+                    [0, 2, 1, 0, 3, 2]
+                };
+                indices.extend(quad.iter().map(|i| first + i));
+            }
+        }
+        (positions, normals, indices)
+    }
+}
+
+/// The cube's positions, normals, indices and texture coordinates.
+type CubeCorners = (Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<u32>, Vec<[f32; 2]>);
+
+static FACETED_CUBE: std::sync::LazyLock<CubeCorners> = std::sync::LazyLock::new(|| {
+    let (positions, normals, indices) = FacetedCube::corners();
+    let uvs = vec![[0.0; 2]; positions.len()];
+    (positions, normals, indices, uvs)
+});
+
+impl MeshSource for FacetedCube {
+    fn key(&self) -> u64 {
+        0xfac_e7ed
+    }
+    fn positions(&self) -> &[[f32; 3]] {
+        &FACETED_CUBE.0
+    }
+    fn normals(&self) -> &[[f32; 3]] {
+        &FACETED_CUBE.1
+    }
+    fn uvs(&self) -> &[[f32; 2]] {
+        &FACETED_CUBE.3
+    }
+    fn indices(&self) -> &[u32] {
+        &FACETED_CUBE.2
+    }
+}
+
+#[test]
+fn a_shown_renderer_adds_a_meshs_snow_skirt_a_few_frames_later() {
+    // A window's renderer makes a caller's mesh's skirt on a worker (for a
+    // big mesh it took tens of milliseconds of the frame that first drew
+    // it), and the slab's sides come in a few frames later, as an offline
+    // renderer draws them at once.
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut list = block_on_floor();
+    list.items[1].shape = Shape::Mesh(Arc::new(FacetedCube));
+    list.weather = Weather {
+        snow: 1.0,
+        snow_thickness: 1.0,
+        ..Weather::default()
+    };
+    let mut offline = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    let (slab, clear) = above_the_block(&mut offline, &list);
+    assert_ne!(
+        slab, clear,
+        "the offline renderer draws the slab's side at once"
+    );
+    let mut shown = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    shown.set_one_frame_ahead(true);
+    let arrived = (0..120).find(|_| above_the_block(&mut shown, &list).0 == slab);
+    assert!(arrived.is_some(), "the skirt never came");
+}
+
+/// Black on the left half, white on the right (an ambient occlusion map
+/// with a crack down one half), 64 texels square so its mips keep the two
+/// halves apart.
+struct Halves(Vec<u8>);
+
+impl Halves {
+    fn new() -> Self {
+        Self(
+            (0..64 * 64)
+                .flat_map(|i| {
+                    let shade = if i % 64 < 32 { 0 } else { 255 };
+                    [shade, shade, shade, 255]
+                })
+                .collect(),
+        )
+    }
+}
+
+impl crate::TextureSource for Halves {
+    fn key(&self) -> u64 {
+        0x4a11_7e55
+    }
+    fn size(&self) -> (u32, u32) {
+        (64, 64)
+    }
+    fn rgba(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+/// A black, rough floor whose ambient occlusion map is dark across one
+/// half, under a sky bright at the horizon and dark overhead, seen low and
+/// along it, so a smooth floor mirrors the bright horizon and a rough one
+/// the sky's average.
+fn floor_with_a_crack(wetness: f32) -> DrawList {
+    let mut material = Material {
+        base_color: [0.0; 3],
+        roughness: 0.85,
+        ..Material::default()
+    };
+    material.maps.occlusion = Some(crate::ChannelMap {
+        texture: Arc::new(Halves::new()),
+        channel: crate::Channel::Red,
+        invert: false,
+    });
+    material.maps.occlusion_strength = 1.0;
+    // A square lying flat, its texture once across it: the crack is the
+    // half toward -X.
+    let floor = DrawItem {
+        shape: Shape::Mesh(Arc::new(Square)),
+        transform: Mat4::from_scale_rotation_translation(
+            Vec3::splat(40.0),
+            glam::Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+            Vec3::ZERO,
+        ),
+        material,
+        ..item(Shape::Block, Vec3::ZERO, 1.0)
+    };
+    let mut list = list_of(vec![floor]);
+    list.sky = Sky {
+        top_color: [0.05; 3],
+        horizon_color: [1.0; 3],
+        ground_color: [0.05; 3],
+        environment_intensity: 1.0,
+        image: None,
+        ..Sky::default()
+    };
+    list.camera = Camera {
+        position: Vec3::new(0.0, 5.0, 12.0),
+        look_at: Vec3::new(0.0, 0.0, 0.0),
+        fov_y_degrees: 70.0,
+    };
+    list.sun.intensity = 0.0;
+    list.ambient.intensity = 0.0;
+    list.weather = Weather {
+        wetness,
+        snow: 0.0,
+        ..Weather::default()
+    };
+    list
+}
+
+#[test]
+fn water_gathers_in_a_surfaces_cracks_first_and_they_shine_where_the_rest_has_a_sheen() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    without_screen_reflections(&mut renderer);
+    let linear = |p: [u8; 4]| {
+        let rgb = linear_color([p[0], p[1], p[2]].map(|c| f32::from(c) / 255.0));
+        rgb.x + rgb.y + rgb.z
+    };
+    let (left, right) = (Vec3::new(-6.0, 0.0, 2.0), Vec3::new(6.0, 0.0, 2.0));
+    let mut seen = Vec::new();
+    for wetness in [0.0, 0.5] {
+        let list = floor_with_a_crack(wetness);
+        seen.push([
+            linear(pixel_at(&mut renderer, &list, left)),
+            linear(pixel_at(&mut renderer, &list, right)),
+        ]);
+    }
+    let [dry, wet] = [seen[0], seen[1]];
+    let (crack, raised) = (0, 1);
+    assert!(
+        dry[crack] < dry[raised] * 0.5,
+        "the crack is dark dry: {dry:?}"
+    );
+    let gain = |side: usize| wet[side] / dry[side].max(1e-4);
+    assert!(
+        gain(crack) > gain(raised) * 1.5,
+        "the crack's water shines more than the raised half's film: dry {dry:?}, wet {wet:?}"
+    );
+    assert!(
+        gain(raised) > 1.0,
+        "the raised half has a sheen: dry {dry:?}, wet {wet:?}"
+    );
+}
+
+#[test]
+fn no_wet_pixel_is_brighter_than_the_sky_it_mirrors() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    let mut list = floor_with_a_crack(1.0);
+    // Looking out over it, the sky in the frame's top half.
+    list.camera.look_at = Vec3::new(0.0, 5.0, 0.0);
+    for _ in 0..3 {
+        renderer.render(&list).unwrap();
+    }
+    let pixels = renderer.read_pixels();
+    let rows: Vec<&[u8]> = pixels.chunks(SIZE as usize * 4).collect();
+    let brightest = |rows: &[&[u8]]| {
+        rows.iter()
+            .flat_map(|row| row.chunks(4))
+            .map(|p| brightness([p[0], p[1], p[2], 255]))
+            .max()
+            .unwrap()
+    };
+    let half = SIZE as usize / 2;
+    let sky = brightest(&rows[..half]);
+    let floor = brightest(&rows[half + 2..]);
+    assert!(sky > 300, "the horizon is bright: {sky}");
+    assert!(floor <= sky, "floor {floor}, sky {sky}");
+}
+
+#[test]
+fn wet_ground_with_no_snow_cover_has_no_snow_on_it() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    without_screen_reflections(&mut renderer);
+    // A dark floor lit evenly, so nothing but the surface's own colour
+    // shows, and snow would show plainly.
+    let mut list = block_on_floor();
+    list.items[0].material.base_color = [0.05; 3];
+    list.sun.intensity = 0.0;
+    list.ambient.intensity = 1.0;
+    renderer.render(&list).unwrap();
+    let dry = renderer.read_pixels();
+    for wetness in [0.1, 0.5] {
+        list.weather = Weather {
+            wetness,
+            snow: 0.0,
+            ..Weather::default()
+        };
+        renderer.render(&list).unwrap();
+        let wet = renderer.read_pixels();
+        // Snow's ragged edge used to lie white patches over level ground
+        // whenever any weather was on (a grey floor turned near white).
+        // Wet, the far floor seen at a glancing angle has a sheen of the
+        // flat light, a little brighter than dry, never as white as snow.
+        // The near half of the frame, seen from above.
+        let near = (SIZE * SIZE * 2) as usize;
+        let whiter = dry[near..]
+            .chunks(4)
+            .zip(wet[near..].chunks(4))
+            .filter(|(d, w)| {
+                brightness([w[0], w[1], w[2], 255]) > brightness([d[0], d[1], d[2], 255]) + 45
+            })
+            .count();
+        assert_eq!(
+            whiter, 0,
+            "at wetness {wetness}, {whiter} pixels whiter than dry"
         );
     }
 }

@@ -73,6 +73,39 @@ impl TerrainWater {
 pub(crate) struct WaterCache {
     lowest: HashMap<(usize, usize), (u64, f32)>,
     painted: HashMap<(usize, usize), BuiltWater>,
+    /// The painted levels (world Y, sorted) a chunk's mesh reads, its own
+    /// cells and the ring around them, with the key of what they were
+    /// read from: how many of them a flood covers is all the flood's level
+    /// changes of the mesh.
+    levels: HashMap<(usize, usize), (u64, Vec<f32>)>,
+    /// The hash of the ring of cells around each chunk ([`ring_hash`]),
+    /// with the water versions of the chunks around it it was read at.
+    rings: HashMap<(usize, usize), (Around, u64)>,
+}
+
+/// The water versions of a chunk and the eight around it, row by row.
+type Around = [[u64; 3]; 3];
+
+/// The cells just outside chunk (`cx`, `cz`)'s cells (its corners' levels
+/// average them in), hashed by their levels.
+fn ring_hash(data: &TerrainData, (cx, cz): (usize, usize)) -> u64 {
+    let rect = data.chunk_rect(cx, cz);
+    let x1 = (rect.x1 - 1).max(rect.x0 + 1);
+    let z1 = (rect.z1 - 1).max(rect.z0 + 1);
+    let level = |x: usize, z: usize| data.water_at(x, z).map(f32::to_bits);
+    let mut hasher = DefaultHasher::new();
+    // The two columns either side, corners included, then the rows.
+    for z in rect.z0.saturating_sub(1)..=z1 {
+        for x in [rect.x0.checked_sub(1), Some(x1)].into_iter().flatten() {
+            level(x, z).hash(&mut hasher);
+        }
+    }
+    for x in rect.x0..x1 {
+        for z in [rect.z0.checked_sub(1), Some(z1)].into_iter().flatten() {
+            level(x, z).hash(&mut hasher);
+        }
+    }
+    hasher.finish()
 }
 
 /// A chunk's painted water mesh (`None` when nothing in it shows), with
@@ -124,20 +157,38 @@ impl WaterCache {
                 0
             }
         };
+        // The chunk's corners read the ring of cells around it too (in the
+        // eight chunks around it): their levels, read again only when one
+        // of those chunks changes, so a stroke next door rebuilds this
+        // chunk only when it reaches the ring.
+        let around = [-1, 0, 1].map(|dz| [-1, 0, 1].map(|dx| neighbor_water(dx, dz)));
+        let ring = match self.rings.get(&(cx, cz)) {
+            Some(&(read, ring)) if read == around => ring,
+            _ => {
+                let ring = ring_hash(data, (cx, cz));
+                self.rings.insert((cx, cz), (around, ring));
+                ring
+            }
+        };
         let mut hasher = DefaultHasher::new();
         (
             data.uid(),
             data.chunk_water_version(cx, cz),
-            neighbor_water(-1, 0),
-            neighbor_water(1, 0),
-            neighbor_water(0, -1),
-            neighbor_water(0, 1),
-            data.chunk_height_version(cx, cz),
-            flood.map(f32::to_bits),
+            ring,
             placement.position.to_array().map(f32::to_bits),
             placement.size.to_array().map(f32::to_bits),
         )
             .hash(&mut hasher);
+        let water = hasher.finish();
+        // A flood leaves out the painted cells at or under its level, so
+        // all its level says of the mesh is how many of them it covers: a
+        // drag of `WaterLevel` rebuilds a chunk only when it crosses one.
+        let flooded = flood.map_or(0, |flood| {
+            let levels = self.painted_levels(data, placement, (cx, cz), water);
+            levels.partition_point(|&level| level <= flood + FLOODED_OVER)
+        });
+        let mut hasher = DefaultHasher::new();
+        (water, data.chunk_height_version(cx, cz), flooded).hash(&mut hasher);
         let built = hasher.finish();
         if let Some((key, mesh)) = self.painted.get(&(cx, cz))
             && *key == built
@@ -148,7 +199,43 @@ impl WaterCache {
         self.painted.insert((cx, cz), (built, mesh.clone()));
         mesh
     }
+
+    /// The painted levels chunk (`cx`, `cz`)'s mesh reads (its cells and the
+    /// ring of cells around them), world Y, sorted; read again only when
+    /// `water` (the key of the water around it) changes.
+    fn painted_levels(
+        &mut self,
+        data: &TerrainData,
+        placement: &Placement,
+        (cx, cz): (usize, usize),
+        water: u64,
+    ) -> &[f32] {
+        let current = self
+            .levels
+            .get(&(cx, cz))
+            .is_some_and(|(read, _)| *read == water);
+        if !current {
+            let rect = data.chunk_rect(cx, cz);
+            let cells_x = (rect.x1 - 1).max(rect.x0 + 1) - rect.x0;
+            let cells_z = (rect.z1 - 1).max(rect.z0 + 1) - rect.z0;
+            let mut levels = Vec::new();
+            for z in rect.z0.saturating_sub(1)..=rect.z0 + cells_z {
+                for x in rect.x0.saturating_sub(1)..=rect.x0 + cells_x {
+                    if let Some(level) = data.water_at(x, z) {
+                        levels.push(placement.world_y(level));
+                    }
+                }
+            }
+            levels.sort_unstable_by(f32::total_cmp);
+            self.levels.insert((cx, cz), (water, levels));
+        }
+        &self.levels[&(cx, cz)].1
+    }
 }
+
+/// How far over a flood's level a painted cell may be and still count as
+/// flooded (studs): it isn't drawn.
+const FLOODED_OVER: f32 = 0.01;
 
 /// Adds the terrain's water to `items`: the flood over each chunk whose
 /// ground dips below its level, and the painted water that shows.
@@ -240,9 +327,12 @@ fn water_item(water: &TerrainWater, shape: Shape, transform: Mat4) -> DrawItem {
 
 /// A chunk's painted water: a square of the water grid's fineness for each
 /// cell that shows, at its level. X and Z go from -0.5 to 0.5 across the
-/// chunk; Y is the world's.
+/// chunk; Y is the world's. Its key is the chunk's, the same however often
+/// it's built again; its version is what it was built from, so the
+/// renderer rewrites its copy in place rather than keeping each one.
 pub(crate) struct PaintedWater {
     key: u64,
+    version: u64,
     positions: Vec<[f32; 3]>,
     normals: Vec<[f32; 3]>,
     uvs: Vec<[f32; 2]>,
@@ -274,7 +364,7 @@ impl PaintedWater {
                 return None;
             }
             let level = placement.world_y(data.water_at(cx as usize, cz as usize)?);
-            if flood.is_some_and(|flood| level <= flood + 0.01) {
+            if flood.is_some_and(|flood| level <= flood + FLOODED_OVER) {
                 return None;
             }
             Some(level)
@@ -313,6 +403,8 @@ impl PaintedWater {
         };
         let mut mesh = PaintedWater {
             key: 0,
+            // Never 0, a mesh source's version that never changes.
+            version: built.max(1),
             positions: Vec::new(),
             normals: Vec::new(),
             uvs: Vec::new(),
@@ -326,7 +418,7 @@ impl PaintedWater {
                 };
                 let level = placement.world_y(level);
                 // Flooded anyway, or the ground is above it all round.
-                if flood.is_some_and(|flood| level <= flood + 0.01) {
+                if flood.is_some_and(|flood| level <= flood + FLOODED_OVER) {
                     continue;
                 }
                 let corners = [
@@ -379,7 +471,7 @@ impl PaintedWater {
             return None;
         }
         let mut hasher = DefaultHasher::new();
-        ("terrain painted water", id, cx, cz, built).hash(&mut hasher);
+        ("terrain painted water", id, cx, cz).hash(&mut hasher);
         mesh.key = hasher.finish();
         Some(mesh)
     }
@@ -388,6 +480,9 @@ impl PaintedWater {
 impl MeshSource for PaintedWater {
     fn key(&self) -> u64 {
         self.key
+    }
+    fn version(&self) -> u64 {
+        self.version
     }
     fn positions(&self) -> &[[f32; 3]] {
         &self.positions

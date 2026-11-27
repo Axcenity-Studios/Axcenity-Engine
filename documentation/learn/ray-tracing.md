@@ -36,6 +36,7 @@ Click **Compare** on the badge to see the view without the ray traced effects, a
 
 - Shadows come from the **sun**, so set **Lighting > ClockTime** to a time when it's up. Low morning or evening sun gives long shadows.
 - **Lighting > ShadowSoftness** decides how soft they are, from sharp (0) to soft. Ray traced shadows get softer the farther a shadow falls from what casts it, as real ones do. **Low**, **Medium** and **High** only change how many rays smooth that softness.
+- **Ray traced shadow resolution** (Settings > Graphics > Ray tracing) is **Full** at Ultra: rays from every pixel. **Half** traces from one pixel in four and fills in the rest from its neighbours on the same surface (with TAA a different pixel each frame, so it averages out): about a quarter of the rays, for a little softer detail in the smallest shadows. It's the preset below Ultra.
 - Rays reach as far as **Ray tracing distance** (Settings > Graphics). Past it, the usual shadow maps take over, so a long distance costs more but traces more of the world.
 
 ## Get good lighting

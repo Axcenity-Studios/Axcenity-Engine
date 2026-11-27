@@ -177,6 +177,17 @@ impl EditorApp {
             self.cover_started = None;
             self.viewport.opening = false;
             ctx.request_repaint();
+            // `AXCENITY_START_PLAY=1` presses Play once the project is
+            // ready, so the frame log can time editor Play
+            // (`docs/benchmarks.md`).
+            if std::env::var_os("AXCENITY_START_PLAY").is_some() && !self.playing() {
+                self.play();
+            }
+            // `AXCENITY_BAKE_PROBES=1` bakes every probe, saves and closes
+            // (`probe_bake::BakeAndClose`).
+            if std::env::var_os("AXCENITY_BAKE_PROBES").is_some() {
+                self.bake_and_close = super::probe_bake::BakeAndClose::Waiting(0);
+            }
             return;
         }
         let mut rect = ctx.content_rect();

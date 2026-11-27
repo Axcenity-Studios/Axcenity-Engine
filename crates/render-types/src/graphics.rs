@@ -439,6 +439,29 @@ impl RayTracedShadows {
     }
 }
 
+/// How many of the screen's pixels ray traced sun shadows trace from
+/// (`docs/rendering/ray-tracing.md`). Half traces one pixel of each 2 × 2
+/// (a different one each frame under TAA) and fills the other three from
+/// the traced ones on the same surface, by depth and normal, before the
+/// soft edges are smoothed: about a quarter of the rays.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum RayShadowResolution {
+    Half,
+    Full,
+}
+
+impl RayShadowResolution {
+    pub const ALL: [RayShadowResolution; 2] =
+        [RayShadowResolution::Full, RayShadowResolution::Half];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            RayShadowResolution::Full => "Full",
+            RayShadowResolution::Half => "Half",
+        }
+    }
+}
+
 /// Hardware ray traced ambient occlusion (`docs/rendering/ray-tracing.md`):
 /// short rays over the hemisphere above each solid pixel find what hides
 /// it, in place of the screen-space guess, so things off screen or behind
@@ -777,6 +800,12 @@ pub struct GraphicsSettings {
     /// Short shadows found on screen, for the gaps the shadow maps miss.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contact_shadows: Option<bool>,
+    /// Smooth and wet surfaces reflect what's on the screen (marched
+    /// through the prepass's depth, last frame's picture read where the
+    /// ray lands), with the sky's reflection shaded where the shadow maps
+    /// say something stands over the way it leaves. On at High and Ultra.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub screen_space_reflections: Option<bool>,
     /// Light probe volumes kept up to date as the world's light changes,
     /// a few probes each frame. Off at every preset.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -814,6 +843,10 @@ pub struct GraphicsSettings {
     /// every preset.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ray_traced_shadows: Option<RayTracedShadows>,
+    /// How many pixels ray traced sun shadows trace from: Full at Ultra,
+    /// Half below it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ray_traced_shadow_resolution: Option<RayShadowResolution>,
     /// Hardware ray traced ambient occlusion, on a GPU that can ray trace.
     /// Off at every preset. On, it draws ambient occlusion even while the
     /// screen-space setting is off.
@@ -981,6 +1014,13 @@ impl GraphicsSettings {
             .unwrap_or(self.quality >= Quality::High)
     }
 
+    /// Whether smooth surfaces reflect what's on the screen: the override,
+    /// or the preset's (on at High and Ultra).
+    pub fn screen_space_reflections(&self) -> bool {
+        self.screen_space_reflections
+            .unwrap_or(self.quality >= Quality::High)
+    }
+
     /// Whether light probe volumes are traced again as the light changes:
     /// the override, or off (every preset's).
     pub fn realtime_gi(&self) -> bool {
@@ -1082,6 +1122,17 @@ impl GraphicsSettings {
     /// Hardware ray traced sun shadows: the override, or Off (every preset).
     pub fn ray_traced_shadows(&self) -> RayTracedShadows {
         self.ray_traced_shadows.unwrap_or(RayTracedShadows::Off)
+    }
+
+    /// How many pixels ray traced sun shadows trace from: the override, or
+    /// the preset's (Full at Ultra, Half below it).
+    pub fn ray_traced_shadow_resolution(&self) -> RayShadowResolution {
+        self.ray_traced_shadow_resolution
+            .unwrap_or(if self.quality >= Quality::Ultra {
+                RayShadowResolution::Full
+            } else {
+                RayShadowResolution::Half
+            })
     }
 
     /// These settings with the ray traced look turned on in one go
@@ -1208,6 +1259,16 @@ impl GraphicsSettings {
         }
         // Its grid is worked out by compute shaders.
         let volumetric_fog = self.volumetric_fog() && capabilities.compute_shaders;
+        // A compute pass, like volumetric fog's.
+        let screen_space_reflections =
+            self.screen_space_reflections() && capabilities.compute_shaders;
+        if self.screen_space_reflections() && !screen_space_reflections {
+            notes.push(
+                "Screen-space reflections are off: this GPU can't run compute shaders. \
+                 Reflection probes and the sky are reflected."
+                    .to_owned(),
+            );
+        }
         if self.volumetric_fog() && !volumetric_fog {
             notes.push(
                 "Volumetric fog is off: this GPU can't run compute shaders. Fog is drawn without \
@@ -1291,6 +1352,7 @@ impl GraphicsSettings {
             reflection_quality,
             // Like ambient occlusion, it reads only the prepass.
             contact_shadows: self.contact_shadows(),
+            screen_space_reflections,
             realtime_gi,
             realtime_gi_tier: self.realtime_gi_tier(),
             volumetric_fog,
@@ -1312,6 +1374,7 @@ impl GraphicsSettings {
             ray_queries: capabilities.ray_queries,
             ray_tracing_distance: self.ray_tracing_distance(),
             ray_traced_shadows,
+            ray_traced_shadow_resolution: self.ray_traced_shadow_resolution(),
             ray_traced_ambient_occlusion,
             ray_traced_global_illumination,
             ray_traced_gi_in_software,
@@ -1403,6 +1466,9 @@ pub struct EffectiveGraphics {
     pub ambient_occlusion: AmbientOcclusion,
     pub reflection_quality: ReflectionQuality,
     pub contact_shadows: bool,
+    /// Whether smooth surfaces reflect what's on the screen (needs the
+    /// prepass's depth and normals, and compute shaders).
+    pub screen_space_reflections: bool,
     /// Whether light probe volumes are traced again as the light changes.
     pub realtime_gi: bool,
     /// How much real-time GI traces each frame while it's on.
@@ -1430,6 +1496,8 @@ pub struct EffectiveGraphics {
     pub ray_tracing_distance: f32,
     /// Ray traced sun shadows (Off on a GPU without ray queries).
     pub ray_traced_shadows: RayTracedShadows,
+    /// How many pixels they trace from.
+    pub ray_traced_shadow_resolution: RayShadowResolution,
     /// Ray traced ambient occlusion (Off on a GPU without ray queries).
     pub ray_traced_ambient_occlusion: RayTracedAmbientOcclusion,
     /// Ray traced global illumination (Off on a GPU that can neither ray
@@ -1905,6 +1973,7 @@ mod tests {
             ambient_occlusion: Some(AmbientOcclusion::Off),
             reflection_quality: Some(ReflectionQuality::Medium),
             contact_shadows: Some(true),
+            screen_space_reflections: Some(true),
             realtime_gi: Some(true),
             volumetric_fog: Some(false),
             cloud_quality: Some(CloudQuality::Low),
@@ -1917,6 +1986,7 @@ mod tests {
             motion_blur: Some(MotionBlurQuality::Low),
             ray_tracing_distance: Some(600.0),
             ray_traced_shadows: Some(RayTracedShadows::Medium),
+            ray_traced_shadow_resolution: Some(RayShadowResolution::Half),
             ray_traced_ambient_occlusion: Some(RayTracedAmbientOcclusion::Low),
             ray_traced_global_illumination: Some(RayTracedGlobalIllumination::High),
             ray_traced_reflections: Some(RayTracedReflections::High),
@@ -2090,6 +2160,8 @@ mod tests {
         }
         let on = GraphicsSettings {
             realtime_gi: Some(true),
+            // Its own note without compute shaders isn't this test's.
+            screen_space_reflections: Some(false),
             ..GraphicsSettings::preset(Quality::High)
         };
         let used = on.effective(&Capabilities::default());
@@ -2109,7 +2181,11 @@ mod tests {
             lowered.notes
         );
         // Asking for none needs nothing, so nothing is noted.
-        let off = GraphicsSettings::preset(Quality::High).effective(&no_compute);
+        let off = GraphicsSettings {
+            screen_space_reflections: Some(false),
+            ..GraphicsSettings::preset(Quality::High)
+        }
+        .effective(&no_compute);
         assert!(!off.realtime_gi && off.notes.is_empty());
     }
 
@@ -2139,6 +2215,49 @@ mod tests {
             assert!(tier.probes_per_frame <= RealtimeGiTier::MAX_PROBES_PER_FRAME);
             last = work;
         }
+    }
+
+    #[test]
+    fn screen_space_reflections_are_on_at_high_and_ultra_and_off_with_a_note_without_compute_shaders()
+     {
+        let preset = |quality| GraphicsSettings::preset(quality).screen_space_reflections();
+        assert_eq!(Quality::ALL.map(preset), [false, false, true, true]);
+        let on = GraphicsSettings {
+            screen_space_reflections: Some(true),
+            ..GraphicsSettings::preset(Quality::Low)
+        };
+        assert!(
+            on.effective(&Capabilities::default())
+                .screen_space_reflections
+        );
+        let off = GraphicsSettings {
+            screen_space_reflections: Some(false),
+            ..GraphicsSettings::preset(Quality::Ultra)
+        };
+        assert!(
+            !off.effective(&Capabilities::default())
+                .screen_space_reflections
+        );
+        let no_compute = Capabilities {
+            compute_shaders: false,
+            ..Capabilities::default()
+        };
+        let lowered = GraphicsSettings::preset(Quality::Ultra).effective(&no_compute);
+        assert!(!lowered.screen_space_reflections);
+        assert!(
+            lowered
+                .notes
+                .iter()
+                .any(|note| note.starts_with("Screen-space reflections are off")),
+            "{:?}",
+            lowered.notes
+        );
+        // Saved only when set.
+        let json = serde_json::to_string(&GraphicsSettings::default()).unwrap();
+        assert!(!json.contains("screen_space_reflections"), "{json}");
+        let read: GraphicsSettings =
+            serde_json::from_str(r#"{"screen_space_reflections":false}"#).unwrap();
+        assert_eq!(read.screen_space_reflections, Some(false));
     }
 
     #[test]
@@ -2498,6 +2617,7 @@ mod tests {
                         ambient_occlusion: Some(AmbientOcclusion::Low),
                         reflection_quality: None,
                         contact_shadows: post,
+                        screen_space_reflections: post,
                         realtime_gi: post,
                         volumetric_fog: post,
                         cloud_quality: Some(CloudQuality::Medium),
@@ -2510,6 +2630,7 @@ mod tests {
                         motion_blur: Some(MotionBlurQuality::Low),
                         ray_tracing_distance: None,
                         ray_traced_shadows: Some(RayTracedShadows::High),
+                        ray_traced_shadow_resolution: None,
                         ray_traced_ambient_occlusion: Some(RayTracedAmbientOcclusion::Medium),
                         ray_traced_global_illumination: Some(RayTracedGlobalIllumination::Low),
                         ray_traced_reflections: Some(RayTracedReflections::Medium),
@@ -2539,6 +2660,10 @@ mod tests {
                         assert_eq!(effective.ambient_occlusion, settings.ambient_occlusion());
                         assert!(effective.reflection_quality <= settings.reflection_quality());
                         assert_eq!(effective.contact_shadows, settings.contact_shadows());
+                        assert!(
+                            effective.screen_space_reflections
+                                <= settings.screen_space_reflections()
+                        );
                         assert!(effective.realtime_gi <= settings.realtime_gi());
                         assert!(effective.volumetric_fog <= settings.volumetric_fog());
                         assert_eq!(effective.cloud_quality, settings.cloud_quality());
@@ -2558,6 +2683,10 @@ mod tests {
                                     effective.reflection_quality != settings.reflection_quality(),
                                 )
                                 + usize::from(effective.realtime_gi != settings.realtime_gi())
+                                + usize::from(
+                                    effective.screen_space_reflections
+                                        != settings.screen_space_reflections(),
+                                )
                                 + usize::from(
                                     effective.volumetric_fog != settings.volumetric_fog(),
                                 )

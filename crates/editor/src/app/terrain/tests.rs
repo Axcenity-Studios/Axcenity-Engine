@@ -398,6 +398,40 @@ fn the_water_brush_paints_a_pond_that_saves_undoes_and_shift_removes() {
     std::fs::remove_dir_all(folder).unwrap();
 }
 
+/// A Water section slider dragged over many frames (one change a frame,
+/// as egui reports it) is one undo step, from where the drag started to
+/// where it let go: the gesture stays open until the pointer is released
+/// (`History::seal`), and each frame's change merges into its step.
+#[test]
+fn dragging_a_water_slider_is_one_undo_step() {
+    let (mut app, folder) = app_with_project("water-slider");
+    let terrain = create(&mut app);
+    let level = |app: &EditorApp| {
+        app.world
+            .get(terrain)
+            .and_then(|t| t.property("WaterLevel"))
+            .and_then(Value::as_number)
+    };
+    let before = level(&app);
+    app.history.seal();
+    let steps = app.history.undo_labels().len();
+    for frame in 1..=30 {
+        app.terrain_action(TerrainAction::SetTerrain(
+            terrain,
+            "WaterLevel",
+            Value::Number(f64::from(frame) * 0.25),
+        ));
+    }
+    // Let go.
+    app.history.seal();
+    assert_eq!(app.history.undo_labels().len(), steps + 1);
+    assert_eq!(level(&app), Some(7.5));
+    app.undo();
+    assert_eq!(level(&app), before, "one undo goes back to the start");
+    assert_eq!(app.history.undo_labels().len(), steps);
+    std::fs::remove_dir_all(folder).unwrap();
+}
+
 /// Runs one frame of the studio's keys with `key` pressed.
 fn press_studio_key(app: &mut EditorApp, key: egui::Key) {
     let input = egui::RawInput {

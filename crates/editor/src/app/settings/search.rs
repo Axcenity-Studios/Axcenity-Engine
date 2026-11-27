@@ -409,7 +409,7 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         setting(
             Graphics,
             "Reflection quality",
-            &["Reflections", "SSR"],
+            &["Reflections"],
             "How reflections are drawn.",
         ),
         setting(
@@ -423,6 +423,12 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
             "Contact shadows",
             &["Small shadows"],
             "Short screen-space shadows where things touch.",
+        ),
+        setting(
+            Graphics,
+            "Screen-space reflections",
+            &["SSR", "Reflections", "Wet", "Puddles"],
+            "Smooth and wet surfaces reflect what's on the screen.",
         ),
         setting(
             Graphics,

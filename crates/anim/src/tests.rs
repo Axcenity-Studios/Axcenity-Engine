@@ -258,6 +258,11 @@ fn root_motion_moves_the_model_instead_of_the_root_bone() {
 /// A controller with one blend tree state: the example's Idle (2 s) at
 /// Speed 0 and Walk (1 s) at Speed 2.
 fn locomotion() -> (crate::Compiled, std::sync::Arc<axcenity_assets::Model>) {
+    locomotion_with(1.0)
+}
+
+/// [`locomotion`], its Walk played `walk_speed` times as fast.
+fn locomotion_with(walk_speed: f64) -> (crate::Compiled, std::sync::Arc<axcenity_assets::Model>) {
     use crate::files::{BlendChild, BlendTree, Motion, ParameterDef, StateDef};
     let assets = Assets::new(example());
     let model = assets.model_blocking("assets/models/noodle.fbx").unwrap();
@@ -275,10 +280,12 @@ fn locomotion() -> (crate::Compiled, std::sync::Arc<axcenity_assets::Model>) {
                     BlendChild {
                         clip: "assets/animations/noodle/Idle.anim.json".into(),
                         threshold: 0.0,
+                        speed: 1.0,
                     },
                     BlendChild {
                         clip: "assets/animations/noodle/Walk.anim.json".into(),
                         threshold: 2.0,
+                        speed: walk_speed,
                     },
                 ],
             }),
@@ -320,6 +327,25 @@ fn a_blend_tree_mixes_its_clips_by_the_parameter() {
     assert!(z(0.0).abs() < 1e-4);
     assert!((z(2.0) - 1.0).abs() < 1e-3, "{}", z(2.0));
     assert!((z(1.0) - 0.5).abs() < 1e-3, "{}", z(1.0));
+}
+
+#[test]
+fn a_blend_tree_clips_speed_sets_its_share_of_the_cadence() {
+    // Walk twice as fast: alone it lasts half its second, and halfway its
+    // half second and Idle's two share the pass.
+    let (compiled, model) = locomotion_with(2.0);
+    assert!((compiled.duration(0, &speed(2.0)) - 0.5).abs() < 1e-9);
+    assert!((compiled.duration(0, &speed(1.0)) - 1.25).abs() < 1e-9);
+    assert!((compiled.duration(0, &speed(0.0)) - 2.0).abs() < 1e-9);
+    // Its pose at a phase is the same: only how fast the phase goes changes.
+    let (plain, _) = locomotion();
+    let rig = model.rig.as_ref().unwrap();
+    let posed = |compiled: &crate::Compiled| {
+        let mut pose = rig.rest_pose();
+        compiled.sample(0, 0.3, rig, &speed(1.5), &mut pose);
+        pose
+    };
+    assert_eq!(posed(&compiled), posed(&plain));
 }
 
 #[test]

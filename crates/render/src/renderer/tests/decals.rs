@@ -14,6 +14,7 @@ fn settings(quality: Quality) -> GraphicsSettings {
     GraphicsSettings {
         ambient_occlusion: Some(AmbientOcclusion::Off),
         contact_shadows: Some(false),
+        screen_space_reflections: Some(false),
         volumetric_fog: Some(false),
         ..GraphicsSettings::preset(quality)
     }

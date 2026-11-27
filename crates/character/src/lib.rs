@@ -15,10 +15,13 @@
 //! The controller of the player's `Character`, or else the first such
 //! controller in the Workspace that has a body, receives the input and
 //! owns the camera: behind the character, zoomed with the mouse
-//! wheel, for a third-person one, or at its eyes for a first-person one.
+//! wheel, for a third-person one, or at its eyes for a first-person one
+//! (and for a third-person one zoomed all the way in). The eyes are the
+//! posed skeleton's eye bones where it has them ([`Controllers::place_eyes`]).
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use axcenity_anim::Poses;
 use axcenity_assets::Assets;
 use axcenity_core::input::{InputMap, InputState};
 use axcenity_core::{ClassName, InstanceId, Value, Vector3, World};
@@ -51,6 +54,27 @@ const MIN_CAMERA_DISTANCE: f32 = 0.5;
 /// zooming feels the same near the character and far from it.
 const ZOOM_PER_NOTCH: f32 = 0.2;
 const MIN_ZOOM_STEP: f32 = 1.0;
+/// A third-person camera zoomed in this close (its closest) goes to the
+/// character's eyes: first person, as in Roblox. A `CameraMinZoomDistance`
+/// over it keeps the camera behind the character.
+const EYES_DISTANCE: f32 = MIN_CAMERA_DISTANCE + 1e-3;
+/// How far in front of the eye bones the camera sits, in studs: at the
+/// front of the eyes, so the near plane leaves the lashes and lids out.
+const EYE_FORWARD: f32 = 0.06;
+/// How much further forward it goes looking straight down, in studs (in
+/// proportion on the way there): the head doesn't bow with the camera, so
+/// from the eyes looking down the nose filled the view; from here it's
+/// behind the camera, and the chest and feet are seen.
+const EYE_FORWARD_DOWN: f32 = 0.26;
+/// A controller's `TurnSpeed` when it has none: the fastest it turns to
+/// face the way it walks, in degrees a second.
+pub const DEFAULT_TURN_SPEED: f32 = 720.0;
+/// How quickly a turn closes on the way to walk (per second): each step
+/// turns this share of what's left, so a turn starts briskly and settles
+/// in instead of stopping dead, under `TurnSpeed`.
+const TURN_RESPONSE: f32 = 14.0;
+/// Turned this close to the way to walk (radians), the turn is done.
+const TURN_DONE: f32 = 0.2 * std::f32::consts::PI / 180.0;
 /// The `Movement` of a dead character (Phase 46): a custom mode, so the
 /// controller doesn't move it, and [`Controllers::keep_kinematic`] leaves
 /// its parts to physics.
@@ -136,11 +160,21 @@ enum Eye {
 }
 
 impl Eye {
+    /// The controller's kind of camera, by its class.
     fn of(world: &World, id: InstanceId) -> Option<Self> {
         match world.get(id)?.class() {
             ClassName::ThirdPersonController => Some(Eye::Follow),
             ClassName::FirstPersonController => Some(Eye::Eyes),
             _ => None,
+        }
+    }
+
+    /// Where its camera is now: a third-person one zoomed all the way in
+    /// is at the eyes.
+    fn seen(world: &World, id: InstanceId) -> Option<Self> {
+        match Self::of(world, id)? {
+            Eye::Follow if camera_distance(world, id) <= EYES_DISTANCE => Some(Eye::Eyes),
+            eye => Some(eye),
         }
     }
 }
@@ -340,6 +374,14 @@ pub struct Controllers {
     /// The last step of the character that takes input, for prediction
     /// (MP6a, [`Controllers::take_drive`]).
     driven: Option<(InstanceId, Drive)>,
+    /// The way each character is turning to face (radians, as `facing`
+    /// counts), kept until it gets there, so a turn finishes after the
+    /// keys are let go.
+    headings: BTreeMap<InstanceId, f32>,
+    /// Where the eyes of the character that takes input are, from its
+    /// posed skeleton ([`Controllers::place_eyes`]): from the middle of its
+    /// feet, turned back by the way it faces, so it rides on the body.
+    eyes: Option<(InstanceId, Vector3)>,
 }
 
 impl Controllers {
@@ -429,6 +471,7 @@ impl Controllers {
         self.crouches.retain(|id, _| world.get(*id).is_some());
         self.built_in.retain(|id, _| world.get(*id).is_some());
         self.facing.retain(|id, _| world.get(*id).is_some());
+        self.headings.retain(|id, _| world.get(*id).is_some());
         self.footings.retain(|id, _| world.get(*id).is_some());
         let active = self.active_of(world);
         self.update_seats(world, assets, active, input.jump);
@@ -448,16 +491,18 @@ impl Controllers {
             return None;
         };
         self.active = Some(id);
-        let eye = Eye::of(world, id).unwrap_or(Eye::Follow);
+        let kind = Eye::of(world, id).unwrap_or(Eye::Follow);
         let turned = self.drive_seat(world, id, input).unwrap_or(0.0);
-        let orbit = self.orbits.entry(id).or_insert_with(|| Orbit::start(eye));
+        let orbit = self.orbits.entry(id).or_insert_with(|| Orbit::start(kind));
         // A camera in a car turns with it (see `seat`).
         orbit.yaw += turned;
         orbit.look(input.look_dx, input.look_dy);
         let orbit = *orbit;
-        if eye == Eye::Follow {
+        if kind == Eye::Follow {
             zoom(world, id, input.zoom);
         }
+        // Zoomed all the way in, a third-person camera is at the eyes.
+        let eye = Eye::seen(world, id).unwrap_or(kind);
         let view = Some((orbit.yaw, eye));
         self.move_character(world, assets, id, view, input, dt);
         self.view(world)
@@ -483,13 +528,14 @@ impl Controllers {
         input: MoveInput,
         dt: f32,
     ) {
-        if let Some((yaw, _)) = view {
+        if let Some((yaw, eye)) = view {
             self.driven = Some((
                 id,
                 Drive {
                     input,
                     yaw,
                     seconds: dt,
+                    eyes: eye == Eye::Eyes,
                 },
             ));
         }
@@ -552,9 +598,23 @@ impl Controllers {
             }
         }
         if flag(world, id, "AutoRotate") {
+            // At the eyes it faces where the camera looks, at once; walking,
+            // it turns toward the way it goes under its TurnSpeed, and goes
+            // on turning there once the keys are let go.
             let face = match view {
-                Some((yaw, Eye::Eyes)) => Some(yaw),
-                _ => heading(dx, dz).map(|(ux, uz)| (-ux).atan2(-uz)),
+                Some((yaw, Eye::Eyes)) => {
+                    self.headings.remove(&id);
+                    Some(yaw)
+                }
+                _ => {
+                    if let Some((ux, uz)) = heading(dx, dz) {
+                        self.headings.insert(id, (-ux).atan2(-uz));
+                    }
+                    self.headings
+                        .get(&id)
+                        .copied()
+                        .map(|face| self.ease_turn(world, &body, id, face, dt))
+                }
             };
             if let Some(face) = face
                 && self.turn(world, &body, id, face)
@@ -596,6 +656,43 @@ impl Controllers {
             Some(footing) => self.footings.insert(id, footing),
             None => self.footings.remove(&id),
         };
+    }
+
+    /// The way the character `id` drives faces after this step's share of
+    /// its turn toward `face` (radians, as [`turn`](Self::turn) takes
+    /// them): `TURN_RESPONSE` of what's left each second, no faster than
+    /// its `TurnSpeed` (degrees a second; 0 or less turns at once). Close
+    /// enough, it's `face`, and the turn is done.
+    fn ease_turn(&mut self, world: &World, body: &Body, id: InstanceId, face: f32, dt: f32) -> f32 {
+        let Some(now) = self.facing_now(world, body, id) else {
+            return face;
+        };
+        let speed = number(world, id, "TurnSpeed").unwrap_or(DEFAULT_TURN_SPEED);
+        let left = wrap_angle(face - now);
+        if !(speed.is_finite() && speed > 0.0) || left.abs() <= TURN_DONE {
+            self.headings.remove(&id);
+            return face;
+        }
+        let most = speed.to_radians() * dt;
+        let step = (left * (1.0 - (-TURN_RESPONSE * dt).exp())).clamp(-most, most);
+        if (left - step).abs() <= TURN_DONE {
+            self.headings.remove(&id);
+            return face;
+        }
+        now + step
+    }
+
+    /// The way the character `id` drives faces now (radians, as
+    /// [`turn`](Self::turn) counts them).
+    fn facing_now(&mut self, world: &World, body: &Body, id: InstanceId) -> Option<f32> {
+        let now = world
+            .get(*body.parts.first()?)?
+            .property("Orientation")
+            .and_then(Value::as_vector3)
+            .filter(|o| o.y.is_finite())
+            .map(|o| o.y.to_radians())?;
+        let base = *self.facing.entry(id).or_insert(now);
+        Some(now - base)
     }
 
     /// Turns the character `id` drives about the middle of its box, so it
@@ -709,10 +806,67 @@ impl Controllers {
             Some(id) if is_driver(world, id) => id,
             _ => self.active_of(world)?,
         };
-        let eye = Eye::of(world, id)?;
-        let orbit = self.orbits.get(&id).copied().unwrap_or(Orbit::start(eye));
+        let kind = Eye::of(world, id)?;
+        let eye = Eye::seen(world, id)?;
+        let orbit = self.orbits.get(&id).copied().unwrap_or(Orbit::start(kind));
         let standing = self.crouches.get(&id).map(|crouched| crouched.height);
-        pose_camera(world, id, eye, orbit, standing)
+        let eyes = self
+            .eyes
+            .filter(|&(of, _)| of == id && eye == Eye::Eyes)
+            .map(|(_, at)| at);
+        pose_camera(world, id, eye, orbit, standing, eyes)
+    }
+
+    /// Whether the camera is at the eyes of the character that takes input
+    /// because its third-person camera is zoomed all the way in: the
+    /// player then looks round with the mouse without holding a button,
+    /// as a first-person game does.
+    pub fn zoomed_to_eyes(&self, world: &World) -> bool {
+        let id = match self.active {
+            Some(id) if is_driver(world, id) => id,
+            _ => match self.active_of(world) {
+                Some(id) => id,
+                None => return false,
+            },
+        };
+        Eye::of(world, id) == Some(Eye::Follow) && Eye::seen(world, id) == Some(Eye::Eyes)
+    }
+
+    /// After the Animators pose the characters (`poses`): where the eyes
+    /// of the character that takes input are, while its camera is at its
+    /// eyes, from the eye bones of its skinned body (`LeftEye` and
+    /// `RightEye`, `eye.L` and `eye.R`, ...), so the camera sees from them
+    /// as the head moves (walking, crouching, an animation's look round).
+    /// A body without them keeps `EyeHeight` (a first-person one) or
+    /// `CameraHeight` above its feet.
+    pub fn place_eyes(&mut self, world: &World, assets: &Assets, poses: &Poses) {
+        self.eyes = None;
+        let Some(id) = self.active.filter(|&id| world.get(id).is_some()) else {
+            return;
+        };
+        if Eye::seen(world, id) != Some(Eye::Eyes) {
+            return;
+        }
+        let Some(body) = Body::read(world, id) else {
+            return;
+        };
+        let Some(at) = body
+            .parts
+            .iter()
+            .find_map(|&part| eyes_of(world, assets, poses, part))
+        else {
+            return;
+        };
+        let turn = world
+            .get(body.parts[0])
+            .and_then(|part| part.property("Orientation"))
+            .and_then(Value::as_vector3)
+            .map_or(0.0, |o| o.y.to_radians());
+        let (x, z) = turn_by(at.x - body.pivot_x, at.z - body.pivot_z, -turn);
+        let offset = Vector3::new(x, at.y - body.feet_y, z);
+        if finite(offset) {
+            self.eyes = Some((id, offset));
+        }
     }
 
     /// The character (Model or part) whose controller the last
@@ -1628,26 +1782,95 @@ fn pose_camera(
     eye: Eye,
     orbit: Orbit,
     standing: Option<f32>,
+    eyes: Option<Vector3>,
 ) -> Option<CharacterCamera> {
     let body = Body::read(world, id)?;
     let drop = standing.map_or(0.0, |height| (height - body.height).max(0.0));
     let (sy, cy) = orbit.yaw.sin_cos();
     let (sp, cp) = orbit.pitch.sin_cos();
     let forward = (-sy * cp, sp, -cy * cp);
+    let yaw = (orbit.yaw.to_degrees() + 180.0).rem_euclid(360.0) - 180.0;
+    let orientation = Vector3::new(orbit.pitch.to_degrees(), yaw, 0.0);
+    if let Some(eyes) = eyes {
+        // The posed eyes, turned as the body is now, and a little in front
+        // of them the way the camera faces (more looking down).
+        let turn = world
+            .get(body.parts[0])
+            .and_then(|part| part.property("Orientation"))
+            .and_then(Value::as_vector3)
+            .map_or(0.0, |o| o.y.to_radians());
+        let (x, z) = turn_by(eyes.x, eyes.z, turn);
+        let ahead = EYE_FORWARD + EYE_FORWARD_DOWN * (-sp).max(0.0);
+        return Some(CharacterCamera {
+            position: Vector3::new(
+                body.pivot_x + x - sy * ahead,
+                body.feet_y + eyes.y,
+                body.pivot_z + z - cy * ahead,
+            ),
+            orientation,
+        });
+    }
     let (height, distance) = match eye {
         Eye::Follow => (camera_height(world, id), camera_distance(world, id)),
-        Eye::Eyes => (number(world, id, "EyeHeight").unwrap_or(4.5), 0.0),
+        Eye::Eyes => match Eye::of(world, id) {
+            // A third-person body without eye bones: where its camera looks.
+            Some(Eye::Follow) => (camera_height(world, id), 0.0),
+            _ => (number(world, id, "EyeHeight").unwrap_or(4.5), 0.0),
+        },
     };
     let look_y = body.feet_y + height - drop;
-    let yaw = (orbit.yaw.to_degrees() + 180.0).rem_euclid(360.0) - 180.0;
     Some(CharacterCamera {
         position: Vector3::new(
             body.pivot_x - forward.0 * distance,
             look_y - forward.1 * distance,
             body.pivot_z - forward.2 * distance,
         ),
-        orientation: Vector3::new(orbit.pitch.to_degrees(), yaw, 0.0),
+        orientation,
     })
+}
+
+/// `(x, z)` turned `angle` radians about Y, the way [`Controllers::turn`]
+/// turns parts.
+fn turn_by(x: f32, z: f32, angle: f32) -> (f32, f32) {
+    let (sin, cos) = angle.sin_cos();
+    (x * cos + z * sin, -x * sin + z * cos)
+}
+
+/// Whether a bone's name is a left or right eye's: `LeftEye`, `RightEye`,
+/// `eye.L`, `eye_R`, `mixamorig:LeftEye` and the like.
+fn is_eye_bone(name: &str) -> bool {
+    let name = name.rsplit(':').next().unwrap_or(name);
+    let plain: String = name
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .collect::<String>()
+        .to_ascii_lowercase();
+    matches!(plain.as_str(), "lefteye" | "righteye" | "eyel" | "eyer")
+}
+
+/// The middle of the eyes of skinned MeshPart `part` in the world, as
+/// `poses` has it posed (at rest without a pose); `None` unless it has
+/// two eye bones.
+fn eyes_of(world: &World, assets: &Assets, poses: &Poses, part: InstanceId) -> Option<Vector3> {
+    let instance = world.get(part)?;
+    if instance.class() != ClassName::MeshPart {
+        return None;
+    }
+    let mesh = instance.property("MeshId").and_then(Value::as_str)?;
+    let rig = assets.model_blocking(mesh)?.rig.clone()?;
+    let bones: Vec<usize> = (0..rig.bones.len())
+        .filter(|&bone| is_eye_bone(&rig.bones[bone].name))
+        .collect();
+    if bones.len() != 2 {
+        return None;
+    }
+    let posed = poses.get(&part).map(|posed| &**posed);
+    let mut sum = Vector3::new(0.0, 0.0, 0.0);
+    for bone in bones {
+        let at = axcenity_anim::ragdoll::bone_in_world(world, part, &rig, posed, bone)?.w_axis;
+        sum = Vector3::new(sum.x + at.x, sum.y + at.y, sum.z + at.z);
+    }
+    Some(Vector3::new(sum.x * 0.5, sum.y * 0.5, sum.z * 0.5))
 }
 
 #[cfg(test)]

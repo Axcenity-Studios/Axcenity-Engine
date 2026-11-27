@@ -80,6 +80,8 @@ pub(super) struct FogRaw {
     pub(super) distance: [f32; 4],
     pub(super) height: [f32; 4],
     pub(super) sun: [f32; 4],
+    /// xyz: toward the sun, w: how many studs from the camera height fog
+    /// starts (`Fog::height_start`).
     pub(super) sun_direction: [f32; 4],
     /// x: how many of `dust` are drawn, y: where the ray traced air (LE3)
     /// starts in the ray traced shadow mask, in u32s (0: not traced; the
@@ -185,6 +187,11 @@ impl FogRaw {
         } else {
             0.0
         };
+        let height_start = if fog.height_start.is_finite() {
+            fog.height_start.max(0.0)
+        } else {
+            0.0
+        };
         let forward = if fog.forward_scattering.is_finite() {
             fog.forward_scattering.clamp(-0.95, 0.95)
         } else {
@@ -200,7 +207,7 @@ impl FogRaw {
             distance: [start, end, scattering, f32::from(u8::from(own_in_grid))],
             height: [density, fog.height, fog.falloff.max(0.001), reach],
             sun: (sun_radiance * scattering).extend(forward).to_array(),
-            sun_direction: sun_direction.extend(0.0).to_array(),
+            sun_direction: sun_direction.extend(height_start).to_array(),
             ..Self::default()
         }
     }
@@ -690,7 +697,28 @@ mod tests {
         assert!(raw.distance[0] >= NEVER, "no distance fog");
         assert_eq!(raw.height, [0.01, -5.0, 20.0, VOLUMETRIC_REACH]);
         assert_eq!(raw.sun, [1.0, 1.0, 1.0, 0.6]);
+        assert_eq!(raw.sun_direction[3], 0.0, "from the camera");
+        // A start distance rides in the sun direction's spare w; one that
+        // isn't a number, or below 0, starts at the camera.
+        let started = |height_start| {
+            FogRaw::new(
+                &Fog {
+                    height_start,
+                    ..fog
+                },
+                horizon,
+                Vec3::ONE,
+                Vec3::Y,
+                Vec3::ONE,
+                0.0,
+            )
+            .sun_direction
+        };
+        assert_eq!(started(40.0), [0.0, 1.0, 0.0, 40.0]);
+        assert_eq!(started(-3.0)[3], 0.0);
+        assert_eq!(started(f32::NAN)[3], 0.0);
     }
+
     #[test]
     fn height_fogs_own_light_moves_into_the_volumetric_grid_but_distance_fogs_does_not() {
         let height = Fog {

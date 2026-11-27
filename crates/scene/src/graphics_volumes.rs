@@ -285,6 +285,7 @@ fn mix_fog(a: &Fog, b: &Fog, w: f32) -> Fog {
         (true, true) => Some(Fog {
             height: lerp(a.height, b.height, w),
             falloff: lerp(a.falloff, b.falloff, w),
+            height_start: lerp(a.height_start, b.height_start, w),
             sun_scattering: lerp(a.sun_scattering, b.sun_scattering, w),
             forward_scattering: lerp(a.forward_scattering, b.forward_scattering, w),
             ..*a
@@ -296,6 +297,7 @@ fn mix_fog(a: &Fog, b: &Fog, w: f32) -> Fog {
     if let Some(shape) = shape {
         fog.height = shape.height;
         fog.falloff = shape.falloff;
+        fog.height_start = shape.height_start;
         fog.sun_scattering = shape.sun_scattering;
         fog.forward_scattering = shape.forward_scattering;
     }
@@ -320,6 +322,11 @@ fn mix_grading(a: Option<ColorGrading>, b: Option<ColorGrading>, w: f32) -> Opti
         contrast: lerp(a.contrast, b.contrast, w),
         saturation: lerp(a.saturation, b.saturation, w),
         tint: lerp3(a.tint, b.tint, w),
+        shadow_tint: lerp3(a.shadow_tint, b.shadow_tint, w),
+        highlight_tint: lerp3(a.highlight_tint, b.highlight_tint, w),
+        balance: lerp(a.balance, b.balance, w),
+        curve: lerp(a.curve, b.curve, w),
+        curve_pivot: lerp(a.curve_pivot, b.curve_pivot, w),
         ..switched
     })
 }

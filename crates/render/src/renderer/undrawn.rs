@@ -135,12 +135,21 @@ impl ScenePipeline {
         }
         let lately = self.lately();
         let recent = |last_drawn: u64| last_drawn >= lately;
+        let meshes_before = self.custom_meshes.len();
         if self.keep_undrawn {
             self.free_undrawn_meshes(lately);
         } else {
             self.custom_meshes
                 .retain(|_, cached| recent(cached.last_drawn));
             self.textures.retain(|_, cached| recent(cached.last_drawn));
+        }
+        // A parked ray traced scene keeps BLASes only for meshes still on
+        // the GPU: one freed for the budget (or the clock) takes its BLAS.
+        if self.custom_meshes.len() < meshes_before
+            && let Some(parked) = &mut self.parked_ray_scene
+        {
+            let (meshes, custom) = (&self.meshes, &self.custom_meshes);
+            parked.forget_meshes(|key| super::scene::gpu_mesh_in(meshes, custom, key).is_some());
         }
         self.full_textures
             .retain(|_, cached| recent(cached.last_drawn));
