@@ -511,9 +511,12 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
         ),
         setting(
             Accessibility,
-            "Steady frame rate",
+            "Frame rate limit",
             &[
+                "Steady frame rate",
                 "FPS cap",
+                "FPS limit",
+                "Held",
                 "VSync",
                 "Refresh rate",
                 "OLED flicker",
@@ -521,7 +524,7 @@ pub(in crate::app) const SEARCHABLE: &[SearchableSetting] = {
                 "G-Sync",
                 "VRR",
             ],
-            "Shows frames at a fixed rate so a variable-refresh display doesn't flicker.",
+            "No limit by default; a limit shows frames at a fixed rate so a variable-refresh display doesn't flicker.",
         ),
         setting(
             Accessibility,

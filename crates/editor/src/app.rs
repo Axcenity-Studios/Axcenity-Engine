@@ -1436,7 +1436,7 @@ impl eframe::App for EditorApp {
         let cpu = frame_started.elapsed();
         self.viewport_bar_state.note_editor_frame(cpu);
         self.pace_display(&ctx, frame, frame_started, cpu);
-        self.pace_frame();
+        self.pace_frame(ctx.requested_repaint_last_pass());
         // Restart now, on the viewport's ray tracing badge.
         if self.viewport.take_restart_request() {
             self.restart_editor();
@@ -1623,6 +1623,14 @@ fn paced_refresh(display: Option<Duration>, steady_hz: u32, steady: bool) -> Opt
     }
 }
 
+/// How far apart steady frames are held, if at all: only when someone
+/// chose a frame rate limit (`limit_hz`, 0 for none, the default). Timing
+/// the editor (`AXCENITY_FRAME_LOG`) times the scene, never the grid.
+fn held_apart(steady: bool, limit_hz: u32) -> Option<Duration> {
+    (steady && limit_hz > 0 && !viewport_bar::frame_log_on())
+        .then(|| Duration::from_secs_f64(1.0 / f64::from(limit_hz)))
+}
+
 /// When to present the frame built at `now`, and when the one after it is
 /// due, on a grid `interval` apart that `scheduled` is the next point of.
 /// A frame that's late by less than an interval goes out at once and the
@@ -1754,25 +1762,28 @@ impl EditorApp {
 
     /// Steady frames come as fast as each is ready, so their lengths still
     /// vary with the work in them, and a variable refresh rate display
-    /// follows every one. So while frames are steady, each is held until
-    /// the next point on a fixed grid (`Appearance::steady_hz`) before it's
-    /// presented, which the display sees as one rate. A frame that misses
-    /// its point takes the next one, so the grid holds. Runs after the
-    /// frame is built, just before eframe presents it.
-    fn pace_frame(&mut self) {
+    /// follows every one. Someone whose display flickers for it can choose
+    /// a frame rate limit (`Appearance::steady_hz`, off by default): while
+    /// frames are steady, each is then held until the next point on that
+    /// fixed grid before it's presented, which the display sees as one
+    /// rate. A frame that misses its point takes the next one, so the grid
+    /// holds. Runs after the frame is built, just before eframe presents
+    /// it. `asked` is whether the last frame asked for this one at once.
+    fn pace_frame(&mut self, asked: bool) {
         let steady = self.frame_pace.is_some_and(|(_, steady)| steady);
-        // Timing the editor (`AXCENITY_FRAME_LOG`) times the scene, not the grid.
-        if !steady || self.appearance.steady_hz == 0 || viewport_bar::frame_log_on() {
+        let Some(interval) = held_apart(steady, self.appearance.steady_hz) else {
             self.next_present = None;
-            self.viewport_bar_state.note_pace(if steady {
+            // A frame the last one asked for at once came as soon as it was
+            // ready (working, Play, Hold the refresh rate steady): the real
+            // rate, focused or not. Only one that came on a timer or after a
+            // rest is the editor resting.
+            self.viewport_bar_state.note_pace(if steady || asked {
                 viewport_bar::Pace::Free
             } else {
                 viewport_bar::Pace::OnDemand
             });
             return;
-        }
-        let interval =
-            std::time::Duration::from_secs_f64(1.0 / f64::from(self.appearance.steady_hz));
+        };
         let now = Instant::now();
         let (due, next) = next_present(now, self.next_present, interval);
         self.next_present = Some(next);

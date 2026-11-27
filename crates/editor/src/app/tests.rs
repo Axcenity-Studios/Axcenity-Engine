@@ -2419,6 +2419,62 @@ fn steady_frames_are_presented_on_a_fixed_grid() {
     assert!(Instant::now() >= target);
 }
 
+/// Paul asked for this many times: the viewport bar read "60 FPS (held)"
+/// with the editor focused and 120 with it in the background, because
+/// steady frames were held to a 60 Hz grid he never chose (the default,
+/// saved into every settings file). A new editor holds nothing, focused or
+/// not, and frames are held, and marked so, only with a limit chosen.
+#[test]
+fn frames_are_held_only_to_a_frame_rate_limit_someone_chose() {
+    use std::time::{Duration, Instant};
+    use viewport_bar::Pace;
+    let mut app = EditorApp::new(None);
+    assert_eq!(app.appearance.steady_hz, 0, "no limit by default");
+    assert_eq!(held_apart(true, app.appearance.steady_hz), None);
+    // Working in the focused window: steady frames, as fast as each is ready.
+    app.frame_pace = Some((0.0, true));
+    let started = Instant::now();
+    for _ in 0..60 {
+        app.pace_frame(true);
+    }
+    assert!(
+        started.elapsed() < Duration::from_millis(100),
+        "no frame waited for a grid: {:?}",
+        started.elapsed()
+    );
+    assert_eq!(app.viewport_bar_state.held_by(), Pace::Free);
+    // In the background with frames still asked for one after another
+    // (Play, moving scenery asked at once): the real rate, not "idle".
+    app.frame_pace = Some((0.0, false));
+    for _ in 0..60 {
+        app.pace_frame(true);
+    }
+    assert_eq!(app.viewport_bar_state.held_by(), Pace::Free);
+    // Frames that come on a timer while nobody works are the editor resting.
+    for _ in 0..60 {
+        app.pace_frame(false);
+    }
+    assert_eq!(app.viewport_bar_state.held_by(), Pace::OnDemand);
+    // A limit chosen holds steady frames to its grid, and the bar says so.
+    app.appearance.steady_hz = 120;
+    assert_eq!(
+        held_apart(true, 120),
+        Some(Duration::from_secs_f64(1.0 / 120.0))
+    );
+    assert_eq!(held_apart(false, 120), None, "only steady frames are held");
+    app.frame_pace = Some((0.0, true));
+    let started = Instant::now();
+    for _ in 0..60 {
+        app.pace_frame(true);
+    }
+    assert!(
+        started.elapsed() >= Duration::from_millis(450),
+        "60 frames on a 120 Hz grid take about half a second: {:?}",
+        started.elapsed()
+    );
+    assert_eq!(app.viewport_bar_state.held_by(), Pace::Held(120));
+}
+
 /// Every piece of text drawn in `output`, with where it was drawn.
 pub(super) fn drawn_texts(output: &egui::FullOutput) -> Vec<(String, egui::Pos2)> {
     fn walk(shape: &egui::Shape, found: &mut Vec<(String, egui::Pos2)>) {
