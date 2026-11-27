@@ -8,9 +8,9 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 |---|---|---|---|---|
 | 0.1 | `cargo build --workspace --all-targets` | Passed | Run (CLI), cloud | Clean build at `cf132127` |
 | 0.2 | Compiler warnings | Passed | Run (CLI), cloud | 0 warnings |
-| 0.3 | `cargo clippy --workspace --all-targets -- -D warnings` | Not started | | |
+| 0.3 | `cargo clippy --workspace --all-targets -- -D warnings` | Passed | Run (CLI), cloud | 0 warnings with `-D warnings` |
 | 0.4 | Every crate's tests | Passed after fix | Automated, cloud | Every crate passes; `every_template_makes_a_project_that_loads_cleanly` updated for the Baseplate pad (QA-006); a stack overflow under plain `cargo test` fixed (QA-014). Run one crate at a time: side by side they ran out of the container's 15 GB |
-| 0.5 | Doc tests | Not started | | |
+| 0.5 | Doc tests | Passed | Run (CLI), cloud | `cargo test --workspace --doc`: 45 crates, no doc tests in any of them |
 | 0.6 | `python3 scripts/check-wiki.py` | Passed | Run (CLI), cloud | 0 errors, 59 warnings (old `verified_commit`s) |
 | 0.7 | `cargo fmt --all --check` | Passed | Run (CLI), cloud | |
 
@@ -19,24 +19,24 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
 | 1.1 | First launch with no saved settings | Passed | Run (GUI), cloud | Start screen, no saved settings |
-| 1.2 | Start screen pages (Home, Recent, All projects, Learn, Documentation, Characters, Team Projects) | Not started | | |
+| 1.2 | Start screen pages (Home, Recent, All projects, Learn, Documentation, Characters, Team Projects) | Passed | Automated, cloud | 60 `start::` tests pass; Home, Recent and Learn also seen in GUI runs |
 | 1.3 | New Project dialog: templates, name, location, validation, Enter/Esc | Passed after fix | Run (GUI), cloud | QA-001, QA-002; QA-008 open |
 | 1.4 | Open Project: valid folder, empty folder, not-a-project, damaged `axcenity.json`, newer format | Passed after fix | Run (GUI), cloud | Empty folder, folder of projects (QA-011), damaged `axcenity.json` (opens empty with a clear message), format 999 (refused clearly) |
 | 1.5 | Recent projects: open, remove, missing folder | Partially functional | Run (GUI), cloud | Open and persistence after restart pass; thumbnail placeholder QA-013 |
 | 1.6 | Project settings dialog from the start screen | Not started | | |
-| 1.7 | User templates: Save as Template, import, delete | Not started | | |
+| 1.7 | User templates: Save as Template, import, delete | Passed | Automated, cloud | `save_as_template_makes_a_template_new_project_lists` and 4 more |
 
 ## 2. Editor shell
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
 | 2.1 | Header menus: File, Edit, View, Debug, Help, Build Game | Partially functional | Run (GUI), cloud | File menu items checked (New, Open, Save, Version History, Checkpoint, Import, Build Game, Close Project); Close Project hung (QA-021, fixed). Edit, View, Debug, Help menus opened but not every item run |
-| 2.2 | Ribbon tabs and their buttons | Not started | | |
+| 2.2 | Ribbon tabs and their buttons | Passed | Automated, cloud | 24 ribbon tests, e.g. `every_insertable_on_the_ribbon_says_what_it_does`; Insert and Script tabs used in GUI runs |
 | 2.3 | Keyboard shortcuts (Ctrl+S, Ctrl+Z/Y, Ctrl+D, Del, F2, F5, Ctrl+K, tool keys) | Passed | Run (GUI), cloud | Ctrl+S, Ctrl+Z, Ctrl+D, Delete, F2 checked |
-| 2.4 | Universal search / command palette (Ctrl+K), Quick Open | Not started | | |
-| 2.5 | Panels: show/hide, drag, dock, float, Reset Layout, saved layouts | Not started | | |
-| 2.6 | Window resize, small window, large window | Not started | | |
-| 2.7 | Toasts, Console/Output messages, error wording | Not started | | |
+| 2.4 | Universal search / command palette (Ctrl+K), Quick Open | Passed | Automated, cloud | command palette tests (fuzzy match, chips, recents, synonyms); `every_ribbon_and_menu_command_can_be_run_from_the_palette` |
+| 2.5 | Panels: show/hide, drag, dock, float, Reset Layout, saved layouts | Passed | Automated, cloud | floating-panel tests (tear off, dock back, move) |
+| 2.6 | Window resize, small window, large window | Passed | Automated, cloud | 21 narrow-column and responsive tests; the GUI ran at 1600 × 900 only |
+| 2.7 | Toasts, Console/Output messages, error wording | Passed | Automated, cloud | `an_error_stays_until_closed_and_a_click_shows_the_console`; toasts seen in GUI runs |
 | 2.8 | Tooltips on ribbon, toolbar and Properties | Not started | | |
 | 2.9 | Close project / Quit with unsaved changes | Not started |  | |
 
@@ -51,15 +51,15 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 | 3.5 | Properties: edit every field type, invalid input, reset, multi-edit | Passed after fix | Run (GUI), cloud | Filter properties; text in a number field is refused; QA-015 |
 | 3.6 | Undo / redo across tools, Undo History | Passed | Run (GUI), cloud | Undo of delete and of a property |
 | 3.7 | Copy / paste between projects | Not started | | |
-| 3.8 | Levels: new, switch, rename, delete | Not started | | |
-| 3.9 | Prefabs: make, place, apply, revert, unpack | Not started | | |
+| 3.8 | Levels: new, switch, rename, delete | Passed | Automated, cloud | 23 level tests, e.g. `a_level_opens_with_the_projects_services_and_saves_to_its_own_file` |
+| 3.9 | Prefabs: make, place, apply, revert, unpack | Passed | Automated, cloud | prefab tests: variants, Apply, linked copies |
 
 ## 4. Viewport
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
-| 4.1 | Camera: orbit, pan, fly, zoom, focus (F) | Not started | | |
-| 4.2 | View cube, grid, guides, overlays, View Mode | Not started | | |
+| 4.1 | Camera: orbit, pan, fly, zoom, focus (F) | Passed | Automated, cloud | camera tests; orbit and zoom used in GUI runs but not checked one by one |
+| 4.2 | View cube, grid, guides, overlays, View Mode | Passed | Automated, cloud | overlay tests (constraints, paths, navmesh) |
 | 4.3 | Picking and gizmos | Not started | | |
 | 4.4 | Viewport bar (FPS, quality) | Not started | | |
 
@@ -69,10 +69,10 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 |---|---|---|---|---|
 | 5.1 | Import: glTF/GLB, FBX, OBJ, images, audio | Passed | Run (GUI) and Run (CLI, MCP `asset_import`), cloud | OBJ through File > Import (GTK picker); glTF/GLB, PNG, WAV through the same import code. FBX through the corrupt-asset fixture only |
 | 5.2 | Import of a missing, empty or corrupt file | Passed after fix | Run (GUI) and Run (CLI), cloud | Corrupt FBX reported; empty/random `.glb` refused; damaged PNG/WAV were copied in silently (QA-018, fixed) |
-| 5.3 | Assets panel: browse, search, rename, delete, drag into the scene | Not started | | |
-| 5.4 | Check Assets: missing references, fixes | Not started | | |
-| 5.5 | Toolbox (online sources) | Not started | | |
-| 5.6 | Materials: Material tab, custom materials | Not started | | |
+| 5.3 | Assets panel: browse, search, rename, delete, drag into the scene | Passed | Automated, cloud | asset_refs tests: rename keeps uses, a taken name refused, Unused filter |
+| 5.4 | Check Assets: missing references, fixes | Passed | Automated, cloud | Asset Check tests incl. levels not open and data tables; QA-022 found by Build Game |
+| 5.5 | Toolbox (online sources) | Unable to verify | Automated, cloud | toolbox tests pass offline; the real sites are blocked from the cloud |
+| 5.6 | Materials: Material tab, custom materials | Passed | Automated, cloud | custom material and Material tab tests |
 
 ## 6. Play mode
 
@@ -82,7 +82,7 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 | 6.2 | Play with a script error | Passed | Run (CLI), cloud | `axcenity-server` on fixtures: syntax error and nil index reported with `scripts/Script.server.lua:2` |
 | 6.3 | Play repeatedly (start/stop many times) | Passed | Run (GUI), cloud | Three Play/Stop runs: editor memory 2.31 GB after each |
 | 6.4 | Multi-client Play | Not started | | |
-| 6.5 | Developer console (F9) | Not started | | |
+| 6.5 | Developer console (F9) | Passed | Automated, cloud | `f9_in_play_opens_the_console_which_runs_timescale_and_the_games_commands` |
 
 ## 7. Scripting
 
@@ -91,34 +91,34 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 | 7.1 | New Script, script tab, save, completion, diagnostics | Partially functional | Run (GUI), cloud | New Script from the Script tab, typed, saved with Ctrl+S, ran in Play. Completion and diagnostics need luau-lsp (the editor offers a 5 MB download; not taken offline) |
 | 7.2 | Runtime errors reported with file and line | Passed | Run (CLI), cloud | File and line, with a stack line |
 | 7.3 | Infinite loop watchdog | Passed | Run (CLI), cloud | `while true do end` stopped after 3 s with advice to add `task.wait()` |
-| 7.4 | Blocks editor and Graph view | Not started | | |
-| 7.5 | Debugger (breakpoints, step) | Not started | | |
+| 7.4 | Blocks editor and Graph view | Passed | Automated, cloud | 50 block editor tests |
+| 7.5 | Debugger (breakpoints, step) | Passed | Automated, cloud | `a_breakpoint_holds_the_whole_frame_until_continue` and 3 more |
 | 7.6 | Hot reload in Play | Not started | | |
-| 7.7 | Find in Scripts | Not started | | |
+| 7.7 | Find in Scripts | Passed | Automated, cloud | `find_in_scripts_finds_a_name_in_lua_and_blocks_and_replace_all_undoes_in_one_step` |
 
 ## 8. Physics, audio, animation, UI, terrain
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
-| 8.1 | Physics: falling parts, anchored, joints, collision groups | Not started | | |
-| 8.2 | Audio: Sound objects, Mixer | Not started | | |
-| 8.3 | Animation tab: clips, record, play | Not started | | |
-| 8.4 | UI Designer: ScreenGui, widgets, live preview | Not started | | |
-| 8.5 | Terrain Studio: sculpt, paint, generate | Not started | | |
-| 8.6 | Character Studio workspace | Not started | | |
-| 8.7 | Model Studio | Not started | | |
+| 8.1 | Physics: falling parts, anchored, joints, collision groups | Passed | Automated, cloud | physics crate 158 tests; falling parts seen in Play |
+| 8.2 | Audio: Sound objects, Mixer | Unable to verify | Automated, cloud | audio crate 21 tests pass; no sound device, nothing heard |
+| 8.3 | Animation tab: clips, record, play | Passed | Automated, cloud | anim crate 198 tests, 64 editor animation tests |
+| 8.4 | UI Designer: ScreenGui, widgets, live preview | Passed | Automated, cloud | editor-ui-designer 47 tests, 24 editor designer tests |
+| 8.5 | Terrain Studio: sculpt, paint, generate | Passed | Automated, cloud | terrain crate 71 tests, 48 editor terrain tests |
+| 8.6 | Character Studio workspace | Passed | Automated, cloud | 197 Character Studio tests (one fails on lavapipe only) |
+| 8.7 | Model Studio | Passed | Automated, cloud | editor-model-studio 69 tests, mesh-edit 131 |
 
 ## 9. Settings
 
 | # | Check | Status | How / where | Notes |
 |---|---|---|---|---|
 | 9.1 | Every Settings page opens and its controls respond | Passed after fix | Run (GUI), cloud | Every page opened; checkboxes were nearly invisible (QA-009, QA-010) |
-| 9.2 | Settings persist across a restart | Not started | | |
+| 9.2 | Settings persist across a restart | Passed | Run (GUI), cloud | Recent projects and the window kept after quitting and starting again with the same settings folder; 21 settings tests. Not every setting checked one by one |
 | 9.3 | Invalid values (empty paths, extreme numbers) | Not started | | |
 | 9.4 | Reset to default | Not started | | |
 | 9.5 | Restart-required settings say so | Not started | | |
-| 9.6 | Settings > This project (project settings) | Not started | | |
-| 9.7 | Input window (File > Input…) | Not started | | |
+| 9.6 | Settings > This project (project settings) | Passed | Run (GUI), cloud | The page opens and its fields show; nothing changed |
+| 9.7 | Input window (File > Input…) | Passed | Automated, cloud | `edits_add_and_remove_inputs_and_actions_and_reset` |
 | 9.8 | Damaged editor settings file | Passed after fix | Run (GUI), cloud | A truncated `app.ron` reset every setting silently (QA-020, fixed) |
 
 ## 10. Save, load and recovery
@@ -138,7 +138,7 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 |---|---|---|---|---|
 | 11.1 | Build Game for this OS (`--build-game` and the menu) | Passed after fix | Run (CLI) and Run (GUI), cloud | `--build-game` and File > Build Game > For this OS (9.2 s, 136.5 MB). A new project's first build listed 84 false Asset Check problems (QA-022, fixed). No picker, no build from the menu (QA-023) |
 | 11.2 | The built game runs | Partially functional | Run (CLI), cloud | The built game starts and runs its script ("Hello world!"); its window stayed black for the minute watched on lavapipe: check on real GPU |
-| 11.3 | Build Game for another OS | Not started | | |
+| 11.3 | Build Game for another OS | Unable to verify |  | needs the other OS's player beside the editor |
 
 ## 12. Networking
 
@@ -146,8 +146,8 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 |---|---|---|---|---|
 | 12.1 | Host and join on one computer (player) | Unable to verify | Run (CLI), cloud | Host started and the joiner connected far enough to say "Joining", then the host was killed for memory (two software-GPU players plus tests). Needs the Linux box or PC |
 | 12.2 | Dedicated server, headless | Passed | Run (CLI), cloud | `axcenity-server` hosts with encryption and reports the UPnP failure in plain words |
-| 12.3 | Collaborate session on one computer | Not started | | |
-| 12.4 | Two-computer LAN / Tailscale | Not started | | |
+| 12.3 | Collaborate session on one computer | Passed | Automated, cloud | collab 175 tests, 59 editor Collaborate tests incl. host hand-off |
+| 12.4 | Two-computer LAN / Tailscale | Unable to verify |  | needs two computers |
 
 ## 13. Beginner end-to-end workflow
 

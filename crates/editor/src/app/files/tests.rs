@@ -1468,3 +1468,11 @@ impl egui::DroppedFile for Dropped {
 fn dropped_file(path: &Path) -> egui::DroppedFileHandle {
     std::sync::Arc::new(Dropped(path.to_path_buf()))
 }
+
+#[test]
+fn a_picker_that_stayed_open_a_while_was_cancelled_not_missing() {
+    // QA-023: only an empty answer that comes back at once can mean that no
+    // picker opened; one after a second is the person cancelling.
+    let asked = Instant::now() - Duration::from_secs(1);
+    assert!(!super::pickers::picker_never_opened(asked));
+}
