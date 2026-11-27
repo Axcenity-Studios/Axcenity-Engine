@@ -826,3 +826,14 @@ mod sky_control_tests {
         }
     }
 }
+
+/// A part's Transparency is 0 (solid) to 1 (invisible): typing 5 or -1
+/// gives 1 or 0, not a value the renderer can't show (QA-015).
+#[test]
+fn transparency_is_limited_to_0_to_1() {
+    for name in ["Transparency", "Metalness", "Roughness"] {
+        let (_, range) = values::number_limits(name).unwrap();
+        assert_eq!(range, 0.0..=1.0, "{name}");
+    }
+    assert!(values::number_limits("Size").is_none());
+}

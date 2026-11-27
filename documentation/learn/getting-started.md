@@ -14,7 +14,7 @@ Axcenity is a free, open-source 3D game engine and editor. You build worlds out 
 
 ## Install
 
-- **Installers**: alpha builds are on the project's [GitHub releases page](https://github.com/MrBearson321/Axcenity-Engine/releases): a Windows setup wizard (`.exe`), a macOS disk image (`.dmg`), and Linux `.deb`, `.rpm`, `.pkg.tar.zst`, `.tar.gz` and AppImage packages.
+- **Installers**: alpha builds are on the project's [GitHub releases page](https://github.com/PaulJanota/Axcenity-Engine/releases): a Windows setup wizard (`.exe`), a macOS disk image (`.dmg`), and Linux `.deb`, `.rpm`, `.pkg.tar.zst`, `.tar.gz` and AppImage packages.
 - **From source**: install Rust with rustup, then run the editor from the engine's folder:
 
 ```sh
@@ -49,6 +49,6 @@ Hold the **right mouse button** and move the mouse to look around. While it is h
 
 ## Where to go next
 
-- Take the tutorial [Place and move a part](https://github.com/MrBearson321/Axcenity-Engine/tree/main/crates/samples/projects/part) in the **part** sample, then [Editor interface](editor-interface.md).
-- Every sample project in the engine's `examples` folder can be opened from Learn with one click. They run without the editor too.
+- Take the tutorial [Place and move a part](https://github.com/PaulJanota/Axcenity-Engine/tree/main/crates/samples/projects/part) in the **part** sample, then [Editor interface](editor-interface.md).
+- Every sample project, in the engine's source under `crates/samples/projects`, opens from Learn with one click in an editor built from source. They run without the editor too (`axcenity-player <folder>`).
 - When you want the details behind a feature, the [Documentation](../README.md) has a page for each system.

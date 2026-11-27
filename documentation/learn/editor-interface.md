@@ -90,7 +90,7 @@ Plugins are Lua scripts that add tools to the editor: buttons on the ribbon's **
 - **Export** on a plugin saves it as one `.axcenity-plugin` file to send to someone. **Import plugin…**, in the Plugins panel or the Toolbox's **Packs** menu, installs one. A package may only hold `plugin.json`, `.lua` and `.css` files.
 - A plugin can only read and write the project's files if its `plugin.json` asks for the `files` permission.
 
-The [plugins](https://github.com/MrBearson321/Axcenity-Engine/tree/main/crates/samples/projects/plugins) sample has two worked plugins.
+The [plugins](https://github.com/PaulJanota/Axcenity-Engine/tree/main/crates/samples/projects/plugins) sample has two worked plugins.
 
 ## Keyboard shortcuts you'll use most
 

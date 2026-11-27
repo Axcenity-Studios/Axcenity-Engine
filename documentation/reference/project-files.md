@@ -27,7 +27,7 @@ A project is a folder of readable text files plus your assets, so it works well 
 | `.axcenity/` | Per-computer files; don't commit it (see below). |
 | `thumbnail.png` | The picture on the start screen's project card. |
 
-The full format of each file is in the engine's topic docs and the engineering wiki's [file formats](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Reference/File-Formats.md) page.
+The full format of each file is in the engine's topic docs and the engineering wiki's [file formats](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Reference/File-Formats.md) page.
 
 ## The `.axcenity` folder
 

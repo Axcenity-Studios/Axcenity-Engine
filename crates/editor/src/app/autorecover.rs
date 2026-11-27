@@ -323,10 +323,14 @@ impl EditorApp {
                 tab.text = text;
             }
         }
+        let docs = match documents {
+            1 => "1 document".to_owned(),
+            n => format!("{n} documents"),
+        };
         let what = match (recovered.info.world, documents) {
             (true, 0) => "the world".to_owned(),
-            (true, n) => format!("the world and {n} document(s)"),
-            (false, n) => format!("{n} document(s)"),
+            (true, _) => format!("the world and {docs}"),
+            (false, _) => docs,
         };
         self.output.warning(format!(
             "Recovered {what} from AutoRecover. Save to keep it; closing without saving \
@@ -380,11 +384,17 @@ fn ago(saved_at: u64) -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_secs());
-    let seconds = now.saturating_sub(saved_at);
-    match seconds {
-        0..60 => "less than a minute ago".to_owned(),
-        60..3600 => format!("about {} minute(s) ago", seconds / 60),
-        3600..86_400 => format!("about {} hour(s) ago", seconds / 3600),
-        _ => format!("about {} day(s) ago", seconds / 86_400),
-    }
+    age_in_words(now.saturating_sub(saved_at))
+}
+
+/// "about 4 minutes ago", "about 1 hour ago" for an age in seconds.
+pub(super) fn age_in_words(seconds: u64) -> String {
+    let (count, unit) = match seconds {
+        0..60 => return "less than a minute ago".to_owned(),
+        60..3600 => (seconds / 60, "minute"),
+        3600..86_400 => (seconds / 3600, "hour"),
+        _ => (seconds / 86_400, "day"),
+    };
+    let s = if count == 1 { "" } else { "s" };
+    format!("about {count} {unit}{s} ago")
 }

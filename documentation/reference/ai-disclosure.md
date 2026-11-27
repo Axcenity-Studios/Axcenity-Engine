@@ -45,4 +45,4 @@ Because AI-assisted code can introduce subtle bugs or unsafe patterns if left un
 
 ## Reporting security issues
 
-If you discover a security vulnerability in the engine, networking layer, script sandbox, or editor, please report it privately rather than opening a public issue. See the repository's [SECURITY.md](https://github.com/MrBearson321/Axcenity-Engine/blob/main/SECURITY.md) for reporting instructions.
+If you discover a security vulnerability in the engine, networking layer, script sandbox, or editor, please report it privately rather than opening a public issue. See the repository's [SECURITY.md](https://github.com/PaulJanota/Axcenity-Engine/blob/main/SECURITY.md) for reporting instructions.

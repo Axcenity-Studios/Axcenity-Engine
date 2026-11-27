@@ -50,4 +50,4 @@ The Toolbox downloads textures, skies, models and sounds from **ambientCG** and 
 
 > **Known limits.** Model files aren't watched while the editor runs: reopen the project after replacing one outside the editor. Some older projects name assets by path rather than ID; both work.
 
-More: [Asset pipeline overview](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Asset-Pipeline/Pipeline-Overview.md) in the engineering wiki.
+More: [Asset pipeline overview](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Asset-Pipeline/Pipeline-Overview.md) in the engineering wiki.

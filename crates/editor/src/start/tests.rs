@@ -1691,3 +1691,63 @@ fn new_project_lists_your_templates_and_makes_projects_from_them() {
     );
     let _ = std::fs::remove_dir_all(parent);
 }
+
+/// The New Project dialog keeps its buttons where they are when an error
+/// or a "what's missing" line shows, so a second click lands on the same
+/// button (QA-008: the centred dialog grew and moved them).
+#[test]
+fn new_projects_buttons_stay_put_when_a_line_appears() {
+    let mut start = StartScreen::default();
+    start.new_project(Template::Baseplate);
+    let ctx = theme::test_context();
+    let mut projects = Vec::new();
+    let mut clock = 0.0;
+    let mut create_button = |start: &mut StartScreen| {
+        let mut at = None;
+        // The dialog settles over a frame before its buttons are where they stay.
+        for _ in 0..3 {
+            clock += 10.0;
+            let input = egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(1280.0, 900.0))),
+                time: Some(clock),
+                ..Default::default()
+            };
+            let output = crate::theme::run(&ctx, input, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    let brand = Brand::load(ui.ctx());
+                    start.show(ui, &mut projects, &brand);
+                });
+            });
+            at = drawn_text(&output)
+                .into_iter()
+                .find(|(text, ..)| text == "Create Project")
+                .map(|(_, left, _, top, _)| (left, top));
+        }
+        at.expect("Create Project is drawn")
+    };
+    let set = |start: &mut StartScreen, typed: &str, problem: Option<&str>| {
+        if let Some(Dialog::New {
+            name,
+            parent,
+            error,
+            ..
+        }) = &mut start.dialog
+        {
+            *name = typed.to_owned();
+            *parent = Some(PathBuf::from("/tmp/Axcenity Projects"));
+            *error = problem.map(str::to_owned);
+        }
+    };
+    set(&mut start, "My Game", None);
+    let ready = create_button(&mut start);
+    set(&mut start, "", None);
+    let missing = create_button(&mut start);
+    set(
+        &mut start,
+        "My Game",
+        Some("A folder with that name is already there. Pick another name or location."),
+    );
+    let failed = create_button(&mut start);
+    assert_eq!(ready, missing, "a missing name moved the buttons");
+    assert_eq!(ready, failed, "an error moved the buttons");
+}

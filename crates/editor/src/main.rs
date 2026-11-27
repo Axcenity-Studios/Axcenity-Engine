@@ -174,7 +174,7 @@ fn usage() -> String {
     format!(
         "usage: axcenity-editor [<project folder>] [{host} | {join} <invite link>]\n\
          \x20      axcenity-editor {studio}\n\
-         \x20      axcenity-editor {build} <project folder> <output folder> [--target windows|macos|linux]\n\
+         \x20      axcenity-editor {build} <project folder> <output folder> [--target windows|macos|linux] [--profile <name>]\n\
          \x20      axcenity-editor {cook} <project folder>\n\
          \x20      {movie}\n\
          \x20      axcenity-editor {mcp} <project folder>   (an MCP server for AI clients)\n\

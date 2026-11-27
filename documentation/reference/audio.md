@@ -65,4 +65,4 @@ Effects are children of a Sound or a SoundGroup, applied in **Priority** order; 
 
 > **Known limits.** Panning is stereo only (no HRTF). Occlusion counts walls between the sound and the camera; it doesn't model sound travelling around them.
 
-More: [Audio in the engineering wiki](https://github.com/MrBearson321/axcenity-engine/blob/main/wiki/Engine-Systems/Audio.md).
+More: [Audio in the engineering wiki](https://github.com/PaulJanota/Axcenity-Engine/blob/main/wiki/Engine-Systems/Audio.md).

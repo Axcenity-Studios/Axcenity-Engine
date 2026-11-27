@@ -118,6 +118,7 @@ mod ui_selection;
 mod update_install;
 mod updates;
 mod version_history;
+pub(crate) use version_history::local_when;
 mod viewport_bar;
 mod welcome;
 

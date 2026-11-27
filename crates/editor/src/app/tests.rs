@@ -1110,8 +1110,7 @@ fn opening_a_folder_of_projects_names_the_projects_inside() {
     let line = last_line(&app);
     assert_eq!(line.kind, OutputKind::Error);
     assert!(
-        line.text.contains("isn't an Axcenity project")
-            && line.text.contains("`Alpha` and `Beta`"),
+        line.text.contains("isn't an Axcenity project") && line.text.contains("`Alpha` and `Beta`"),
         "{}",
         line.text
     );

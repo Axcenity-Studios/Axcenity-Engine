@@ -26,8 +26,8 @@ QA_SIZE=${QA_SIZE:-1600x900}
 mkdir -p "$QA_SHOTS"
 export DISPLAY=$QA_DISPLAY
 # Reattach to an editor started by an earlier shell.
-QA_PID=${QA_PID:-$(pgrep -f "$QA_BIN" | head -1)}
-QA_WIN=${QA_WIN:-$( [ -n "$QA_PID" ] && xdotool search --pid "$QA_PID" --onlyvisible 2>/dev/null | head -1)}
+QA_PID=${QA_PID:-$(pgrep -x axcenity-editor | head -1)}
+QA_WIN=${QA_WIN:-$( [ -n "$QA_PID" ] && xdotool search --pid "$QA_PID" 2>/dev/null | head -1)}
 
 qa_xvfb() {
     if ! xdpyinfo -display "$QA_DISPLAY" >/dev/null 2>&1; then

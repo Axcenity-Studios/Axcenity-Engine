@@ -12,6 +12,10 @@ pub(super) fn field_label(ui: &mut egui::Ui, palette: &Palette, text: &str) {
     ui.add_space(theme::space::XXS);
 }
 
+/// The height kept under the New Project dialog's fields for its status
+/// lines: the folder it makes and a one-line error.
+const STATUS_LINES_HEIGHT: f32 = 46.0;
+
 /// A problem with what was typed, in red, with what to do about it.
 pub(super) fn error_line(ui: &mut egui::Ui, palette: &Palette, error: Option<&str>) {
     if let Some(error) = error {
@@ -534,33 +538,40 @@ impl StartScreen {
                         .as_deref()
                         .map(project_location)
                         .filter(|folder| !folder.as_os_str().is_empty());
-                    if let Some(parent) = &location
-                        && !name.trim().is_empty()
-                    {
-                        ui.label(
-                            RichText::new(format!(
-                                "Makes a new folder: {}",
-                                parent.join(name.trim()).display()
-                            ))
-                            .size(type_scale::SMALL)
-                            .color(palette.text_weak),
-                        );
-                    }
-                    error_line(ui, &palette, error.as_deref());
                     let ready = location.is_some() && !name.trim().is_empty();
-                    // Say why Create Project can't be pressed yet.
-                    if !ready && error.is_none() {
-                        let missing = if name.trim().is_empty() {
-                            "Type a name for the project."
-                        } else {
-                            "Choose or type where to make it."
-                        };
-                        ui.label(
-                            RichText::new(missing)
+                    // The lines under the fields keep one height whichever show
+                    // (the folder it makes, what's missing, a one-line error),
+                    // so the centred dialog doesn't move its buttons from under
+                    // the pointer (QA-008).
+                    ui.vertical(|ui| {
+                        ui.set_min_height(STATUS_LINES_HEIGHT);
+                        if let Some(parent) = &location
+                            && !name.trim().is_empty()
+                        {
+                            ui.label(
+                                RichText::new(format!(
+                                    "Makes a new folder: {}",
+                                    parent.join(name.trim()).display()
+                                ))
                                 .size(type_scale::SMALL)
                                 .color(palette.text_weak),
-                        );
-                    }
+                            );
+                        }
+                        error_line(ui, &palette, error.as_deref());
+                        // Say why Create Project can't be pressed yet.
+                        if !ready && error.is_none() {
+                            let missing = if name.trim().is_empty() {
+                                "Type a name for the project."
+                            } else {
+                                "Choose or type where to make it."
+                            };
+                            ui.label(
+                                RichText::new(missing)
+                                    .size(type_scale::SMALL)
+                                    .color(palette.text_weak),
+                            );
+                        }
+                    });
                     // The name is the only thing typed, so Enter there creates.
                     let (create, cancel) = dialog_buttons(
                         ui,
@@ -853,9 +864,11 @@ impl StartScreen {
                                                                 .family(theme::medium_family()),
                                                         );
                                                         ui.label(
-                                                            RichText::new(version.when())
-                                                                .size(type_scale::SMALL)
-                                                                .color(palette.text_weak),
+                                                            RichText::new(crate::app::local_when(
+                                                                version,
+                                                            ))
+                                                            .size(type_scale::SMALL)
+                                                            .color(palette.text_weak),
                                                         );
                                                     });
                                                     ui.with_layout(
@@ -891,7 +904,7 @@ impl StartScreen {
                             "Restore \"{}\" ({})? The current files are kept first as a \
                                  pinned version named \"Before restore\".",
                             version.label,
-                            version.when()
+                            crate::app::local_when(&version)
                         ));
                         ui.horizontal(|ui| {
                             if ui
@@ -908,7 +921,7 @@ impl StartScreen {
                                     Ok(()) => {
                                         *notice = Some(format!(
                                             "Restored the version from {}.",
-                                            version.when()
+                                            crate::app::local_when(&version)
                                         ));
                                         *error = None;
                                         restored = Some(folder.clone());
