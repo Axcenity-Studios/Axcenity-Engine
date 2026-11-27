@@ -300,6 +300,9 @@ fn main() -> eframe::Result {
         std::process::exit(2);
     }
 
+    // eframe names its settings folder after the app ID when there is
+    // one; keep the settings where they have always been, under APP_ID.
+    let settings_file = eframe::storage_dir(APP_ID).map(|folder| folder.join("app.ron"));
     let options = eframe::NativeOptions {
         // The viewport draws with wgpu, so egui must too (they share the GPU device).
         renderer: eframe::Renderer::Wgpu,
@@ -322,9 +325,7 @@ fn main() -> eframe::Result {
         // Always open at the size above, in the middle of the screen. A
         // remembered size can outgrow a monitor (or span two) and stick.
         persist_window: false,
-        // eframe names its settings folder after the app ID when there is
-        // one; keep the settings where they have always been, under APP_ID.
-        persistence_path: eframe::storage_dir(APP_ID).map(|folder| folder.join("app.ron")),
+        persistence_path: settings_file.clone(),
         centered: true,
         wgpu_options: wgpu_options(),
         ..Default::default()
@@ -339,6 +340,9 @@ fn main() -> eframe::Result {
             theme::install(ctx);
             let mut app = EditorApp::new(None);
             app.set_window_icon(window_icon());
+            if let Some(file) = &settings_file {
+                app.check_settings_file(file, creation_context.storage);
+            }
             app.load_settings(ctx, creation_context.storage);
             app.set_global_assets(global_assets::default_folder());
             app.set_characters_folder(character_workspace::default_folder());

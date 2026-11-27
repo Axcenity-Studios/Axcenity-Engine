@@ -18,7 +18,7 @@
 # restart with the same QA_HOME tests persistence and a new one tests a
 # first launch.
 
-QA_ROOT=${QA_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}
+QA_ROOT=${QA_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && git rev-parse --show-toplevel)}
 QA_BIN=${QA_BIN:-$QA_ROOT/target/debug/axcenity-editor}
 QA_SHOTS=${QA_SHOTS:-/home/user/axtmp/shots}
 QA_DISPLAY=${QA_DISPLAY:-:99}
