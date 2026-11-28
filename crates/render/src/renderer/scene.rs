@@ -3845,7 +3845,7 @@ pub(super) fn cascade_turn(frame: usize, index: usize, cascades: usize) -> bool 
     }
     // The frames its neighbour (index - 1) leaves free are those where
     // `frame + index` is even; one of every two of them.
-    alternate && (frame + index) % FARTHEST_CASCADE_TURN == 0
+    alternate && (frame + index).is_multiple_of(FARTHEST_CASCADE_TURN)
 }
 
 /// Which pass a batch is being drawn in (see `ScenePipeline::bind_batch`).
