@@ -286,7 +286,7 @@ fn foliage_fades_out_near_its_cull_distance_and_is_culled_past_it() {
 #[test]
 fn a_grouped_items_level_follows_the_same_rules_as_one_listed_singly() {
     use crate::renderer::lod::LodStates;
-    let [threshold, _] = LOD_SCREEN_SIZES;
+    let threshold = LOD_SCREEN_SIZES[0];
     let start = distance_for(threshold * 1.05);
     let single = square_at(start, 7);
     let mut grouped = single.clone();
