@@ -108,6 +108,10 @@ pub(super) fn warnings(app: &EditorApp) -> Vec<String> {
 
 #[test]
 fn joining_gives_the_same_world_and_both_editors_are_in_the_session() {
+    with_big_stack(joining_gives_the_same_world_and_both_editors_are_in_the_session_test);
+}
+
+fn joining_gives_the_same_world_and_both_editors_are_in_the_session_test() {
     let (a, b, hub) = two_editors();
     assert!(a.in_team_session() && b.in_team_session());
     assert!(a.world.is_recording_edits());
@@ -116,6 +120,10 @@ fn joining_gives_the_same_world_and_both_editors_are_in_the_session() {
 
 #[test]
 fn an_inserted_and_renamed_part_shows_in_the_other_editor() {
+    with_big_stack(an_inserted_and_renamed_part_shows_in_the_other_editor_test);
+}
+
+fn an_inserted_and_renamed_part_shows_in_the_other_editor_test() {
     let (mut a, mut b, hub) = two_editors();
     a.insert(Insertable::Part(PartType::Block), None);
     let part = a.selected.expect("the new part is selected");
@@ -128,6 +136,10 @@ fn an_inserted_and_renamed_part_shows_in_the_other_editor() {
 
 #[test]
 fn a_drag_is_held_until_it_ends() {
+    with_big_stack(a_drag_is_held_until_it_ends_test);
+}
+
+fn a_drag_is_held_until_it_ends_test() {
     let (mut a, mut b, hub) = two_editors();
     let part = a.world.descendants(a.world.workspace())[0];
     let label = "Change Transparency".to_owned();
@@ -164,6 +176,10 @@ fn a_drag_is_held_until_it_ends() {
 
 #[test]
 fn delete_duplicate_and_undo_in_one_editor_reach_the_other() {
+    with_big_stack(delete_duplicate_and_undo_in_one_editor_reach_the_other_test);
+}
+
+fn delete_duplicate_and_undo_in_one_editor_reach_the_other_test() {
     let (mut a, mut b, hub) = two_editors();
     let part = b.world.descendants(b.world.workspace())[0];
     let copy = b.duplicate(part).expect("duplicated");
@@ -186,6 +202,10 @@ fn delete_duplicate_and_undo_in_one_editor_reach_the_other() {
 
 #[test]
 fn edits_made_at_the_same_time_end_the_same_in_both() {
+    with_big_stack(edits_made_at_the_same_time_end_the_same_in_both_test);
+}
+
+fn edits_made_at_the_same_time_end_the_same_in_both_test() {
     let (mut a, mut b, hub) = two_editors();
     let part = a.world.descendants(a.world.workspace())[0];
     rename(&mut a, part, "Mine");
@@ -210,6 +230,10 @@ fn edits_made_at_the_same_time_end_the_same_in_both() {
 
 #[test]
 fn undo_leaves_alone_what_someone_else_changed_since() {
+    with_big_stack(undo_leaves_alone_what_someone_else_changed_since_test);
+}
+
+fn undo_leaves_alone_what_someone_else_changed_since_test() {
     let (mut a, mut b, hub) = two_editors();
     let part = a.world.descendants(a.world.workspace())[0];
     rename(&mut a, part, "Door");
@@ -246,6 +270,10 @@ fn a_viewer_cannot_change_the_world() {
 
 #[test]
 fn many_edits_from_both_editors_stay_identical() {
+    with_big_stack(many_edits_from_both_editors_stay_identical_test);
+}
+
+fn many_edits_from_both_editors_stay_identical_test() {
     let (mut a, mut b, hub) = two_editors();
     for round in 0..20 {
         let (me, other) = if round % 2 == 0 {
@@ -426,6 +454,10 @@ fn the_command_line_asks_for_a_session() {
 
 #[test]
 fn what_one_editor_selects_shows_in_the_others_session() {
+    with_big_stack(what_one_editor_selects_shows_in_the_others_session_test);
+}
+
+fn what_one_editor_selects_shows_in_the_others_session_test() {
     let (mut a, mut b, _hub) = two_editors();
     let part = a.world.descendants(a.world.workspace())[0];
     a.selection = vec![part];
@@ -1143,6 +1175,10 @@ fn stop_offline_then_join_again() {
 
 #[test]
 fn following_a_member_moves_the_camera_with_theirs_until_you_move_it() {
+    with_big_stack(following_a_member_moves_the_camera_with_theirs_until_you_move_it_test);
+}
+
+fn following_a_member_moves_the_camera_with_theirs_until_you_move_it_test() {
     let (mut a, mut b, _hub) = two_editors();
     let b_member = b.team().unwrap().me().unwrap();
     // Presence goes at most 10 times a second.
@@ -1189,6 +1225,10 @@ fn invite_defaults_are_kept_between_runs() {
 
 #[test]
 fn chat_reaches_the_other_editor_with_an_unread_count_and_instance_links() {
+    with_big_stack(chat_reaches_the_other_editor_with_an_unread_count_and_instance_links_test);
+}
+
+fn chat_reaches_the_other_editor_with_an_unread_count_and_instance_links_test() {
     let (mut a, mut b, _hub) = two_editors();
     settle(&mut a, &mut b);
     let part = a.world.get(a.world.workspace()).unwrap().children()[0];
@@ -1228,6 +1268,10 @@ fn chat_reaches_the_other_editor_with_an_unread_count_and_instance_links() {
 
 #[test]
 fn only_paths_of_instances_become_links() {
+    with_big_stack(only_paths_of_instances_become_links_test);
+}
+
+fn only_paths_of_instances_become_links_test() {
     let (a, _b, _hub) = two_editors();
     let part = a.world.get(a.world.workspace()).unwrap().children()[0];
     let path = a.world.full_name(part).unwrap();

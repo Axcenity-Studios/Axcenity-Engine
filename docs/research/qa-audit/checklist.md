@@ -9,7 +9,7 @@ One row per feature. **Status**: Passed · Passed after fix · Partially functio
 | 0.1 | `cargo build --workspace --all-targets` | Passed | Run (CLI), cloud | Clean build at `cf132127` |
 | 0.2 | Compiler warnings | Passed | Run (CLI), cloud | 0 warnings |
 | 0.3 | `cargo clippy --workspace --all-targets -- -D warnings` | Passed | Run (CLI), cloud | 0 warnings with `-D warnings` |
-| 0.4 | Every crate's tests | Passed after fix | Automated, cloud | Every crate passes; `every_template_makes_a_project_that_loads_cleanly` updated for the Baseplate pad (QA-006); a stack overflow under plain `cargo test` fixed (QA-014). Run one crate at a time: side by side they ran out of the container's 15 GB |
+| 0.4 | Every crate's tests | Passed after fix | Automated, cloud and Linux computer | Cloud: every crate one at a time (editor one test per process). Linux computer, `cargo nextest run --workspace` on the RX 9070 XT: `main` 15 failed and 1 timed out; the branch after fixes 5,678 of 5,680 passed. The two left (QA-027, QA-028) fail on `main` too and pass alone. Fixes: QA-006's player test, QA-014, QA-026 |
 | 0.5 | Doc tests | Passed | Run (CLI), cloud | `cargo test --workspace --doc`: 45 crates, no doc tests in any of them |
 | 0.6 | `python3 scripts/check-wiki.py` | Passed | Run (CLI), cloud | 0 errors, 59 warnings (old `verified_commit`s) |
 | 0.7 | `cargo fmt --all --check` | Passed | Run (CLI), cloud | |

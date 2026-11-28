@@ -238,9 +238,10 @@ fn a_new_baseplate_projects_player_is_the_default_humanoid_and_walks_animated() 
         .unwrap();
     let body = game.world.find_first_child(character, "Body").unwrap();
     let start = game.vector(root, "Position");
+    // On the template's spawn pad, one stud above the baseplate.
     assert!(
-        start.y > 2.0 && start.y < 3.0,
-        "standing on the baseplate: {start:?}"
+        start.y > 3.0 && start.y < 4.0,
+        "standing on the spawn pad: {start:?}"
     );
     let animator = game.world.find_first_child(body, "Animator").unwrap();
     let state = |game: &Game| game.world.animator(animator).unwrap().current_state.clone();

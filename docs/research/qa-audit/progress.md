@@ -21,4 +21,5 @@ Newest entry last. Each entry: what ran, the result, what is next.
 - Checklist: 74 of 94 rows done; 15 Not started, left for a run on a real machine.
 - Wrote [report.md](report.md).
 - Paul connected his Linux computer (Fedora, Ryzen 9 9950X3D, RX 9070 XT) and approved pushing `qa-audit` and opening a PR. A separate worktree there (`~/Documents/VSCode Projects/Axcenity-Engine-qa`; his checkout is left alone) runs `cargo nextest run --workspace`.
-- Next: the Linux computer's test results; the 15 Not started rows there; real-GPU checks of the beginner project and the built game; host and join on one computer.
+- Linux computer, `cargo nextest run --workspace`, about 160 s per run. `main`: 5,667 run, 15 failed, 1 timed out. Branch at `3b02a628`: 14 failed, 1 timed out, one of them a regression from the Baseplate pad. Fixed: the pad test, the 11 team tests' stacks (QA-014) and the port-0 race (QA-026), and the garment checks got 4 minutes (QA-027). Branch at `ab3c6e91`: 5,678 of 5,680 passed; the overlay test (QA-028) and the garment timeout fail on `main` too and pass alone.
+- Next: the 15 Not started rows there; real-GPU checks of the beginner project and the built game; host and join on one computer.
