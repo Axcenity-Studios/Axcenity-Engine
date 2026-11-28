@@ -22,8 +22,9 @@ use crate::{Camera, DrawItem, DrawList, ItemChunk, MeshSource, Shape};
 
 /// Below these sizes on screen (the fraction of the screen's height its
 /// bounding sphere covers), an item is drawn with its mesh's first, then
-/// second, simpler copy.
-pub(super) const LOD_SCREEN_SIZES: [f32; 2] = [0.3, 0.12];
+/// second, simpler copy, and below the last with a third where it has one
+/// (a cut-out plant's far copy, `assets::model::lod`).
+pub(super) const LOD_SCREEN_SIZES: [f32; 3] = [0.3, 0.12, 0.05];
 
 /// How far past a threshold, as a fraction of it, an item's size must go
 /// before its level changes.
@@ -533,7 +534,7 @@ mod tests {
 
     #[test]
     fn a_size_on_the_threshold_keeps_the_level_it_had() {
-        let [threshold, _] = LOD_SCREEN_SIZES;
+        let [threshold, _, _] = LOD_SCREEN_SIZES;
         for size in [threshold * 0.95, threshold, threshold * 1.05] {
             assert_eq!(lod_level(size, Some(0), 2), 0, "{size}");
             assert_eq!(lod_level(size, Some(1), 2), 1, "{size}");

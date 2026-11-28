@@ -800,6 +800,11 @@ pub struct GraphicsSettings {
     /// Short shadows found on screen, for the gaps the shadow maps miss.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contact_shadows: Option<bool>,
+    /// The farthest shadow cascade draws each caster at the level of
+    /// detail its size in that map calls for, not the camera's: a tree near
+    /// the camera is a few of that map's texels across. On at every preset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shadow_lod: Option<bool>,
     /// Smooth and wet surfaces reflect what's on the screen (marched
     /// through the prepass's depth, last frame's picture read where the
     /// ray lands), with the sky's reflection shaded where the shadow maps
@@ -1012,6 +1017,13 @@ impl GraphicsSettings {
     pub fn contact_shadows(&self) -> bool {
         self.contact_shadows
             .unwrap_or(self.quality >= Quality::High)
+    }
+
+    /// Whether the farthest shadow cascade draws casters at the level of
+    /// detail their size in its map calls for: the override, or the
+    /// preset's (on at every preset).
+    pub fn shadow_lod(&self) -> bool {
+        self.shadow_lod.unwrap_or(true)
     }
 
     /// Whether smooth surfaces reflect what's on the screen: the override,
@@ -1352,6 +1364,7 @@ impl GraphicsSettings {
             reflection_quality,
             // Like ambient occlusion, it reads only the prepass.
             contact_shadows: self.contact_shadows(),
+            shadow_lod: self.shadow_lod(),
             screen_space_reflections,
             realtime_gi,
             realtime_gi_tier: self.realtime_gi_tier(),
@@ -1466,6 +1479,9 @@ pub struct EffectiveGraphics {
     pub ambient_occlusion: AmbientOcclusion,
     pub reflection_quality: ReflectionQuality,
     pub contact_shadows: bool,
+    /// Whether the farthest shadow cascade draws casters at the level of
+    /// detail their size in its map calls for.
+    pub shadow_lod: bool,
     /// Whether smooth surfaces reflect what's on the screen (needs the
     /// prepass's depth and normals, and compute shaders).
     pub screen_space_reflections: bool,
@@ -1973,6 +1989,7 @@ mod tests {
             ambient_occlusion: Some(AmbientOcclusion::Off),
             reflection_quality: Some(ReflectionQuality::Medium),
             contact_shadows: Some(true),
+            shadow_lod: Some(false),
             screen_space_reflections: Some(true),
             realtime_gi: Some(true),
             volumetric_fog: Some(false),
@@ -2617,6 +2634,7 @@ mod tests {
                         ambient_occlusion: Some(AmbientOcclusion::Low),
                         reflection_quality: None,
                         contact_shadows: post,
+                        shadow_lod: post,
                         screen_space_reflections: post,
                         realtime_gi: post,
                         volumetric_fog: post,

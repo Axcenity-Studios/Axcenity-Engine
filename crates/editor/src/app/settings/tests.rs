@@ -132,6 +132,7 @@ fn graphics_settings_survive_a_restart() {
         ambient_occlusion: Some(AmbientOcclusion::Low),
         reflection_quality: Some(ReflectionQuality::Medium),
         contact_shadows: Some(false),
+        shadow_lod: Some(false),
         screen_space_reflections: Some(false),
         realtime_gi: Some(true),
         volumetric_fog: Some(true),

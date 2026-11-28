@@ -127,6 +127,7 @@ mod tests {
             ambient_occlusion: Some(AmbientOcclusion::High),
             reflection_quality: Some(ReflectionQuality::Low),
             contact_shadows: Some(true),
+            shadow_lod: Some(false),
             screen_space_reflections: Some(false),
             realtime_gi: Some(true),
             volumetric_fog: Some(false),

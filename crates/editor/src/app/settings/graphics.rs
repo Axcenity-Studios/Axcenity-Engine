@@ -52,6 +52,7 @@ impl Cost {
 /// The rows in the Advanced fold, which search opens to show one.
 const ADVANCED: &[&str] = &[
     "Shadow distance",
+    "Far shadow detail",
     "Contact shadows",
     "Texture quality",
     "Texture memory",
@@ -695,6 +696,24 @@ fn advanced_rows(
                             .suffix(" studs"),
                     );
                 },
+            );
+        },
+    );
+    row(
+        ui,
+        "Far shadow detail",
+        Cost::Low,
+        "The farthest shadow cascade draws each tree or model at the level of detail its \
+         size in that map calls for. On saves GPU time in dense scenes; off draws it as the \
+         camera sees it.",
+        |ui| {
+            choice(
+                ui,
+                "far shadow detail",
+                &mut settings.shadow_lod,
+                preset.shadow_lod(),
+                &[true, false],
+                on_off,
             );
         },
     );

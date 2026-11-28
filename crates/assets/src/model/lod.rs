@@ -19,12 +19,20 @@
 //! A project's model also keeps them on disk ([`super::lod_cache`]), so
 //! loading it again doesn't simplify again.
 
+use super::cards;
 use super::lod_cache::{self, Levels};
 use super::{AlphaMode, InProject, Primitive, new_key};
 use crate::cooked::ContentHasher;
 
-/// How many simpler copies a primitive can have.
+/// How many simpler copies a primitive can have from its file or from
+/// simplifying. A cut-out plant whose file has both gets one more, its far
+/// copy: the last with [`FAR_KEEP`] of that copy's leaf cards, the rest
+/// grown to cover about as much (`cards.rs`), which the renderer draws
+/// below its last screen size.
 pub(super) const LEVELS: u8 = 2;
+
+/// The share of the last copy's cards a plant's far copy keeps.
+const FAR_KEEP: f32 = 0.5;
 
 /// The share of the full primitive's triangles each simplified copy aims for.
 const TARGETS: [f32; LEVELS as usize] = [0.5, 0.25];
@@ -92,6 +100,18 @@ pub(super) fn attach(
         // A level the file skipped (it has `_LOD2` but no `_LOD1`) is left
         // out, so each copy is simpler than the last.
         primitive.lods.retain(|copy| !copy.indices.is_empty());
+    }
+    // A plant whose file has both its copies gets a far one: the last,
+    // with half its leaf cards (`cards.rs`), drawn below the renderer's
+    // last screen size.
+    for primitive in &mut full {
+        if primitive.lods.len() == usize::from(LEVELS)
+            && cards::may_thin(primitive)
+            && let Some(last) = primitive.lods.last()
+            && let Some(far) = cards::thinned(last, &[FAR_KEEP]).pop()
+        {
+            primitive.lods.push(far);
+        }
     }
     let simplify: Vec<usize> = (0..full.len())
         .filter(|&index| {
@@ -306,6 +326,12 @@ impl Primitive {
     /// A copy with only the triangles `indices` (into this one's corners),
     /// keeping only the corners they use.
     pub(super) fn with_triangles(&self, indices: &[u32]) -> Self {
+        self.with_triangles_at(indices, &self.positions)
+    }
+
+    /// [`Self::with_triangles`] with its corners at `positions` (one for
+    /// each of this one's corners) instead of where they are.
+    pub(super) fn with_triangles_at(&self, indices: &[u32], positions: &[[f32; 3]]) -> Self {
         const UNUSED: u32 = u32::MAX;
         let mut remap = vec![UNUSED; self.positions.len()];
         let mut used = Vec::new();
@@ -329,7 +355,7 @@ impl Primitive {
         }
         Self {
             key: new_key(),
-            positions: pick(&self.positions, &used),
+            positions: pick(positions, &used),
             normals: pick(&self.normals, &used),
             uvs: pick(&self.uvs, &used),
             tangents: pick(&self.tangents, &used),
@@ -554,6 +580,45 @@ mod tests {
             1
         );
         let _ = std::fs::remove_dir_all(&project);
+    }
+
+    /// A bush of `count` small cut-out cards, each a square of two triangles.
+    fn bush(count: u32, level: u8) -> Primitive {
+        let mut bush = wavy_grid(1);
+        bush.indices.clear();
+        bush.positions.clear();
+        bush.normals.clear();
+        bush.uvs.clear();
+        bush.level = level;
+        bush.material.alpha_mode = AlphaMode::Mask { cutoff: 0.5 };
+        for card in 0..count {
+            let at = |k: f32| ((card as f32 + 1.0) * k).fract();
+            let (x, y, z) = (at(0.618), at(0.755), at(0.570));
+            let first = bush.positions.len() as u32;
+            for (u, v) in [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)] {
+                bush.positions.push([x + u * 0.05, y + v * 0.05, z]);
+                bush.normals.push([0.0, 0.0, 1.0]);
+                bush.uvs.push([u, v]);
+            }
+            bush.indices
+                .extend([first, first + 1, first + 2, first, first + 2, first + 3]);
+        }
+        bush
+    }
+
+    /// A plant whose file has both its copies gets a far one, with half
+    /// the last copy's cards; one with only one copy, or a sheet, doesn't.
+    #[test]
+    fn a_plant_with_both_its_files_copies_gets_a_far_one_with_half_the_cards() {
+        let full = attach(vec![bush(400, 0), bush(200, 1), bush(100, 2)], None);
+        let lods = &full[0].lods;
+        assert_eq!(lods.len(), 3);
+        let triangles = |p: &Primitive| p.indices.len() / 3;
+        assert_eq!(triangles(&lods[1]), 200);
+        let far = triangles(&lods[2]);
+        assert!((80..=120).contains(&far), "{far} of 200");
+        let one = attach(vec![bush(400, 0), bush(200, 1)], None);
+        assert_eq!(one[0].lods.len(), 1);
     }
 
     #[test]
