@@ -275,3 +275,28 @@ fn turning_it_on_and_off_on_one_renderer_keeps_the_picture() {
     assert_eq!(difference(&cleared, &shared), (0, 0));
     assert_eq!(difference(&cleared, &cleared_again), (0, 0));
 }
+
+#[test]
+fn cut_outs_need_no_depth_fill_where_the_depth_starts_from_the_prepasss() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let list = thicket();
+    let fills = |from_prepass| {
+        let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+        renderer.set_graphics(&settings(AntiAliasing::Taa, AmbientOcclusion::High));
+        renderer.set_depth_from_prepass(from_prepass);
+        renderer.render(&list).unwrap();
+        renderer.render(&list).unwrap();
+        renderer.stats().depth_fill_draws
+    };
+    // The thicket's leaf cards and hair card are standard cut-outs: their
+    // depth is the prepass's, kept exactly (`depth_start.wgsl`), and the
+    // pictures are the same (`a_scene_whose_depth_starts_from_the_prepasss_is_the_same_picture`).
+    assert!(
+        fills(false) > 0,
+        "with a cleared depth the cut-outs fill it"
+    );
+    assert_eq!(fills(true), 0);
+}

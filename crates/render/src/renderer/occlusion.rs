@@ -29,7 +29,7 @@ impl OcclusionPasses {
             create_pipeline(
                 device,
                 &scene_shader,
-                ("vs_main", "fs_prepass"),
+                ("vs_main", "fs_prepass_standard"),
                 &item_layouts,
                 (NORMAL_FORMAT, 1),
                 (false, double_sided),

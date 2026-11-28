@@ -293,7 +293,8 @@ pub(super) enum DepthUse {
     /// Writes only depth, drawing no color: the cut-out surfaces' depth
     /// before the scene is lit.
     Fill,
-    /// Draws only where depth equals what [`DepthUse::Fill`] left, and
+    /// Draws only where depth equals what [`DepthUse::Fill`] left (or the
+    /// scene's depth start kept from the prepass, `depth_start.wgsl`), and
     /// doesn't write it.
     Filled,
 }
