@@ -1929,8 +1929,10 @@ pub fn insert_hint(what: Insertable) -> String {
              fires MouseClick, and the cursor changes over it."
         }
         Insertable::Character => {
-            "Insert a Character: six welded parts with a Humanoid, a third-person controller, \
-             Health, Inventory and an Animator with Idle, Walk, Run, Jump, Fall and Sit states."
+            "Insert a Character: the human character in its default clothes, with a Humanoid, \
+             a third-person controller, Health, Inventory and an Animator playing the starter \
+             state machine (Idle, Walk, Run, Jump, Fall, Sit, Crouch and more). It stands at \
+             rest while editing and animates in Play."
         }
         Insertable::Humanoid => {
             "Insert a Humanoid into the selected character's Model: Roblox-style properties \

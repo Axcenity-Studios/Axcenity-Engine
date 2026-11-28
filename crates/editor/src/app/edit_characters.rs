@@ -19,7 +19,8 @@
 //!    is posed by `anim`'s Animators, and the poses are drawn on the
 //!    editor's own Instances. The parts that follow the body are placed on
 //!    it as Play would place them. Posing runs again only when one of
-//!    those characters changes (or a model is still loading).
+//!    those characters changes (or a model, the body's or a part's, is still
+//!    loading).
 //!
 //! Two things keep that showing honest under the Game Editor's own edits:
 //!
@@ -300,17 +301,33 @@ fn pose_at_rest(world: &mut World, assets: &Assets, characters: &[InstanceId]) -
             }
         }
     }
-    // Done when every body is posed, or its model can't be read.
+    // Done when every body is posed, or its model can't be read, and no
+    // part on it is still loading: a part (a garment, the hair) whose
+    // model comes in after the body's is placed and posed only by posing
+    // again, so until then it would stay where it was made, unposed.
+    let mesh_of = |id: InstanceId| {
+        world
+            .get(id)
+            .filter(|part| part.class() == ClassName::MeshPart)
+            .and_then(|part| part.property("MeshId"))
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
     let complete = characters.iter().all(|&character| {
         let Some(body) = applier::body_of(world, character) else {
             return true;
         };
-        let mesh = world
-            .get(body)
-            .and_then(|part| part.property("MeshId"))
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        poses.contains_key(&body) || matches!(assets.model_slot(mesh), Slot::Failed)
+        let body_done = poses.contains_key(&body)
+            || matches!(
+                assets.model_slot(&mesh_of(body).unwrap_or_default()),
+                Slot::Failed
+            );
+        body_done
+            && world.descendants_iter(body).all(|part| {
+                mesh_of(part).is_none_or(|mesh| {
+                    mesh.is_empty() || !matches!(assets.model_slot(&mesh), Slot::Loading)
+                })
+            })
     });
     (poses, complete)
 }
