@@ -1397,23 +1397,33 @@ pub(super) fn plan_draws(
             casts_shadow: draw.casts_shadow,
             cut_out,
         };
-        (key, index as u32)
+        // Water is drawn with the see-through items, before them (see
+        // renderer/water.rs), and a Part's Decal is blended by its
+        // texture's alpha even when solid. Worked out here, on the threads,
+        // so the split below reads no item.
+        let see_through = material.opacity < 1.0
+            || material.water.is_some()
+            || draw.item.decal_role == DecalRole::Decal;
+        let class = match (material.opacity > 0.0, see_through) {
+            (false, _) => DrawClass::Unseen,
+            (true, true) => DrawClass::SeeThrough,
+            (true, false) => DrawClass::Solid,
+        };
+        (key, class)
     });
-    // Water is drawn with the see-through items, before them (see
-    // renderer/water.rs).
     let water = |index: u32| draws[index as usize].item.material.water.is_some();
-    // A Part's Decal is blended by its texture's alpha even when solid.
-    let decal = |index: u32| draws[index as usize].item.decal_role == DecalRole::Decal;
-    let (mut transparent, mut opaque): (Vec<_>, Vec<_>) = keys
-        .iter()
-        .copied()
-        .filter(|(_, index)| draws[*index as usize].item.material.opacity > 0.0)
-        .partition(|(_, index)| {
-            draws[*index as usize].item.material.opacity < 1.0 || water(*index) || decal(*index)
-        });
+    let mut solid: Vec<u32> = Vec::with_capacity(keys.len());
+    let mut transparent: Vec<(SortKey, u32)> = Vec::new();
+    for (index, &(key, class)) in keys.iter().enumerate() {
+        match class {
+            DrawClass::Solid => solid.push(index as u32),
+            DrawClass::SeeThrough => transparent.push((key, index as u32)),
+            DrawClass::Unseen => {}
+        }
+    }
 
     // By key then index, which keeps the draws' order where keys are equal.
-    sort_unstable(&mut opaque);
+    let opaque = sorted_draws(&solid, |index| keys[index as usize].0, uses);
     let distance = |index: u32| {
         draws[index as usize]
             .item
@@ -1456,6 +1466,103 @@ pub(super) fn plan_draws(
         super::occlusion_probe::count(parts.iter().map(|part| part.hidden).sum());
     }
     join_plan(parts, seen, draws.len())
+}
+
+/// Where a draw goes in [`plan_draws`]: with the solid items, with the
+/// see-through ones, or nowhere (fully transparent).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DrawClass {
+    Solid,
+    SeeThrough,
+    Unseen,
+}
+
+/// The draws `indices`, each with its key (`key_of`), sorted by key and
+/// then index, as `sort_unstable` would sort them. Where every key fits,
+/// they are sorted as numbers ([`packed_key`]), on the threads, and the
+/// keys looked up again after: sorting whole [`SortKey`]s, splitting them
+/// off on one thread and copying them was 2.2 ms of Overgrown Street's
+/// frame for its 124,000 draws.
+fn sorted_draws(
+    indices: &[u32],
+    key_of: impl Fn(u32) -> SortKey + Sync,
+    uses: &FrameUses,
+) -> Vec<(SortKey, u32)> {
+    // Each mesh by its place among the frame's meshes, in `MeshKey`'s order.
+    let mut meshes: Vec<MeshKey> = [
+        MeshKey::Block,
+        MeshKey::Sphere,
+        MeshKey::Cylinder,
+        MeshKey::Wedge,
+        MeshKey::CornerWedge,
+    ]
+    .into_iter()
+    .chain(
+        uses.meshes
+            .iter()
+            .map(|source| MeshKey::Custom(source.key())),
+    )
+    .collect();
+    meshes.sort_unstable();
+    meshes.dedup();
+    let packed = map_parts(indices, |part| {
+        part.iter()
+            .map(|&index| packed_key(&key_of(index), index, &meshes))
+            .collect::<Option<Vec<u128>>>()
+    });
+    match packed.into_iter().collect::<Option<Vec<Vec<u128>>>>() {
+        Some(parts) => {
+            let mut packed: Vec<u128> = parts.into_iter().flatten().collect();
+            sort_unstable(&mut packed);
+            map_parts(&packed, |part| {
+                part.iter()
+                    .map(|&packed| {
+                        let index = packed as u32;
+                        (key_of(index), index)
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .into_iter()
+            .flatten()
+            .collect()
+        }
+        None => {
+            let mut keyed: Vec<(SortKey, u32)> = indices
+                .iter()
+                .map(|&index| (key_of(index), index))
+                .collect();
+            sort_unstable(&mut keyed);
+            keyed
+        }
+    }
+}
+
+/// `key` and `index` as one number that sorts as they do (key, then
+/// index), or `None` where a part doesn't fit or a surface shader is in it:
+/// 8 bits of band, 4 of part, 31 of pipeline, 20 of the mesh's place in
+/// `meshes`, 20 of material, 3 of flags and 32 of index.
+fn packed_key(key: &SortKey, index: u32, meshes: &[MeshKey]) -> Option<u128> {
+    if key.shader.is_some() || key.pipeline >= 1 << 31 || key.material >= 1 << 20 {
+        return None;
+    }
+    let mesh = meshes.binary_search(&key.mesh).ok()? as u128;
+    if mesh >= 1 << 20 {
+        return None;
+    }
+    let part = key.part as u128;
+    debug_assert!(part < 16);
+    let flags = u128::from(key.double_sided) << 2
+        | u128::from(key.casts_shadow) << 1
+        | u128::from(key.cut_out);
+    Some(
+        u128::from(key.band) << 120
+            | part << 116
+            | u128::from(key.pipeline) << 85
+            | mesh << 65
+            | u128::from(key.material) << 45
+            | flags << 42
+            | u128::from(index),
+    )
 }
 
 /// What makes two draws one batch.
@@ -2383,4 +2490,101 @@ pub(super) fn linear_color([r, g, b]: [f32; 3]) -> Vec3 {
         }
     }
     Vec3::new(channel(r), channel(g), channel(b))
+}
+
+#[cfg(test)]
+mod sort_tests {
+    use super::*;
+
+    struct Keyed(u64);
+
+    impl crate::MeshSource for Keyed {
+        fn key(&self) -> u64 {
+            self.0
+        }
+        fn positions(&self) -> &[[f32; 3]] {
+            &[]
+        }
+        fn normals(&self) -> &[[f32; 3]] {
+            &[]
+        }
+        fn uvs(&self) -> &[[f32; 2]] {
+            &[]
+        }
+        fn indices(&self) -> &[u32] {
+            &[]
+        }
+    }
+
+    /// Keys with every part varying, by a fixed pseudo-random pattern.
+    fn keys(count: u32, shader: bool) -> Vec<SortKey> {
+        let parts = [
+            DrawnPart::Items,
+            DrawnPart::Scattered,
+            DrawnPart::Terrain,
+            DrawnPart::SeeThrough,
+        ];
+        let meshes = [
+            MeshKey::Block,
+            MeshKey::Sphere,
+            MeshKey::Custom(7),
+            MeshKey::Custom(u64::MAX),
+            MeshKey::Custom(1 << 40),
+        ];
+        (0..count)
+            .map(|i| {
+                let r =
+                    |k: u32| (i.wrapping_mul(2_654_435_761).wrapping_add(k * 40_503) >> 7) as usize;
+                SortKey {
+                    band: (r(1) % 5) as u8,
+                    part: parts[r(2) % parts.len()],
+                    pipeline: (r(3) % 4) as u32 * 0x1000_0001,
+                    mesh: meshes[r(4) % meshes.len()],
+                    material: (r(5) % 9) as u32,
+                    shader: (shader && i == count / 2).then_some(99),
+                    double_sided: r(6) % 2 == 0,
+                    casts_shadow: r(7) % 2 == 0,
+                    cut_out: r(8) % 2 == 0,
+                }
+            })
+            .collect()
+    }
+
+    fn uses_with(meshes: &[Arc<dyn crate::MeshSource>]) -> FrameUses<'_> {
+        FrameUses {
+            materials: Vec::new(),
+            material_of: Vec::new(),
+            first_draw: Vec::new(),
+            meshes: meshes.iter().collect(),
+        }
+    }
+
+    #[test]
+    fn packed_keys_sort_draws_as_their_keys_do() {
+        let sources: Vec<Arc<dyn crate::MeshSource>> = [7, u64::MAX, 1 << 40]
+            .into_iter()
+            .map(|key| Arc::new(Keyed(key)) as Arc<dyn crate::MeshSource>)
+            .collect();
+        let check = |count: u32, shader: bool, uses: &FrameUses| {
+            let keys = keys(count, shader);
+            // Every other draw, out of order, as the split leaves them.
+            let indices: Vec<u32> = (0..count).rev().step_by(2).collect();
+            let mut expected: Vec<(SortKey, u32)> = indices
+                .iter()
+                .map(|&index| (keys[index as usize], index))
+                .collect();
+            expected.sort_unstable();
+            let sorted = sorted_draws(&indices, |index| keys[index as usize], uses);
+            assert_eq!(sorted, expected, "{count} draws, a shader {shader}");
+        };
+        // Enough to be shared among the threads, and a few; with a surface
+        // shader the keys themselves are sorted.
+        for count in [9, 40_000] {
+            for shader in [false, true] {
+                check(count, shader, &uses_with(&sources));
+            }
+        }
+        // So are they with a mesh missing from the frame's list.
+        check(200, false, &uses_with(&sources[..1]));
+    }
 }
