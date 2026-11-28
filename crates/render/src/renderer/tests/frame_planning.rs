@@ -121,7 +121,7 @@ fn with_four_cascades_the_farthest_is_drawn_one_frame_in_four_alone() {
         let third = cascade_turn(frame, 2, 4);
         let fourth = cascade_turn(frame, 3, 4);
         assert!(!(third && fourth), "frame {frame}");
-        assert_eq!(third, frame % 2 == 0, "frame {frame}");
+        assert_eq!(third, frame.is_multiple_of(2), "frame {frame}");
     }
     let fourth = (0..64).filter(|&frame| cascade_turn(frame, 3, 4)).count();
     assert_eq!(fourth, 16);
