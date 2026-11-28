@@ -10,7 +10,8 @@
 //! Cut-out primitives (leaves, fences: [`AlphaMode::Mask`]) aren't
 //! simplified: moving their corners stretches the texture's holes, so
 //! leaves changed shape and bushes thinned or clumped visibly at the
-//! switch. Nor are primitives with blend shapes (a character's body and
+//! switch. Foliage made of many small cards is thinned instead, by
+//! dropping whole cards and growing the rest ([`super::cards`]). Nor are primitives with blend shapes (a character's body and
 //! what it wears, a face): a copy is made from the rest shape alone and
 //! may move the surface by centimetres, so a garment's simpler copy cut
 //! through the skin under it, and where that skin is hidden
@@ -19,6 +20,7 @@
 //! A project's model also keeps them on disk ([`super::lod_cache`]), so
 //! loading it again doesn't simplify again.
 
+use super::cards;
 use super::lod_cache::{self, Levels};
 use super::{AlphaMode, InProject, Primitive, new_key};
 use crate::cooked::ContentHasher;
@@ -92,6 +94,14 @@ pub(super) fn attach(
         // A level the file skipped (it has `_LOD2` but no `_LOD1`) is left
         // out, so each copy is simpler than the last.
         primitive.lods.retain(|copy| !copy.indices.is_empty());
+    }
+    for primitive in &mut full {
+        if primitive.lods.is_empty()
+            && primitive.indices.len() / 3 >= MIN_TRIANGLES
+            && cards::may_thin(primitive)
+        {
+            primitive.lods = cards::thinned(primitive);
+        }
     }
     let simplify: Vec<usize> = (0..full.len())
         .filter(|&index| {
@@ -306,6 +316,12 @@ impl Primitive {
     /// A copy with only the triangles `indices` (into this one's corners),
     /// keeping only the corners they use.
     pub(super) fn with_triangles(&self, indices: &[u32]) -> Self {
+        self.with_triangles_at(indices, &self.positions)
+    }
+
+    /// [`Self::with_triangles`] with its corners at `positions` (one for
+    /// each of this one's corners) instead of where they are.
+    pub(super) fn with_triangles_at(&self, indices: &[u32], positions: &[[f32; 3]]) -> Self {
         const UNUSED: u32 = u32::MAX;
         let mut remap = vec![UNUSED; self.positions.len()];
         let mut used = Vec::new();
@@ -329,7 +345,7 @@ impl Primitive {
         }
         Self {
             key: new_key(),
-            positions: pick(&self.positions, &used),
+            positions: pick(positions, &used),
             normals: pick(&self.normals, &used),
             uvs: pick(&self.uvs, &used),
             tangents: pick(&self.tangents, &used),
@@ -556,11 +572,45 @@ mod tests {
         let _ = std::fs::remove_dir_all(&project);
     }
 
+    /// A cut-out sheet (a fence) is one card, so it's neither simplified
+    /// nor thinned: either would change its holes.
     #[test]
     fn a_cut_out_primitive_is_not_simplified() {
         let mut leaves = wavy_grid(40);
         leaves.material.alpha_mode = AlphaMode::Mask { cutoff: 0.5 };
         assert!(attach(vec![leaves], None)[0].lods.is_empty());
+    }
+
+    /// A bush of many small cut-out cards is thinned instead (`cards.rs`).
+    #[test]
+    fn a_bush_of_cut_out_cards_gets_copies_with_fewer_cards() {
+        let mut bush = wavy_grid(1);
+        bush.indices.clear();
+        bush.positions.clear();
+        bush.normals.clear();
+        bush.uvs.clear();
+        bush.material.alpha_mode = AlphaMode::Mask { cutoff: 0.5 };
+        for card in 0..200u32 {
+            let at = |k: f32| ((card as f32 + 1.0) * k).fract();
+            let (x, y, z) = (at(0.618), at(0.755), at(0.570));
+            let first = bush.positions.len() as u32;
+            for (u, v) in [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)] {
+                bush.positions.push([x + u * 0.05, y + v * 0.05, z]);
+                bush.normals.push([0.0, 0.0, 1.0]);
+                bush.uvs.push([u, v]);
+            }
+            bush.indices
+                .extend([first, first + 1, first + 2, first, first + 2, first + 3]);
+        }
+        let triangles = bush.indices.len() / 3;
+        let full = attach(vec![bush], None);
+        let counts: Vec<usize> = full[0]
+            .lods
+            .iter()
+            .map(|copy| copy.indices.len() / 3)
+            .collect();
+        assert_eq!(counts.len(), 2, "{counts:?}");
+        assert!(counts[0] < triangles && counts[1] < counts[0], "{counts:?}");
     }
 
     /// A character's body and its garments have blend shapes, and are
