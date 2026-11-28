@@ -256,7 +256,9 @@ mod tests {
         assert_eq!(lines[3].1, "LOD3, a simpler copy: 0 in view");
         assert_eq!(lines[4].1, "No simpler copies");
         assert!(
-            lines[5].1.contains("LOD1 below 30%, LOD2 below 12%, LOD3 below 5%"),
+            lines[5]
+                .1
+                .contains("LOD1 below 30%, LOD2 below 12%, LOD3 below 5%"),
             "{}",
             lines[5].1
         );
