@@ -22,7 +22,7 @@ use rustc_hash::FxHashMap;
 
 use glam::Mat4;
 
-use super::lighting::material_key_with;
+use super::lighting::{key_digest, material_key_with};
 use super::ray_cut_outs::has_holes;
 use super::ray_tracing::{SurfaceRaw, surface_of};
 use super::terrain::LastArrays;
@@ -65,6 +65,9 @@ pub(super) struct Cluster {
     last_used: u64,
     /// The distinct material bindings among the items.
     pub(super) materials: Vec<MaterialKey>,
+    /// Each of `materials`' digest (`key_digest`), worked out once here
+    /// and not again by each frame that joins the cluster's materials in.
+    pub(super) digests: Vec<u64>,
     /// Which of `materials` each item is drawn with.
     pub(super) material_of: Vec<u32>,
     /// The distinct meshes of callers' among the items' own shapes.
@@ -100,6 +103,7 @@ impl Cluster {
                 })
             })
             .collect();
+        let digests = materials.iter().map(key_digest).collect();
         let mut meshes: Vec<Arc<dyn MeshSource>> = Vec::new();
         let mut mesh_indexes: FxHashMap<*const (), u32> = FxHashMap::default();
         let mesh_of = items
@@ -118,6 +122,7 @@ impl Cluster {
             items: items.clone(),
             last_used: frame,
             materials,
+            digests,
             material_of,
             meshes,
             mesh_of,
@@ -232,6 +237,7 @@ mod tests {
         for (index, item) in items.iter().enumerate() {
             let local = cluster.material_of[index] as usize;
             assert_eq!(cluster.materials[local], material_key(item));
+            assert_eq!(cluster.digests[local], key_digest(&material_key(item)));
             assert_eq!(cluster.ray_kinds[index], RayKind::of(item));
             assert_eq!(cluster.mesh_keys[index], MeshKey::of(&item.shape));
             assert_eq!(cluster.transforms[index], item.transform);

@@ -2588,8 +2588,11 @@ impl ScenePipeline {
                     .iter()
                     .filter(|draw| draw.item.id != 0)
                     .filter_map(|draw| {
+                        // The skin first: most draws have none, and a
+                        // draw's mesh key is read through its item's shape.
+                        let skin = draw.item.skin.as_deref()?;
                         let mesh = draw.mesh();
-                        let offset = self.posing.offset(draw.item.skin.as_deref()?, mesh)?;
+                        let offset = self.posing.offset(skin, mesh)?;
                         Some(((draw.item.id, mesh), offset))
                     })
                     .collect();
