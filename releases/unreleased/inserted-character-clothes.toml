@@ -1,0 +1,5 @@
+category = "fix"
+subsystem = "editor"
+title = "Insert > Character shows the whole dressed character, not a floating head and hands"
+details = "In edit mode a described character is posed at rest, and the parts it wears (clothes, hair, shoes, eyes) are placed on its body. Posing stopped as soon as the body's model was in, so parts whose models were still loading in the background were never placed: they stayed unposed where they were made, so only the body's uncovered skin showed, and in snow the snow lay on the still parts. Posing now runs again until every part's model is in. The Insert > Character tooltip also says what it inserts now (the human character and its starter state machine), not the old six-part block character."
+features = ["gameplay.humanoid"]

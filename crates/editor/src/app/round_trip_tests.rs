@@ -451,6 +451,67 @@ fn a_saved_described_character_shows_its_identity_in_edit_mode() {
     let _ = std::fs::remove_dir_all(parent);
 }
 
+/// Insert > Character with models read in the background, as the editor
+/// reads them: the body's model is in first, and each part (the clothes,
+/// the hair) is still placed on it and posed once its own model is in.
+/// Before, posing stopped as soon as the body was posed, so a part whose
+/// model came later stayed unposed where it was made, and only the skin
+/// the clothes don't cover showed: a floating head and hands (and, in
+/// snow, snow lying on the still parts).
+#[test]
+fn parts_whose_models_load_after_the_body_are_placed_on_it() {
+    let (parent, folder, studio) = new_project("late-parts");
+    let mut app = open(&folder, &studio);
+    app.assets.load_textures_in_background(|| {});
+    let character = inserted(&mut app, Insertable::Character, None);
+    let body = applier::body_of(&app.world, character).unwrap();
+    // The body's model is in; the parts' come in on their own.
+    app.assets.model_blocking(&mesh_id(&app.world, body));
+    app.edit_characters_frame();
+    let parts: Vec<InstanceId> = app
+        .world
+        .get(body)
+        .unwrap()
+        .children()
+        .iter()
+        .copied()
+        .filter(|id| {
+            app.world
+                .get(*id)
+                .is_some_and(|p| p.attribute(applier::DESCRIPTION_PART).is_some())
+        })
+        .collect();
+    assert!(!parts.is_empty(), "the character wears parts");
+    let late = parts
+        .iter()
+        .filter(|part| !app.edit_characters.poses().contains_key(part))
+        .count();
+    eprintln!("{late} of {} parts were still loading", parts.len());
+    let started = std::time::Instant::now();
+    loop {
+        app.edit_characters_frame();
+        let loading = parts.iter().any(|part| {
+            matches!(
+                app.assets.model_slot(&mesh_id(&app.world, *part)),
+                axcenity_assets::Slot::Loading
+            )
+        });
+        if !loading || started.elapsed().as_secs() > 120 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    app.edit_characters_frame();
+    let poses = app.edit_characters.poses();
+    assert!(poses.contains_key(&body), "the body is posed");
+    for part in &parts {
+        let name = app.world.get(*part).unwrap().name().to_owned();
+        assert!(poses.contains_key(part), "{name} follows the body");
+    }
+    drop(app);
+    let _ = std::fs::remove_dir_all(parent);
+}
+
 /// OPEN-21 across opens in one run: opening the same project again (File >
 /// Open, Open Recent, close and reopen) gives it new `Assets` but the same
 /// Instance IDs, so the edit-mode state of the last open must not count
