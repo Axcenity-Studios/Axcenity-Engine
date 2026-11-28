@@ -249,13 +249,24 @@ impl RayShadows {
             "ray traced shadows",
             include_str!("../ray_shadows.wgsl"),
         );
+        // `AXCENITY_SOLID_EVERY_RAY`: the solid blocker's distance asked
+        // on every ray a cut-out blocked, as before 2026-11-28, to compare.
+        let solid_every_ray = [(
+            "SOLID_EVERY_RAY",
+            f64::from(u8::from(
+                std::env::var_os("AXCENITY_SOLID_EVERY_RAY").is_some(),
+            )),
+        )];
         let pipeline = |entry, layout: &wgpu::PipelineLayout| {
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                 label: Some(entry),
                 layout: Some(layout),
                 module: &shader,
                 entry_point: Some(entry),
-                compilation_options: Default::default(),
+                compilation_options: wgpu::PipelineCompilationOptions {
+                    constants: &solid_every_ray,
+                    ..Default::default()
+                },
                 cache: None,
             })
         };
