@@ -539,7 +539,7 @@ fn part_draw_item(
         .flatten();
     let material = match (appearance, variant) {
         (None, _) if blueprint.is_some() => Material {
-            base_color: color.map(|channel| (channel / BLUEPRINT_PLAIN_GREY).min(1.0)),
+            base_color: color,
             base_color_texture: blueprint.as_ref().map(texture),
             metalness: 0.0,
             roughness: BLUEPRINT_ROUGHNESS,
@@ -592,9 +592,6 @@ fn part_draw_item(
     })
 }
 
-/// A new part's Color: on a blueprint it's no tint at all, so the grid's
-/// lines stay white on a part nobody has painted.
-const BLUEPRINT_PLAIN_GREY: f32 = 0.64;
 /// How rough the editor's blueprint texture is drawn.
 const BLUEPRINT_ROUGHNESS: f32 = 0.8;
 

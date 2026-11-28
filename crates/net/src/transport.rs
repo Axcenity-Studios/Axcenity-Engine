@@ -270,11 +270,8 @@ impl Server {
         secured: Secured,
         rules: TokenRules,
     ) -> io::Result<Server> {
-        let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, port))?;
+        let (socket, tokens) = bind_game_and_token_ports(port, &secured, rules)?;
         let port = socket.local_addr()?.port();
-        // The token port takes the same number, or the server doesn't
-        // start: players look for it there.
-        let tokens = TokenPort::start(port, &secured, rules)?;
         let config = ServerConfig {
             current_time: now(),
             max_clients: max_connections.clamp(1, 1024),
@@ -860,5 +857,30 @@ fn renet_reason(reason: &DisconnectReason) -> String {
         DisconnectReason::DisconnectedByServer => "The server closed the connection.".to_owned(),
         DisconnectReason::Transport => "The connection was lost.".to_owned(),
         other => format!("The connection failed: {other}."),
+    }
+}
+
+/// How many free numbers port 0 tries before giving up.
+const ANY_PORT_TRIES: usize = 8;
+
+/// Binds the game's UDP socket and its token port's TCP listener to one
+/// number: players look for the token port at the game's port. For port 0
+/// (any free one), UDP picks the number and another program may already hold
+/// it for TCP, so a few more numbers are tried (QA-026).
+pub(crate) fn bind_game_and_token_ports(
+    port: u16,
+    secured: &Secured,
+    rules: TokenRules,
+) -> io::Result<(UdpSocket, TokenPort)> {
+    let mut tries = if port == 0 { ANY_PORT_TRIES } else { 1 };
+    loop {
+        let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, port))?;
+        let picked = socket.local_addr()?.port();
+        tries -= 1;
+        match TokenPort::start(picked, secured, rules.clone()) {
+            Ok(tokens) => return Ok((socket, tokens)),
+            Err(err) if tries > 0 && err.kind() == io::ErrorKind::AddrInUse => continue,
+            Err(err) => return Err(err),
+        }
     }
 }
