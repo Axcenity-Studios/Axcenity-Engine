@@ -116,6 +116,16 @@ var<private> cut_out_near_here: f32 = CUT_OUT_NEAR;
 // The ray being traced's place in the pattern a thinning shadow is left
 // out by (`casts_on_this_ray`), set by `cs_trace`: 1 casts every shadow.
 var<private> shadow_share_here: f32 = 1.0;
+
+// The solid item's distance along this pixel's rays toward the sun, once
+// a ray a cut-out blocked has asked for it (`blocker_distance`): -1 not
+// asked yet, 0 none. The rays of one pixel go to points of the sun's disc
+// a fraction of a degree apart, so one answer serves them all.
+var<private> solid_here: f32 = -1.0;
+
+// 1 (`AXCENITY_SOLID_EVERY_RAY`): ask for the solid distance on every ray
+// a cut-out blocked, as before 2026-11-28, for comparing.
+override SOLID_EVERY_RAY: bool = false;
 // The widest a soft edge is smoothed, in pixels each way.
 const MAX_BLUR: i32 = 12;
 // The narrowest, so the few rays a pixel traces always even out with
@@ -269,15 +279,21 @@ fn cut_out_near(origin: vec3<f32>, on_cut_out: bool) -> f32 {
 // One ray toward the sun: how far to what blocks it, or 0, for a soft
 // shadow's edge (`blur_radius`). Where a solid item and a cut-out both
 // block the ray it is the solid item's distance, whichever the query met
-// first, so a second query asks for it only on rays a cut-out blocked.
+// first, so a second query asks for it only on rays a cut-out blocked,
+// and only once a pixel (`solid_here`): under a canopy nearly every ray
+// is blocked by leaves, and each asked again walked the scene twice. The
+// distance only sets how wide the soft edge is, which the pixel's rays
+// average anyway.
 fn blocker_distance(origin: vec3<f32>, direction: vec3<f32>) -> f32 {
     let far = rays.camera.w * 2.0;
     let found = first_blocker(origin, direction, far);
     if found.y == 0.0 {
         return found.x;
     }
-    let solid = solid_blocker(origin, direction, far);
-    return select(found.x, solid, solid > 0.0);
+    if solid_here < 0.0 || SOLID_EVERY_RAY {
+        solid_here = solid_blocker(origin, direction, far);
+    }
+    return select(found.x, solid_here, solid_here > 0.0);
 }
 
 // How much of `light` reaches the surface at `point` (facing `normal`): 1
