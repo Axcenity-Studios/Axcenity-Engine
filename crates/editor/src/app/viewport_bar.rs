@@ -35,8 +35,8 @@ pub(super) enum Pace {
     /// As soon as it was ready.
     #[default]
     Free,
-    /// Ready sooner, and held to the steady frame rate's grid, this many
-    /// a second (`EditorApp::pace_frame`).
+    /// Ready sooner, and held to the frame rate limit someone chose, this
+    /// many a second (`EditorApp::pace_frame`).
     Held(u32),
 }
 
@@ -211,7 +211,7 @@ impl ViewportBar {
     }
 
     /// What holds the frame rate, if most late frames were held.
-    fn held_by(&self) -> Pace {
+    pub(super) fn held_by(&self) -> Pace {
         if self.paced_share > 0.5 {
             self.pace
         } else {
@@ -248,12 +248,14 @@ impl ViewportBar {
     fn fps_tooltip(&self, steady_hz: u32) -> String {
         let pace = if steady_hz > 0 {
             format!(
-                " While you work, the editor holds frames to {steady_hz} Hz (Settings > \
-                 Accessibility > Steady frame rate); scenery that moves on its own is drawn \
-                 as fast as it can be while you don't."
+                " While you work, the editor holds frames to the {steady_hz} Hz limit you chose \
+                 (Settings > Accessibility > Frame rate limit); scenery that moves on its own is \
+                 drawn as fast as it can be while you don't."
             )
         } else {
-            String::new()
+            " No frame rate limit is set: this is the real rate, at most your display's \
+             refresh, and scenery that moves on its own is drawn as fast as it can be."
+                .to_owned()
         };
         let Some(shown) = self.shown_ms else {
             return format!(
@@ -275,9 +277,9 @@ impl ViewportBar {
             Pace::Free => (String::new(), pace),
             Pace::Held(hz) => (
                 format!(
-                    " This rate is held to {hz} Hz, not the scene's: each frame is ready \
-                     sooner (about {without:.0} a second without the hold). Settings > \
-                     Accessibility > Steady frame rate changes it."
+                    " This rate is held to the {hz} Hz limit you chose, not the scene's: \
+                     each frame is ready sooner (about {without:.0} a second without it). \
+                     Settings > Accessibility > Frame rate limit changes it."
                 ),
                 String::new(),
             ),
@@ -606,8 +608,8 @@ mod tests {
 
     #[test]
     fn a_frame_rate_held_to_the_steady_grid_says_so() {
-        // 9 ms of work a frame, shown every 16.7 ms because the editor
-        // holds frames to 60 Hz while someone works: the bar must not
+        // 9 ms of work a frame, shown every 16.7 ms because someone chose a
+        // 60 Hz frame rate limit: the bar must not
         // read as if the scene could only reach 60.
         let mut bar = ViewportBar::default();
         let mut at = Instant::now();
@@ -619,9 +621,9 @@ mod tests {
         }
         assert_eq!(bar.fps_text(), "60 FPS (held)");
         let tooltip = bar.fps_tooltip(60);
-        assert!(tooltip.contains("held to 60 Hz"), "{tooltip}");
+        assert!(tooltip.contains("held to the 60 Hz limit"), "{tooltip}");
         assert!(!tooltip.contains("  "), "no runs of spaces: {tooltip}");
-        assert!(tooltip.contains("Steady frame rate"), "{tooltip}");
+        assert!(tooltip.contains("Frame rate limit"), "{tooltip}");
         // The slower of the editor's CPU frame and the GPU's: 10 ms.
         assert!(tooltip.contains("about 100 a second without"), "{tooltip}");
         // Frames that stop being held stop saying so.
@@ -631,6 +633,27 @@ mod tests {
             bar.record(Some(cost(20.0, Some(6.0))), Duration::ZERO, at);
         }
         assert_eq!(bar.fps_text(), "40 FPS");
+    }
+
+    #[test]
+    fn with_no_limit_the_bar_reads_the_real_rate_unmarked() {
+        // Paul's report: "60 FPS (held)" with the editor focused, 120 with
+        // it in the background. With no frame rate limit (the default)
+        // frames are never held, so the bar reads what's shown, unmarked,
+        // and the tooltip doesn't talk of a hold.
+        let mut bar = ViewportBar::default();
+        let mut at = Instant::now();
+        for _ in 0..120 {
+            at += Duration::from_micros(8_333);
+            bar.note_editor_frame(Duration::from_millis(5));
+            bar.note_pace(Pace::Free);
+            bar.record(Some(cost(5.0, Some(4.0))), Duration::ZERO, at);
+        }
+        assert_eq!(bar.fps_text(), "120 FPS");
+        let tooltip = bar.fps_tooltip(0);
+        assert!(tooltip.contains("No frame rate limit is set"), "{tooltip}");
+        assert!(!tooltip.contains("held"), "{tooltip}");
+        assert!(!tooltip.contains("  "), "no runs of spaces: {tooltip}");
     }
 
     #[test]

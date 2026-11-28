@@ -6,12 +6,22 @@ Paul's brief of 2026-11-27. Branch `qa-audit` from `main` at `cf132127` (version
 
 Axcenity's core workflow works from start to finish. In the real editor, driven by mouse and keyboard, a first-time user can make a project, build a scene, import a model, write a script, play, save, reopen and build a game that runs. None of the GUI runs crashed. Recovery is solid: a project killed with `kill -9` comes back through AutoRecover, and damaged project files open with a clear message instead of failing.
 
-The audit found 24 issues: 2 High, 6 Medium and 16 Low. No Critical ones (crash, data loss, security). Of the 24:
+The audit found 29 issues: 2 High, 7 Medium and 20 Low. None are Critical (crash, data loss, security). Of the 29:
 
-- 18 are fixed on the branch, each with a regression test where code changed.
+- 21 are fixed, each with a regression test where code changed. QA-005 was fixed after Paul's call.
 - 1 is partly fixed (QA-013).
 - 2 are not product bugs (QA-010, and QA-019, a test-environment limit).
-- 3 need Paul's decision because they are deliberate designs (QA-005, QA-012, QA-024).
+- 2 were measured and left for now with Paul's leave: QA-012 and QA-024. Section 10 says why.
+- 3 are open. They are tests that fail only under load, and they failed on `main` too (QA-025, QA-028, QA-029).
+
+The full test suite (`cargo nextest run --workspace`, 5,680 tests) was then run on Paul's Linux computer (RX 9070 XT):
+
+| Run | Failed | Timed out |
+|---|---|---|
+| `main` | 15 | 1 |
+| The branch, after the fixes it prompted | 1 | 1 |
+
+Both remaining failures are on `main` too, and both pass when run alone.
 
 The two High issues were both on a beginner's first path:
 
@@ -124,8 +134,8 @@ Full wording in [findings.md](findings.md).
 |---|---|
 | Critical | none |
 | High | QA-021 Close Project hang, QA-022 Asset Check false problems on a new project |
-| Medium | QA-001 no way to pick a folder without a system picker, QA-002 New Project's unexplained grey button and raw error, QA-005 new parts look black (blueprint grid), QA-009 invisible checkboxes in every theme, QA-018 damaged images and sounds imported silently, QA-020 a damaged settings file reset every setting silently |
-| Low | QA-003, QA-004, QA-006, QA-007, QA-008, QA-010, QA-011, QA-012, QA-013, QA-014, QA-015, QA-016, QA-017, QA-019, QA-023, QA-024 |
+| Medium | QA-001 no way to pick a folder without a system picker, QA-002 New Project's unexplained grey button and raw error, QA-005 new parts look black (blueprint grid), QA-009 invisible checkboxes in every theme, QA-014 12 editor tests overflow the test stack on `main`, QA-018 damaged images and sounds imported silently, QA-020 a damaged settings file reset every setting silently |
+| Low | QA-003, QA-004, QA-006, QA-007, QA-008, QA-010, QA-011, QA-012, QA-013, QA-015, QA-016, QA-017, QA-019, QA-023, QA-024, QA-025, QA-026, QA-027, QA-028, QA-029 |
 
 ## 7. Fixes and quality-of-life changes
 
@@ -146,7 +156,7 @@ Full wording in [findings.md](findings.md).
 | QA-015 | Transparency, PlaybackSpeed, Volume, RollOff and others are limited to useful ranges | `transparency_is_limited_to_0_to_1` |
 | QA-016 | "about 4 minutes ago", "1 document" | `the_age_of_a_copy_reads_as_words` |
 | QA-017 | Version History shows local time | used by its tests |
-| QA-014 | A test that overflowed the 2 MB test stack runs on a big stack | itself |
+| QA-014 | 12 editor tests that overflowed the 2 MB test stack (11 Collaborate tests and AutoRecover's prompt; they failed on `main` under nextest on Paul's Linux computer) run on a big stack | themselves |
 | QA-004 | Getting started names the real samples folder; GitHub links follow the renamed account | docs |
 
 The audit also added a per-test runner ([run-each.sh](run-each.sh)) for machines without nextest.
@@ -178,14 +188,35 @@ All runs in the cloud container:
 | Render, one test per process | 119 passed before the run was stopped; the rest would not fit in memory on lavapipe |
 | Player | Not run in the cloud: too large on lavapipe |
 
-**Running on Paul's Linux computer now** (Ryzen 9 9950X3D, RX 9070 XT, Fedora): `cargo nextest run --workspace` on `main` in a separate worktree, then the same on `qa-audit`. [progress.md](progress.md) will have the results.
+**On Paul's Linux computer** (Fedora 45, Ryzen 9 9950X3D, RX 9070 XT, 60 GB). The suite ran in a separate worktree, so Paul's checkout wasn't touched. Command: `cargo nextest run --workspace --no-fail-fast`, about 160 s per run. Build: 0 warnings.
+
+| Commit | Run | Passed | Failed | Timed out |
+|---|---|---|---|---|
+| `main` `cf132127` | 5,667 | 5,651 | 15 | 1 |
+| `qa-audit` `3b02a628` | 5,679 | 5,664 | 14 | 1 |
+| `qa-audit` `ab3c6e91` | 5,680 | 5,678 | **1** | **1** |
+
+What the first two runs found:
+
+- **The branch caused one regression.** A player test still expected the character on the bare baseplate (QA-006's spawn pad). It's fixed.
+- **11 Collaborate tests overflowed the stack on `main` too.** They're fixed (QA-014).
+- **A secured host on port 0 could fail with "Address already in use".** It's fixed (QA-026).
+
+What's left in the last run:
+
+- **`the_overlay_is_drawn_only_where_the_feature_shows` failed.** It fails under load on `main` too, and passes alone (QA-028).
+- **`human_garments_and_hair_stay_steady_in_the_idle` timed out.** It takes 112 s alone against the 120 s limit (QA-027). `.config/nextest.toml` now gives it 4 minutes.
 
 ## 10. Remaining issues and what couldn't be verified
 
-**Needs Paul's decision:**
+**Paul's decisions (2026-11-27):**
 
-- **QA-005:** new parts look almost black in edit mode because of the blueprint grid. Possible changes: a lighter grid, or blueprint off for parts from the ribbon.
-- **QA-012 and QA-024:** a new project copies 77 MB, its first open cooks 22 skin textures (about 40 s on the cloud CPU), and a one-part game builds to 136.5 MB. Both come from shipping the whole default character library (ADR-0050). Copying or cooking it on first use would shrink both.
+- **QA-005, fixed:** new parts now show their own colour in edit mode, on a light blueprint grid.
+- **QA-012 and QA-024, measured and left for now.** Paul left these to my judgement, and no cut was both safe and worth it.
+  - A new project's 77 MB is mostly the human base and the default outfit.
+  - A one-part build's 136.5 MB is the 22 skins, cooked (89 MB), plus models shipped both as `.glb` and cooked (43 MB).
+  - Leaving skins out would break `Humanoid:ApplyDescription` at runtime.
+  - Shipping models cooked-only would save about 25 MB, but it needs animation takes in the cooked format first. That's proposed as its own work.
 
 **Open, low:**
 
@@ -196,32 +227,25 @@ All runs in the cloud container:
 **Unable to verify in the cloud:**
 
 - **Real GPU:** the look, speed, ray tracing and the built game's window on the RX 9070 XT. Lavapipe ran 4 to 24 FPS, which says nothing about real hardware.
-- **Render and player unit tests in full:** one render test takes 1.6 to 3 GB on lavapipe.
 - **Audio playback:** there is no sound device in the container.
 - **Networking:** host and join, Collaborate, two computers, LAN and Tailscale.
 - **Native pickers:** the Windows and macOS file dialogs.
 - **Build Game for another OS** (11.3).
-- **Three editor tests that fail only in the cloud:**
-  - `every_tutorial_sample_opens_and_plays_in_the_editor` (no audio device).
-  - `the_overlay_is_drawn_only_where_the_feature_shows` (lavapipe).
-  - `ffmpeg_encodes_every_format_it_offers` (the container's ffmpeg rejects an AV1 parameter).
-
-  These failures aren't from the audit's changes; they need a rerun on a real machine.
+- **Editor tests that failed only in the cloud:** `every_tutorial_sample_opens_and_plays_in_the_editor` (no audio device) and `ffmpeg_encodes_every_format_it_offers` (the container's ffmpeg rejects an AV1 parameter). Both pass on the Linux computer.
 
 **Recommended next run** (on Paul's Linux machine at `~/Documents/VSCode Projects/Axcenity-Engine`, or the PC):
 
-1. `cargo nextest run --workspace`.
-2. Open the beginner project and Build Game on a real GPU, and run the built game.
-3. Host and join on one computer.
-4. Play a Sound.
-5. The rows still **Not started** in [checklist.md](checklist.md).
+1. Open the beginner project and Build Game on a real GPU, and run the built game.
+2. Host and join on one computer.
+3. Play a Sound.
+4. The rows still **Not started** in [checklist.md](checklist.md).
 
 ## 11. Recommendations
 
-1. **Decide QA-005 and QA-012/QA-024.** They're what a beginner meets first: a black part, and a large, slow first project and build.
+1. **Shrink builds safely.** Cook animation takes with the model, so a build can ship models cooked-only, which saves about 25 MB on a one-part game (QA-024). The skins have to stay, because scripts can change a character's skin.
 2. **Run the full suite on a real machine before merging** (`cargo nextest run --workspace`), since the cloud couldn't run render and player in full.
 3. **Give every system picker one fallback.** Route them through one helper that says when no picker opened (the QA-023 check), and offer a typed path where it matters (Import, Back Up).
-4. **Keep the test suite runnable without nextest.** Two tests depended on nextest's 8 MB main-thread stack or on AccessKit being on. The wiki's Testing strategy page now says what plain `cargo test` needs.
+4. **Keep the test suite runnable without nextest.** Twelve tests overflowed the 2 MB test stack (under nextest too) and one depended on AccessKit being on. The wiki's Testing strategy page now says what plain `cargo test` needs.
 5. **Add a "first five minutes" test.** Make a Baseplate project, insert a part, Play, Stop, Build Game, and assert no warnings. Two High findings would have been caught by one test like that; `every_template_passes_asset_check` is the start of it.
 
 ## 12. Ratings
@@ -231,10 +255,10 @@ Out of 10, from what this audit ran. Anything left unverified pulls a rating tow
 | Area | Rating | Why |
 |---|---|---|
 | Functionality | **7.5** | Every step of the beginner workflow works in the real editor, and the feature set is very broad: scripting, blocks, terrain, animation, UI, Collaborate, building games. Two High bugs sat right on the first-project path. Some areas were checked only by their tests. |
-| Stability | **7** | No crash in any GUI or CLI run. AutoRecover after `kill -9` works, damaged project files open with a message, and the script watchdog works. Against that: one hang (QA-021), a damaged settings file wiped silently (QA-020), and several tests that only pass under nextest. Real GPU and networking not seen. |
-| Beginner friendliness | **6** | The Learn page, templates, plain-language errors and a working first Play are strong. A new part looks black until Play (QA-005). A new project is 77 MB with a 40 s background cook, and a one-part game is 136 MB. Pickers can fail silently on some Linux desktops. |
+| Stability | **7** | No crash in any GUI or CLI run. AutoRecover after `kill -9` works, damaged project files open with a message, and the script watchdog works. The full suite passes on a real GPU, apart from two load-sensitive tests. Against that: one hang (QA-021), a damaged settings file wiped silently (QA-020), and 11 tests aborting on `main`. Networking wasn't checked by hand. |
+| Beginner friendliness | **6** | The Learn page, templates, plain-language errors and a working first Play are strong. New parts looked black until Play (QA-005, now fixed). A new project is 77 MB with a 40 s background cook, and a one-part game is 136 MB. Pickers can fail silently on some Linux desktops. |
 | UI/UX | **6.5** | The design system is consistent and panels fit narrow columns. But unticked checkboxes were nearly invisible in every theme (QA-009), a dialog's buttons jumped (QA-008), and the ribbon and settings are dense for a newcomer. |
 | Performance | **6** (low confidence) | Not measurable on lavapipe. Earlier PC benchmarks put the XB10k frame at 5.14 ms, slower than s&box (2.05) and Unity (3.11) but faster than Godot (10.27). Memory stayed flat over repeated Play at 2.31 GB. The first open's texture cook and build sizes are heavy. |
 | Settings | **7** | Every page opens and responds, the input settings reset, and a damaged file is now kept and reported. Limits, reset to default and restart notes weren't checked by hand. |
-| Code quality | **8** | Clean build, clippy and format. About 5,000 tests, behaviour-named and driving real paths. Thorough docs, a wiki and ADRs. Minus points: very large modules, and a test suite that assumes nextest and plenty of memory. |
-| Production readiness | **5** | It's an alpha (`0.3.0-alpha.1`), and the label is fair. The core loop is dependable, but real-GPU, audio, multiplayer and other-OS builds haven't been verified here, builds are large, and there's no CI beyond release tags, so every check depends on local runs. |
+| Code quality | **8** | Clean build, clippy and format. About 5,000 tests, behaviour-named and driving real paths. Thorough docs, a wiki and ADRs. The suite runs in under 3 minutes on a 32-thread machine. Minus points: very large modules, 15 tests failing on `main` with nobody noticing (no CI), and a suite that needs plenty of memory. |
+| Production readiness | **5** | It's an alpha (`0.3.0-alpha.1`), and the label is fair. The core loop is dependable, but audio, multiplayer, other-OS builds and the built game on a real GPU haven't been checked by hand, builds are large, and there's no CI beyond release tags, so every check depends on local runs. |

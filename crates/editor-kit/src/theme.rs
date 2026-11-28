@@ -599,9 +599,16 @@ pub struct Appearance {
     /// Draws continuously while the window has focus, so a variable refresh
     /// rate display never drops out of its rate when the editor goes idle.
     pub hold_refresh: bool,
-    /// While frames are being kept steady, present them on a fixed grid of
-    /// this many a second, so a variable refresh rate display sees one
-    /// rate, not every frame's own length. 0 is the display's own rate.
+    /// A frame rate limit the person chose: while frames are being kept
+    /// steady, present them on a fixed grid of this many a second, so a
+    /// variable refresh rate display sees one rate, not every frame's own
+    /// length. 0, the default, is no limit: frames are shown as soon as
+    /// each is ready and the viewport bar reads the real rate.
+    ///
+    /// Saved under a new name since no limit became the default: 60 was
+    /// the default before and every saved settings file carries it, so
+    /// under the old name the held 60 came back whatever the default said.
+    #[serde(rename = "frame_limit_hz")]
     pub steady_hz: u32,
     /// Where the ribbon's tabs and buttons sit across the window. Saved
     /// under a new name when Left became the default, so a Centered saved
@@ -630,7 +637,7 @@ impl Default for Appearance {
             code_font_size: 13.0,
             ui_scale: 1.0,
             hold_refresh: false,
-            steady_hz: 60,
+            steady_hz: 0,
             ribbon: RibbonAlign::Left,
             ui_font: UiFont::Inter,
             code_font: CodeFont::JetBrainsMono,
@@ -642,12 +649,12 @@ impl Default for Appearance {
 impl Appearance {
     pub const CODE_FONT_SIZES: std::ops::RangeInclusive<f32> = 10.0..=20.0;
     pub const UI_SCALES: [f32; 5] = [0.9, 1.0, 1.1, 1.25, 1.5];
-    /// The steady frame rates to choose from; 0 is the display's own rate.
+    /// The frame rate limits to choose from; 0 is no limit.
     pub const STEADY_RATES: [u32; 4] = [0, 120, 60, 30];
 
     pub fn steady_rate_name(hz: u32) -> String {
         if hz == 0 {
-            "Display's rate".to_owned()
+            "No limit".to_owned()
         } else {
             format!("{hz} a second")
         }
@@ -667,7 +674,7 @@ impl Appearance {
             appearance.ui_scale = 1.0;
         }
         if !Self::STEADY_RATES.contains(&appearance.steady_hz) {
-            appearance.steady_hz = 60;
+            appearance.steady_hz = 0;
         }
         appearance
     }
@@ -2766,11 +2773,38 @@ mod tests {
         assert_eq!(odd.code_font_size, 20.0);
         assert_eq!(odd.ui_scale, 1.0);
         assert_eq!(odd.accent, Accent::Blue);
-        let odd = Appearance::from_text(r#"{"steady_hz": 7}"#);
-        assert_eq!(odd.steady_hz, 60);
+        let odd = Appearance::from_text(r#"{"frame_limit_hz": 7}"#);
+        assert_eq!(odd.steady_hz, 0);
         // Centered was the default once: saved then, it's Left now.
         let old = Appearance::from_text(r#"{"ribbon": "Centered"}"#);
         assert_eq!(old.ribbon, RibbonAlign::Left);
+    }
+
+    /// The editor shows the real frame rate unless someone chose a limit
+    /// (Paul, asked several times). The held 60 kept coming back because
+    /// every saved settings file carried the old default, `steady_hz: 60`,
+    /// so the old key is ignored and only a limit chosen since counts.
+    #[test]
+    fn frames_have_no_limit_unless_one_is_chosen() {
+        assert_eq!(Appearance::default().steady_hz, 0, "no limit by default");
+        let saved_before = Appearance::from_text(r#"{"steady_hz": 60, "hold_refresh": true}"#);
+        assert_eq!(
+            saved_before.steady_hz, 0,
+            "the old default 60 isn't a choice"
+        );
+        assert!(saved_before.hold_refresh, "other saved settings are kept");
+        let chosen = Appearance {
+            steady_hz: 60,
+            ..Appearance::default()
+        };
+        let text = chosen.to_text();
+        assert!(text.contains(r#""frame_limit_hz":60"#), "{text}");
+        assert_eq!(
+            Appearance::from_text(&text).steady_hz,
+            60,
+            "a chosen limit stays"
+        );
+        assert_eq!(Appearance::steady_rate_name(0), "No limit");
     }
 
     #[test]
