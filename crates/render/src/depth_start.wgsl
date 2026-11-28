@@ -1,5 +1,6 @@
 // The scene pass's depth before anything is drawn into it: the depth the
-// prepass drew, one representable step farther (renderer/depth_start.rs).
+// prepass drew, one representable step farther (renderer/depth_start.rs),
+// and on a cut-out's pixel that depth itself.
 //
 // A solid item's pixel that the prepass kept is then still nearer than
 // what's there, so it is drawn, and writes its own depth: a second
@@ -8,6 +9,15 @@
 // before it is lit.
 
 @group(0) @binding(0) var prepass_depth: texture_depth_2d;
+// The prepass's normals, whose w says which pixels are a cut-out's
+// (shader.wgsl's `fs_prepass`).
+@group(0) @binding(1) var prepass_normals: texture_2d<f32>;
+
+// Must match `PREPASS_STANDARD_CUT_OUT` and `PREPASS_CHARACTER_CUT_OUT` in
+// shader.wgsl: the standard material's cut-outs, which the scene pass
+// lights where their depth equals what's there.
+const PREPASS_STANDARD_CUT_OUT: f32 = 0.85;
+const PREPASS_CHARACTER_CUT_OUT: f32 = 0.625;
 
 @vertex
 fn vs_main(@builtin(vertex_index) index: u32) -> @builtin(position) vec4<f32> {
@@ -28,6 +38,15 @@ fn fs_main(@builtin(position) position: vec4<f32>) -> @builtin(frag_depth) f32 {
     // Nothing drawn there: the far plane, as a cleared depth has.
     if depth >= 1.0 {
         return 1.0;
+    }
+    // A cut-out's pixel keeps the prepass's depth exactly: the scene pass
+    // lights cut-outs only where their depth equals what's there (as it did
+    // over the depth the cut-outs' fill drew, which is this one), so they
+    // need no fill of their own.
+    let flag = textureLoad(prepass_normals, vec2<i32>(position.xy), 0).w;
+    if abs(flag - PREPASS_STANDARD_CUT_OUT) < 0.01
+        || abs(flag - PREPASS_CHARACTER_CUT_OUT) < 0.01 {
+        return depth;
     }
     // The next float up: a positive float's bits, read as a whole number,
     // count the floats in order.

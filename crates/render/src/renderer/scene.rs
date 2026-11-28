@@ -2182,7 +2182,7 @@ impl ScenePipeline {
             Some(prepass) if self.frame_targets.samples == 1 => self.depth_start.draw(
                 &self.device,
                 &mut encoder,
-                &prepass.depth_view,
+                (&prepass.depth_view, &prepass.normal_view),
                 &self.frame_targets.depth_view,
             ),
             _ => false,
@@ -2276,11 +2276,14 @@ impl ScenePipeline {
             pass.set_bind_group(0, frame_bind_group, &[]);
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             // The cut-out surfaces' depth first, so they're lit only once
-            // per pixel, and what's behind them not at all.
-            if solid.iter().any(|batch| batch.prefilled) {
+            // per pixel, and what's behind them not at all. Where the depth
+            // started from the prepass's it's there already: a cut-out's
+            // pixel kept the prepass's depth exactly (renderer/depth_start.rs).
+            let fill = !depth_started || cut_out_fill_forced();
+            if fill && solid.iter().any(|batch| batch.prefilled) {
                 stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::CutOutDepth));
             }
-            for batch in solid.iter().filter(|batch| batch.prefilled) {
+            for batch in solid.iter().filter(|batch| fill && batch.prefilled) {
                 let Some(mesh) = self.bind_batch(&mut pass, batch, BatchPass::DepthFill) else {
                     continue;
                 };
@@ -4335,4 +4338,12 @@ enum ShadowStep<'a> {
         &'a [(lighting::CasterGroup, Range<u32>)],
     ),
     Copy,
+}
+
+/// `AXCENITY_CUT_OUT_FILL` (set to anything) draws the cut-outs' depth fill
+/// even where the scene's depth started from the prepass's, as before
+/// 2026-11-28, for comparing.
+fn cut_out_fill_forced() -> bool {
+    static FORCED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *FORCED.get_or_init(|| std::env::var_os("AXCENITY_CUT_OUT_FILL").is_some())
 }

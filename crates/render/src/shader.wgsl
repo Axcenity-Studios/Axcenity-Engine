@@ -159,6 +159,15 @@ const ROLE_DECAL: f32 = 2.0;
 // character's). Must match `PREPASS_CUT_OUT` in ray_shadows.wgsl and
 // ray_ao.wgsl.
 const PREPASS_CUT_OUT: f32 = 0.875;
+// The prepass normal's w on a cut-out pixel of the standard material
+// (`fs_prepass_standard`), whose depth the scene pass's depth start keeps
+// exactly (depth_start.wgsl): near enough `PREPASS_CUT_OUT` that everything
+// else reads it as that. A surface shader's cut-outs are lit with a depth
+// test of their own and keep `PREPASS_CUT_OUT`.
+const PREPASS_STANDARD_CUT_OUT: f32 = 0.85;
+// The same on a character's cut-out pixel (hair cards): read as a
+// character's (0.5) by everything but the depth start.
+const PREPASS_CHARACTER_CUT_OUT: f32 = 0.625;
 // How far toward the camera a Decal's depth is moved, in clip-space depth
 // (0 to 1): many times the depth's rounding, so it always wins over the
 // face it lies on, yet far less than anything placed in front of it.
@@ -1125,6 +1134,17 @@ fn dithered_out(fade: f32, pixel: vec2<f32>) -> bool {
 // and view-space normals. Cut-out pixels are left out, as in `fs_main`.
 @fragment
 fn fs_prepass(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    return prepass_pixel(in, front, false);
+}
+
+// `fs_prepass` for the standard material's items, whose cut-outs the scene
+// pass lights over the prepass's depth (their pixels are marked as such).
+@fragment
+fn fs_prepass_standard(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    return prepass_pixel(in, front, true);
+}
+
+fn prepass_pixel(in: VertexOut, front: bool, standard: bool) -> vec4<f32> {
     let facing = select(-1.0, 1.0, front);
     let shaded = pixel_surface(in, facing);
     let strand = textureSample(metalness_texture, material_sampler, in.uv).g;
@@ -1143,11 +1163,11 @@ fn fs_prepass(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0)
     normal.w = 1.0 + clamp(weather.roughness, 0.0, 0.999);
     // A character's pixels are marked for projected decals (decal.wgsl).
     if in.role == ROLE_CHARACTER {
-        normal.w = 0.5;
+        normal.w = select(0.5, PREPASS_CHARACTER_CUT_OUT, standard && in.surface.z > 0.0);
     } else if in.surface.z > 0.0 {
         // A cut-out's pixel, for ray traced shadows and AO
         // (ray_shadows.wgsl's `cut_out_near`); decals treat it as solid.
-        normal.w = PREPASS_CUT_OUT;
+        normal.w = select(PREPASS_CUT_OUT, PREPASS_STANDARD_CUT_OUT, standard);
     }
     return normal;
 }

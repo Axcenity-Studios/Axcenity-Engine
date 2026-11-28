@@ -17,6 +17,13 @@
 //!   depth then fails, as before: the same one of them shows;
 //! - what's farther by a step or more fails the test before it is lit.
 //!
+//! A cut-out's pixel (the prepass's normal says which) keeps the
+//! prepass's depth exactly instead. The scene pass lights a cut-out only
+//! where its depth equals what's there (`DepthUse::Filled`); it used to
+//! draw every cut-out's depth again first to get that (the cut-outs' depth
+//! fill), which left exactly this depth, so the fill is left out whenever
+//! the depth starts here.
+//!
 //! The picture is the same, pixel for pixel. It needs the prepass to have
 //! drawn the scene's solid items with as many samples a pixel: one, so not
 //! under MSAA, and not while nothing reads the prepass (no ambient
@@ -32,24 +39,37 @@ pub(super) struct DepthStart {
     pub(super) enabled: bool,
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
-    /// The prepass's depth last read, and its binding.
-    bound: Option<(wgpu::TextureView, wgpu::BindGroup)>,
+    /// The prepass's depth and normals last read, and their binding.
+    bound: Option<(wgpu::TextureView, wgpu::TextureView, wgpu::BindGroup)>,
 }
 
 impl DepthStart {
     pub(super) fn new(device: &wgpu::Device) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("depth start"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Depth,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Depth,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                // The prepass's normals: their w marks a cut-out's pixels.
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+            ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("depth start"),
@@ -95,13 +115,15 @@ impl DepthStart {
 
     /// Draws `scene_depth`'s start from `prepass_depth`, which must be
     /// the depth of the same solid items at the same size with one sample
-    /// a pixel. False, with nothing drawn, while it's off: the scene pass
+    /// a pixel; `prepass_normals` say which pixels are a cut-out's, whose
+    /// depth is kept exactly (the scene pass lights cut-outs where their
+    /// depth equals it, so they need no depth fill). False, with nothing drawn, while it's off: the scene pass
     /// then clears its depth.
     pub(super) fn draw(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        prepass_depth: &wgpu::TextureView,
+        (prepass_depth, prepass_normals): (&wgpu::TextureView, &wgpu::TextureView),
         scene_depth: &wgpu::TextureView,
     ) -> bool {
         if !self.enabled {
@@ -110,19 +132,25 @@ impl DepthStart {
         if self
             .bound
             .as_ref()
-            .is_none_or(|(view, _)| view != prepass_depth)
+            .is_none_or(|(depth, normals, _)| depth != prepass_depth || normals != prepass_normals)
         {
             let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("depth start"),
                 layout: &self.layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(prepass_depth),
-                }],
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(prepass_depth),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(prepass_normals),
+                    },
+                ],
             });
-            self.bound = Some((prepass_depth.clone(), group));
+            self.bound = Some((prepass_depth.clone(), prepass_normals.clone(), group));
         }
-        let Some((_, group)) = &self.bound else {
+        let Some((_, _, group)) = &self.bound else {
             return false;
         };
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
