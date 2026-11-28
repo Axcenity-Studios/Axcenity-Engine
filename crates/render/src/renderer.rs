@@ -126,9 +126,9 @@ use gpu::{
     target_bytes, update_custom_mesh, upload_custom_mesh_with, upload_mesh, upload_texture,
 };
 use lighting::{
-    DrawPlan, FrameUses, camera_view_projection, casters_in_views, frame_uniform, linear_color,
-    maps_uniform_of, material_textures, plan_draws, plan_lights, post_drawn, post_uniform,
-    shadows_drawn, sun_reach,
+    DrawPlan, FarCascadeLods, FrameUses, camera_view_projection, casters_in_views, frame_uniform,
+    linear_color, maps_uniform_of, material_textures, plan_draws, plan_lights, post_drawn,
+    post_uniform, shadows_drawn, sun_reach,
 };
 #[cfg(test)]
 use lighting::{cascade_ends, light_raw, material_key, uv_matrix, view_projection};

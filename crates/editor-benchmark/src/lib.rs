@@ -581,7 +581,7 @@ type Row = (&'static str, fn(&GraphicsSettings) -> String);
 /// The settings that differ between `now` and `recommended`, as they'd be
 /// drawn (each the override or its preset's value).
 pub fn changes(now: &GraphicsSettings, recommended: &GraphicsSettings) -> Vec<Change> {
-    let rows: [Row; 29] = [
+    let rows: [Row; 30] = [
         ("Preset", |s| {
             let preset = Tier::of(s.quality).label();
             if s.automatic {
@@ -612,6 +612,7 @@ pub fn changes(now: &GraphicsSettings, recommended: &GraphicsSettings) -> Vec<Ch
         }),
         ("Post-processing", |s| on_off(s.post_processing())),
         ("Contact shadows", |s| on_off(s.contact_shadows())),
+        ("Far shadow detail", |s| on_off(s.shadow_lod())),
         ("Screen-space reflections", |s| {
             on_off(s.screen_space_reflections())
         }),
