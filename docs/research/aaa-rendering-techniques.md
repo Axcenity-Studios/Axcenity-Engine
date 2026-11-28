@@ -13,11 +13,12 @@ There are two goals. The first is performance close to Unity HDRP and Unreal Eng
 
 The ranking at the end uses these numbers.
 
-**What became of it (2026-11-28).** Recommendations taken up so far, each behind a switch for comparing and timed against the 2026-11-27 baseline (Overgrown Street at 2560 × 1405 on the PC):
-- 10, card LODs for foliage: simpler copies of cut-out foliage with fewer, bigger leaf cards (`model/cards.rs`, PR #436, awaiting the owner's look check). Impostors are not done.
-- 1, cheaper far cascades: the farthest of four drawn one frame in four (PR #438). Caching static casters across frames and opaque far proxies (2) are not done.
-- 3, the RT ray budget: one solid-blocker query a pixel instead of one per ray stopped by leaves (PR #437). Near-field-only RT shadows, checkerboarding and a shadow denoiser are not done.
-- Also from the profile, not ranked here: cut-outs lit over the depth started from the prepass, with no separate depth fill (PR #435).
+**What became of it (2026-11-28).** Recommendations taken up so far, each behind a switch for comparing and timed on the PC against the 2026-11-27 baseline (Overgrown Street, 2560 × 1405):
+- 1, cheaper far cascades: the farthest of four drawn one frame in four (PR #438): cascade 4 4.0–4.4 → 1.9–2.1 ms a frame, 5–8% more frames a second. Caching static casters across frames and opaque far proxies (2) are not done.
+- 3, the RT ray budget: one solid-blocker query a pixel instead of one per ray stopped by leaves (PR #437): traced shadows 25.9–53.6 → 9.8–34.7 ms. Near-field-only RT shadows, checkerboarding and a shadow denoiser are not done.
+- 10, card LODs: thinning cut-out foliage by whole leaf cards was built and dropped (PR #436, closed): Overgrown Street's models all ship their own `_LOD1` copies, so it changed nothing. Impostors are not done.
+- Also tried and dropped: lighting cut-outs over the depth started from the prepass with no depth fill (PRs #435 and #440): it removed the fill's 2.0–4.1 ms but made the scene pass dearer by more on RADV, 5–14% slower in all.
+- Still the cap without ray tracing: the frame's thread, 15.7–21.2 ms in every variant (about 47–64 frames a second at most).
 
 ---
 
