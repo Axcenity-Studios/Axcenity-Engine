@@ -2213,6 +2213,11 @@ impl ScenePipeline {
         let mut drawn = (0, 0);
         // The depth fill's draw calls, triangles and corners.
         let mut depth_fill = (0, 0, 0);
+        let scene_kind = if depth_started && self.depth_start.tested_cut_outs {
+            BatchPass::SceneOverStart
+        } else {
+            BatchPass::Scene
+        };
         let mut draw_batches = |pass: &mut wgpu::RenderPass<'_>, batches: &[Batch], solid: bool| {
             let mut water_bound = false;
             let mut drawing = None;
@@ -2230,7 +2235,7 @@ impl ScenePipeline {
                     };
                     pass.set_bind_group(0, group, &[]);
                 }
-                let Some(mesh) = self.bind_batch(pass, batch, BatchPass::Scene) else {
+                let Some(mesh) = self.bind_batch(pass, batch, scene_kind) else {
                     continue;
                 };
                 count(mesh, &batch.instances);
@@ -2243,7 +2248,7 @@ impl ScenePipeline {
             }
             // Outlines (solid items only) go behind what was just drawn.
             for batch in batches.iter().filter(|batch| batch.outline) {
-                let Some(mesh) = self.bind_batch(pass, batch, BatchPass::Scene) else {
+                let Some(mesh) = self.bind_batch(pass, batch, scene_kind) else {
                     continue;
                 };
                 pass.set_pipeline(&self.outline_pipeline);
@@ -2276,11 +2281,16 @@ impl ScenePipeline {
             pass.set_bind_group(0, frame_bind_group, &[]);
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             // The cut-out surfaces' depth first, so they're lit only once
-            // per pixel, and what's behind them not at all.
-            if solid.iter().any(|batch| batch.prefilled) {
+            // per pixel, and what's behind them not at all. Where the depth
+            // started from the prepass's it already holds theirs, a step
+            // farther: they're lit over it, cutting their own holes
+            // (`PrefillPipelines::tested`), and no fill is drawn.
+            let fill = !depth_started || !self.depth_start.tested_cut_outs;
+            let filled = solid.iter().filter(|batch| batch.prefilled && fill);
+            if filled.clone().next().is_some() {
                 stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::CutOutDepth));
             }
-            for batch in solid.iter().filter(|batch| batch.prefilled) {
+            for batch in filled {
                 let Some(mesh) = self.bind_batch(&mut pass, batch, BatchPass::DepthFill) else {
                     continue;
                 };
@@ -2693,13 +2703,16 @@ impl ScenePipeline {
             let probe = self
                 .plant_probe
                 .as_ref()
-                .filter(|_| kind == BatchPass::Scene)
+                .filter(|_| matches!(kind, BatchPass::Scene | BatchPass::SceneOverStart))
                 .and_then(|probe| probe.pipeline(batch));
             let pipeline = match (prepass, batch.double_sided, surface) {
                 _ if kind == BatchPass::DepthFill => &self.prefill_pipelines.depth[side],
                 // Water is never in the prepass.
                 _ if batch.water => water,
                 _ if probe.is_some() => probe?,
+                (false, _, None) if batch.prefilled && kind == BatchPass::SceneOverStart => {
+                    &self.prefill_pipelines.tested[side]
+                }
                 (false, _, None) if batch.prefilled => &self.prefill_pipelines.lit[side],
                 (false, _, None) if !batch.transparent && !batch.fading && self.whole_solids => {
                     &self.prefill_pipelines.whole[side]
@@ -3826,6 +3839,9 @@ const HEAVY_SHADOW_CASTERS: usize = 12000;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum BatchPass {
     Scene,
+    /// The scene pass over the depth the prepass started it with, where
+    /// cut-outs need no fill (`PrefillPipelines::tested`).
+    SceneOverStart,
     /// The cut-out surfaces' depth, drawn first in the scene pass.
     DepthFill,
     Prepass,
@@ -3987,6 +4003,8 @@ fn scene_pipelines(
         lit_double,
         whole,
         whole_double,
+        tested,
+        tested_double,
     ] = gpu::in_parallel([
         &|| create_sky_pipeline(device, frame_layout, clouds_layout, samples),
         &|| pipeline(false, false),
@@ -4009,6 +4027,8 @@ fn scene_pipelines(
         &|| prefill("fs_prefilled", true, DepthUse::Filled),
         &|| prefill("fs_prefilled", false, DepthUse::Plain),
         &|| prefill("fs_prefilled", true, DepthUse::Plain),
+        &|| prefill("fs_main", false, DepthUse::Tested),
+        &|| prefill("fs_main", true, DepthUse::Tested),
     ]);
     (
         sky,
@@ -4023,6 +4043,7 @@ fn scene_pipelines(
             depth: [depth, depth_double],
             lit: [lit, lit_double],
             whole: [whole, whole_double],
+            tested: [tested, tested_double],
         },
     )
 }

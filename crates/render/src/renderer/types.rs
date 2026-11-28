@@ -1011,6 +1011,10 @@ pub(super) struct PrefillPipelines {
     pub(super) lit: [wgpu::RenderPipeline; 2],
     /// Solid items with nothing left out, by `double_sided`.
     pub(super) whole: [wgpu::RenderPipeline; 2],
+    /// Cut-outs lit over the depth the prepass started the scene with, by
+    /// `double_sided`: their holes cut by `fs_main`, no depth written, so
+    /// no fill is drawn before them (renderer/depth_start.rs).
+    pub(super) tested: [wgpu::RenderPipeline; 2],
 }
 
 /// The GPU objects for drawing a scene, whatever it's drawn into. Both

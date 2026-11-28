@@ -275,3 +275,40 @@ fn turning_it_on_and_off_on_one_renderer_keeps_the_picture() {
     assert_eq!(difference(&cleared, &shared), (0, 0));
     assert_eq!(difference(&cleared, &cleared_again), (0, 0));
 }
+
+#[test]
+fn cut_outs_lit_over_the_started_depth_need_no_fill_and_keep_the_picture() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let list = thicket();
+    for anti_aliasing in [AntiAliasing::Off, AntiAliasing::Taa] {
+        let settings = settings(anti_aliasing, AmbientOcclusion::High);
+        let draw = |over_start| {
+            let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+            renderer.set_graphics(&settings);
+            renderer.set_cut_outs_over_depth_start(over_start);
+            for _ in 0..6 {
+                renderer.render(&list).unwrap();
+            }
+            let stats = renderer.stats();
+            assert!(stats.depth_from_prepass);
+            (renderer.read_pixels(), stats.draw_calls, stats.triangles)
+        };
+        let (filled, filled_calls, filled_triangles) = draw(false);
+        let (over, over_calls, over_triangles) = draw(true);
+        assert_eq!(
+            difference(&filled, &over),
+            (0, 0),
+            "{anti_aliasing:?}: channels that differ, and the most by"
+        );
+        // The thicket's leaf cards and hair card are drawn once fewer (the
+        // triangle count is the lit passes', which the fill never added to).
+        assert!(
+            over_calls < filled_calls && over_triangles <= filled_triangles,
+            "{anti_aliasing:?}: {over_calls} draws and {over_triangles} triangles, \
+             against {filled_calls} and {filled_triangles} with the fill"
+        );
+    }
+}
