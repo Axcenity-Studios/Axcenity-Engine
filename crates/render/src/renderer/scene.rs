@@ -2609,8 +2609,12 @@ impl ScenePipeline {
     /// shadow casters than [`HEAVY_SHADOW_CASTERS`]) the two farthest take
     /// turns, so each frame draws one: they hold most of its shadow
     /// triangles and cover what's far away, where one frame's lag doesn't
-    /// show. A cascade waiting its turn goes in `uniform` as it was last
-    /// drawn, for the shaders to read it the way it was drawn.
+    /// show. With four cascades (Ultra) the farthest, which covers only
+    /// what's well past the middle distance, is drawn one frame in
+    /// [`FARTHEST_CASCADE_TURN`], on a frame its neighbour isn't
+    /// (`AXCENITY_FAR_CASCADE_EVERY_OTHER` puts it back on every other
+    /// frame, to compare). A cascade waiting its turn goes in `uniform` as
+    /// it was last drawn, for the shaders to read it the way it was drawn.
     fn schedule_cascades(
         &mut self,
         list: &DrawList,
@@ -2634,7 +2638,7 @@ impl ScenePipeline {
                 continue;
             }
             let takes_turns = heavy && map_fits && cascades >= 3 && index >= cascades - 2;
-            let its_turn = (self.frame as usize + index).is_multiple_of(2);
+            let its_turn = cascade_turn(self.frame as usize, index, cascades);
             // A cascade reaches half the map's width from the camera: it
             // isn't kept once the camera has gone a good way across it.
             let near = |kept: &DrawnCascade| {
@@ -3821,6 +3825,28 @@ impl ScenePipeline {
 /// More shadow casters a frame than this and the far cascades take turns
 /// (see [`ScenePipeline::schedule_cascades`]).
 const HEAVY_SHADOW_CASTERS: usize = 12000;
+
+/// With four cascades or more, the farthest is drawn one frame in this
+/// many in a heavy scene (Overgrown Street's farthest cascade was about
+/// 8 ms of GPU on the frames that drew it, 2026-11-27).
+const FARTHEST_CASCADE_TURN: usize = 4;
+
+/// Whether cascade `index` of `cascades`, one of the two farthest, is drawn
+/// on `frame` in a heavy scene: the two take alternate frames, and with
+/// four cascades or more the farthest takes only one frame in
+/// [`FARTHEST_CASCADE_TURN`] of its own, so no frame draws both.
+pub(super) fn cascade_turn(frame: usize, index: usize, cascades: usize) -> bool {
+    static EVERY_OTHER: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let every_other =
+        *EVERY_OTHER.get_or_init(|| std::env::var_os("AXCENITY_FAR_CASCADE_EVERY_OTHER").is_some());
+    let alternate = (frame + index).is_multiple_of(2);
+    if cascades < 4 || index + 1 < cascades || every_other {
+        return alternate;
+    }
+    // The frames its neighbour (index - 1) leaves free are those where
+    // `frame + index` is even; one of every two of them.
+    alternate && (frame + index) % FARTHEST_CASCADE_TURN == 0
+}
 
 /// Which pass a batch is being drawn in (see `ScenePipeline::bind_batch`).
 #[derive(Clone, Copy, PartialEq, Eq)]
