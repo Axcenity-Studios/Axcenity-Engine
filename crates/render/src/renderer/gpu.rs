@@ -296,6 +296,10 @@ pub(super) enum DepthUse {
     /// Draws only where depth equals what [`DepthUse::Fill`] left, and
     /// doesn't write it.
     Filled,
+    /// Tests against what's nearer and doesn't write: a cut-out drawn over
+    /// the depth the prepass started the scene with, which already holds
+    /// its depth (renderer/depth_start.rs), so it needs no fill first.
+    Tested,
 }
 
 /// `layouts` as a pipeline layout takes them: every bind group used (wgpu
@@ -380,7 +384,9 @@ pub(super) fn create_pipeline_for(
             format: DEPTH_FORMAT,
             // See-through items are hidden behind solid ones, but don't hide
             // other see-through items behind them.
-            depth_write_enabled: Some(!transparent && depth != DepthUse::Filled),
+            depth_write_enabled: Some(
+                !transparent && depth != DepthUse::Filled && depth != DepthUse::Tested,
+            ),
             depth_compare: Some(if depth == DepthUse::Filled {
                 wgpu::CompareFunction::Equal
             } else {

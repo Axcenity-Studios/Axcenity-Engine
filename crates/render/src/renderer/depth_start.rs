@@ -30,6 +30,11 @@ pub(super) struct DepthStart {
     /// (`Renderer::set_depth_from_prepass`, or `AXCENITY_NO_DEPTH_START`
     /// set when the renderer is made), for comparing the two.
     pub(super) enabled: bool,
+    /// Whether cut-outs are lit straight over the started depth with no
+    /// fill first (`PrefillPipelines::tested`). Off (`AXCENITY_CUT_OUT_FILL`
+    /// set when the renderer is made) draws their depth first as before,
+    /// for comparing the two.
+    pub(super) tested_cut_outs: bool,
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     /// The prepass's depth last read, and its binding.
@@ -87,6 +92,7 @@ impl DepthStart {
         });
         Self {
             enabled: std::env::var_os("AXCENITY_NO_DEPTH_START").is_none(),
+            tested_cut_outs: std::env::var_os("AXCENITY_CUT_OUT_FILL").is_none(),
             pipeline,
             layout,
             bound: None,

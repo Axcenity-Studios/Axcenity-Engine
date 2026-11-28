@@ -582,6 +582,14 @@ impl Renderer {
         self.scene.depth_start.enabled = on;
     }
 
+    /// Whether cut-outs (leaves, fences) are lit straight over that
+    /// started depth, cutting their own holes, with no pass drawing their
+    /// depth first (renderer/depth_start.rs): on by default. The picture
+    /// is the same either way. For comparing the two.
+    pub fn set_cut_outs_over_depth_start(&mut self, on: bool) {
+        self.scene.depth_start.tested_cut_outs = on;
+    }
+
     /// How many background uploads are still on their way.
     pub fn pending_uploads(&self) -> usize {
         self.scene.pending_uploads()
@@ -812,6 +820,11 @@ impl TextureRenderer {
     /// See [`Renderer::set_depth_from_prepass`].
     pub fn set_depth_from_prepass(&mut self, on: bool) {
         self.scene.depth_start.enabled = on;
+    }
+
+    /// See [`Renderer::set_cut_outs_over_depth_start`].
+    pub fn set_cut_outs_over_depth_start(&mut self, on: bool) {
+        self.scene.depth_start.tested_cut_outs = on;
     }
 
     /// See [`Renderer::pending_uploads`].
