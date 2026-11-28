@@ -1100,9 +1100,14 @@ impl<'a> FrameUses<'a> {
                 .map(|(cluster, local, first)| {
                     let index = &mut in_frame[first_of[cluster as usize] + local as usize];
                     if *index == u32::MAX {
-                        let key = clusters[cluster as usize].materials[local as usize];
+                        // The cluster's digests were worked out when it was
+                        // made: hashing 480-byte keys here again each frame
+                        // was 1.5 ms of Overgrown Street's 3.6 ms Materials.
+                        let cluster = clusters[cluster as usize];
+                        let key = cluster.materials[local as usize];
+                        let digest = cluster.digests[local as usize];
                         let first = (start + first as usize) as u32;
-                        *index = uses.place(&mut places, key, key_digest(&key), first);
+                        *index = uses.place(&mut places, key, digest, first);
                     }
                     *index
                 })
@@ -1141,7 +1146,7 @@ impl FrameUses<'_> {
 }
 
 /// A material key's digest, which [`MaterialPlaces`] finds it by.
-fn key_digest(key: &MaterialKey) -> u64 {
+pub(super) fn key_digest(key: &MaterialKey) -> u64 {
     use std::hash::BuildHasher;
     rustc_hash::FxBuildHasher.hash_one(key)
 }
