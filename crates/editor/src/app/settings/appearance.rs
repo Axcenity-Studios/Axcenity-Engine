@@ -564,8 +564,8 @@ pub(super) fn accessibility_page(ui: &mut egui::Ui, appearance: &mut Appearance)
     ui.add_space(space::L);
     section(ui, "Display");
     ui.horizontal(|ui| {
-        found_label(ui, "Steady frame rate");
-        egui::ComboBox::from_id_salt("steady frame rate")
+        found_label(ui, "Frame rate limit");
+        egui::ComboBox::from_id_salt("frame rate limit")
             .selected_text(Appearance::steady_rate_name(appearance.steady_hz))
             .show_ui(ui, |ui| {
                 for hz in Appearance::STEADY_RATES {
@@ -579,10 +579,11 @@ pub(super) fn accessibility_page(ui: &mut egui::Ui, appearance: &mut Appearance)
     });
     ui.label(
         egui::RichText::new(
-            "While you work, frames are shown at this fixed rate rather than as fast as each \
-             one is ready, so a FreeSync or G-Sync display holds one refresh rate. OLED and \
-             VA monitors flicker when the rate swings; if yours still does, pick a lower rate. \
-             The display's own rate has no limit.",
+            "No limit shows each frame as soon as it's ready, up to your display's refresh, \
+             and the viewport bar reads the real frame rate. With a limit, frames are shown at \
+             that fixed rate while you work, so a FreeSync or G-Sync display holds one refresh \
+             rate (OLED and VA monitors can flicker when it swings), and the viewport bar marks \
+             the rate (held).",
         )
         .color(palette.text_secondary),
     );
@@ -591,8 +592,8 @@ pub(super) fn accessibility_page(ui: &mut egui::Ui, appearance: &mut Appearance)
     found(ui, &row, "Hold the refresh rate steady");
     ui.label(
         egui::RichText::new(
-            "Keeps drawing at the steady frame rate while the editor has focus instead of \
-             stopping when it's idle, for displays that flicker as the rate drops. It uses \
+            "Keeps drawing, at the frame rate limit if one is set, while the editor has focus \
+             instead of stopping when it's idle, for displays that flicker as the rate drops. It uses \
              more of the graphics card.",
         )
         .color(palette.text_secondary),
