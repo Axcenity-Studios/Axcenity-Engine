@@ -214,11 +214,12 @@ impl AssetBrowser {
                     }
                 })
                 .filter(|dir| {
-                    // Don't duplicate model/animation package folders already shown as Packages.
-                    !packages.iter().any(|p| {
-                        dir.eq_ignore_ascii_case(&format!("assets/models/{}", p.name))
-                            || dir.eq_ignore_ascii_case(&format!("assets/animations/{}", p.name))
-                    })
+                    // Don't duplicate the folders shown as folder tiles, or
+                    // the folders inside them (a model's `textures`, each
+                    // garment's folder in a character's).
+                    !packages.iter().any(|package| package.covers(dir))
+                        && !(dir.eq_ignore_ascii_case("assets/characters")
+                            && packages.iter().any(|package| package.character))
                 })
                 .cloned()
                 .collect();
