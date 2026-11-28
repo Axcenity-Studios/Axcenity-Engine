@@ -554,29 +554,6 @@ impl Hue {
     }
 }
 
-/// Where a menu item's icon sits in the column before the labels
-/// (Settings > Appearance > Menu icons). Either way every label in a menu
-/// starts at the same place, with an icon or without one.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MenuIcons {
-    /// Against the left edge, as in Visual Studio and Unity.
-    #[default]
-    Left,
-    /// In the middle of the icon column, lined up like a toolbar's icons.
-    Centered,
-}
-
-impl MenuIcons {
-    pub const ALL: [MenuIcons; 2] = [MenuIcons::Left, MenuIcons::Centered];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            MenuIcons::Left => "Left",
-            MenuIcons::Centered => "Centered",
-        }
-    }
-}
-
 /// Where the ribbon's tabs and buttons sit across the window (Settings >
 /// Appearance > Ribbon): from the left edge, in line with the menus and the
 /// panels, or in the middle. When they don't fit, they start at the left
@@ -633,8 +610,6 @@ pub struct Appearance {
     /// under the old name the held 60 came back whatever the default said.
     #[serde(rename = "frame_limit_hz")]
     pub steady_hz: u32,
-    /// Where icons sit in menus.
-    pub menu_icons: MenuIcons,
     /// Where the ribbon's tabs and buttons sit across the window. Saved
     /// under a new name when Left became the default, so a Centered saved
     /// back when it was the default doesn't keep the old look.
@@ -663,7 +638,6 @@ impl Default for Appearance {
             ui_scale: 1.0,
             hold_refresh: false,
             steady_hz: 0,
-            menu_icons: MenuIcons::Left,
             ribbon: RibbonAlign::Left,
             ui_font: UiFont::Inter,
             code_font: CodeFont::JetBrainsMono,
@@ -1448,19 +1422,9 @@ fn density_id() -> egui::Id {
     egui::Id::new("axcenity density")
 }
 
-fn menu_icons_id() -> egui::Id {
-    egui::Id::new("axcenity menu icons")
-}
-
-/// Where icons sit in menus, as picked in Settings.
-pub fn menu_icons(ctx: &egui::Context) -> MenuIcons {
-    ctx.data(|data| data.get_temp::<MenuIcons>(menu_icons_id()))
-        .unwrap_or_default()
-}
-
 /// A menu item's icon and label as one button's contents: the icon in a
-/// column of its own (so labels line up whether or not an item has an
-/// icon), placed as Settings > Appearance > Menu icons says. Use it for
+/// column of its own, against its left edge (so labels line up whether or
+/// not an item has an icon). Use it for
 /// every item in a menu: `ui.button(theme::menu_entry(ui.ctx(), Some(icon), "Save"))`.
 pub fn menu_entry(
     ctx: &egui::Context,
@@ -1481,8 +1445,10 @@ pub fn menu_item_tinted(
     menu_entry_tinted(ctx, Some(icon), Some(color), text)
 }
 
+/// `_ctx` is kept so callers needn't change: it once carried the removed
+/// Menu icons setting (left or centred icons).
 fn menu_entry_tinted(
-    ctx: &egui::Context,
+    _ctx: &egui::Context,
     icon: Option<&str>,
     color: Option<Color32>,
     text: impl Into<String>,
@@ -1490,26 +1456,10 @@ fn menu_entry_tinted(
     use egui::{AtomExt as _, IntoAtoms as _};
     let icon = icon.unwrap_or("");
     let font = egui::FontId::proportional(size::ICON_MEDIUM);
-    // egui paints a sized atom's text at the atom's left edge whatever its
-    // `atom_align` says (the atom's cell is exactly its size), so the
-    // column's left room is put in front of the glyph as leading space.
-    let indent = match menu_icons(ctx) {
-        MenuIcons::Left => 0.0,
-        MenuIcons::Centered if icon.is_empty() => 0.0,
-        MenuIcons::Centered => {
-            let width = ctx.fonts_mut(|fonts| {
-                fonts
-                    .layout_no_wrap(icon.to_owned(), font.clone(), Color32::PLACEHOLDER)
-                    .rect
-                    .width()
-            });
-            ((MENU_ICON_COLUMN - width) / 2.0).max(0.0)
-        }
-    };
     let mut job = egui::text::LayoutJob::default();
     job.append(
         icon,
-        indent,
+        0.0,
         egui::TextFormat::simple(font, color.unwrap_or(Color32::PLACEHOLDER)),
     );
     let icon = egui::WidgetText::from(job)
@@ -1616,7 +1566,6 @@ pub fn apply(ctx: &egui::Context, appearance: &Appearance) {
         data.insert_temp(accent_id(), appearance.accent);
         data.insert_temp(density_id(), appearance.density);
         data.insert_temp(contrast_id(), appearance.increase_contrast);
-        data.insert_temp(menu_icons_id(), appearance.menu_icons);
         data.insert_temp(theme_choice_id(), appearance.theme);
         let desired = (appearance.ui_font.clone(), appearance.code_font.clone());
         let prev = data.get_temp::<(UiFont, CodeFont)>(applied_font_id());
@@ -2764,64 +2713,38 @@ mod tests {
 
     #[test]
     fn menu_labels_start_at_the_same_place_with_or_without_an_icon() {
-        let mut placed = Vec::new();
-        for place in MenuIcons::ALL {
-            let ctx = test_context();
-            let appearance = Appearance {
-                menu_icons: place,
-                ..Default::default()
-            };
-            let mut output = None;
-            for _ in 0..2 {
-                output = Some(run(&ctx, Default::default(), |ui| {
-                    apply(ui.ctx(), &appearance);
-                    assert_eq!(menu_icons(ui.ctx()), place);
-                    ui.vertical(|ui| {
-                        let _ = ui.button(menu_item(ui.ctx(), icons::FLOPPY_DISK, "Save"));
-                        let _ = ui.button(menu_entry(ui.ctx(), None, "Settings"));
-                        let _ = ui.button(menu_item(ui.ctx(), icons::GEAR_SIX, "Gear"));
-                    });
-                }));
-            }
-            let mut starts = std::collections::HashMap::new();
-            let mut icon_centres = Vec::new();
-            for clipped in &output.unwrap().shapes {
-                if let egui::Shape::Text(text) = &clipped.shape {
-                    let rect = text.visual_bounding_rect();
-                    match text.galley.text() {
-                        "Save" | "Settings" | "Gear" => {
-                            starts.insert(text.galley.text().to_owned(), rect.left());
-                        }
-                        text if !text.trim().is_empty() => icon_centres.push(rect.center().x),
-                        _ => {}
-                    }
-                }
-            }
-            assert_eq!(starts.len(), 3, "{place:?}: {starts:?}");
-            let save = starts["Save"];
-            for (label, left) in &starts {
-                // Glyphs' own side bearings differ by a point or so.
-                assert!(
-                    (left - save).abs() <= 1.5,
-                    "{place:?}: {label} at {left}, Save at {save}"
+        let ctx = test_context();
+        let mut output = None;
+        for _ in 0..2 {
+            output = Some(run(&ctx, Default::default(), |ui| {
+                apply(ui.ctx(), &Appearance::default());
+                ui.vertical(|ui| {
+                    let _ = ui.button(menu_item(ui.ctx(), icons::FLOPPY_DISK, "Save"));
+                    let _ = ui.button(menu_entry(ui.ctx(), None, "Settings"));
+                    let _ = ui.button(menu_item(ui.ctx(), icons::GEAR_SIX, "Gear"));
+                });
+            }));
+        }
+        let mut starts = std::collections::HashMap::new();
+        for clipped in &output.unwrap().shapes {
+            if let egui::Shape::Text(text) = &clipped.shape
+                && matches!(text.galley.text(), "Save" | "Settings" | "Gear")
+            {
+                starts.insert(
+                    text.galley.text().to_owned(),
+                    text.visual_bounding_rect().left(),
                 );
             }
-            assert_eq!(icon_centres.len(), 2, "{place:?}");
-            placed.push((icon_centres[0], save));
         }
-        // Centered moves the icons to the middle of their column (they're
-        // narrower than it), and the labels stay where they were.
-        let [(left_icon, left_label), (centered_icon, centered_label)] = placed[..] else {
-            unreachable!()
-        };
-        assert!(
-            centered_icon > left_icon + 2.0,
-            "Centered icon at {centered_icon}, Left at {left_icon}"
-        );
-        assert!(
-            (centered_label - left_label).abs() < 0.5,
-            "labels at {left_label} and {centered_label}"
-        );
+        assert_eq!(starts.len(), 3, "{starts:?}");
+        let save = starts["Save"];
+        for (label, left) in &starts {
+            // Glyphs' own side bearings differ by a point or so.
+            assert!(
+                (left - save).abs() <= 1.5,
+                "{label} at {left}, Save at {save}"
+            );
+        }
     }
 
     #[test]
@@ -2836,7 +2759,6 @@ mod tests {
             ui_scale: 1.25,
             hold_refresh: true,
             steady_hz: 30,
-            menu_icons: MenuIcons::Centered,
             ribbon: RibbonAlign::Centered,
             ui_font: UiFont::Poppins,
             code_font: CodeFont::Hack,

@@ -653,9 +653,9 @@ impl BenchRun {
         }
         if self.gpu_parts.frames() > 0 {
             text.push_str(
-                &self
-                    .gpu_parts
-                    .table("GPU within the prepass and the scene pass, by what is drawn"),
+                &self.gpu_parts.table(
+                    "GPU within the prepass, the scene pass and the shadows, by what is drawn",
+                ),
             );
         }
         let shown = self.shown().zip(self.interval());

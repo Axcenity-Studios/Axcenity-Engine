@@ -39,13 +39,27 @@ const ALPHA_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
 pub(super) struct CutOutRaw {
     /// x: its mesh's first triangle in the texture coordinate buffer, y:
     /// its alpha's layer plus 1 (0: no holes, every hit counts), z: the
-    /// alpha cutoff's bits, w: unused.
+    /// alpha cutoff's bits, w: the bits of the share of its shadow it
+    /// leaves out near the end of its shadow's reach (0: none), which only
+    /// shadow rays read ([`CutOutRaw::casting`]).
     mesh: [u32; 4],
     /// The columns of the material's texture coordinate matrix
     /// (`lighting::uv_matrix`).
     uv_matrix: [f32; 4],
     /// xy: the material's texture coordinate offset.
     uv_offset: [f32; 4],
+}
+
+impl CutOutRaw {
+    /// This slot casting `share` of its shadow (`Draw::shadow`): shadow
+    /// rays pass through it the rest of the time, pixel by pixel. A slot
+    /// without holes casts all of it or none (its instance mask).
+    pub(super) fn casting(mut self, share: f32) -> Self {
+        if self.mesh[1] != 0 {
+            self.mesh[3] = (1.0 - share.clamp(0.0, 1.0)).to_bits();
+        }
+        self
+    }
 }
 
 /// Must match `Extract` in ray_cut_out_uvs.wgsl.

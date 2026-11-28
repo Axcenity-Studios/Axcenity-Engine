@@ -23,6 +23,18 @@ use axcenity_render::{
 use super::probes::{ToBake, bake_path, invalid_probes};
 use super::*;
 
+/// Where `AXCENITY_BAKE_PROBES=1` is ([`App::bake_and_close_frame`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BakeAndClose {
+    Off,
+    /// Frames waited since the project opened.
+    Waiting(u32),
+    Baking,
+}
+
+/// Frames drawn after the project opens before the bake starts.
+const BAKE_AND_CLOSE_SETTLE: u32 = 120;
+
 /// How long one frame may bake before the editor draws again. Each step
 /// bakes at least one probe, so a very heavy scene still moves.
 pub(super) const FRAME_BUDGET: Duration = Duration::from_millis(30);
@@ -437,6 +449,42 @@ impl EditorApp {
         }
         self.assets.put_light_probes(path, probes);
         bake.bakes.push((volume.probe.id, path.clone()));
+    }
+
+    /// `AXCENITY_BAKE_PROBES=1`, once the project is open: waits for its
+    /// textures and a few frames (models and generated plants come in),
+    /// presses Bake Probes, then once the bake is done saves the world and
+    /// closes the window, so a project's build script can bake its probes
+    /// after making its world again (`docs/rendering/sky.md`).
+    pub(super) fn bake_and_close_frame(&mut self, ctx: &egui::Context) {
+        match self.bake_and_close {
+            BakeAndClose::Off => {}
+            BakeAndClose::Waiting(frames) => {
+                ctx.request_repaint();
+                if self.assets.texture_progress().is_some() || frames < BAKE_AND_CLOSE_SETTLE {
+                    self.bake_and_close = BakeAndClose::Waiting(frames + 1);
+                } else {
+                    self.bake_probes_asked = true;
+                    self.bake_and_close = BakeAndClose::Baking;
+                }
+            }
+            BakeAndClose::Baking => {
+                ctx.request_repaint();
+                if self.probe_bake.is_none() && !self.bake_probes_asked {
+                    let saved = self.save();
+                    eprintln!(
+                        "AXCENITY_BAKE_PROBES: baked, {}; closing",
+                        if saved {
+                            "saved"
+                        } else {
+                            "NOT saved (Output says why)"
+                        }
+                    );
+                    self.bake_and_close = BakeAndClose::Off;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            }
+        }
     }
 
     /// Names the finished bakes in their probes' `Bake`, one undo step, and

@@ -288,6 +288,38 @@ fn leaves_flutter_at_the_top_of_a_plant_and_not_at_its_foot() {
 }
 
 #[test]
+fn leaves_flutter_with_no_sway_at_all() {
+    // Ivy on a wall: its leaves shiver while what they grow on stands still.
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    let gale = Vec3::new(40.0, 0.0, 0.0);
+    let scene = |flutter: f32, time: f32| {
+        let mut list = plant_seen_side_on(true, gale);
+        let sway = list.items[0].sway.as_mut().unwrap();
+        sway.strength = 0.0;
+        sway.flutter = flutter;
+        list.time = time;
+        list
+    };
+    let still = plant_column(&mut renderer, &plant_seen_side_on(false, gale), 6.0, 7.8);
+    let mut most = 0.0_f32;
+    for step in 0..8 {
+        let time = 1.0 + step as f32 * 0.13;
+        let plain = plant_column(&mut renderer, &scene(0.0, time), 6.0, 7.8);
+        assert!(
+            (plain - still).abs() < 0.05,
+            "no sway and no flutter stands still: {plain} {still}"
+        );
+        let shaken = plant_column(&mut renderer, &scene(0.9, time), 6.0, 7.8);
+        most = most.max((shaken - still).abs());
+    }
+    assert!(most > 0.5, "the top only moved {most} pixels");
+}
+
+#[test]
 fn flutter_keeps_the_decal_role_apart_and_widens_the_reach() {
     let plain = Sway {
         base: 0.0,

@@ -623,6 +623,21 @@ impl World {
         self.terrains.get_mut(&id).map(Arc::make_mut)
     }
 
+    /// The Terrain `id`'s data, to change its generated foliage only
+    /// (`set_generated`, `clear_generated`): what scatter rules place, which
+    /// isn't saved or edited. Shared with a copy of the world or with what
+    /// was built from it (a collider, the drawn ground), it's copied first
+    /// as [`terrain_mut`](Self::terrain_mut) does, but the copy keeps the
+    /// data's uid, so what was built from its heights and paint stays
+    /// current. Changing anything else through it would leave that stale.
+    pub fn terrain_generated_mut(&mut self, id: InstanceId) -> Option<&mut TerrainData> {
+        let data = self.terrains.get_mut(&id)?;
+        if Arc::get_mut(data).is_none() {
+            *data = Arc::new(data.clone_keeping_identity());
+        }
+        Arc::get_mut(data)
+    }
+
     /// Gives the Terrain `id` this data. False (and nothing changes) if
     /// `id` isn't a Terrain.
     pub fn set_terrain(&mut self, id: InstanceId, data: Arc<TerrainData>) -> bool {

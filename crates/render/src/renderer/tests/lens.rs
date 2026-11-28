@@ -16,6 +16,7 @@ fn settings() -> GraphicsSettings {
         anti_aliasing: Some(AntiAliasing::Off),
         ambient_occlusion: Some(AmbientOcclusion::Off),
         contact_shadows: Some(false),
+        screen_space_reflections: Some(false),
         volumetric_fog: Some(false),
         ..GraphicsSettings::preset(Quality::High)
     }

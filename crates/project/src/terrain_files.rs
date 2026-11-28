@@ -72,14 +72,24 @@ pub(crate) fn load_terrains_reporting(
             total,
         });
         let disk = folder.join(&data_folder);
+        let mut notes = Vec::new();
         let result = if is_safe_folder(&data_folder) {
-            files::decode(|name| fs::read(disk.join(name)).ok()).map_err(|error| error.to_string())
+            files::decode_reporting(|name| fs::read(disk.join(name)).ok(), &mut notes)
+                .map_err(|error| error.to_string())
         } else {
             Err("its DataFolder must be a folder inside the project".to_owned())
         };
         match result {
             Ok(data) => {
                 world.set_terrain(id, Arc::new(data));
+                // Loaded, but without something: say what, so a hand-written or
+                // generated file cut short doesn't go unnoticed.
+                for message in notes {
+                    problems.push(LoadError::Terrain {
+                        path: disk.join(files::FOLIAGE_FILE),
+                        message,
+                    });
+                }
             }
             Err(message) => {
                 problems.push(LoadError::Terrain {
@@ -239,6 +249,42 @@ mod tests {
         )
         .unwrap();
         assert!(!holes.exists());
+        fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn a_foliage_file_past_the_limit_loads_and_is_reported() {
+        let folder = temp_folder("foliage-limit");
+        let (world, terrain) = world_with_terrain("assets/terrain/Meadow");
+        save_terrain(
+            &folder,
+            "assets/terrain/Meadow",
+            world.terrain(terrain).unwrap(),
+        )
+        .unwrap();
+        let record = r#"{"kind":"prop","name":"Crate","x":1,"z":1,"yaw":0,"scale":1}"#;
+        let text = format!(
+            "{{\"instances\":[{}]}}",
+            vec![record; axcenity_core::MAX_FOLIAGE_INSTANCES + 1].join(",")
+        );
+        fs::write(folder.join("assets/terrain/Meadow/foliage.json"), text).unwrap();
+
+        let mut loaded = crate::parse_world(&crate::write_world(&world)).unwrap();
+        let id = loaded.descendants(loaded.workspace())[0];
+        let mut problems = Vec::new();
+        let damaged = load_terrains(&folder, &mut loaded, &mut problems);
+        // Not damaged: the terrain is there with as many plants as it keeps.
+        assert!(damaged.is_empty());
+        assert_eq!(
+            loaded.terrain(id).unwrap().foliage().len(),
+            axcenity_core::MAX_FOLIAGE_INSTANCES
+        );
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(
+            matches!(&problems[0], LoadError::Terrain { path, message }
+                if path.ends_with("foliage.json") && message.contains("the last 1 were left out")),
+            "{problems:?}"
+        );
         fs::remove_dir_all(folder).unwrap();
     }
 

@@ -404,10 +404,13 @@ fn animators(ctx: &mut FrameCtx) {
     }
 }
 
-/// Tools in hand follow the posed hands.
+/// Tools in hand follow the posed hands, and a camera at the eyes the
+/// posed eyes (`Controllers::place_eyes`).
 fn tools_place(ctx: &mut FrameCtx) {
     let sim = ctx.io.sim();
     axcenity_gameplay::place_tools(&mut sim.scripts, &mut sim.world, sim.animators.poses());
+    sim.characters
+        .place_eyes(&sim.world, &sim.assets, sim.animators.poses());
     ctx.io.flush_output();
 }
 

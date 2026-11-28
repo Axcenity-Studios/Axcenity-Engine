@@ -702,10 +702,17 @@ pub fn pass_times(
 
 /// The depth prepass's and the scene pass's GPU time by what was drawn in
 /// `stats` (terrain, scattered items, other items, the sky), by name, for
-/// `--bench`. Empty where the GPU can't stamp inside a pass.
+/// `--bench`, and after them each of the sun's cascades the frame drew.
+/// Empty where the GPU can't stamp inside a pass.
 pub fn part_times(
     stats: &axcenity_render::RenderStats,
 ) -> Vec<(&'static str, std::time::Duration)> {
+    const CASCADES: [&str; axcenity_render::SHADOW_CASCADE_COUNT] = [
+        "Shadows: cascade 1",
+        "Shadows: cascade 2",
+        "Shadows: cascade 3",
+        "Shadows: cascade 4",
+    ];
     axcenity_render::PartPass::ALL
         .into_iter()
         .flat_map(|pass| axcenity_render::DrawnPart::ALL.map(|part| (pass, part)))
@@ -715,6 +722,12 @@ pub fn part_times(
                 stats.part_time(pass, part)?,
             ))
         })
+        .chain(
+            CASCADES
+                .into_iter()
+                .zip(stats.cascade_times)
+                .filter_map(|(name, time)| Some((name, time?))),
+        )
         .collect()
 }
 

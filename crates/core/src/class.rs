@@ -1301,6 +1301,11 @@ impl ClassName {
                     // Whether parts around it cast shadows. Off, so worlds
                     // saved without it look as they did.
                     ("Shadows", Value::Bool(false)),
+                    // Studs from the light before anything casts its
+                    // shadows, every way (and past its own part, if it's in
+                    // one): the size of a fixture it sits inside, such as a
+                    // lantern's frame, so that doesn't shadow its own light.
+                    ("ShadowStart", Value::Number(0.0)),
                 ],
                 free_standing_properties(),
             ]
@@ -1319,6 +1324,11 @@ impl ClassName {
                     // Whether parts in the beam cast shadows. Off, so worlds
                     // saved without it look as they did.
                     ("Shadows", Value::Bool(false)),
+                    // Studs from the light before anything casts its
+                    // shadows, every way (and past its own part, if it's in
+                    // one): the size of a fixture it sits inside, such as a
+                    // lantern's frame, so that doesn't shadow its own light.
+                    ("ShadowStart", Value::Number(0.0)),
                 ],
                 free_standing_properties(),
             ]
@@ -1336,6 +1346,11 @@ impl ClassName {
                     // The way its front faces, as a SpotLight's Direction.
                     ("Direction", Value::Vector3(Vector3::new(0.0, -1.0, 0.0))),
                     ("Shadows", Value::Bool(false)),
+                    // Studs from the light before anything casts its
+                    // shadows, every way (and past its own part, if it's in
+                    // one): the size of a fixture it sits inside, such as a
+                    // lantern's frame, so that doesn't shadow its own light.
+                    ("ShadowStart", Value::Number(0.0)),
                 ],
                 free_standing_properties(),
             ]
@@ -1383,6 +1398,17 @@ impl ClassName {
                 // Adds dust and haze to the air, from 0 to 10: a paler
                 // horizon, a wider glow and a dimmer, redder sun.
                 ("Haze", Value::Number(0.0)),
+                // Its height fog (exponential): how many times thicker than
+                // Density and Haze make it, leaving the sky as it is (0 is
+                // none, up to 100)...
+                ("FogDensity", Value::Number(1.0)),
+                // ...the height (world Y, in studs) at and below which it's
+                // thickest...
+                ("FogHeight", Value::Number(0.0)),
+                // ...how many studs above that it thins by e...
+                ("FogFalloff", Value::Number(50.0)),
+                // ...and how many studs from the camera it starts.
+                ("FogStart", Value::Number(0.0)),
             ],
             ClassName::Clouds => vec![
                 // How much of the sky is cloud, from 0 (none) to 1 (overcast).
@@ -1457,6 +1483,18 @@ impl ClassName {
                 ("Saturation", Value::Number(0.0)),
                 // Multiplies every color. White changes nothing.
                 ("TintColor", Value::Color3(Color3::new(1.0, 1.0, 1.0))),
+                // Split toning: the dark colors' and the light colors' tint,
+                // each keeping the brightness (white changes nothing), and
+                // where one gives way to the other, from -1 (more shadows)
+                // to 1 (more highlights).
+                ("ShadowTint", Value::Color3(Color3::new(1.0, 1.0, 1.0))),
+                ("HighlightTint", Value::Color3(Color3::new(1.0, 1.0, 1.0))),
+                ("Balance", Value::Number(0.0)),
+                // An S-curve from -1 to 1: above 0 deepens shadows and lifts
+                // highlights about CurvePivot (a shade from 0 to 1) without
+                // clipping; below 0 flattens toward it.
+                ("Curve", Value::Number(0.0)),
+                ("CurvePivot", Value::Number(0.5)),
                 // A `.cube` file or a strip image every color is looked up
                 // in, or "" for none.
                 ("LookupTable", Value::String(String::new())),
@@ -2689,6 +2727,10 @@ impl ClassName {
                 ("ScaleRange", Value::Vector2(Vector2::new(0.85, 1.15))),
                 // Whether parts and characters bump into what it places.
                 ("CanCollide", Value::Bool(false)),
+                // Whether what it places casts a shadow (in the shadow maps
+                // and ray traced). Off for ground cover too small for its
+                // shadow to show: contact shadows still ground it.
+                ("CastShadow", Value::Bool(true)),
                 // 0 to 1: how far what it places leans with the slope (0
                 // stands straight up, 1 square to the ground), and studs
                 // it sinks into the ground at scale 1.
@@ -3827,6 +3869,9 @@ fn movement_properties() -> Vec<(&'static str, Value)> {
         // On, the character turns to face the way it walks (a first-person
         // one, the way the camera looks).
         ("AutoRotate", Value::Bool(true)),
+        // The fastest it turns to face the way it walks, in degrees a
+        // second; it eases into the turn under that. 0 turns at once.
+        ("TurnSpeed", Value::Number(720.0)),
     ]
 }
 

@@ -86,7 +86,7 @@ impl TerrainStudio {
                     ui.end_row();
                     for (name, label, otherwise, range, suffix, tip) in [
                         ("WaterClarity", "Clarity", 4.0, 0.1..=64.0, " studs", "How far light crosses the water before what's under it fades. Bigger is clearer."),
-                        ("WaveHeight", "Wave height", 0.25, 0.0..=4.0, " studs", "How high the biggest wave rises above the surface at rest."),
+                        ("WaveHeight", "Wave height", 0.25, 0.0..=4.0, " studs", "How high the biggest wave rises above the surface at rest. With more variety the waves share it more evenly, and they calm where the water is shallow."),
                         ("WaveLength", "Wave length", 12.0, 1.0..=128.0, " studs", "From one crest of the biggest wave to the next."),
                         ("WaveSpeed", "Wave speed", 1.0, 0.0..=3.0, "×", "1 rolls like real waves of that length; 0 stills them."),
                         ("WaveDirection", "Wave direction", 0.0, -180.0..=180.0, "°", "0 rolls toward +X, 90 toward +Z."),

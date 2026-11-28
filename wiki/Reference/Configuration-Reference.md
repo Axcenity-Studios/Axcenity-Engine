@@ -47,6 +47,8 @@ Command-line flags, environment variables, Cargo features and settings files. Ga
 | `AXCENITY_SAVE_DIR` | Override the saves folder (tests) |
 | `AXCENITY_EXPORT_SMOKE` | Packaging smoke test destination |
 | `AXCENITY_ASSETS_SOURCE_HASH` | Set by `assets/build.rs`; stamps cooked models |
+| `AXCENITY_OCCLUSION_PROBE=<every>[/<texels>]` | Measuring only (2026-11-27): every `<every>` frames the renderer reads back the prepass's depth and, for the next 8 planned frames, leaves out items whose bounding box lies wholly behind it (`renderer/occlusion_probe.rs`); prints how many it hid. Not a feature: the read stalls the frame |
+| `AXCENITY_BAKE_PROBES=1` | The editor opens the project, bakes every light and reflection probe once the scene has settled (120 frames), saves and closes (2026-11-27; Overgrown Street's `build_all.sh` uses it) |
 
 ## Cargo features
 
@@ -62,7 +64,7 @@ Command-line flags, environment variables, Cargo features and settings files. Ga
 | File | Scope | Holds |
 |---|---|---|
 | Editor settings (eframe persistence, OS app data) | Per user | Appearance, layout, recent projects, graphics settings, overlays, steady-frame pacing |
-| Player `graphics.json` (game's data folder) | Per machine per game | `GraphicsSettings` |
+| Player `graphics.json` (game's data folder) | Per machine per game | `GraphicsSettings`; since 2026-11-27 an optional `ray_traced_shadow_resolution` (`"Full"` or `"Half"`; left out, Full at Ultra and Half below) |
 | `.config/nextest.toml` | Repo | Timeouts, slow-first ordering, the `gpu` group (8) |
 | `.config/hakari.toml` | Repo | Workspace-hack platforms and `final-excludes` (`http`, `httparse`, `winit`, `profiling`) |
 | `rust-toolchain.toml` | Repo | Rust 1.97.0 |

@@ -294,6 +294,10 @@ enum Dialog {
         /// The ScreenGui the project uses as its loading screen, in place of
         /// the splash; empty for none.
         loading_gui: String,
+        /// The project's picture is one the person chose.
+        chosen_picture: bool,
+        /// What Save does to the picture.
+        picture: dialogs::PictureEdit,
         error: Option<String>,
     },
     Delete {
@@ -1147,6 +1151,9 @@ impl StartScreen {
         let show_splash = manifest
             .as_ref()
             .is_none_or(|manifest| manifest.show_splash);
+        let chosen_picture = manifest
+            .as_ref()
+            .is_some_and(|manifest| manifest.chosen_picture);
         let loading_gui = manifest
             .map(|manifest| manifest.loading_screen.screen_gui)
             .unwrap_or_default();
@@ -1156,6 +1163,8 @@ impl StartScreen {
             description: link.description,
             show_splash,
             loading_gui,
+            chosen_picture,
+            picture: dialogs::PictureEdit::Unchanged,
             error: None,
         });
     }

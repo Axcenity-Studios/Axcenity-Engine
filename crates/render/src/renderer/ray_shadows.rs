@@ -13,7 +13,7 @@
 use glam::{Mat4, Vec3};
 
 use crate::draw_list::DrawList;
-use crate::graphics::{EffectiveGraphics, RayTracedShadows};
+use crate::graphics::{EffectiveGraphics, RayShadowResolution, RayTracedShadows};
 
 use super::MAX_SUN_SIZE;
 use super::ray_tracing::RayScene;
@@ -59,6 +59,9 @@ const AIR_CELLS: u64 = AIR_GRID[0] as u64 * AIR_GRID[1] as u64 * AIR_GRID[2] as 
 pub(super) struct Shape {
     /// The soft passes' buffers.
     pub(super) soft: bool,
+    /// Traced from one pixel of each 2 × 2 and filled (`cs_fill`), which
+    /// needs the soft passes' buffers too.
+    pub(super) half: bool,
     /// The lamps' part of the mask (LE1).
     pub(super) lamps: bool,
     /// The volumetric fog's air's part of the mask (LE3).
@@ -82,6 +85,9 @@ pub(super) struct RayShadowPlan {
     /// Whether the volumetric fog's air is traced too (LE3): its grid is
     /// drawn. The scene sets it.
     pub(super) air: bool,
+    /// Whether rays are traced from one pixel of each 2 × 2 only
+    /// ([`RayShadowResolution::Half`]).
+    pub(super) half: bool,
 }
 
 impl RayShadowPlan {
@@ -115,6 +121,7 @@ impl RayShadowPlan {
             },
             lamps: list.lights.iter().any(casts_shadows),
             air: false,
+            half: graphics.ray_traced_shadow_resolution == RayShadowResolution::Half,
         })
     }
 
@@ -126,6 +133,7 @@ impl RayShadowPlan {
     pub(super) fn shape(&self) -> Shape {
         Shape {
             soft: self.soft(),
+            half: self.half,
             lamps: self.lamps,
             air: self.air,
         }
@@ -163,11 +171,16 @@ pub(super) struct RayShadows {
     trace: wgpu::ComputePipeline,
     blur_across: wgpu::ComputePipeline,
     blur_down: wgpu::ComputePipeline,
+    /// Fills the pixels a half-resolution trace left (`cs_fill`), through
+    /// `fill_layout`: the smoothing passes' bindings and the lamps' mask.
+    fill: wgpu::ComputePipeline,
+    fill_layout: wgpu::BindGroupLayout,
     uniform: wgpu::Buffer,
     /// The scene's size the buffers are for, whether the soft passes'
     /// two buffers exist, and whether the mask has the lamps' half.
     size: (u32, u32),
     soft: bool,
+    half: bool,
     lamps: bool,
     /// What the scene reads: a u32 per pixel for the sun (see
     /// ray_shadows.wgsl), then, from `lamp_offset` bytes, one per pixel
@@ -176,7 +189,8 @@ pub(super) struct RayShadows {
     lamp_offset: u64,
     /// Where the air's part starts (LE3), in bytes, while traced.
     air_offset: Option<u64>,
-    /// The soft passes' rays, then rays smoothed across.
+    /// The soft passes' rays, then rays smoothed across (and while `half`,
+    /// rays as traced, then filled).
     soft_buffers: Option<[wgpu::Buffer; 2]>,
     /// Bound where a pass reads nothing.
     nothing: wgpu::Buffer,
@@ -192,7 +206,15 @@ pub(super) struct RayShadows {
 impl RayShadows {
     pub(super) fn new(
         device: &wgpu::Device,
-        (size, Shape { soft, lamps, air }): ((u32, u32), Shape),
+        (
+            size,
+            Shape {
+                soft,
+                half,
+                lamps,
+                air,
+            },
+        ): ((u32, u32), Shape),
     ) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("ray traced shadows"),
@@ -213,6 +235,15 @@ impl RayShadows {
                 bind_group_layouts: &[Some(&smoothing_layout)],
                 immediate_size: 0,
             });
+        let fill_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("ray traced shadows (filling)"),
+            entries: &fill_entries(),
+        });
+        let fill_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("ray traced shadows (filling)"),
+            bind_group_layouts: &[Some(&fill_layout)],
+            immediate_size: 0,
+        });
         let shader = super::gpu::shader_module(
             device,
             "ray traced shadows",
@@ -250,17 +281,20 @@ impl RayShadows {
             trace: pipeline("cs_trace", &pipeline_layout),
             blur_across: pipeline("cs_blur_across", &smoothing_pipeline_layout),
             blur_down: pipeline("cs_blur_down", &smoothing_pipeline_layout),
+            fill: pipeline("cs_fill", &fill_pipeline_layout),
             air: pipeline("cs_air", &pipeline_layout),
+            fill_layout,
             layout,
             smoothing_layout,
             uniform,
             size,
             soft,
+            half,
             lamps,
             mask,
             lamp_offset,
             air_offset,
-            soft_buffers: soft.then(|| {
+            soft_buffers: (soft || half).then(|| {
                 [
                     pixel_buffer(device, "ray traced shadow rays", size),
                     pixel_buffer(device, "ray traced shadow rays (smoothed across)", size),
@@ -277,6 +311,7 @@ impl RayShadows {
     pub(super) fn fits(&self, size: (u32, u32), shape: Shape) -> bool {
         self.size == size
             && self.soft == shape.soft
+            && self.half == shape.half
             && self.lamps == shape.lamps
             && self.air_offset.is_some() == shape.air
     }
@@ -444,8 +479,18 @@ impl RayShadows {
             })
         };
         let groups = (self.size.0.div_ceil(8), self.size.1.div_ceil(8));
-        // The rays: the sun's from every pixel, then the air's from every
-        // cell of the fog's grid, in one pass that binds the scene once.
+        // At half resolution a thread traces one pixel of each 2 × 2.
+        let traced_groups = if self.half {
+            (
+                self.size.0.div_ceil(2).div_ceil(8),
+                self.size.1.div_ceil(2).div_ceil(8),
+            )
+        } else {
+            groups
+        };
+        // The rays: the sun's from every pixel (or each 2 × 2), then the
+        // air's from every cell of the fog's grid, in one pass that binds
+        // the scene once.
         {
             let traced = match &self.soft_buffers {
                 None => group(&self.nothing, self.sun_mask()),
@@ -457,21 +502,78 @@ impl RayShadows {
             });
             pass.set_pipeline(&self.trace);
             pass.set_bind_group(0, &traced, &[]);
-            pass.dispatch_workgroups(groups.0, groups.1, 1);
+            pass.dispatch_workgroups(traced_groups.0, traced_groups.1, 1);
             if self.air_offset.is_some() {
                 pass.set_pipeline(&self.air);
                 let [x, y, z] = AIR_GRID;
                 pass.dispatch_workgroups(x.div_ceil(4), y.div_ceil(4), z.div_ceil(4));
             }
         }
-        // Soft shadows' rays smoothed across, then down into the mask.
-        if let Some([rays, across]) = &self.soft_buffers {
+        // At half resolution, the pixels left filled from those traced, by
+        // depth and normal: into the second buffer for soft shadows (whose
+        // smoothing then reads it), or the mask for hard ones.
+        if self.half
+            && let Some([rays, across]) = &self.soft_buffers
+        {
+            let destination = if self.soft {
+                across.as_entire_binding()
+            } else {
+                self.sun_mask()
+            };
+            let filling = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("ray traced shadows (filling)"),
+                layout: &self.fill_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(&prepass.depth_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&prepass.normal_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: self.uniform.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: rays.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 5,
+                        resource: destination,
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 12,
+                        resource: lamp_mask.clone(),
+                    },
+                ],
+            });
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("ray traced shadows (filling)"),
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(&self.fill);
+            pass.set_bind_group(0, &filling, &[]);
+            pass.dispatch_workgroups(groups.0, groups.1, 1);
+        }
+        // Soft shadows' rays smoothed across, then down into the mask (at
+        // half resolution from the filled buffer, by way of the first).
+        if self.soft
+            && let Some([rays, across]) = &self.soft_buffers
+        {
+            let (first, second) = if self.half {
+                (across, rays)
+            } else {
+                (rays, across)
+            };
             let steps = [
                 (
                     &self.blur_across,
-                    smoothing(rays, across.as_entire_binding()),
+                    smoothing(first, second.as_entire_binding()),
                 ),
-                (&self.blur_down, smoothing(across, self.sun_mask())),
+                (&self.blur_down, smoothing(second, self.sun_mask())),
             ];
             for (pipeline, bind_group) in &steps {
                 let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -553,6 +655,18 @@ fn smoothing_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
     ]
 }
 
+/// The bindings of the pass that fills a half-resolution trace (`cs_fill`):
+/// the smoothing passes' and the lamps' mask, whose untraced pixels it
+/// fills too. Not the ray traced scene.
+fn fill_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
+    let mut entries = smoothing_entries();
+    entries.push(buffer_entry(
+        12,
+        wgpu::BufferBindingType::Storage { read_only: false },
+    ));
+    entries
+}
+
 fn buffer_entry(binding: u32, ty: wgpu::BufferBindingType) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         binding,
@@ -594,7 +708,9 @@ pub(super) fn ray_shadow_uniform(
                 0.0
             },
         ],
-        size: [size.0, size.1, 0, 0],
+        // z: 1 traced at half resolution, w: which pixel of each 2 × 2 is
+        // traced this frame (0 to 3), turning with TAA's rays.
+        size: [size.0, size.1, u32::from(plan.half), (turn as u32) % 4],
         lamps: [
             u32::from(plan.lamps && lamps.1 > 0),
             lamps.0.max(1),
@@ -646,6 +762,14 @@ mod tests {
         // it, so the two smoothing passes mustn't.
         assert!(binds_the_scene(&tracing_entries()));
         assert!(!binds_the_scene(&smoothing_entries()));
+        assert!(!binds_the_scene(&fill_entries()));
+        for entry in fill_entries() {
+            assert!(
+                tracing_entries().contains(&entry),
+                "binding {}",
+                entry.binding
+            );
+        }
         // What smoothing binds, the tracing passes bind at the same
         // places: one shader module declares them all.
         let tracing = tracing_entries();

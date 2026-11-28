@@ -12,6 +12,7 @@ Map only. `render` draws a draw list. It does not know about Instances. Open the
 - Clouds (a `Clouds` layer, its shadows, the wind, cloud quality): [rendering/clouds.md](rendering/clouds.md)
 - Weather (a `Weather`: rain and snow, wet and snow-covered surfaces, easing; a `WeatherVolume`: where they go in a box, by hand): [rendering/weather.md](rendering/weather.md)
 - Plants swaying in the wind (`DrawItem::sway`, a material's `sway`, `GlobalWind`): [rendering/wind.md](rendering/wind.md)
+- Screen-space reflections (smooth and wet surfaces reflecting what's on the screen from last frame's picture, sky visibility shading the sky's reflection): [rendering/reflections.md](rendering/reflections.md)
 - Water (a material file's `water`: waves, seeing through it, reflections, depth tint, foam, the scene copy): [rendering/water.md](rendering/water.md)
 - Shading models and outlines (a material file's `shading`: Standard, Unlit, Toon bands, ramp, rim and highlight; its `outline`; Lighting's `OutlineEffect`): [rendering/stylized.md](rendering/stylized.md)
 - Skin shading (characters' `Shading::Skin`: blurred-normal diffuse, pre-integrated scattering, two specular lobes, the defined normal map; glTF `extras.axcenity_shading`): [rendering/skin.md](rendering/skin.md)

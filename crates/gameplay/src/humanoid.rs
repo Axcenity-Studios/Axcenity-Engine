@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use axcenity_anim::files::Motion;
 use axcenity_anim::read_state_machine;
 use axcenity_assets::Assets;
 use axcenity_character::Controllers;
@@ -555,6 +556,9 @@ pub struct Humanoids {
     /// standing.
     playing: HashMap<InstanceId, Option<&'static str>>,
     feet: HashMap<InstanceId, Vector3>,
+    /// How fast each walks across the ground, eased (studs a second), for
+    /// its Animator's `Speed` parameter.
+    speeds: HashMap<InstanceId, f32>,
     /// The navigation mesh walks plan on: the game's one mesh once the
     /// host shares it ([`Self::share_nav_mesh`]), until then one of its
     /// own, whose clock this steps.
@@ -640,6 +644,7 @@ impl Humanoids {
             .retain(|id, _| humanoids.contains(id));
         self.playing.retain(|id, _| humanoids.contains(id));
         self.feet.retain(|id, _| humanoids.contains(id));
+        self.speeds.retain(|id, _| humanoids.contains(id));
         let mut events = Vec::new();
         for &humanoid in &humanoids {
             let Some(pieces) = ensure_pieces(world, humanoid) else {
@@ -811,6 +816,21 @@ impl Humanoids {
             (Some(now), Some(last)) if dt > 0.0 => across(last, now) / dt,
             _ => 0.0,
         };
+        // The Animator's Number parameter `Speed`, where it has one: how
+        // fast the feet go, eased over SPEED_EASE so a blend tree by it
+        // (walk into run) moves between its clips smoothly.
+        let eased = self.speeds.entry(humanoid).or_insert(speed);
+        if dt > 0.0 && speed.is_finite() {
+            *eased += (speed - *eased) * (1.0 - (-dt / SPEED_EASE).exp());
+        }
+        let eased = *eased;
+        if let Some(live) = pieces.animator.and_then(|id| world.animator_mut(id))
+            && let Some(axcenity_core::Parameter::Number(value)) =
+                live.parameters.get_mut(SPEED_PARAMETER)
+            && (*value - f64::from(eased)).abs() > 1e-4
+        {
+            *value = f64::from(eased);
+        }
         let state = self.states.0.borrow().get(&humanoid).copied();
         let path = pieces
             .animator
@@ -832,6 +852,16 @@ impl Humanoids {
             machine()
                 .as_ref()
                 .is_some_and(|file| file.state(name).is_some())
+        };
+        // A Walk that's a blend tree by Speed mixes into running itself:
+        // it plays at every speed, and Run isn't switched to.
+        let walk_blends = || {
+            machine()
+                .as_ref()
+                .and_then(|file| file.state("Walk"))
+                .is_some_and(|walk| {
+                    matches!(&walk.motion, Motion::BlendTree(tree) if tree.parameter == SPEED_PARAMETER)
+                })
         };
         // A Land that never ends by itself would be stood in for good.
         let lands = || {
@@ -866,7 +896,7 @@ impl Humanoids {
                     })
                 } else if crouched && has("CrouchWalk") {
                     Some("CrouchWalk")
-                } else if run > walk && speed > (walk + run) * 0.5 {
+                } else if run > walk && speed > (walk + run) * 0.5 && !walk_blends() {
                     Some("Run")
                 } else {
                     Some("Walk")
@@ -910,6 +940,12 @@ impl Humanoids {
 
 /// The Animator state a Humanoid plays as it comes down standing still.
 const LAND: &str = "Land";
+/// The Animator Number parameter a Humanoid keeps at how fast it walks.
+pub const SPEED_PARAMETER: &str = "Speed";
+/// How long `Speed` takes to come most of the way (63%) to a new speed, in
+/// seconds: a tenth, so a blend tree eases from walk to run as the
+/// character speeds up, without lagging its feet.
+const SPEED_EASE: f32 = 0.1;
 /// How long the fall blends into the landing, in seconds.
 const LAND_BLEND: f64 = 0.1;
 

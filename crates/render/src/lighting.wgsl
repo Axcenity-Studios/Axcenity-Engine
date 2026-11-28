@@ -884,6 +884,14 @@ fn surrounding_diffuse(position: vec3<f32>, n: vec3<f32>, environment: f32) -> v
 // faces. Smaller boxes come first and the bigger ones and then the sky
 // (times the environment intensity) fill what they leave.
 fn reflected(position: vec3<f32>, dir: vec3<f32>, roughness: f32, environment: f32) -> vec3<f32> {
+    return reflected_open(position, dir, roughness, environment, 1.0);
+}
+
+// `reflected`, with only `open` of the sky's share seen: the rest is
+// something standing in the way (`sky_open_along`), which gives back what
+// a dark surface lit by the whole sky does (`SKY_BLOCKED_ALBEDO`).
+fn reflected_open(position: vec3<f32>, dir: vec3<f32>, roughness: f32, environment: f32,
+    open: f32) -> vec3<f32> {
     var color = vec3<f32>(0.0);
     var left = 1.0;
     let count = min(frame.reflection_probes.x, MAX_PROBES);
@@ -916,7 +924,77 @@ fn reflected(position: vec3<f32>, dir: vec3<f32>, roughness: f32, environment: f
             break;
         }
     }
-    return color + left * environment * sky_specular(dir, roughness);
+    if open >= 1.0 {
+        return color + left * environment * sky_specular(dir, roughness);
+    }
+    let blocked = SKY_BLOCKED_ALBEDO
+        * (frame.ambient.rgb + environment * sky_diffuse(vec3<f32>(0.0, 1.0, 0.0)));
+    return color + left * mix(blocked, environment * sky_specular(dir, roughness), open);
+}
+
+// What stands over a reflection and hides the sky from it (a canopy, an
+// eave) is taken to be this dark: leaves and undersides, lit by the sky.
+const SKY_BLOCKED_ALBEDO: f32 = 0.12;
+// How far along a reflection (studs) the shadow maps are asked whether
+// something stands over it, and how much of the sky a way that's under
+// something all along loses.
+const SKY_OPEN_STEPS: vec4<f32> = vec4<f32>(1.5, 4.0, 9.0, 20.0);
+// What each point counts for: the nearest most, since what stands right
+// over a surface hides the most of its sky, and further points may have
+// passed out from under it, or through it.
+const SKY_OPEN_WEIGHTS: vec4<f32> = vec4<f32>(0.35, 0.3, 0.2, 0.15);
+const SKY_OPEN_SHADE: f32 = 0.9;
+
+// How open the sky over `p` is by the shadow maps: 0 where something stands
+// close over it on the way toward the sun (a canopy, an eave: nearer than
+// SKY_BLOCKER.x studs along that way), 1 where nothing does or what does
+// is SKY_BLOCKER.y studs or more away (a tree whose long shadow falls on
+// open ground hides the sun from it, not the sky), and 1 where no cascade
+// reaches. One read of the nearest cascade covering it.
+const SKY_BLOCKER: vec2<f32> = vec2<f32>(10.0, 35.0);
+fn sky_over(p: vec3<f32>) -> f32 {
+    let count = u32(frame.shadow.z);
+    for (var i = 0u; i < count; i++) {
+        let light = frame.cascades[i] * vec4<f32>(p, 1.0);
+        let uv = vec2<f32>(light.x * 0.5 + 0.5, 0.5 - light.y * 0.5);
+        if any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0)) || light.z > 1.0 || light.z < 0.0 {
+            continue;
+        }
+        let size = textureDimensions(shadow_map).x;
+        let texel = min(vec2<u32>(uv * f32(size)), vec2<u32>(size - 1u));
+        let stored = textureLoad(shadow_map, texel, i32(i), 0);
+        // How far toward the sun what stands over it is.
+        let over = (light.z - stored) * frame.cascade_depths[i];
+        if over <= 2.0 * frame.cascade_texels[i] {
+            return 1.0;
+        }
+        return smoothstep(SKY_BLOCKER.x, SKY_BLOCKER.y, over);
+    }
+    return 1.0;
+}
+
+// How much of the sky a reflection leaving `world_position` along `dir`
+// sees (specular occlusion by sky visibility): the sun's shadow maps are
+// asked at four points along it whether something stands close over them
+// (`sky_over`; the nearest point counting most, `SKY_OPEN_WEIGHTS`), and
+// a way that stays under a canopy or an eave sees little of the sky. A way
+// heading down sees the ground's part of the sky anyway, and with no
+// shadow maps all of it is seen. Only while screen-space reflections are
+// drawn (`frame.ray_reflections.w`).
+fn sky_open_along(world_position: vec3<f32>, dir: vec3<f32>, pixel: vec2<f32>) -> f32 {
+    let upward = smoothstep(0.0, 0.15, dir.y);
+    if frame.shadow.x == 0.0 || upward <= 0.0 {
+        return 1.0;
+    }
+    let jitter = 0.75 + 0.5 * shading_noise(pixel);
+    var lit = 0.0;
+    for (var k = 0; k < 4; k++) {
+        lit += SKY_OPEN_WEIGHTS[k] * sky_over(world_position + dir * (SKY_OPEN_STEPS[k] * jitter));
+    }
+    // Shadows fade out toward their reach, and so does this.
+    let reach = frame.shadow.w;
+    let fade = 1.0 - smoothstep(reach * 0.8, reach, distance(frame.camera_position.xyz, world_position));
+    return 1.0 - SKY_OPEN_SHADE * upward * fade * (1.0 - lit);
 }
 
 // The low 16 bits of `bits` as a half float, positive and finite (as
@@ -943,7 +1021,15 @@ fn traced_reflected(
     pixel: vec2<f32>,
     solid: bool,
 ) -> vec3<f32> {
-    let probes = reflected(world_position, dir, roughness, environment);
+    // Found on the screen (`frame.ray_reflections.w`): what's off it falls
+    // back to the probes and the sky, shaded where something stands over
+    // the way the reflection leaves.
+    let screen = frame.ray_reflections.w > 0.5;
+    var open = 1.0;
+    if screen && solid {
+        open = sky_open_along(world_position, dir, pixel);
+    }
+    let probes = reflected_open(world_position, dir, roughness, environment, open);
     let cutoff = frame.ray_reflections.x;
     if !solid || roughness >= cutoff {
         return probes;
@@ -957,8 +1043,15 @@ fn traced_reflected(
     let packed = ray_reflections[index];
     let rg = vec2<f32>(half_float(packed.x), half_float(packed.x >> 16u));
     let b_weight = vec2<f32>(half_float(packed.y), half_float(packed.y >> 16u));
-    let fade = 1.0 - roughness / cutoff;
-    let weight = clamp(b_weight.y, 0.0, 1.0) * fade * fade;
+    // Rays are traced along the mirror's way: they fade into the probes'
+    // blur by (1 - roughness / cutoff)². On the screen there's no blur to
+    // fade into but the sky's, so they're whole up to over half the cutoff.
+    var fade = 1.0 - roughness / cutoff;
+    fade *= fade;
+    if screen {
+        fade = 1.0 - smoothstep(cutoff * 0.55, cutoff, roughness);
+    }
+    let weight = clamp(b_weight.y, 0.0, 1.0) * fade;
     return mix(probes, vec3<f32>(rg, b_weight.x), weight);
 }
 
@@ -1019,9 +1112,36 @@ fn light_surface(
     solid: bool,
     bumped: bool,
 ) -> vec3<f32> {
-    let weather = weathered(world_position, geometric, n, base_color, metalness, roughness);
+    return light_surface_low(world_position, geometric, n, pixel, base_color, metalness, roughness,
+        occlusion, dielectric, solid, bumped, -1.0, true);
+}
+
+// `light_surface` for a surface whose own maps say how low it lies here
+// (`cavity`, 0 raised to 1 the deepest; below 0 not known), where water
+// gathers first when it's wet (`wet_gathered`), if it `pools` at all
+// (paint laid over a surface, a projected decal, has only a film: what's
+// under it gathers the water).
+fn light_surface_low(
+    world_position: vec3<f32>,
+    geometric: vec3<f32>,
+    n: vec3<f32>,
+    pixel: vec2<f32>,
+    base_color: vec3<f32>,
+    metalness: f32,
+    roughness: f32,
+    occlusion: f32,
+    dielectric: vec3<f32>,
+    solid: bool,
+    bumped: bool,
+    cavity: f32,
+    pools: bool,
+) -> vec3<f32> {
+    let weather = weathered_lying(world_position, geometric, pools, false, cavity, n, base_color,
+        metalness, roughness);
+    micro_open = filled_occlusion(micro_open, weather.filled);
     return shade_surface(world_position, geometric, weather.normal, pixel, weather.base_color,
-        weather.metalness, weather.roughness, occlusion, dielectric, solid, bumped)
+        weather.metalness, weather.roughness, filled_occlusion(occlusion, weather.filled),
+        dielectric, solid, bumped)
         + snow_glow(weather.snow);
 }
 
@@ -1073,6 +1193,10 @@ const WET_SHEEN_REACH: vec2<f32> = vec2<f32>(250.0, 900.0);
 // of: a yard shone pale right up to the foot of the house that should
 // have darkened it. Its puddles are what mirror.
 const WET_FILM_GROUND: f32 = 0.38;
+// How deep gathered water must be (its share, `wet_gathered`) to level
+// its surface's bumps (the normal map's) altogether, as a puddle does: a
+// half-levelled film over the grains glittered pale.
+const WET_GATHERED_LEVEL: f32 = 0.5;
 
 // How rough a film of water leaves a surface `roughness` rough, `away`
 // studs from the camera.
@@ -1188,6 +1312,8 @@ const SNOW_GLINT_ROUGHNESS: f32 = 0.1;
 const SNOW_GLINT_REACH: vec2<f32> = vec2<f32>(30.0, 90.0);
 // How much darker the ground is under the thin, melting edge of snow.
 const SNOW_EDGE_DAMP: f32 = 0.6;
+// The cover over which the first snow comes in (`snow_lying`).
+const SNOW_FIRST: f32 = 0.1;
 
 // The height of the snow's grain at `place`, from 0 to 1: small lumps and
 // the wind's finer marks on them.
@@ -1209,8 +1335,13 @@ fn snow_drift(place: vec2<f32>) -> f32 {
 fn snow_lying(place: vec2<f32>, up: f32, cover: f32) -> f32 {
     let ragged = 0.6 * cloud_noise2(place * 0.7 + 31.0) + 0.4 * cloud_noise2(place * 2.9);
     let thin = 1.0 - smoothstep(0.55, 1.0, cover);
+    // None at all without cover: the ragged edge alone isn't snow. Before
+    // 2026-11-26 it was, wherever any weather was on (a little wetness with
+    // `SnowCover` 0 lay white blotches over level ground), and it comes in
+    // over the first tenth of cover so nothing pops.
+    let some = smoothstep(0.0, SNOW_FIRST, cover);
     return clamp(1.5 * cover - 2.5 * (1.0 - up) + (ragged - 0.5) * SNOW_RAGGED * (0.35 + 0.65 * thin),
-        0.0, 1.0);
+        0.0, 1.0) * some;
 }
 
 // How much a surface lying along `lie` holds snow in the wind, as the
@@ -1240,6 +1371,17 @@ struct Weathered {
     normal: vec3<f32>,
     // How much of it snow covers, from 0 to 1.
     snow: f32,
+    // How much of it water has gathered in and levelled, from 0 to 1: its
+    // cracks are filled, so their occlusion no longer darkens what the
+    // water's top reflects (`WET_FILLED_OPEN`).
+    filled: f32,
+}
+
+// How much of the occlusion a surface's cracks had is gone where water
+// has filled them.
+const WET_FILLED_OPEN: f32 = 0.6;
+fn filled_occlusion(occlusion: f32, filled: f32) -> f32 {
+    return mix(occlusion, 1.0, WET_FILLED_OPEN * filled);
 }
 
 // Samples one cell of `weather_field`, clamped to the grid.
@@ -1541,9 +1683,9 @@ fn weather_print(world_position: vec3<f32>) -> vec4<f32> {
 // exposed to the sky it is, or what a weather box sets, where above 1 it's
 // wetter than the open, up to soaked). Water runs off undersides and down
 // walls in streaks, and stands only on level ground (`pools`), in puddles.
-fn weather_wet(world_position: vec3<f32>, up: f32, share: f32, pools: bool) -> vec2<f32> {
+fn weather_wet(world_position: vec3<f32>, up: f32, share: f32, pools: bool, cavity: f32) -> vec3<f32> {
     if frame.weather.x <= 0.0 || share <= 0.001 {
-        return vec2<f32>(0.0);
+        return vec3<f32>(0.0);
     }
     let wetness = min(frame.weather.x * max(share, 1.0), 1.0);
     let exposure = min(share, 1.0);
@@ -1553,12 +1695,64 @@ fn weather_wet(world_position: vec3<f32>, up: f32, share: f32, pools: bool) -> v
     let run = mix(1.0, mix(WET_WALL_DRY, 1.0, smoothstep(0.3, 0.7, streaks)), wall);
     let wet = wetness * exposure * smoothstep(-1.0, -0.2, up) * run;
     if !pools {
-        return vec2<f32>(wet, 0.0);
+        return vec3<f32>(wet, 0.0, 0.0);
     }
     let away = distance(frame.camera_position.xyz, world_position);
-    let pooled = smoothstep(0.93, 0.995, up) * puddle_at(place, wetness) * exposure
-        * (1.0 - smoothstep(PUDDLE_REACH.x, PUDDLE_REACH.y, away));
-    return vec2<f32>(wet, pooled);
+    let near = 1.0 - smoothstep(PUDDLE_REACH.x, PUDDLE_REACH.y, away);
+    let pooled = smoothstep(0.93, 0.995, up) * puddle_at(place, wetness) * exposure * near;
+    let gathered = wet_gathered(place, up, wetness, cavity) * min(exposure, 1.0) * near;
+    return vec3<f32>(wet, pooled, gathered);
+}
+
+// Water gathers first where a surface lies low: in its own cracks, seams
+// and hollows (`cavity`, from its height or ambient occlusion map: 0
+// raised, 1 the deepest, below 0 not known) and in the world's broad low
+// spots (smooth noise over x and z, so they stay put), and only on what's
+// nearly level. As it gets wetter the water spreads out of the cracks into
+// the hollows around them. How much of the surface at `place` facing `up`
+// is under gathered water at `wetness`, from 0 to 1, with soft edges.
+// `WET_GATHER` is the wetness it starts at and where the low spots alone
+// (with no cavity) would be full; `WET_GATHER_CAVITY` is how much the
+// surface's own cavities count against the broad low spots.
+const WET_GATHER: vec2<f32> = vec2<f32>(0.12, 1.0);
+const WET_GATHER_CAVITY: f32 = 0.55;
+const WET_GATHER_EDGE: f32 = 0.09;
+fn wet_gathered(place: vec2<f32>, up: f32, wetness: f32, cavity: f32) -> f32 {
+    let level = smoothstep(0.75, 0.95, up);
+    let rising = smoothstep(WET_GATHER.x, WET_GATHER.y, wetness);
+    if level <= 0.0 || rising <= 0.0 {
+        return 0.0;
+    }
+    let lows = 1.0 - (0.6 * cloud_noise2(place * 0.06 + 3.1) + 0.4 * cloud_noise2(place * 0.21 + 47.0));
+    var score = lows;
+    if cavity >= 0.0 {
+        score = mix(lows, saturate(cavity), WET_GATHER_CAVITY);
+    }
+    let threshold = 0.98 - 0.85 * rising;
+    return level * smoothstep(threshold - WET_GATHER_EDGE, threshold + WET_GATHER_EDGE, score);
+}
+
+// How rough gathered water leaves a surface: from WET_GATHERED_ROUGHNESS.y
+// at its thin edge to .x where it's deepest (a film over the grains, then
+// standing water). Darker still where it stands (`WET_GATHERED_DARKENING`
+// of the soaked colour on a porous surface).
+const WET_GATHERED_ROUGHNESS: vec2<f32> = vec2<f32>(0.05, 0.25);
+const WET_GATHERED_DARKENING: f32 = 0.8;
+fn gathered_roughness(roughness: f32, film: f32, gathered: f32) -> f32 {
+    let standing = mix(WET_GATHERED_ROUGHNESS.y, WET_GATHERED_ROUGHNESS.x, gathered);
+    return mix(film, min(roughness, standing), smoothstep(0.0, 0.35, gathered));
+}
+
+// The ground's film of water (`weathered_lying` with `ground`): its own
+// roughness drawn toward WET_FILM_GROUND, never smoother than that for a
+// film (only gathered water and puddles are). Drawing toward one value
+// evens out a texture's rough and smooth patches, where `weather_film`'s
+// share of each kept them apart: the smooth patches of the asphalt's map
+// shone as pale blotches.
+const WET_FILM_GROUND_SHARE: f32 = 0.6;
+fn ground_film(roughness: f32, away: f32) -> f32 {
+    let film = min(roughness, mix(roughness, WET_FILM_GROUND, WET_FILM_GROUND_SHARE));
+    return mix(film, roughness, smoothstep(WET_SHEEN_REACH.x, WET_SHEEN_REACH.y, away));
 }
 
 // How falling rain tips the water on a surface at `world_position` facing
@@ -1586,20 +1780,36 @@ struct WeatheredPrepass {
     normal: vec3<f32>,
 }
 
+// The surface's own cavities aren't known here (no maps are read), so
+// it's taken as deep as can be: the roughness kept is the least the scene
+// pass can find for it, and what's traced or marched on the screen is
+// faded by the roughness that pass finds (`traced_reflected`).
 fn weathered_prepass(world_position: vec3<f32>, geometric: vec3<f32>, roughness: f32) -> WeatheredPrepass {
+    return weathered_prepass_on(world_position, geometric, roughness, false);
+}
+
+// `weathered_prepass` for the ground (`ground`: the terrain's film).
+fn weathered_prepass_on(world_position: vec3<f32>, geometric: vec3<f32>, roughness: f32,
+    ground: bool) -> WeatheredPrepass {
     var out = WeatheredPrepass(roughness, geometric);
     if frame.weather.x <= 0.0 {
         return out;
     }
     let sample = weather_sample(world_position);
     let up = geometric.y;
-    let water = weather_wet(world_position, up, weather_blown(world_position, geometric, sample.x), true);
+    let water = weather_wet(world_position, up, weather_blown(world_position, geometric, sample.x),
+        true, 1.0);
     if water.x <= 0.0 {
         return out;
     }
     // Snow over it is matte again.
     let snow = snow_lying(world_position.xz, up, frame.weather.y) * min(sample.z, 1.0);
-    let film = weather_film(roughness, distance(frame.camera_position.xyz, world_position));
+    let away = distance(frame.camera_position.xyz, world_position);
+    var film = weather_film(roughness, away);
+    if ground {
+        film = ground_film(roughness, away);
+    }
+    film = gathered_roughness(roughness, film, water.z);
     let soaked = mix(film, min(roughness, WET_ROUGHNESS), water.y);
     out.roughness = mix(mix(roughness, soaked, water.x), max(roughness, SNOW_ROUGHNESS), snow);
     let tilt = weather_dimples(world_position, up, water.x, water.y) * (1.0 - snow);
@@ -1624,7 +1834,8 @@ fn weathered(
     metalness: f32,
     roughness: f32,
 ) -> Weathered {
-    return weathered_lying(world_position, geometric, true, false, n, base_color, metalness, roughness);
+    return weathered_lying(world_position, geometric, true, false, -1.0, n, base_color, metalness,
+        roughness);
 }
 
 // `light_surface` for the ground (the terrain): snow lies on it under what's
@@ -1639,29 +1850,35 @@ fn light_ground(
     roughness: f32,
     occlusion: f32,
     dielectric: vec3<f32>,
+    cavity: f32,
 ) -> vec3<f32> {
-    let weather = weathered_lying(world_position, geometric, true, true, n, base_color, metalness,
-        roughness);
+    let weather = weathered_lying(world_position, geometric, true, true, cavity, n, base_color,
+        metalness, roughness);
+    micro_open = filled_occlusion(micro_open, weather.filled);
     return shade_surface(world_position, geometric, weather.normal, pixel, weather.base_color,
-        weather.metalness, weather.roughness, occlusion, dielectric, true, false)
+        weather.metalness, weather.roughness, filled_occlusion(occlusion, weather.filled), dielectric,
+        true, false)
         + snow_glow(weather.snow);
 }
 
 // `weathered` for a surface on which rain and snow lie as on one facing
 // `lie`: its own normal for most, and for a leaf the way its place in its
 // plant's crown faces, since snow lies on a bush and not on each card of
-// it. `pools` is whether water can stand on it in puddles.
+// it. `pools` is whether water can stand on it in puddles and gather in
+// its low spots, `cavity` how low the surface lies here by its own maps
+// (`wet_gathered`; below 0 not known).
 fn weathered_lying(
     world_position: vec3<f32>,
     lie: vec3<f32>,
     pools: bool,
     ground: bool,
+    cavity: f32,
     n: vec3<f32>,
     base_color: vec3<f32>,
     metalness: f32,
     roughness: f32,
 ) -> Weathered {
-    var out = Weathered(base_color, metalness, roughness, n, 0.0);
+    var out = Weathered(base_color, metalness, roughness, n, 0.0, 0.0);
     let wetness = frame.weather.x;
     let cover = frame.weather.y;
     if wetness <= 0.0 && cover <= 0.0 {
@@ -1697,7 +1914,7 @@ fn weathered_lying(
     let snow = clamp(lying * (1.0 - snow_thin), 0.0, 1.0);
 
     // Wet: rain, and meltwater under the thin edge of snow.
-    let water = weather_wet(world_position, up, wet_share, pools);
+    let water = weather_wet(world_position, up, wet_share, pools, cavity);
     // (None without snow: the ragged edge's noise alone isn't snow melting.)
     let melt = smoothstep(0.0, 0.25, lying) * (1.0 - smoothstep(0.5, 0.95, lying)) * SNOW_EDGE_DAMP
         * step(0.0005, cover);
@@ -1705,20 +1922,25 @@ fn weathered_lying(
     let pooled = water.y;
     let porous = (1.0 - metalness) * mix(WET_SEALED, 1.0, smoothstep(0.25, 0.7, roughness));
     let soaked = wet * porous;
-    let darker = base_color * mix(1.0, WET_DARKENING, soaked);
+    let darker = base_color * mix(1.0, WET_DARKENING, soaked)
+        * mix(1.0, WET_GATHERED_DARKENING, water.z * porous);
     let grey = dot(darker, vec3<f32>(0.2126, 0.7152, 0.0722));
     out.base_color = max(mix(vec3<f32>(grey), darker, 1.0 + WET_SATURATION * soaked), vec3<f32>(0.0));
     // Water stands only on level ground, in puddles; elsewhere it's a film.
     var film = weather_film(roughness, away);
     if ground {
-        film = max(film, min(roughness, WET_FILM_GROUND));
+        film = ground_film(roughness, away);
     }
+    // Gathered water in the low spots, then puddles.
+    film = gathered_roughness(roughness, film, water.z);
     let slick = mix(film, min(roughness, WET_ROUGHNESS), pooled);
     out.roughness = mix(roughness, slick, water.x);
     // A puddle's top is level whatever lies under it, but for the rings
-    // falling drops leave on it.
-    let dimples = weather_dimples(world_position, up, water.x, pooled);
-    out.normal = normalize(mix(n, lie, pooled * water.x) + vec3<f32>(dimples.x, 0.0, dimples.y));
+    // falling drops leave on it; water standing in the cracks levels them.
+    let dimples = weather_dimples(world_position, up, water.x, max(pooled, water.z));
+    let level = max(pooled, smoothstep(0.0, WET_GATHERED_LEVEL, water.z));
+    out.filled = level * water.x;
+    out.normal = normalize(mix(n, lie, level * water.x) + vec3<f32>(dimples.x, 0.0, dimples.y));
     if snow <= 0.0 {
         return out;
     }
@@ -2107,6 +2329,29 @@ fn bumps(bumped: bool, geometric: vec3<f32>, n: vec3<f32>, l: vec3<f32>) -> f32 
     return bump_shadowing(geometric, n, l);
 }
 
+// How open the surface being lit is by its own maps (an ambient occlusion
+// map; a terrain's layers' occlusion and height), for micro-shadowing: 1
+// (the default, for every surface that sets nothing) is open. Never
+// screen-space occlusion, which isn't about the surface's own relief. Set
+// by `fs_main` and `fs_terrain` before they light a pixel, and filled
+// with water and snow as occlusion is (`filled_occlusion`).
+var<private> micro_open: f32 = 1.0;
+
+// Micro-shadowing: in a surface's cracks and pits (where its maps say it
+// is closed in), direct light coming in at a slant is shaded by the
+// relief around, which the normal map's bumps alone don't do. The cone of
+// directions a pit is open to narrows with its occlusion, and light from
+// outside it is cut, softly (Chan 2018, "Material Advances in Call of
+// Duty: WWII", as Filament's `computeMicroShadowing`). 1 where it's open.
+fn micro_shadow(n_dot_l: f32) -> f32 {
+    if micro_open >= 0.999 {
+        return 1.0;
+    }
+    let aperture = inverseSqrt(1.0 - min(micro_open, 0.9999));
+    let lit = saturate(n_dot_l * aperture);
+    return lit * lit;
+}
+
 fn shade_surface(
     world_position: vec3<f32>,
     geometric: vec3<f32>,
@@ -2128,7 +2373,8 @@ fn shade_surface(
     let sun_parts = sun_arrival_parts(world_position, geometric, pixel, solid);
     let sun_light = sun_parts.arrival;
     let sun = shade(n, v, sun_light.l, base_color, metalness, roughness, f0)
-        * sun_light.radiance * sun_light.visible * bumps(bumped, geometric, n, sun_light.l);
+        * sun_light.radiance * sun_light.visible * bumps(bumped, geometric, n, sun_light.l)
+        * micro_shadow(dot(n, sun_light.l));
 
     // Point and spot lights: only the ones listed for this pixel's tile.
     var lit = vec3<f32>(0.0);
@@ -2139,7 +2385,7 @@ fn shade_surface(
         slot += lamp_slots(lamps, i);
         if lamp.visible > 0.0 {
             lit += shade(n, v, lamp.l, base_color, metalness, roughness, f0) * lamp.radiance
-                * lamp.visible * bumps(bumped, geometric, n, lamp.l);
+                * lamp.visible * bumps(bumped, geometric, n, lamp.l) * micro_shadow(dot(n, lamp.l));
         }
     }
     let flash = lightning_arrival(world_position, sun_light.l, sun_parts.shadow);

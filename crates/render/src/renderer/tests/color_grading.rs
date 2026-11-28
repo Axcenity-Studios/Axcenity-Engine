@@ -1,7 +1,8 @@
-//! Color grading: brightness, contrast, saturation, tint, a lookup table,
-//! posterizing and a palette each change the finished frame as they say,
-//! a neutral table changes nothing, and the table's texture lives only
-//! while one is used.
+//! Color grading: brightness, contrast, saturation, tint, split toning, the
+//! S-curve, a lookup table, posterizing and a palette each change the
+//! finished frame as they say, a neutral table and the new controls at
+//! their defaults change nothing, and the table's texture lives only while
+//! one is used.
 
 use super::*;
 use crate::graphics::{AntiAliasing, Quality};
@@ -154,6 +155,123 @@ fn each_control_changes_the_frame_as_it_says() {
         "nearest is black",
     );
     near(shown([0.8; 3], palette), [255; 3], "nearest is white");
+}
+
+#[test]
+fn the_curve_deepens_shadows_and_lifts_highlights_about_its_pivot_without_clipping() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = renderer(&device, &queue, AntiAliasing::Off);
+    let mut shown = |grey: f32, curve, curve_pivot| {
+        shown(
+            &mut renderer,
+            [grey; 3],
+            ColorGrading {
+                curve,
+                curve_pivot,
+                ..ColorGrading::default()
+            },
+        )
+    };
+    // A power of 1.5 each side of 0.5: 0.5 × 0.5^1.5 = 0.177 below it, its
+    // mirror above.
+    near(shown(0.25, 0.5, 0.5), [45; 3], "a shadow, deeper");
+    near(shown(0.75, 0.5, 0.5), [210; 3], "a highlight, lifted");
+    near(shown(0.5, 0.5, 0.5), [128; 3], "the pivot stays");
+    // It eases into black and white: nothing near them is clipped.
+    near(shown(0.05, 0.5, 0.5), [4; 3], "near black");
+    near(shown(0.95, 0.5, 0.5), [251; 3], "near white");
+    near(shown(0.0, 0.5, 0.5), [0; 3], "black");
+    near(shown(1.0, 0.5, 0.5), [255; 3], "white");
+    // Below 0 it flattens toward the pivot (a power of 2/3).
+    near(shown(0.25, -0.5, 0.5), [80; 3], "a shadow, lifted");
+    // About a lower pivot, mid-grey is a highlight: 1 − 0.7 × (0.5 / 0.7)^1.5.
+    near(shown(0.3, 0.5, 0.3), [77; 3], "a lower pivot stays");
+    near(shown(0.5, 0.5, 0.3), [147; 3], "mid-grey above it, lifted");
+}
+
+#[test]
+fn split_toning_tints_shadows_and_highlights_apart_keeping_their_brightness() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let mut renderer = renderer(&device, &queue, AntiAliasing::Off);
+    let mut shown = |grey: f32, grading| shown(&mut renderer, [grey; 3], grading);
+    let cool = |balance| ColorGrading {
+        shadow_tint: [0.8, 0.9, 1.0],
+        balance,
+        ..ColorGrading::default()
+    };
+    // The tint scaled to white's brightness (0.903, 1.016, 1.129), mostly
+    // (0.896) on a dark grey of 0.2, which keeps its brightness.
+    near(shown(0.2, cool(0.0)), [47, 52, 57], "cool shadows");
+    near(
+        shown(0.9, cool(0.0)),
+        [229, 230, 230],
+        "light colors barely",
+    );
+    let warm = ColorGrading {
+        highlight_tint: [1.0, 0.95, 0.85],
+        ..ColorGrading::default()
+    };
+    near(shown(0.9, warm.clone()), [240, 229, 205], "warm highlights");
+    near(shown(0.2, warm), [51, 51, 50], "dark colors barely");
+    // The balance moves where shadows end: above 0, the dark grey is more a
+    // highlight and so less cooled; below, all shadow.
+    let spread = |[r, _, b]: [u8; 3]| i16::from(b) - i16::from(r);
+    let (less, even, more) = (
+        spread(shown(0.2, cool(1.0))),
+        spread(shown(0.2, cool(0.0))),
+        spread(shown(0.2, cool(-1.0))),
+    );
+    assert!(
+        less + 5 < even && even <= more,
+        "balance 1, 0, -1: {less} {even} {more}"
+    );
+}
+
+#[test]
+fn the_new_controls_at_their_defaults_give_back_the_picture_exactly() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    for aa in [AntiAliasing::Off, AntiAliasing::Msaa4] {
+        let mut renderer = renderer(&device, &queue, aa);
+        let mut list = colorful();
+        list.grading = Some(ColorGrading::default());
+        renderer.render(&list).unwrap();
+        let plain = renderer.read_pixels();
+        // White tints and no curve change nothing, whatever the balance and
+        // pivot say.
+        list.grading = Some(ColorGrading {
+            shadow_tint: [1.0; 3],
+            highlight_tint: [1.0; 3],
+            balance: 0.8,
+            curve: 0.0,
+            curve_pivot: 0.3,
+            ..ColorGrading::default()
+        });
+        renderer.render(&list).unwrap();
+        assert!(
+            renderer.read_pixels() == plain,
+            "neutral split toning and curve changed the frame ({aa:?})"
+        );
+        // And grading the default is as near as 8 bits allow to none.
+        list.grading = None;
+        renderer.render(&list).unwrap();
+        let ungraded = renderer.read_pixels();
+        let most = plain
+            .iter()
+            .zip(&ungraded)
+            .map(|(a, b)| a.abs_diff(*b))
+            .max()
+            .unwrap();
+        assert!(most <= 1, "default grading changed a channel by {most}");
+    }
 }
 
 /// A frame with many colors: lit blocks and spheres in front of the sky,

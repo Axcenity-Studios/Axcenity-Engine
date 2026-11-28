@@ -1692,6 +1692,78 @@ fn new_project_lists_your_templates_and_makes_projects_from_them() {
     let _ = std::fs::remove_dir_all(parent);
 }
 
+/// Project Settings shows the project's picture with where it comes from
+/// and the buttons to change it, and ends just under its buttons.
+#[test]
+fn project_settings_shows_the_picture_and_how_to_change_it() {
+    let parent = std::env::temp_dir().join(format!("axcenity-settings-pic-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&parent);
+    std::fs::create_dir_all(&parent).unwrap();
+    let folder = axcenity_project::create_project(&parent, "Pictured").unwrap();
+    let mut rgb = Vec::new();
+    for y in 0..360u32 {
+        for x in 0..640u32 {
+            rgb.extend([(x * 255 / 640) as u8, (y * 255 / 360) as u8, 120]);
+        }
+    }
+    let mut png_bytes = Vec::new();
+    let mut encoder = png::Encoder::new(&mut png_bytes, 640, 360);
+    encoder.set_color(png::ColorType::Rgb);
+    encoder
+        .write_header()
+        .unwrap()
+        .write_image_data(&rgb)
+        .unwrap();
+    std::fs::write(folder.join(axcenity_project::THUMBNAIL_FILE), png_bytes).unwrap();
+    let mut start = StartScreen::default();
+    start.open_settings(ProjectLink {
+        name: "Pictured".to_owned(),
+        description: String::new(),
+        folder: folder.clone(),
+    });
+    let mut projects = Vec::new();
+    let texts = std::cell::RefCell::new(Vec::new());
+    let mut draw = |ui: &mut egui::Ui| {
+        let ctx = &ui.ctx().clone();
+        egui::CentralPanel::default().show(ui, |_| {});
+        let _ = start.dialogs(ctx, &mut projects);
+    };
+    if let Some(snapshots) = std::env::var_os("AXCENITY_SNAPSHOTS").map(PathBuf::from) {
+        crate::snapshot::snapshot(
+            &snapshots.join("start-project-settings.png"),
+            vec2(900.0, 900.0),
+            vec![Vec::new(); 3],
+            &mut draw,
+        );
+    }
+    let ctx = theme::test_context();
+    for _ in 0..3 {
+        let output = crate::theme::run(&ctx, Default::default(), |ui| draw(ui));
+        *texts.borrow_mut() = output
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::epaint::Shape::Text(text) => Some(text.galley.text().to_owned()),
+                _ => None,
+            })
+            .collect();
+    }
+    let texts = texts.into_inner();
+    for wanted in ["Picture", "Choose Image…", "Save"] {
+        assert!(
+            texts.iter().any(|text| text.contains(wanted)),
+            "{wanted} isn't drawn: {texts:?}"
+        );
+    }
+    assert!(
+        texts
+            .iter()
+            .any(|text| text.contains("taken each time you save")),
+        "{texts:?}"
+    );
+    let _ = std::fs::remove_dir_all(&parent);
+}
+
 /// The New Project dialog keeps its buttons where they are when an error
 /// or a "what's missing" line shows, so a second click lands on the same
 /// button (QA-008: the centred dialog grew and moved them).

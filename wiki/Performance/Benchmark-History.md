@@ -58,6 +58,9 @@ Dated whole-frame numbers, **never overwritten**: add a row or a section when yo
 | 2026-11-10 | `39dd258` | Temperate Wet Patch | 5.279 | 820 | 2,064 |
 
 | 2026-11-11 | `15965da` | Abandoned Farmhouse | 5.399 | 212 | 1,579 |
+| 2026-11-27 | `ff769d90` + uncommitted (old rules → still groups, distances, cascades) | Overgrown Street, owner's settings with ray tracing, 1996 × 703, pinned | 50.4 → 43.9 shown (19.8 → 22.8 fps); thread 43.5 → 30.1, GPU 50.2 → 43.5 | | |
+| 2026-11-27 | `ff769d90` + uncommitted (before → CastShadow off for ground cover, probes, micro-shadowing) | Overgrown Street, owner's settings, 1996 × 703, pinned, two rounds | non-RT 37.0 → 37.9 fps (GPU 26.5 → 25.9); RT 22.9 → 24.5 fps (GPU 43.3 → 40.3); RT with Half traced shadows 27.6 fps (GPU 32.8) | | |
+| 2026-11-27 | `ff769d90` + uncommitted (the same engines, regression check) | Desert Homestead, owner's Ultra / every ray traced effect, 1996 × 998, pinned, two rounds | Ultra 174.7 / 175.0 → 175.1 / 173.6 fps; RT 96.8 / 97.1 → 96.8 / 96.9 fps; GPU 5.41–5.44 and 9.95–9.97 ms both | | |
 | 2026-11-11 | `15965da` | General Store Roadside | 4.092 | 446 | 1,581 |
 | 2026-11-11 | `15965da` | Temperate Wet Patch | 5.14 | 268 | 1,399 |
 | 2026-11-11 | `15965da` | Temperate Dry Patch, Ultra 2560×1440 | 11.043 (GPU 10.9, GPU-bound) | 282 | 1,559 |
@@ -83,7 +86,7 @@ The pre-#65 Farmhouse row is from the PR's own run and isn't directly comparable
 | 2560×1440 | 1.03–1.07 | 0.99–1.12 | 0.93 | noise / 0.24 |
 | 3840×2160 | 1.90–1.92 | 1.27 | 1.01 | 0.20–0.26 / below noise |
 
-**Cut-out shadows on foliage (CO7 review fixes 1, 2026-11-18, `bench_cut_out_foliage_shadows`)**: 24 trees of 1,500 cut-out leaf cards (36,000) under a low sun with its cascades, 1080p High with TAA, medians of 200 frames; Desktop, pinned to CPUs 0 to 15, five rounds alternating with `main` (`e1658afb`). Casting every cut-out through its holes was dropped for this; only hair cards do (`docs/rendering/shadows.md`).
+**Cut-out shadows on foliage (CO7 review fixes 1, 2026-11-18, `bench_cut_out_foliage_shadows`)**: 24 trees of 1,500 cut-out leaf cards (36,000) under a low sun with its cascades, 1080p High with TAA, medians of 200 frames; Desktop, pinned to CPUs 0 to 15, five rounds alternating with `main` (`e1658afb`). Casting every cut-out through its holes was dropped for this then, and only hair cards did. Since 2026-11-26 every cut-out of the standard material does, at the owner's asking: in Desert Homestead (Ultra, 1920 × 1080) the Shadows pass is 0.13 to 0.17 ms dearer for it in five views and 0.42 ms in one (`docs/rendering/shadows.md`).
 
 | Build | Shadows | Prepass | Scene |
 |---|---|---|---|
@@ -249,6 +252,21 @@ The first step of the plan those numbers gave: the sky's clouds traced before th
 The `Clouds` pass is 0.04 to 0.30 ms at 1920 × 1080 (HDRP's clouds: 0.30) and the scene pass lost 1.1 to 2.7 ms where sky shows. Against the sky pass's own clouds the stills differ by 0.01 to 0.14 of 255 levels on average. The windmill view at 1920 × 1080 is now limited by the frame's thread (4.15 ms). The lit surfaces' cloud shadows are untouched (about 0.25 ms of the scene pass in the hero view).
 
 **By what is drawn** (the second step: `DrawnPart`, stamps between draws; hero view, a line through 960 × 540, 1920 × 1080 and 2560 × 1405): the GPU's frame is 3.75 ms whatever the window's size plus 1.09 ms for each million pixels. Of the fixed part: shadows 1.07, the prepass 0.51, the scattered items in the scene pass 0.82, other items 0.47, volumetric fog 0.38. By the pixel: the terrain 0.35 ms a million pixels, items 0.19, the dust's sprites 0.16 (0.34 ms at 1920 × 1080, which the Unity port doesn't draw). The cut-out surfaces' depth is drawn in the prepass and again in the scene pass (0.12 to 0.18 ms).
+
+### Ray tracing in both, and where they stand (2026-11-27)
+
+The owner asked for ray traced runs in both engines. HDRP traces rays only with DirectX 12, and Unity's Linux editor builds a Windows player without its ray tracing shaders (empty `.raytrace` shaders, Lit's ray tracing passes not compiled; a known Unity issue). So Unity's ray traced numbers need the Windows editor; the port and `run.py` are ready for it. Same machine and method, `f01da632`, 1920 × 1080, frames a second, the median of three runs:
+
+| View | Axcenity Ultra | Unity HDRP | Axcenity, traced shadows and AO | Axcenity, everything traced |
+|---|---|---|---|---|
+| hero | 178.3 | 237.0 | 109.5 | 108.6 |
+| mailbox | 178.3 | 232.2 | 93.8 | 93.2 |
+| porch | 218.7 | 236.5 | 131.7 | 131.1 |
+| truck | 203.1 | 227.1 | 144.0 | 141.7 |
+| windmill | 225.4 | 258.4 | 108.1 | 108.8 |
+| crane | 182.3 | 251.0 | 107.6 | 108.0 |
+
+Traced shadows and AO meet the owner's 90 in every view (84 to 117 on 2026-11-26). Traced AO is now their largest cost (2.55 to 2.86 ms), ahead of the sun's rays (1.79 to 2.79). Rasterized, the views are 7 to 10% slower than on 2026-11-26: the scene pass's shading is 0.17 to 0.40 ms heavier across everything it draws (f01da632's `lighting.wgsl`), plus 0.05 for screen-space reflections, none of which the port draws. Details: `benchmarks/cross-engine/homestead/results.md`, "Ray tracing in both engines".
 
 ## Raw data
 

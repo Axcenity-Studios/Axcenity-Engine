@@ -2019,18 +2019,16 @@ pub fn shader_time(ui: &egui::Ui, list: &axcenity_render::DrawList) -> f32 {
             .iter()
             .any(|item| item.material.surface_shader.is_some() || (windy && item.sway.is_some()));
     if moving {
-        // Swaying plants and drifting clouds don't need every frame the
-        // display can show: while nobody touches the editor they're drawn
-        // at `SCENERY_FPS`, sparing the GPU. Input brings full-rate frames
-        // back (`EditorApp::keep_frames_steady`).
-        ui.ctx()
-            .request_repaint_after(std::time::Duration::from_secs_f32(1.0 / SCENERY_FPS));
+        // Swaying plants and drifting clouds are drawn as fast as frames
+        // can be, touched or not: the frame rate shown is then the scene's,
+        // which is what benchmarking the engine needs (Paul, 2026-11-27).
+        // It used to rest at a slower pace while nobody touched the editor,
+        // which the viewport bar marked "(idle)". A still scene still
+        // draws nothing until something changes.
+        ui.ctx().request_repaint();
     }
     ui.input(|input| input.time) as f32
 }
-
-/// Frames a second for scenery that moves on its own in an idle editor.
-const SCENERY_FPS: f32 = 30.0;
 
 /// How far a part must be from how it started to count as changed.
 const CHANGED: f32 = 0.0005;

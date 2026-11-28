@@ -1,6 +1,7 @@
 //! What scatter rules keep off besides paths (procedural worlds PW5):
 //! anchored, colliding parts standing on or near the ground, such as a
-//! house's walls and floor, a placed rock model or a fence. A rule with
+//! house's walls and floor, a placed rock model or a fence; not a
+//! character's, which its controller anchors but which walk about. A rule with
 //! `AvoidParts` places nothing whose spot is under such a part (grown by
 //! its `PartMargin`) or that would grow into one.
 //!
@@ -168,6 +169,31 @@ impl Obstacle {
     }
 }
 
+/// Whether `part` belongs to a character: inside a Model that has a
+/// Humanoid or a character controller. A controller anchors the parts it
+/// moves (kinematic), so they read as anchored and colliding, but a
+/// character walks about: kept off like a wall, the ground cover round it
+/// was made again every frame it moved.
+fn in_a_character(world: &World, part: InstanceId) -> bool {
+    let mut at = world.get(part).and_then(|instance| instance.parent());
+    while let Some(id) = at {
+        let Some(instance) = world.get(id) else {
+            return false;
+        };
+        let is_character = instance.children().iter().any(|&child| {
+            world.get(child).is_some_and(|child| {
+                child.class() == axcenity_core::ClassName::Humanoid
+                    || child.class().is_character_controller()
+            })
+        });
+        if is_character {
+            return true;
+        }
+        at = instance.parent();
+    }
+    false
+}
+
 /// The Workspace's anchored, colliding parts, kept between frames.
 #[derive(Default)]
 pub struct Obstacles {
@@ -194,8 +220,9 @@ impl Obstacles {
             }
             self.read_for = Some(key);
             self.parts = world.all_below(workspace, |class| class.is_base_part());
-            self.parts
-                .retain(|&id| !axcenity_core::csg::out_of_world(world, id));
+            self.parts.retain(|&id| {
+                !axcenity_core::csg::out_of_world(world, id) && !in_a_character(world, id)
+            });
             let parts: HashSet<InstanceId> = self.parts.iter().copied().collect();
             self.boxes.retain(|id, _| parts.contains(id));
             changed = true;

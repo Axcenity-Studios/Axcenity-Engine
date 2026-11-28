@@ -16,11 +16,14 @@ mod cloth;
 mod clouds;
 mod color_grading;
 mod cooked_textures;
+mod cut_out_coverage;
 #[cfg(feature = "debug-views")]
 mod debug_views;
 mod decals;
+mod depth_from_prepass;
 mod environment_maps;
 mod fog;
+mod foliage_light;
 mod foliage_shadow_bench;
 mod frame_parts;
 mod frame_planning;
@@ -39,6 +42,7 @@ mod ray_reflections;
 mod ray_tracing;
 mod realtime_gi;
 mod reflection_probes;
+mod screen_reflections;
 mod shading;
 mod shadows;
 mod skin;
@@ -197,6 +201,7 @@ fn batch(mesh: MeshKey, transparent: bool, instances: Range<u32>) -> Batch {
     Batch {
         mesh,
         prefilled: false,
+        fading: false,
         material: MaterialKey::default(),
         transparent,
         double_sided: false,
@@ -1022,6 +1027,25 @@ fn stats_count_draws_and_triangles_and_time_the_gpu_where_it_can() {
     let stats = renderer.stats();
     assert!(stats.gpu_timing);
     assert!(stats.gpu_time.is_some(), "{stats:?}");
+
+    // Frames drawn one after another, as a window draws them, without
+    // waiting for the GPU between: every one is timed, not every other
+    // one (which, with far cascades taking turns, read only the frames
+    // of one parity). A shown renderer never gets more than a frame ahead.
+    renderer.set_one_frame_ahead(true);
+    let before = renderer.stats().gpu_readings;
+    const FRAMES: u64 = 24;
+    for _ in 0..FRAMES {
+        renderer.render(&list).unwrap();
+    }
+    device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+    // A few more frames read what's still on its way back, one a frame.
+    for _ in 0..4 {
+        renderer.render(&list).unwrap();
+        device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
+    }
+    let read = renderer.stats().gpu_readings - before;
+    assert!(read >= FRAMES, "{read} readings for {FRAMES} frames");
 }
 
 #[test]
@@ -1188,8 +1212,12 @@ fn stats_time_each_pass_the_frame_draws() {
         renderer.stats()
     };
 
-    // Shadows and ambient occlusion on, no UI, fog or GPU particles.
-    renderer.set_graphics(&with_occlusion(crate::AmbientOcclusion::High));
+    // Shadows, ambient occlusion and screen-space reflections on, no UI,
+    // fog or GPU particles.
+    renderer.set_graphics(&GraphicsSettings {
+        screen_space_reflections: Some(true),
+        ..with_occlusion(crate::AmbientOcclusion::High)
+    });
     let mut list = list_of(vec![big_block()]);
     list.shadows.enabled = true;
     let stats = draw(&mut renderer, &list);
@@ -2367,6 +2395,8 @@ fn with_occlusion(mode: crate::AmbientOcclusion) -> GraphicsSettings {
     GraphicsSettings {
         ambient_occlusion: Some(mode),
         contact_shadows: Some(false),
+        // They keep the prepass too (tests/screen_reflections.rs).
+        screen_space_reflections: Some(false),
         ..GraphicsSettings::default()
     }
 }
@@ -2478,19 +2508,30 @@ fn every_setting_and_value() -> Vec<GraphicsSettings> {
         all.push(with(&|s| {
             s.ambient_occlusion = Some(AmbientOcclusion::Off);
             s.contact_shadows = Some(false);
+            s.screen_space_reflections = Some(false);
             s.volumetric_fog = Some(on);
+        }));
+    }
+    // Screen-space reflections alone still draw the prepass.
+    for on in [true, false] {
+        all.push(with(&|s| {
+            s.ambient_occlusion = Some(AmbientOcclusion::Off);
+            s.contact_shadows = Some(false);
+            s.screen_space_reflections = Some(on);
         }));
     }
     // Contact shadows alone still draw the prepass.
     all.push(with(&|s| {
         s.ambient_occlusion = Some(AmbientOcclusion::Off);
         s.contact_shadows = Some(true);
+        s.screen_space_reflections = Some(false);
     }));
     // So does depth of field, with its own target.
     for quality in crate::DepthOfFieldQuality::ALL {
         all.push(with(&|s| {
             s.ambient_occlusion = Some(AmbientOcclusion::Off);
             s.contact_shadows = Some(false);
+            s.screen_space_reflections = Some(false);
             s.depth_of_field = Some(quality);
         }));
     }
@@ -2508,6 +2549,7 @@ fn every_setting_and_value() -> Vec<GraphicsSettings> {
         all.push(with(&|s| {
             s.ambient_occlusion = Some(AmbientOcclusion::Off);
             s.contact_shadows = Some(false);
+            s.screen_space_reflections = Some(false);
             s.depth_of_field = Some(crate::DepthOfFieldQuality::Off);
             s.motion_blur = Some(quality);
         }));
@@ -2515,6 +2557,7 @@ fn every_setting_and_value() -> Vec<GraphicsSettings> {
     all.push(with(&|s| {
         s.ambient_occlusion = Some(AmbientOcclusion::Off);
         s.contact_shadows = Some(false);
+        s.screen_space_reflections = Some(false);
         s.depth_of_field = Some(crate::DepthOfFieldQuality::Off);
         s.motion_blur = Some(crate::MotionBlurQuality::Off);
         s.anti_aliasing = Some(AntiAliasing::Taa);
@@ -2698,6 +2741,7 @@ fn switching_every_setting_and_dropping_renderers_leaves_no_resources_behind() {
             assert_eq!(motion, usize::from(jittered || streaked), "{context}");
             let prepass = used.ambient_occlusion != crate::AmbientOcclusion::Off
                 || used.contact_shadows
+                || used.screen_space_reflections
                 || used.volumetric_fog
                 || blurred
                 || jittered

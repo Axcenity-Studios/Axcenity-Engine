@@ -1384,3 +1384,55 @@ fn a_recording_replica_mode_world_makes_instances_at_ids_from_its_blocks_first()
     world.create_at(taken, ClassName::Part).unwrap();
     assert!(world.contains(taken));
 }
+
+#[test]
+fn generated_foliage_changes_keep_the_terrains_identity() {
+    use crate::{FoliageInstance, FoliagePlant, FoliageSource, TerrainData};
+    let mut world = World::new();
+    let terrain = world.create(ClassName::Terrain).unwrap();
+    world.set_parent(terrain, Some(world.workspace())).unwrap();
+    world.set_terrain(terrain, Arc::new(TerrainData::flat(65, 65, 0.5).unwrap()));
+    // Something built from the ground (a collider, the drawn terrain) holds it.
+    let held = Arc::clone(world.terrain(terrain).unwrap());
+    let plant = |collide| FoliageInstance {
+        source: FoliageSource::Plant(FoliagePlant::Grass),
+        x: 3.0,
+        z: 3.0,
+        yaw: 0.0,
+        scale: 1.0,
+        collide,
+        shadow: true,
+        lean: 0.0,
+        sink: 0.0,
+    };
+    let data = world.terrain_generated_mut(terrain).unwrap();
+    data.set_generated(0, 0, 7, vec![plant(false)]);
+    let now = world.terrain(terrain).unwrap();
+    assert!(
+        !Arc::ptr_eq(now, &held),
+        "the shared data isn't changed under its holder"
+    );
+    assert_eq!(now.uid(), held.uid());
+    assert_eq!(now.revision(), held.revision());
+    assert_ne!(now.generated_version(), held.generated_version());
+    assert_eq!(held.generated_foliage().count(), 0);
+    // Grass that doesn't collide leaves a collider current; a colliding plant doesn't.
+    assert_eq!(
+        now.generated_collide_version(),
+        held.generated_collide_version()
+    );
+    let before = now.generated_collide_version();
+    let data = world.terrain_generated_mut(terrain).unwrap();
+    data.set_generated(0, 0, 8, vec![plant(true)]);
+    assert_ne!(
+        world.terrain(terrain).unwrap().generated_collide_version(),
+        before
+    );
+    // An edit of the ground itself still makes a new identity.
+    let uid = world.terrain(terrain).unwrap().uid();
+    let _ = Arc::clone(world.terrain(terrain).unwrap());
+    let shared = Arc::clone(world.terrain(terrain).unwrap());
+    world.terrain_mut(terrain).unwrap();
+    assert_ne!(world.terrain(terrain).unwrap().uid(), uid);
+    drop(shared);
+}

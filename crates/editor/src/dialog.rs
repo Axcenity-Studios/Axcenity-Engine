@@ -191,17 +191,26 @@ pub fn button_row(ui: &mut egui::Ui, buttons: &[Button], enter: Enter) -> Button
     let mut picked = None;
     let mut rects = vec![egui::Rect::NOTHING; buttons.len()];
     ui.add_space(space::L);
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        ui.spacing_mut().item_spacing.x = space::S;
-        // Right to left, so the main button ends up at the right.
-        for (index, button) in buttons.iter().enumerate().rev() {
-            let response = dialog_button(ui, button);
-            rects[index] = response.rect;
-            if response.clicked() {
-                picked = Some(index);
+    // The row is given only its own height. Given the rest of the box, a
+    // right-to-left row centres its buttons in the height the box had last
+    // frame, so a box that shows a taller page first (Collaborate's Check
+    // page, then Ready) never shrinks and its buttons float in the middle.
+    let row = vec2(ui.available_width(), 30.0);
+    ui.allocate_ui_with_layout(
+        row,
+        egui::Layout::right_to_left(egui::Align::Center),
+        |ui| {
+            ui.spacing_mut().item_spacing.x = space::S;
+            // Right to left, so the main button ends up at the right.
+            for (index, button) in buttons.iter().enumerate().rev() {
+                let response = dialog_button(ui, button);
+                rects[index] = response.rect;
+                if response.clicked() {
+                    picked = Some(index);
+                }
             }
-        }
-    });
+        },
+    );
     let typing = ui.data(|data| data.get_temp(typing_id()).unwrap_or(false));
     let main = buttons
         .iter()
@@ -357,6 +366,62 @@ mod tests {
             let _ = crate::theme::run(&ctx, input, |ui| draw(ui));
         }
         assert_eq!(*outcomes.borrow(), [None, Some(Outcome::Dismissed)]);
+    }
+
+    /// The button row sits just under the dialog's text and the dialog ends
+    /// with it. A right-to-left row centred across the modal's whole height
+    /// once pushed the buttons halfway down the screen, leaving a tall
+    /// empty band above and below them (Project Settings, Collaborate's
+    /// Ready page).
+    #[test]
+    fn a_dialog_ends_just_under_its_buttons() {
+        let ctx = theme::test_context();
+        let mut seen = None;
+        // A taller page first, as Collaborate's Check page comes before
+        // Ready and New Project before Project Settings in the same box.
+        for frame in 0..6 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    vec2(1600.0, 1200.0),
+                )),
+                ..Default::default()
+            };
+            let _ = crate::theme::run(&ctx, input, |ui| {
+                let ctx = &ui.ctx().clone();
+                let (row, _) = modal(ctx, "height test", WIDTH, |ui| {
+                    header(
+                        ui,
+                        icons::CHECK_CIRCLE,
+                        Tone::Question,
+                        "Ready",
+                        Some("Done."),
+                    );
+                    if frame < 3 {
+                        ui.add_space(500.0);
+                    }
+                    let text_bottom = ui.min_rect().bottom();
+                    let row = button_row(
+                        ui,
+                        &[Button::new(icons::CHECK, "OK", Kind::Main)],
+                        Enter::Main,
+                    );
+                    (text_bottom, row.rects[0], ui.min_rect().bottom())
+                });
+                seen = Some(row);
+            });
+        }
+        let (text_bottom, button, dialog_bottom) = seen.unwrap();
+        assert!(
+            button.top() - text_bottom < 2.0 * space::L,
+            "buttons {} below the text",
+            button.top() - text_bottom
+        );
+        assert!(
+            dialog_bottom - button.bottom() < 2.0,
+            "{} of empty space under the buttons",
+            dialog_bottom - button.bottom()
+        );
     }
 
     /// Enter in a dialog's text field picks the main button only when the

@@ -154,29 +154,39 @@ impl OcclusionTargets {
         alive: &Arc<()>,
     ) -> Self {
         let bytes = std::cell::Cell::new(0);
-        let view = |label, (width, height): (u32, u32), format| {
+        let texture = |label, (width, height): (u32, u32), format, usage| {
             let (width, height) = (width.max(1), height.max(1));
             bytes.set(bytes.get() + target_bytes((width, height, 1), format, 1));
-            device
-                .create_texture(&wgpu::TextureDescriptor {
-                    label: Some(label),
-                    size: wgpu::Extent3d {
-                        width,
-                        height,
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format,
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                        | wgpu::TextureUsages::TEXTURE_BINDING,
-                    view_formats: &[],
-                })
+            device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(label),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING
+                    | usage,
+                view_formats: &[],
+            })
+        };
+        let view = |label, size, format| {
+            texture(label, size, format, wgpu::TextureUsages::empty())
                 .create_view(&wgpu::TextureViewDescriptor::default())
         };
         let half = (width.div_ceil(2), height.div_ceil(2));
-        let depth_view = view("prepass depth", (width, height), DEPTH_FORMAT);
+        // Copied from only by the occlusion probe (`occlusion_probe.rs`).
+        let depth_texture = texture(
+            "prepass depth",
+            (width, height),
+            DEPTH_FORMAT,
+            wgpu::TextureUsages::COPY_SRC,
+        );
+        let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let normal_view = view("prepass normals", (width, height), NORMAL_FORMAT);
         let raw_view = view("ambient occlusion", half, OCCLUSION_FORMAT);
         let blurred_view = view("ambient occlusion (blurred)", half, OCCLUSION_FORMAT);
@@ -204,6 +214,7 @@ impl OcclusionTargets {
             occlusion_group: group(&normal_view, &passes.uniform),
             blur_group: group(&raw_view, &passes.uniform),
             edge_group: group(&normal_view, &passes.edge_uniform),
+            depth_texture,
             depth_view,
             normal_view,
             raw_view,

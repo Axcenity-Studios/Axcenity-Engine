@@ -248,6 +248,16 @@ pub struct GeneratorSettings {
     /// Heights stay between these, 0 to 1.
     pub min_height: f32,
     pub max_height: f32,
+    /// Studs (X, Z) the landscape is moved along by: a tile beside another
+    /// samples the noise one tile along, so the two make one landscape.
+    /// Island and crater shapes stay each tile's own. Left out when zero,
+    /// so a terrain that isn't a tile saves as before.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub offset: [f32; 2],
+}
+
+fn is_zero(offset: &[f32; 2]) -> bool {
+    *offset == [0.0, 0.0]
 }
 
 impl Default for GeneratorSettings {
@@ -278,6 +288,7 @@ impl Default for GeneratorSettings {
             curve: 1.2,
             min_height: 0.0,
             max_height: 1.0,
+            offset: [0.0, 0.0],
         }
     }
 }
@@ -366,6 +377,8 @@ pub fn check(
         settings.persistence,
         settings.lacunarity,
         settings.curve,
+        settings.offset[0],
+        settings.offset[1],
         target.world_size.x,
         target.world_size.y,
     ];
@@ -411,8 +424,11 @@ impl HeightGenerator for Fractal {
     }
 }
 
-/// The fractal landscape's height at `at` studs from the terrain's corner.
-fn fractal_height(s: &GeneratorSettings, at: Vec2, world: Vec2) -> f32 {
+/// The fractal landscape's height at `local` studs from the terrain's
+/// corner. Noise and dunes are sampled `offset` along; the island and
+/// crater shapes are the tile's own.
+fn fractal_height(s: &GeneratorSettings, local: Vec2, world: Vec2) -> f32 {
+    let at = local + Vec2::from(s.offset);
     let noise = Noise::new(s.seed);
     let octaves = s.octaves.clamp(1, 12);
     let persistence = s.persistence.clamp(0.05, 0.95);
@@ -480,7 +496,7 @@ fn fractal_height(s: &GeneratorSettings, at: Vec2, world: Vec2) -> f32 {
     let mut height = s.base_height + s.amplitude * (shape - 0.3);
 
     // How far from the middle, 0 there and 1 at the middle of each edge.
-    let from_middle = ((at - world / 2.0) / (world / 2.0)).length();
+    let from_middle = ((local - world / 2.0) / (world / 2.0)).length();
     if s.island > 0.0 {
         let sink = smoothstep(0.45, 1.0, from_middle) * s.island.clamp(0.0, 1.0);
         height = lerp(height, -0.05, sink);
@@ -595,6 +611,47 @@ mod tests {
             ..GeneratorSettings::default()
         };
         assert!(generate(&nan, target(33), &control).is_err());
+    }
+
+    #[test]
+    fn tiles_moved_by_their_offset_meet_at_their_edges() {
+        let settings = Preset::MountainRange.settings();
+        let here = make(&settings, 65);
+        // East: our last column is their first. North: our last row is
+        // their first. (Each sample index along the edge, theirs and ours.)
+        let east = |i: usize| (i * 65, i * 65 + 64);
+        let north = |i: usize| (i, 64 * 65 + i);
+        for (offset, edge) in [
+            ([512.0, 0.0], &east as &dyn Fn(usize) -> (usize, usize)),
+            ([0.0, 512.0], &north),
+        ] {
+            let moved = GeneratorSettings {
+                offset,
+                ..settings.clone()
+            };
+            let there = make(&moved, 65);
+            assert_ne!(here, there);
+            for i in 0..65 {
+                let (theirs, ours) = edge(i);
+                let (a, b) = (here[ours], there[theirs]);
+                assert!((a - b).abs() < 1e-4, "{offset:?} {i}: {a} {b}");
+            }
+        }
+        // No offset is the landscape as it always was, saved as before.
+        let zero = GeneratorSettings {
+            offset: [0.0, 0.0],
+            ..settings.clone()
+        };
+        assert_eq!(make(&zero, 65), here);
+        assert!(!settings.to_json().contains("offset"));
+        let moved = GeneratorSettings {
+            offset: [512.0, -512.0],
+            ..settings
+        };
+        assert_eq!(
+            GeneratorSettings::from_json(&moved.to_json()).unwrap(),
+            moved
+        );
     }
 
     #[test]

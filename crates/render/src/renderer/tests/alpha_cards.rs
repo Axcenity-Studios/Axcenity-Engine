@@ -415,12 +415,26 @@ fn stripes_in(pixels: &[u8], size: u32) -> (usize, f32, f32) {
 
 /// `list`'s frame with the sun's shadow maps at High and no anti-aliasing.
 fn shadow_mapped(device: &wgpu::Device, queue: &wgpu::Queue, list: &DrawList) -> Vec<u8> {
+    shadow_mapped_through(device, queue, list, None)
+}
+
+/// As [`shadow_mapped`], with cut-outs casting through their holes in the
+/// `cascades` nearest of the sun's cascades (`None`: as the renderer starts).
+fn shadow_mapped_through(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    list: &DrawList,
+    cascades: Option<usize>,
+) -> Vec<u8> {
     let mut renderer = TextureRenderer::new(device, queue, 256, 256);
     renderer.set_graphics(&GraphicsSettings {
         shadow_quality: Some(crate::ShadowQuality::High),
         anti_aliasing: Some(AntiAliasing::Off),
         ..GraphicsSettings::default()
     });
+    if let Some(cascades) = cascades {
+        renderer.scene.cut_out_cascades = cascades;
+    }
     renderer.render(list).unwrap();
     renderer.read_pixels()
 }
@@ -448,31 +462,170 @@ fn a_striped_hair_cards_shadow_is_striped_in_the_shadow_maps() {
     }
 }
 
-/// A Standard cut-out (a leaf card, a fence) casts its whole card in the
-/// shadow maps, as before CO7. Casting through its holes too more than
-/// doubled the Shadows pass on foliage (`bench_cut_out_foliage_shadows`:
-/// 0.19 to 0.42 ms for 36,000 leaf cards at 1080p High), so only Hair
-/// casts through its holes (review fixes 1).
+/// A Standard cut-out (a leaf card, a blade of grass, a fence) casts
+/// through its holes in the shadow maps as a hair card does: a plant's
+/// shadow is its leaves', not a block the size of its cards (which is what
+/// it was until 2026-11-26, when only Hair cast through its holes).
 #[test]
-fn a_standard_cut_out_casts_its_whole_card_in_the_shadow_maps() {
+fn a_standard_cut_outs_shadow_follows_its_holes_in_the_shadow_maps() {
     let Some((device, queue)) = test_device() else {
         eprintln!("skipped: no graphics adapter on this machine");
         return;
     };
-    let pixels = shadow_mapped(&device, &queue, &striped_shadow(false, false));
-    evidence(
-        "shadow-map-stripes-hair-false-posed-false",
-        &pixels,
-        256,
-        256,
-    );
-    let (turns, low, high) = stripes_in(&pixels, 256);
-    eprintln!("shadow maps, standard: {turns} turns, {low}..{high}");
-    assert!(high - low > 40.0, "a shadow falls: {low}..{high}");
+    let size = 256;
+    for posed in [false, true] {
+        let pixels = shadow_mapped(&device, &queue, &striped_shadow(false, posed));
+        evidence(
+            &format!("shadow-map-stripes-hair-false-posed-{posed}"),
+            &pixels,
+            size,
+            size,
+        );
+        let (turns, low, high) = stripes_in(&pixels, size);
+        eprintln!("shadow maps, standard, posed {posed}: {turns} turns, {low}..{high}");
+        assert!(high - low > 40.0, "a shadow falls: {low}..{high}");
+        // Four stripes and three gaps: about seven turns, not a slab's two.
+        assert!(turns >= 6, "posed {posed}: a slab ({turns} turns)");
+    }
+}
+
+/// A cut-out drawn through its holes is the dear way to draw a shadow map
+/// (its texture read at every texel, no depth test first), so the renderer
+/// can keep it to the sun's nearest cascades: past them a Standard cut-out
+/// casts its whole mesh, as every solid caster does. A hair card casts
+/// through its holes in every cascade.
+#[test]
+fn a_standard_cut_out_casts_whole_past_the_near_cascades_and_a_hair_card_does_not() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let size = 256;
+    // The striped card's scene six times the size, which is the same
+    // picture from the camera: the card 36 studs away and the wall 63,
+    // past High's first cascade (17 studs) and in its second and third.
+    let far = |hair_model: bool| {
+        let mut list = striped_shadow(hair_model, false);
+        for item in &mut list.items {
+            item.transform = Mat4::from_scale(Vec3::splat(6.0)) * item.transform;
+        }
+        list
+    };
+    let turns_of = |name: &str, list: &DrawList, cascades: usize| {
+        let pixels = shadow_mapped_through(&device, &queue, list, Some(cascades));
+        evidence(
+            &format!("near-cascade-cut-outs-{name}"),
+            &pixels,
+            size,
+            size,
+        );
+        let (turns, low, high) = stripes_in(&pixels, size);
+        eprintln!("{name}: {turns} turns, {low}..{high}");
+        assert!(high - low > 40.0, "{name}: a shadow falls: {low}..{high}");
+        turns
+    };
+    // Every cascade through the holes: the far card's stripes.
+    let all = turns_of("far-every-cascade", &far(false), 3);
     assert!(
-        turns <= 2,
-        "holes in a Standard cut-out's shadow ({turns} turns)"
+        all >= 6,
+        "a slab with every cascade asked for ({all} turns)"
     );
+    // Only the first: the far card casts a slab, into it and out of it.
+    let whole = turns_of("far-first-cascade-only", &far(false), 1);
+    assert!(whole <= 2, "holes past the near cascades ({whole} turns)");
+    // The near card is in the first cascade and keeps its stripes.
+    let near = turns_of("near-first-cascade-only", &striped_shadow(false, false), 1);
+    assert!(near >= 6, "a slab in the near cascade ({near} turns)");
+    // A hair card's strands are cast from any distance.
+    let hair = turns_of("far-hair-first-cascade-only", &far(true), 1);
+    assert!(hair >= 6, "a far hair card casts a slab ({hair} turns)");
+}
+
+/// The striped card's scene with the card a painted plant 6.5 studs from
+/// the camera (`cull_distance` 13, half of it away), drawn with `graphics`
+/// and plants' shadows reaching `reach` of their cull distance, thinning
+/// over `fade` of it: the mean light (linear, 0 to 1) on the wall where
+/// the card's shadow falls.
+fn plant_shadow(
+    (device, queue): (&wgpu::Device, &wgpu::Queue),
+    graphics: &GraphicsSettings,
+    (reach, fade): (f32, f32),
+) -> f32 {
+    let size = 256;
+    let mut list = striped_shadow(false, false);
+    list.items[1].cull_distance = 13.0;
+    list.shadows.softness = 0.2;
+    let mut renderer = TextureRenderer::new(device, queue, size, size);
+    renderer.set_graphics(graphics);
+    renderer.scene.lods.shadows = crate::renderer::lod::ShadowReach { reach, fade };
+    for _ in 0..4 {
+        renderer.render(&list).unwrap();
+    }
+    let pixels = renderer.read_pixels();
+    evidence(
+        &format!(
+            "plant-shadow-reach-{reach}-fade-{fade}-rays-{}",
+            graphics.ray_traced_shadows.is_some()
+        ),
+        &pixels,
+        size,
+        size,
+    );
+    // The rows through the card's shadow, left of the middle.
+    let rows = size / 2 - 20..size / 2 + 20;
+    let count = (rows.len() as u32 * size / 2) as f32;
+    rows.flat_map(|y| (0..size / 2).map(move |x| (x, y)))
+        .map(|(x, y)| (rgb_at(&pixels, size, x, y)[0] / 255.0).powf(2.2))
+        .sum::<f32>()
+        / count
+}
+
+/// A painted plant casts no shadow past a share of its cull distance
+/// (`renderer/lod.rs`). Its shadow must not go all at once: as the camera
+/// moves, every plant crossing that line would pop its shadow on or off.
+/// Over the band before the line the shadow thins out, in the shadow maps
+/// (texels left out by a pattern, averaged by the filter) and ray traced
+/// (rays let through, pixel by pixel).
+#[test]
+fn a_plants_shadow_thins_out_before_the_end_of_its_reach() {
+    let maps = GraphicsSettings {
+        shadow_quality: Some(crate::ShadowQuality::High),
+        anti_aliasing: Some(AntiAliasing::Off),
+        ..GraphicsSettings::default()
+    };
+    let rays = GraphicsSettings {
+        shadow_quality: Some(crate::ShadowQuality::Off),
+        ray_traced_shadows: Some(crate::RayTracedShadows::Low),
+        anti_aliasing: Some(AntiAliasing::Off),
+        ..GraphicsSettings::default()
+    };
+    let check = |name: &str, device: &(wgpu::Device, wgpu::Queue), graphics: &GraphicsSettings| {
+        let device = (&device.0, &device.1);
+        // The plant is half of its cull distance away: well inside a reach
+        // of 0.9, half way through a fade from 0.4 to 0.6, past a reach of
+        // 0.4.
+        let whole = plant_shadow(device, graphics, (0.9, 0.2));
+        let half = plant_shadow(device, graphics, (0.6, 0.2));
+        let none = plant_shadow(device, graphics, (0.4, 0.2));
+        eprintln!("{name}: whole {whole:.3}, half {half:.3}, none {none:.3}");
+        assert!(
+            none - whole > 0.02,
+            "{name}: a shadow falls: {whole} to {none}"
+        );
+        let share = (none - half) / (none - whole);
+        assert!(
+            (0.35..=0.65).contains(&share),
+            "{name}: half way through its fade the shadow is {share} of itself"
+        );
+    };
+    match test_device() {
+        Some(device) => check("shadow maps", &device, &maps),
+        None => eprintln!("skipped: no graphics adapter on this machine"),
+    }
+    match ray_test_device() {
+        Some(device) => check("ray traced", &device, &rays),
+        None => eprintln!("skipped: no GPU with hardware ray tracing on this machine"),
+    }
 }
 
 /// A cut-out whose texture is tiled by its size (`uv_tile`, every textured

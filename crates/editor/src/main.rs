@@ -135,6 +135,20 @@ fn window_icon() -> egui::IconData {
     })
 }
 
+/// The window's size at launch: 1280 × 800, or `AXCENITY_WINDOW_SIZE=WxH`
+/// for a timed run at someone's own window and panel layout
+/// (`docs/benchmarks.md`).
+fn window_size() -> [f32; 2] {
+    std::env::var("AXCENITY_WINDOW_SIZE")
+        .ok()
+        .and_then(|text| {
+            let (width, height) = text.split_once('x')?;
+            Some([width.trim().parse().ok()?, height.trim().parse().ok()?])
+        })
+        .filter(|[width, height]: &[f32; 2]| *width >= 800.0 && *height >= 500.0)
+        .unwrap_or([1280.0, 800.0])
+}
+
 /// eframe's GPU setup, plus timestamps where the GPU can take them, so the
 /// Profiler can show the viewport's GPU time (the player never asks for
 /// those), and BC7 for cooked textures.
@@ -318,7 +332,7 @@ fn main() -> eframe::Result {
                 // a launch ends as soon as the window appears, instead of
                 // spinning until the desktop gives up.
                 .with_app_id(DESKTOP_ID)
-                .with_inner_size([1280.0, 800.0])
+                .with_inner_size(window_size())
                 .with_min_inner_size([800.0, 500.0])
                 .with_icon(window_icon()),
         ),

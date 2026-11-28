@@ -92,7 +92,7 @@ How many studs of water light crosses before only about a third of what's under 
 Terrain.WaveHeight: number
 ```
 
-How high the biggest wave rises above the water's surface at rest, in studs.
+How high the biggest wave rises above the water's surface at rest, in studs. With more WaveVariation the waves share it more evenly, and they calm where the water is shallow.
 
 #### WaveLength
 

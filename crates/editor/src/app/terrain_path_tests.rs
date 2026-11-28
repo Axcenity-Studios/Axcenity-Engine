@@ -156,6 +156,7 @@ fn apply_paints_a_ragged_shoulder_and_clears_painted_foliage_as_one_step() {
                 yaw: 0.0,
                 scale: 1.0,
                 collide: false,
+                shadow: true,
                 lean: 0.0,
                 sink: 0.0,
             });

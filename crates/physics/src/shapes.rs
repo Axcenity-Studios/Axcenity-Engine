@@ -107,7 +107,7 @@ impl PartialEq for TerrainShape {
     fn eq(&self, other: &Self) -> bool {
         self.data.uid() == other.data.uid()
             && self.data.revision() == other.data.revision()
-            && self.data.generated_version() == other.data.generated_version()
+            && self.data.generated_collide_version() == other.data.generated_collide_version()
             && self.foliage_models == other.foliage_models
     }
 }

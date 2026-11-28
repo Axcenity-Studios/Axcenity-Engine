@@ -6,9 +6,13 @@
 //! pass writes a timestamp before each [`FramePass`] and one after the
 //! last, so each part's time runs from its stamp to the next. (A part such
 //! as the shadows or bloom is many render passes, so stamping between parts
-//! times them whole.) The results are copied into a buffer that's read once
-//! the GPU is done with it, a frame or two later, so measuring never makes
-//! the CPU wait for the GPU.
+//! times them whole.) The results are copied into one of a few buffers
+//! ([`READBACKS`]), each read once the GPU is done with it, a frame or two
+//! later, so measuring never makes the CPU wait for the GPU and every frame
+//! is timed. (With one buffer only every other frame was, always of the
+//! same parity: in a scene whose far cascades take turns, one run read only
+//! the frames drawing cascade 3 and another only those drawing cascade 4,
+//! 5 ms apart in Overgrown Street.)
 //!
 //! Within the depth prepass and the scene pass, which are one render pass
 //! each, the time is also taken by what is drawn ([`DrawnPart`]): the
@@ -44,6 +48,9 @@ pub enum FramePass {
     RayTracedGi,
     /// Ray traced reflections' rays, while they're on.
     RayTracedReflections,
+    /// Screen-space reflections' rays, while they're on (and ray traced
+    /// ones aren't).
+    ScreenReflections,
     /// The volumetric fog's grid, while it's on (its light is added to the
     /// scene as part of `Scene`).
     VolumetricFog,
@@ -61,7 +68,7 @@ pub enum FramePass {
 }
 
 impl FramePass {
-    pub const COUNT: usize = 14;
+    pub const COUNT: usize = 15;
     pub const ALL: [FramePass; Self::COUNT] = [
         FramePass::CharacterPosing,
         FramePass::AccelerationStructures,
@@ -71,6 +78,7 @@ impl FramePass {
         FramePass::RayTracedShadows,
         FramePass::RayTracedGi,
         FramePass::RayTracedReflections,
+        FramePass::ScreenReflections,
         FramePass::VolumetricFog,
         FramePass::Particles,
         FramePass::Clouds,
@@ -89,6 +97,7 @@ impl FramePass {
             FramePass::RayTracedShadows => "Ray traced shadows",
             FramePass::RayTracedGi => "Ray traced GI",
             FramePass::RayTracedReflections => "Ray traced reflections",
+            FramePass::ScreenReflections => "Screen-space reflections",
             FramePass::VolumetricFog => "Volumetric fog",
             FramePass::Particles => "GPU particles",
             FramePass::Clouds => "Clouds",
@@ -229,6 +238,10 @@ struct PartStamps {
     overflowed: Cell<bool>,
 }
 
+/// How many frames' results can be on their way back at once: the GPU is
+/// at most a frame or two behind, so this times every frame.
+const READBACKS: usize = 4;
+
 /// What became of the last request to read the results.
 const PENDING: u8 = 0;
 const MAPPED: u8 = 1;
@@ -242,22 +255,32 @@ struct Waiting {
     parts: Vec<Option<(PartPass, DrawnPart)>>,
 }
 
+/// A buffer the CPU reads one frame's results from.
+struct Readback {
+    /// A copy of the resolved queries the CPU can read.
+    buffer: wgpu::Buffer,
+    /// [`PENDING`], [`MAPPED`] or [`FAILED`]: set by the map callback, on
+    /// whichever thread polls the device.
+    mapped: Arc<AtomicU8>,
+    /// While its frame is on its way back: which passes that frame drew.
+    waiting: Option<Waiting>,
+}
+
 pub(super) struct GpuTimer {
+    /// Written again each frame: the queue runs in order, so a frame's
+    /// stamps are resolved before the next frame writes them.
     queries: wgpu::QuerySet,
     /// The stamps between draws, where the device can write them.
     parts: Option<PartStamps>,
     /// Where the queries are resolved on the GPU.
     resolve: wgpu::Buffer,
-    /// A copy of `resolve` the CPU can read.
-    readback: wgpu::Buffer,
+    /// [`READBACKS`] copies of `resolve`, used in turn: `in_flight` of
+    /// them from `first` on wait to be read, oldest first.
+    readbacks: Vec<Readback>,
+    first: usize,
+    in_flight: usize,
     /// Nanoseconds per timestamp tick.
     period: f64,
-    /// While waiting for `readback` to be read: which passes that frame
-    /// drew. No new frame is timed meanwhile, since the buffer is in use.
-    waiting: Option<Waiting>,
-    /// [`PENDING`], [`MAPPED`] or [`FAILED`]: set by the map callback, on
-    /// whichever thread polls the device.
-    mapped: Arc<AtomicU8>,
     /// The last frame measured, whole.
     last: Option<Duration>,
     /// Its passes, `None` for any it didn't draw.
@@ -313,13 +336,19 @@ impl GpuTimer {
                 "frame timestamps resolve",
                 wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
             ),
-            readback: buffer(
-                "frame timestamps readback",
-                wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            ),
+            readbacks: (0..READBACKS)
+                .map(|_| Readback {
+                    buffer: buffer(
+                        "frame timestamps readback",
+                        wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                    ),
+                    mapped: Arc::new(AtomicU8::new(PENDING)),
+                    waiting: None,
+                })
+                .collect(),
+            first: 0,
+            in_flight: 0,
             period: f64::from(queue.get_timestamp_period()),
-            waiting: None,
-            mapped: Arc::new(AtomicU8::new(PENDING)),
             last: None,
             last_passes: [None; FramePass::COUNT],
             last_cascades: [None; CASCADES],
@@ -354,90 +383,99 @@ impl GpuTimer {
         self.readings
     }
 
-    /// Reads a finished measurement, if one is ready. Returns true if this
-    /// frame can be timed (call [`Self::mark`] before each pass, then
-    /// [`Self::end`]).
+    /// Reads the oldest measurement on its way back, if it's ready: one a
+    /// frame, so a reader that looks each frame sees every frame's time.
+    /// Returns true if this frame can be timed (call [`Self::mark`] before
+    /// each pass, then [`Self::end`]).
     pub(super) fn collect(&mut self, device: &wgpu::Device) -> bool {
-        let Some(Waiting {
+        if self.in_flight > 0 {
+            // Runs the map callbacks of what the GPU has finished, without
+            // waiting.
+            let _ = device.poll(wgpu::PollType::Poll);
+            let oldest = &mut self.readbacks[self.first];
+            let state = oldest.mapped.swap(PENDING, Ordering::AcqRel);
+            if state != PENDING {
+                let waiting = oldest.waiting.take();
+                // A lost device (`FAILED`) gives no reading.
+                if state == MAPPED
+                    && let Some(waiting) = waiting
+                {
+                    self.read(self.first, waiting);
+                }
+                self.first = (self.first + 1) % READBACKS;
+                self.in_flight -= 1;
+            }
+        }
+        self.in_flight < READBACKS
+    }
+
+    /// The readback the frame being timed is copied into.
+    fn next_readback(&self) -> usize {
+        (self.first + self.in_flight) % READBACKS
+    }
+
+    /// Takes the times out of mapped readback `index`, which holds the
+    /// frame `waiting` describes.
+    fn read(&mut self, index: usize, waiting: Waiting) {
+        let Waiting {
             drawn,
             cascades,
             parts,
-        }) = self.waiting.take()
-        else {
-            return true;
+        } = waiting;
+        let readback = &self.readbacks[index].buffer;
+        let bytes = readback
+            .slice(..)
+            .get_mapped_range()
+            .expect("the buffer is mapped");
+        let stamps: [u64; STAMPS as usize] =
+            bytemuck::pod_read_unaligned(&bytes[..RESULT_BYTES as usize]);
+        let part_stamps: Vec<u64> = bytes[PART_OFFSET as usize..]
+            .chunks_exact(size_of::<u64>())
+            .take(parts.len())
+            .map(bytemuck::pod_read_unaligned)
+            .collect();
+        drop(bytes);
+        readback.unmap();
+        let between = |start: u64, end: u64| {
+            // A clock that went backwards (some drivers, across
+            // power states) gives no reading rather than a wrong one.
+            (end >= start)
+                .then(|| Duration::from_nanos(((end - start) as f64 * self.period) as u64))
         };
-        // Runs the map callback if the GPU has finished, without waiting.
-        let _ = device.poll(wgpu::PollType::Poll);
-        match self.mapped.swap(PENDING, Ordering::AcqRel) {
-            PENDING => {
-                self.waiting = Some(Waiting {
-                    drawn,
-                    cascades,
-                    parts,
-                });
-                return false;
+        if let Some(whole) = between(stamps[0], stamps[FRAME_END as usize]) {
+            self.last = Some(whole);
+            self.readings += 1;
+            for (index, time) in self.last_passes.iter_mut().enumerate() {
+                *time = drawn[index]
+                    .then(|| between(stamps[index], stamps[index + 1]))
+                    .flatten();
             }
-            MAPPED => {
-                let bytes = self
-                    .readback
-                    .slice(..)
-                    .get_mapped_range()
-                    .expect("the buffer is mapped");
-                let stamps: [u64; STAMPS as usize] =
-                    bytemuck::pod_read_unaligned(&bytes[..RESULT_BYTES as usize]);
-                let part_stamps: Vec<u64> = bytes[PART_OFFSET as usize..]
-                    .chunks_exact(size_of::<u64>())
-                    .take(parts.len())
-                    .map(bytemuck::pod_read_unaligned)
-                    .collect();
-                drop(bytes);
-                self.readback.unmap();
-                let between = |start: u64, end: u64| {
-                    // A clock that went backwards (some drivers, across
-                    // power states) gives no reading rather than a wrong one.
-                    (end >= start)
-                        .then(|| Duration::from_nanos(((end - start) as f64 * self.period) as u64))
+            // Each drawn cascade runs to the next drawn one's stamp,
+            // or to the stamp after the last.
+            let stamp = |cascade: usize| stamps[CASCADE_STAMPS as usize + cascade];
+            for index in 0..CASCADES {
+                let end = (index + 1..CASCADES)
+                    .find(|&next| cascades[next])
+                    .unwrap_or(CASCADES);
+                self.last_cascades[index] = cascades[index]
+                    .then(|| between(stamp(index), stamp(end)))
+                    .flatten();
+            }
+            // Each stamp between draws starts a part that runs to
+            // the next stamp; a part drawn in several runs (once a
+            // distance band) is their sum.
+            self.last_parts = PartTimes::default();
+            for (index, started) in parts.iter().enumerate() {
+                let (Some((pass, part)), Some(&end)) = (*started, part_stamps.get(index + 1))
+                else {
+                    continue;
                 };
-                if let Some(whole) = between(stamps[0], stamps[FRAME_END as usize]) {
-                    self.last = Some(whole);
-                    self.readings += 1;
-                    for (index, time) in self.last_passes.iter_mut().enumerate() {
-                        *time = drawn[index]
-                            .then(|| between(stamps[index], stamps[index + 1]))
-                            .flatten();
-                    }
-                    // Each drawn cascade runs to the next drawn one's stamp,
-                    // or to the stamp after the last.
-                    let stamp = |cascade: usize| stamps[CASCADE_STAMPS as usize + cascade];
-                    for index in 0..CASCADES {
-                        let end = (index + 1..CASCADES)
-                            .find(|&next| cascades[next])
-                            .unwrap_or(CASCADES);
-                        self.last_cascades[index] = cascades[index]
-                            .then(|| between(stamp(index), stamp(end)))
-                            .flatten();
-                    }
-                    // Each stamp between draws starts a part that runs to
-                    // the next stamp; a part drawn in several runs (once a
-                    // distance band) is their sum.
-                    self.last_parts = PartTimes::default();
-                    for (index, started) in parts.iter().enumerate() {
-                        let (Some((pass, part)), Some(&end)) =
-                            (*started, part_stamps.get(index + 1))
-                        else {
-                            continue;
-                        };
-                        if let Some(time) = between(part_stamps[index], end) {
-                            *self.last_parts[pass as usize][part as usize]
-                                .get_or_insert(Duration::ZERO) += time;
-                        }
-                    }
+                if let Some(time) = between(part_stamps[index], end) {
+                    *self.last_parts[pass as usize][part as usize].get_or_insert(Duration::ZERO) +=
+                        time;
                 }
             }
-            // The device was lost; the next frame tries again.
-            _ => {}
         }
-        true
     }
 
     /// Writes the timestamp before `pass`.
@@ -487,7 +525,7 @@ impl GpuTimer {
         encoder.copy_buffer_to_buffer(
             &self.resolve,
             0,
-            &self.readback,
+            &self.readbacks[self.next_readback()].buffer,
             0,
             PART_OFFSET + PART_BYTES,
         );
@@ -500,8 +538,10 @@ impl GpuTimer {
         drawn: [bool; FramePass::COUNT],
         cascades: [bool; CASCADES],
     ) {
-        let mapped = self.mapped.clone();
-        self.readback
+        let index = self.next_readback();
+        let mapped = self.readbacks[index].mapped.clone();
+        self.readbacks[index]
+            .buffer
             .slice(..)
             .map_async(wgpu::MapMode::Read, move |result| {
                 let state = if result.is_ok() { MAPPED } else { FAILED };
@@ -517,11 +557,12 @@ impl GpuTimer {
                 written
             }
         });
-        self.waiting = Some(Waiting {
+        self.readbacks[index].waiting = Some(Waiting {
             drawn,
             cascades,
             parts,
         });
+        self.in_flight += 1;
     }
 
     /// An empty compute pass that only writes timestamp `index`.

@@ -142,6 +142,164 @@ fn height_fog_hides_far_parts_and_thins_above_its_height() {
     );
 }
 
+/// An Atmosphere's exponential height fog as creators shape it: a start
+/// distance keeps the foreground exactly as it was, and a short falloff
+/// keeps the fog low while what's up high clears.
+#[test]
+fn height_fog_starts_at_its_start_distance_and_keeps_low_by_its_falloff() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let near = Vec3::new(-4.0, 0.0, -18.0);
+    let far = Vec3::new(4.0, 0.0, -80.0);
+    let mut list = list_of(vec![
+        red_block(near, Vec3::splat(3.0)),
+        red_block(far, Vec3::splat(12.0)),
+    ]);
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    renderer.render(&list).unwrap();
+    let clear = renderer.read_pixels();
+    let fog = Fog {
+        color: Some([0.0, 1.0, 0.0]),
+        density: 0.03,
+        height: 0.0,
+        falloff: 50.0,
+        ..Fog::default()
+    };
+    list.fog = fog;
+    renderer.render(&list).unwrap();
+    let from_camera = renderer.read_pixels();
+    list.fog.height_start = 30.0;
+    renderer.render(&list).unwrap();
+    let started = renderer.read_pixels();
+
+    let clear_near = pixel_at(&clear, screen_of(&list, near));
+    let [fogged_red, fogged_green, ..] = pixel_at(&from_camera, screen_of(&list, near));
+    assert!(
+        fogged_green > 80,
+        "from the camera, 18 studs of it shows: {fogged_red} {fogged_green}"
+    );
+    assert_eq!(
+        pixel_at(&started, screen_of(&list, near)),
+        clear_near,
+        "nearer than the start is exactly as without fog"
+    );
+    // 80 studs away the fog takes 50 studs' worth with the start (78% lost)
+    // in place of 80 (91%).
+    let [r0, g0, ..] = pixel_at(&from_camera, screen_of(&list, far)).map(u16::from);
+    let [r1, g1, ..] = pixel_at(&started, screen_of(&list, far)).map(u16::from);
+    assert!(g1 > 180, "past the start it fogs: {r1} {g1}");
+    assert!(
+        r1 > r0 + 20 && g1 < g0,
+        "less of it with the start: {r1} {g1} vs {r0} {g0}"
+    );
+
+    // As far away, a block at the fog's height and one 24 studs up: a short
+    // falloff leaves the low one as fogged and clears the high one.
+    let low = Vec3::new(-12.0, 0.0, -60.0);
+    let high = Vec3::new(12.0, 24.0, -60.0);
+    let mut list = list_of(vec![
+        red_block(low, Vec3::splat(8.0)),
+        red_block(high, Vec3::splat(8.0)),
+    ]);
+    list.camera.look_at = Vec3::new(0.0, 12.0, -60.0);
+    list.fog = Fog {
+        density: 0.02,
+        ..fog
+    };
+    let shown = |renderer: &mut TextureRenderer, list: &DrawList, falloff| {
+        let mut list = list.clone();
+        list.fog.falloff = falloff;
+        renderer.render(&list).unwrap();
+        let pixels = renderer.read_pixels();
+        [low, high].map(|point| pixel_at(&pixels, screen_of(&list, point)).map(u16::from))
+    };
+    let [wide_low, wide_high] = shown(&mut renderer, &list, 50.0);
+    let [short_low, short_high] = shown(&mut renderer, &list, 6.0);
+    assert!(
+        wide_low[1] > 150 && short_low[1] > 150,
+        "low down it's thick either way: {wide_low:?} {short_low:?}"
+    );
+    assert!(
+        short_high[0] > wide_high[0] + 40 && short_high[1] + 40 < wide_high[1],
+        "a short falloff clears what's up high: {short_high:?} vs {wide_high:?}"
+    );
+    assert!(
+        short_high[0] > short_low[0] + 60,
+        "thicker low than high: {short_high:?} vs {short_low:?}"
+    );
+}
+
+/// With volumetric fog on, the grid scatters the height fog's own light and
+/// the sun's within its reach; with a start distance and a short falloff it
+/// must agree with the surfaces' own fog (volumetric fog off) in open air.
+#[test]
+fn shaped_height_fog_looks_the_same_with_or_without_volumetric_fog() {
+    let Some((device, queue)) = test_device() else {
+        eprintln!("skipped: no graphics adapter on this machine");
+        return;
+    };
+    let points = [
+        Vec3::new(-6.0, 0.0, -15.0),
+        Vec3::new(6.0, 0.0, -60.0),
+        Vec3::new(-25.0, 2.0, -150.0),
+        Vec3::new(30.0, 20.0, -120.0),
+    ];
+    let items = points
+        .iter()
+        .enumerate()
+        .map(|(i, &at)| {
+            let mut block = red_block(at, Vec3::splat(2.0 + 4.0 * i as f32));
+            block.material.emissive = [0.0; 3];
+            block
+        })
+        .collect();
+    let mut list = list_of(items);
+    list.camera.look_at = Vec3::new(0.0, 3.0, -60.0);
+    // High ahead: low, each block would shadow the air in front of it,
+    // which only the volumetric fog shows.
+    list.sun.direction = Vec3::new(0.0, 1.0, -0.3);
+    list.fog = Fog {
+        color: Some([0.5, 0.55, 0.6]),
+        density: 0.015,
+        height: -2.0,
+        falloff: 12.0,
+        height_start: 25.0,
+        sun_scattering: 0.8,
+        forward_scattering: 0.6,
+        ..Fog::default()
+    };
+    let mut renderer = TextureRenderer::new(&device, &queue, SIZE, SIZE);
+    renderer.set_graphics(&ultra(true));
+    renderer.render(&list).unwrap();
+    assert_eq!(renderer.scene.volumetric_fogs_alive(), 1);
+    let on = renderer.read_pixels();
+    renderer.set_graphics(&ultra(false));
+    renderer.render(&list).unwrap();
+    let off = renderer.read_pixels();
+    let [near_on, near_off] =
+        [&on, &off].map(|pixels| pixel_at(pixels, screen_of(&list, points[0])));
+    assert!(
+        near_on[..3].iter().chain(&near_off[..3]).all(|&c| c <= 3),
+        "nearer than the start stays black: {near_on:?} {near_off:?}"
+    );
+    let far_off = pixel_at(&off, screen_of(&list, points[2]));
+    assert!(far_off[1] > 40, "far away it fogs: {far_off:?}");
+    for point in points {
+        let (a, b) = (
+            pixel_at(&on, screen_of(&list, point)),
+            pixel_at(&off, screen_of(&list, point)),
+        );
+        for channel in 0..3 {
+            assert!(
+                a[channel].abs_diff(b[channel]) <= 8,
+                "at {point}: {a:?} with volumetric fog, {b:?} without"
+            );
+        }
+    }
+}
+
 /// Black air full of fog that scatters only the sun's light, with the sun
 /// low ahead of the camera, and a black wall over the left half of the
 /// view that shadows the air in front of it.

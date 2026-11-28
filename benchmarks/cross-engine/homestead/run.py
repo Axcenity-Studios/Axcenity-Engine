@@ -9,6 +9,8 @@ views, window size, frame count and CPU cores, one run at a time.
            [--unity-set clouds=0,...]   (one feature off in Unity, for ablate.sh)
            [--unity-size 2560x1405]     (GNOME gives a window asked to be 2560x1440
                                          2560 x 1405; Unity draws the size it is told)
+           [--unity-player windows]     (the DirectX 12 player with HDRP's ray tracing,
+                                         through Proton: README.md, "Ray tracing")
 
 Each still view is the tour's camera at one moment of a shot (VIEWS). The
 tour is the sequence's first 61 seconds, the daytime shots, at a sixtieth
@@ -34,6 +36,11 @@ ENGINE = HERE.parents[2]
 WORK = ENGINE / "target/cross-engine/homestead"
 UNITY_PROJECT = Path(os.environ.get("HOMESTEAD_UNITY", Path.home() / "Projects/Unity Projects/Desert Homestead HDRP"))
 UNITY_PLAYER = UNITY_PROJECT / "Build/DesertHomesteadHDRP.x86_64"
+UNITY_WINDOWS_PLAYER = UNITY_PROJECT / "Build-Windows/DesertHomesteadHDRP.exe"
+# GE-Proton (Wine with vkd3d-proton, which turns DirectX 12's ray tracing
+# into Vulkan's) and the prefix the Windows player runs in.
+PROTON_HOME = Path(os.environ.get("HOMESTEAD_PROTON_HOME", Path.home() / ".local/share/proton-ge"))
+PROTON = Path(os.environ.get("HOMESTEAD_PROTON", PROTON_HOME / "GE-Proton11-14-x86_64/proton"))
 AXCENITY_PLAYER = ENGINE / "target/release/axcenity-player"
 # HOMESTEAD_STILL names another copy of the standing-still project, to time
 # a change to the world (no clouds, no wind) the same way.
@@ -65,9 +72,12 @@ def look_of(row):
 class Sensors(threading.Thread):
     """Reads the card and the process five times a second."""
 
-    def __init__(self, pid):
+    def __init__(self, pid, find=None):
         super().__init__(daemon=True)
         self.pid = pid
+        # Through Proton the launched process is a wrapper: the player is
+        # found by its command line, and its own numbers are read.
+        self.find = find
         self.samples = []
         self.stop = threading.Event()
         hwmon = sorted((CARD / "hwmon").glob("hwmon*"))
@@ -97,8 +107,27 @@ class Sensors(threading.Thread):
             return None
         return total if seen else None
 
+    def follow(self):
+        best = None
+        for entry in Path("/proc").iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+                if self.find not in command or "proton run" in command:
+                    continue
+                rss = int((entry / "statm").read_text().split()[1])
+            except (OSError, IndexError, ValueError):
+                continue
+            if best is None or rss > best[1]:
+                best = (int(entry.name), rss)
+        if best:
+            self.pid = best[0]
+
     def run(self):
         while not self.stop.is_set():
+            if self.find:
+                self.follow()
             sample = {"t": time.time()}
             sample["gpu_busy"] = self.number(CARD / "gpu_busy_percent")
             vram = self.number(CARD / "mem_info_vram_used")
@@ -136,13 +165,13 @@ class Sensors(threading.Thread):
         return out
 
 
-def launch(command, env, log):
+def launch(command, env, log, find=None):
     """Runs one benchmark pinned to CORES with the sensors read beside it."""
     full_env = dict(os.environ, **env)
     with open(log, "w") as out:
         started = time.time()
         process = subprocess.Popen(["taskset", "-c", CORES, *map(str, command)], stdout=out, stderr=subprocess.STDOUT, env=full_env)
-        sensors = Sensors(process.pid)
+        sensors = Sensors(process.pid, find)
         sensors.start()
         try:
             process.wait(timeout=900)
@@ -227,17 +256,26 @@ def axcenity_run(name, project, frames, size, graphics, out):
     return record, per_frame
 
 
-def unity_run(name, view_args, frames, size, out, shot=None, settings=""):
+def unity_run(name, view_args, frames, size, out, shot=None, settings="", player="linux"):
     result_file = out / f"{name}.unity.json"
     log = out / f"{name}.log"
-    command = [UNITY_PLAYER, "-logFile", log.with_suffix(".player.log"), "-hs-out", result_file, "-hs-size", size,
+    windows = player == "windows"
+    # Wine sees the Linux file system as drive Z:.
+    path = (lambda p: "Z:" + str(p).replace("/", "\\")) if windows else str
+    command = ["-logFile", path(log.with_suffix(".player.log")), "-hs-out", path(result_file), "-hs-size", size,
                "-hs-frames", frames, *view_args]
     if shot:
-        command += ["-hs-shot", shot]
+        command += ["-hs-shot", path(shot)]
     if settings:
         command += ["-hs-set", settings]
-    # A Wayland window like the engine's own; Unity opens an X11 one otherwise.
-    _, sensors = launch(command, {"SDL_VIDEODRIVER": "wayland"}, log)
+    if windows:
+        PROTON_HOME.joinpath("prefix-homestead").mkdir(parents=True, exist_ok=True)
+        env = {"STEAM_COMPAT_DATA_PATH": str(PROTON_HOME / "prefix-homestead"),
+               "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(PROTON_HOME)}
+        _, sensors = launch([PROTON, "run", UNITY_WINDOWS_PLAYER, *command], env, log, find=UNITY_WINDOWS_PLAYER.name)
+    else:
+        # A Wayland window like the engine's own; Unity opens an X11 one otherwise.
+        _, sensors = launch([UNITY_PLAYER, *command], {"SDL_VIDEODRIVER": "wayland"}, log)
     result = json.loads(result_file.read_text())
     times = result.pop("frame_ms")
     start = result["measure_start_unix"]
@@ -246,6 +284,9 @@ def unity_run(name, view_args, frames, size, out, shot=None, settings=""):
         "version": result["version"],
         "graphics_api": result["graphics_api"],
         "ray_tracing_supported": result["ray_tracing_supported"],
+        "hdrp_ray_tracing": result.get("hdrp_ray_tracing"),
+        "ray_traced": result.get("ray_traced"),
+        "player": player,
         "drawn_at": result["drawn_at"],
         **frame_stats(times),
         "cpu_main_thread_ms": result.get("cpu_main_thread_ms"),
@@ -293,6 +334,8 @@ def main():
     parser.add_argument("--shots", action="store_true")
     parser.add_argument("--unity-set", default="", help="look changes for Unity's runs (HomesteadBench.Set)")
     parser.add_argument("--unity-size", default="", help="Unity's size, where the desktop gives Axcenity's window another")
+    parser.add_argument("--unity-player", default="linux", choices=["linux", "windows"],
+                        help="windows: the DirectX 12 player (HDRP's ray tracing) through Proton")
     args = parser.parse_args()
 
     out = WORK / "runs" / f"{args.label}-{args.size}"
@@ -323,11 +366,13 @@ def main():
                         record, per_frame = axcenity_run(label, still_project(name, row), args.frames, args.size, args.graphics, out)
                 else:
                     if row is None:
-                        record, per_frame = unity_run(label, ["-hs-tour", TOUR_SECONDS], 0, args.unity_size or args.size, out, settings=args.unity_set)
+                        record, per_frame = unity_run(label, ["-hs-tour", TOUR_SECONDS], 0, args.unity_size or args.size, out,
+                                                      settings=args.unity_set, player=args.unity_player)
                     else:
                         view = ",".join(str(row[key]) for key in ("x", "y", "z", "pitch", "yaw", "fov"))
                         shot = out / f"{name}-unity.png" if args.shots and run == 1 else None
-                        record, per_frame = unity_run(label, ["-hs-view", view], args.frames, args.unity_size or args.size, out, shot, args.unity_set)
+                        record, per_frame = unity_run(label, ["-hs-view", view], args.frames, args.unity_size or args.size, out, shot,
+                                                      args.unity_set, args.unity_player)
                 record.update({"view": name, "run": run, "size_asked": args.size, "cores": CORES, "label": args.label})
                 target.write_text(json.dumps(record, indent=1))
                 (out / f"{label}.frames.json").write_text(json.dumps(per_frame))

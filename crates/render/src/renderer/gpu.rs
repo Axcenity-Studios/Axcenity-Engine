@@ -158,6 +158,9 @@ pub(super) const RAY_REFLECTIONS_SHADER: &str = concat!(
     include_str!("../ray_cut_outs.wgsl"),
     include_str!("../ray_reflections.wgsl")
 );
+/// Screen-space reflections' pass (`screen_reflections.wgsl`,
+/// renderer/screen_reflections.rs), on its own.
+pub(super) const SCREEN_REFLECTIONS_SHADER: &str = include_str!("../screen_reflections.wgsl");
 /// Ray traced GI's pass traced in software (RL3, renderer/ray_soft.rs) on
 /// a GPU without ray queries: the same, with its rays walking
 /// `ray_soft.wgsl`'s BVHs.
@@ -423,6 +426,24 @@ pub(super) fn create_shadow_views(
     size: u32,
     layers: u32,
 ) -> (wgpu::TextureView, Vec<wgpu::TextureView>) {
+    let (_, array, layers) = create_shadow_layers(device, label, (size, layers), false);
+    (array, layers)
+}
+
+/// [`create_shadow_views`]' texture with its views, and with `copies`
+/// one whose layers can be copied to and from (a lamp's map and its kept
+/// still casters, renderer/lamp_shadows.rs).
+pub(super) fn create_shadow_layers(
+    device: &wgpu::Device,
+    label: &str,
+    (size, layers): (u32, u32),
+    copies: bool,
+) -> (wgpu::Texture, wgpu::TextureView, Vec<wgpu::TextureView>) {
+    let copy = if copies {
+        wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST
+    } else {
+        wgpu::TextureUsages::empty()
+    };
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
         size: wgpu::Extent3d {
@@ -434,7 +455,7 @@ pub(super) fn create_shadow_views(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: DEPTH_FORMAT,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING | copy,
         view_formats: &[],
     });
     let array = texture.create_view(&wgpu::TextureViewDescriptor {
@@ -453,7 +474,7 @@ pub(super) fn create_shadow_views(
             })
         })
         .collect();
-    (array, layers)
+    (texture, array, layers)
 }
 
 /// The frame's bindings (group 0 in lighting.wgsl): its uniform, lights,
@@ -624,6 +645,13 @@ pub(super) fn create_shadow_pipeline(
             format: wgpu::VertexFormat::Float32x4,
             offset: std::mem::offset_of!(InstanceRaw, surface) as u64,
             shader_location: 11,
+        },
+        // A caster's copy holds how much of its shadow it casts in the
+        // fade's place.
+        wgpu::VertexAttribute {
+            format: wgpu::VertexFormat::Float32x4,
+            offset: std::mem::offset_of!(InstanceRaw, emissive_fade) as u64,
+            shader_location: 10,
         },
     ];
     let mut instance_attributes = vec![
@@ -839,9 +867,27 @@ pub(super) fn upload_custom_mesh(
     skinning: &Skinning,
     source: &dyn MeshSource,
 ) -> Option<GpuMesh> {
+    upload_custom_mesh_with(device, bytes, skinning, source, true)
+}
+
+/// [`upload_custom_mesh`], with its snow skirt (`snow_caps.rs`) only when
+/// `with_skirt`: a renderer whose frames are shown makes it on a worker
+/// instead ([`super::snow_caps::Skirts`]) and adds it when it's ready, as
+/// for a mesh of 200,000 triangles it takes tens of milliseconds.
+pub(super) fn upload_custom_mesh_with(
+    device: &wgpu::Device,
+    bytes: &GpuBytes,
+    skinning: &Skinning,
+    source: &dyn MeshSource,
+    with_skirt: bool,
+) -> Option<GpuMesh> {
     let vertices = custom_vertices(source)?;
     let indices = source.indices();
-    let skirt = super::snow_caps::skirt(&vertices, indices);
+    let skirt = if with_skirt {
+        super::snow_caps::skirt(&vertices, indices)
+    } else {
+        Vec::new()
+    };
     let mut mesh = upload_buffers(
         device,
         bytes,
@@ -886,7 +932,7 @@ pub(super) fn update_custom_mesh(
 /// too, with no warning: there is nothing of it to draw (a part of a
 /// garment that lies wholly under another one has its corners left and
 /// every triangle taken out).
-fn custom_vertices(source: &dyn MeshSource) -> Option<Vec<Vertex>> {
+pub(super) fn custom_vertices(source: &dyn MeshSource) -> Option<Vec<Vertex>> {
     let positions = source.positions();
     let normals = source.normals();
     let uvs = source.uvs();
@@ -923,6 +969,15 @@ fn vertex_bounds(vertices: &[Vertex]) -> Bounds {
     Bounds::around(vertices.iter().map(|vertex| Vec3::from(vertex.position)))
 }
 
+/// A mesh's index buffer, as every pass and ray tracing read it.
+pub(super) fn index_buffer(device: &wgpu::Device, name: &str, indices: &[u8]) -> wgpu::Buffer {
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some(name),
+        contents: indices,
+        usage: wgpu::BufferUsages::INDEX | MESH_READ | super::ray_tracing::blas_input(device),
+    })
+}
+
 pub(super) fn upload_buffers(
     device: &wgpu::Device,
     bytes: &GpuBytes,
@@ -948,11 +1003,7 @@ pub(super) fn upload_buffers(
             | MESH_READ
             | super::ray_tracing::blas_input(device),
     });
-    let indices = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some(name),
-        contents: indices,
-        usage: wgpu::BufferUsages::INDEX | MESH_READ | super::ray_tracing::blas_input(device),
-    });
+    let indices = index_buffer(device, name, indices);
     GpuMesh {
         bounds: vertex_bounds(corners),
         _bytes: bytes.count(vertices.size() + indices.size()),
@@ -1182,9 +1233,12 @@ pub(super) fn create_material(
             ),
         ],
     });
+    // Every binding made gets a number of its own, never used again.
+    static MADE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     GpuMaterial {
         bind_group,
         _maps: maps,
+        serial: MADE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
     }
 }
 

@@ -73,6 +73,8 @@ pub struct Rule {
     pub rotation: Vec2,
     pub scale: Vec2,
     pub collide: bool,
+    /// Whether what it places casts a shadow (its `CastShadow`).
+    pub shadow: bool,
     /// The Biome (by its place among the terrain's biomes) it's inside, if any.
     pub biome: Option<usize>,
     /// 0 to 1: how far what it places leans with the slope (PW5).
@@ -158,6 +160,7 @@ impl Rule {
             rotation: pair("RotationRange", Vec2::new(0.0, 360.0)),
             scale: pair("ScaleRange", Vec2::new(0.85, 1.15)),
             collide: instance.property("CanCollide") == Some(&Value::Bool(true)),
+            shadow: instance.property("CastShadow") != Some(&Value::Bool(false)),
             biome: None,
             lean: number("AlignToSlope", 0.0).clamp(0.0, 1.0),
             sink: number("SinkDepth", 0.0).clamp(0.0, MAX_SINK),
@@ -330,6 +333,7 @@ pub fn chunk(rules: &[Rule], ground: &Ground, cx: usize, cz: usize) -> Vec<Folia
                     yaw: spot.yaw,
                     scale: spot.scale,
                     collide: rule.collide,
+                    shadow: rule.shadow,
                     lean: rule.lean,
                     sink: rule.sink * spot.scale,
                 });
@@ -625,7 +629,7 @@ impl TerrainScatter {
             self.seen.remove(&terrain);
             let any =
                 (0..chunks_z).any(|cz| (0..chunks_x).any(|cx| data.generated_key(cx, cz) != 0));
-            if any && let Some(data) = world.terrain_mut(terrain) {
+            if any && let Some(data) = world.terrain_generated_mut(terrain) {
                 data.clear_generated();
             }
             return 0;
@@ -738,7 +742,7 @@ impl TerrainScatter {
                 obstacles,
             };
             let results = make_chunks(&rules, &ground, &dirty);
-            if let Some(data) = world.terrain_mut(terrain) {
+            if let Some(data) = world.terrain_generated_mut(terrain) {
                 for ((cx, cz, key), instances) in dirty.into_iter().zip(results) {
                     data.set_generated(cx, cz, key, instances);
                 }

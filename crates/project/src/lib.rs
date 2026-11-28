@@ -277,6 +277,11 @@ pub struct Manifest {
     /// off; their `graphics.json` wins after the first start.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub ray_traced_by_default: bool,
+    /// The project's picture (`thumbnail.png`) is an image the person
+    /// chose, which saves leave alone; otherwise it's a picture of the
+    /// scene, taken again at each save.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub chosen_picture: bool,
 }
 
 fn default_show_splash() -> bool {
@@ -393,6 +398,16 @@ pub fn set_ray_traced_by_default(folder: &Path, on: bool) -> Result<(), SaveErro
     update_manifest(folder, "ray_traced_by_default", serde_json::Value::Bool(on))
 }
 
+/// Stores whether the project's picture is one the person chose
+/// (`Manifest::chosen_picture`). False takes the key out again.
+pub fn set_chosen_picture(folder: &Path, chosen: bool) -> Result<(), SaveError> {
+    if chosen {
+        update_manifest(folder, "chosen_picture", serde_json::Value::Bool(true))
+    } else {
+        remove_manifest_key(folder, "chosen_picture")
+    }
+}
+
 /// Stores how the player's loading screen goes.
 pub fn set_loading_screen(folder: &Path, loading: &LoadingScreen) -> Result<(), SaveError> {
     let value = serde_json::to_value(loading).expect("the loading screen settings are plain data");
@@ -404,6 +419,19 @@ pub(crate) fn update_manifest(
     folder: &Path,
     key: &str,
     value: serde_json::Value,
+) -> Result<(), SaveError> {
+    change_manifest(folder, key, Some(value))
+}
+
+/// Takes one key out of the manifest, keeping the rest as it was.
+fn remove_manifest_key(folder: &Path, key: &str) -> Result<(), SaveError> {
+    change_manifest(folder, key, None)
+}
+
+fn change_manifest(
+    folder: &Path,
+    key: &str,
+    value: Option<serde_json::Value>,
 ) -> Result<(), SaveError> {
     let path = folder.join(MANIFEST_FILE);
     let text = fs::read_to_string(&path).map_err(SaveError::new(&path))?;
@@ -419,7 +447,14 @@ pub(crate) fn update_manifest(
             "project manifest must be a JSON object",
         )));
     };
-    object.insert(key.to_owned(), value);
+    match value {
+        Some(value) => {
+            object.insert(key.to_owned(), value);
+        }
+        None => {
+            object.remove(key);
+        }
+    }
     let serialized = serde_json::to_vec_pretty(&manifest).map_err(|error| {
         SaveError::new(&path)(std::io::Error::new(ErrorKind::InvalidData, error))
     })?;
@@ -627,6 +662,7 @@ pub(crate) fn load_project_with(
                 branding: Default::default(),
                 memory_budget: Default::default(),
                 ray_traced_by_default: false,
+                chosen_picture: false,
             }
         }
     };

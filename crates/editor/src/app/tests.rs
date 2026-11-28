@@ -2435,7 +2435,7 @@ fn frames_are_held_only_to_a_frame_rate_limit_someone_chose() {
     app.frame_pace = Some((0.0, true));
     let started = Instant::now();
     for _ in 0..60 {
-        app.pace_frame(true);
+        app.pace_frame();
     }
     assert!(
         started.elapsed() < Duration::from_millis(100),
@@ -2443,18 +2443,12 @@ fn frames_are_held_only_to_a_frame_rate_limit_someone_chose() {
         started.elapsed()
     );
     assert_eq!(app.viewport_bar_state.held_by(), Pace::Free);
-    // In the background with frames still asked for one after another
-    // (Play, moving scenery asked at once): the real rate, not "idle".
+    // In the background (Play, moving scenery): the real rate too.
     app.frame_pace = Some((0.0, false));
     for _ in 0..60 {
-        app.pace_frame(true);
+        app.pace_frame();
     }
     assert_eq!(app.viewport_bar_state.held_by(), Pace::Free);
-    // Frames that come on a timer while nobody works are the editor resting.
-    for _ in 0..60 {
-        app.pace_frame(false);
-    }
-    assert_eq!(app.viewport_bar_state.held_by(), Pace::OnDemand);
     // A limit chosen holds steady frames to its grid, and the bar says so.
     app.appearance.steady_hz = 120;
     assert_eq!(
@@ -2465,7 +2459,7 @@ fn frames_are_held_only_to_a_frame_rate_limit_someone_chose() {
     app.frame_pace = Some((0.0, true));
     let started = Instant::now();
     for _ in 0..60 {
-        app.pace_frame(true);
+        app.pace_frame();
     }
     assert!(
         started.elapsed() >= Duration::from_millis(450),
@@ -2661,37 +2655,17 @@ fn every_frame_waits_for_the_display_only_when_asked() {
     assert!(frames_always_wait_for_the_display(Some("1")));
 }
 
-/// Close Project waits for the viewport's screenshot to save a thumbnail;
-/// when one never comes (the cloud's software Vulkan never sent one), the
-/// project still closes after a few seconds, without a new thumbnail, rather
-/// than staying open with nothing said (QA-021).
+/// Close Project never waits for a thumbnail: the picture is drawn by its
+/// own renderer and saved when it's ready, so a close goes ahead at once,
+/// also where no picture can be drawn (the cloud's software Vulkan once
+/// sent no screenshot and the project stayed open, QA-021).
 #[test]
-fn close_project_goes_ahead_when_the_thumbnail_screenshot_never_comes() {
+fn close_project_goes_ahead_without_waiting_for_the_thumbnail() {
     with_big_stack(|| {
         let folder = copy_of_example("part", "close-no-screenshot");
         let mut app = EditorApp::new(Some(&folder));
-        let ctx = crate::theme::test_context();
-        app.viewport_rect = Some(egui::Rect::from_min_size(
-            egui::pos2(0.0, 0.0),
-            egui::vec2(200.0, 100.0),
-        ));
         app.close_project();
-        let frame = |app: &mut EditorApp, time: f64| {
-            let input = egui::RawInput {
-                time: Some(time),
-                ..Default::default()
-            };
-            let _ = crate::theme::run(&ctx, input, |ui| {
-                let ctx = ui.ctx().clone();
-                app.start_thumbnail(&ctx);
-                app.finish_thumbnail(&ctx);
-            });
-        };
-        frame(&mut app, 1.0);
-        assert!(app.project.is_some(), "waits for the screenshot first");
-        frame(&mut app, 2.5);
-        assert!(app.project.is_some());
-        frame(&mut app, 5.0);
+        app.start_thumbnail(None);
         assert!(app.project.is_none(), "closed without a thumbnail");
         let _ = std::fs::remove_dir_all(folder);
     });

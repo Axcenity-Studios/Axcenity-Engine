@@ -332,7 +332,8 @@ fn spot_shadows_skip_casters_outside_the_beams_bounds() {
     let beam = (Vec3::new(0.0, 0.0, -5.0), 4.0);
     // A view that sees everywhere, so only the lamp's reach decides.
     let everywhere = Frustum::of(Mat4::ZERO);
-    let views = lighting::casters_in_views(&casters, &[ShadowView::Lamp(beam, everywhere)]);
+    let views =
+        lighting::casters_in_views(&casters, &[ShadowView::Lamp(beam, everywhere)], 0, false);
     // Only the near solid block: the far one is out of reach, the glass is
     // see-through and the sphere casts no shadow.
     assert_eq!(views[0].groups, [((MeshKey::Block, None), 0..1)]);
@@ -340,4 +341,74 @@ fn spot_shadows_skip_casters_outside_the_beams_bounds() {
     let instances: Vec<_> = views[0].instances.iter().flatten().collect();
     assert_eq!(instances.len(), 1);
     assert_eq!(instances[0].model[3][2], -3.0);
+}
+
+#[test]
+fn a_shadow_view_draws_each_mesh_once_whatever_distance_its_casters_are_at() {
+    // Blocks and spheres near the camera and far from it: the scene sorts
+    // them by distance band first, so its casters alternate by mesh.
+    let at = |shape, z| item(shape, Vec3::new(0.0, 0.0, z), 1.0);
+    let mut list = list_of(vec![
+        at(Shape::Block, -3.0),
+        at(Shape::Sphere, -4.0),
+        at(Shape::Block, -40.0),
+        at(Shape::Sphere, -45.0),
+        at(Shape::Block, -200.0),
+    ]);
+    // A cut-out, drawn through its holes in the near cascades only.
+    list.items.push(DrawItem {
+        material: Material {
+            alpha_cutoff: 0.5,
+            ..Material::default()
+        },
+        ..at(Shape::Block, -5.0)
+    });
+    let DrawPlan { casters, .. } = plan(&list);
+    let order: Vec<MeshKey> = casters.iter().flatten().map(|caster| caster.mesh).collect();
+    assert_ne!(
+        order[..2],
+        [MeshKey::Block, MeshKey::Block],
+        "the scene's order"
+    );
+    let everywhere = Frustum::of(Mat4::ZERO);
+    let sun = ShadowView::Sun(everywhere);
+    let views = lighting::casters_in_views(&casters, &[sun, sun], 1, false);
+    let material = casters
+        .iter()
+        .flatten()
+        .find_map(|caster| caster.cut_out)
+        .expect("a cut-out caster")
+        .material;
+    // Whole casters first, a draw per mesh, then the cut-out.
+    let groups: Vec<_> = views[0]
+        .groups
+        .iter()
+        .map(|(group, range)| (*group, range.len()))
+        .collect();
+    assert_eq!(
+        groups,
+        [
+            ((MeshKey::Block, None), 3),
+            ((MeshKey::Sphere, None), 2),
+            ((MeshKey::Block, Some(material)), 1),
+        ]
+    );
+    // Past the near cascades the cut-out casts whole, with the other blocks.
+    let groups: Vec<_> = views[1]
+        .groups
+        .iter()
+        .map(|(group, range)| (*group, range.len()))
+        .collect();
+    assert_eq!(
+        groups,
+        [((MeshKey::Block, None), 4), ((MeshKey::Sphere, None), 2)]
+    );
+    // Each group's instances are its own casters.
+    let instances: Vec<f32> = views[1]
+        .instances
+        .iter()
+        .flatten()
+        .map(|raw| raw.model[3][2])
+        .collect();
+    assert_eq!(instances[4..], [-4.0, -45.0]);
 }

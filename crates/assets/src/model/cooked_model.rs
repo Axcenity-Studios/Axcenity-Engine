@@ -271,6 +271,7 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
         sway,
         flutter,
         hangs,
+        glossy_leaf,
         translucency,
         shading,
         defined_normal_texture,
@@ -310,7 +311,9 @@ fn encode_material(out: &mut Output, images: &mut Images, material: &ModelMateri
     out.floats(uv_offset);
     out.u8(u8::from(*double_sided));
     out.floats(&[*sway, *flutter, *translucency]);
-    out.u8(u8::from(*hangs));
+    // Hanging in the low bit, a glossy leaf in the next: a file from before
+    // glossy leaves (0 or 1) reads the same.
+    out.u8(u8::from(*hangs) | (u8::from(*glossy_leaf) << 1));
     out.u8(match shading {
         ModelShading::Standard => 0,
         ModelShading::Skin => 1,
@@ -775,7 +778,11 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
     let uv_offset = input.floats()?;
     let double_sided = input.bool()?;
     let [sway, flutter, translucency] = input.floats()?;
-    let hangs = input.bool()?;
+    let leaf_flags = input.u8()?;
+    if leaf_flags > 3 {
+        return None;
+    }
+    let (hangs, glossy_leaf) = (leaf_flags & 1 != 0, leaf_flags & 2 != 0);
     let shading = match input.u8()? {
         0 => ModelShading::Standard,
         1 => ModelShading::Skin,
@@ -831,6 +838,7 @@ fn decode_material(input: &mut Input<'_>, images: &[Arc<Image>]) -> Option<Model
         sway,
         flutter,
         hangs,
+        glossy_leaf,
         translucency,
         shading,
         defined_normal_texture,
@@ -982,7 +990,12 @@ mod tests {
                 channel(&material.opacity_texture),
                 (material.uv_scale, material.uv_rotation, material.uv_offset),
                 image(&material.specular_texture),
-                (material.double_sided, material.sway, material.hangs),
+                (
+                    material.double_sided,
+                    material.sway,
+                    material.hangs,
+                    material.glossy_leaf,
+                ),
                 material.flutter,
                 (material.translucency, material.shading),
                 (
@@ -1090,6 +1103,53 @@ mod tests {
             for primitive in &again.primitives {
                 assert_eq!(primitive.material.hair_shell, shell, "{model}");
             }
+        }
+        let _ = fs::remove_dir_all(project);
+    }
+
+    #[test]
+    fn a_cooked_model_keeps_a_hanging_glossy_leaf() {
+        let project = std::env::temp_dir().join(format!(
+            "axcenity-cooked-model-glossy-leaf-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&project);
+        let folder = project.join("assets/models");
+        fs::create_dir_all(&folder).unwrap();
+        for (name, extras) in [
+            (
+                "ivy",
+                r#"{"axcenity_flutter": 0.05, "axcenity_hang": true, "axcenity_glossy_leaf": true}"#,
+            ),
+            (
+                "drape",
+                r#"{"axcenity_flutter": 0.05, "axcenity_hang": true}"#,
+            ),
+            (
+                "laurel",
+                r#"{"axcenity_flutter": 0.05, "axcenity_glossy_leaf": true}"#,
+            ),
+        ] {
+            let mut file: serde_json::Value =
+                serde_json::from_str(&crate::model::tests::pyramid_with(extras, "")).unwrap();
+            // Without its texture: a model with embedded maps isn't kept
+            // until they're cooked.
+            file["materials"][0]["pbrMetallicRoughness"]
+                .as_object_mut()
+                .unwrap()
+                .remove("baseColorTexture");
+            fs::write(folder.join(format!("{name}.gltf")), file.to_string()).unwrap();
+            let model = format!("assets/models/{name}.gltf");
+            let first = Assets::new(&project).model_blocking(&model).unwrap();
+            assert!(read(&project, &model, "").is_some(), "{model}");
+            let again = Assets::new(&project).model_blocking(&model).unwrap();
+            assert_eq!(describe(&again), describe(&first), "{model}");
+            let material = &again.primitives[0].material;
+            assert_eq!(
+                (material.hangs, material.glossy_leaf),
+                (name != "laurel", name != "drape"),
+                "{model}"
+            );
         }
         let _ = fs::remove_dir_all(project);
     }

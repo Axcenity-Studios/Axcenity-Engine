@@ -751,6 +751,7 @@ pub(crate) fn push_model(
     transform: Mat4,
     id: u64,
     cull_distance: f32,
+    casts_shadow: bool,
     items: &mut Vec<DrawItem>,
 ) {
     for piece in pieces {
@@ -759,7 +760,7 @@ pub(crate) fn push_model(
             transform,
             material: piece.material.clone(),
             uv_tile: 0.0,
-            casts_shadow: true,
+            casts_shadow,
             id,
             cull_distance,
             skin: None,

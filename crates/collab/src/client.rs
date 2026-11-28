@@ -1149,7 +1149,9 @@ impl Client {
                 } else {
                     world.id_blocks_left()
                 };
-                *world = *snapshot.0;
+                let mut arrived = *snapshot.0;
+                keep_same_landscapes(world, &mut arrived);
+                *world = arrived;
                 world.make_replica();
                 for (start, len) in blocks {
                     world.add_id_block(start, len);
@@ -1563,4 +1565,39 @@ impl Client {
                 .map(|applied| applied.undo);
         }
     }
+}
+
+/// Gives each Terrain of `arrived` (a join snapshot) the data `old` had
+/// for it when the two are the same landscape: the host's own editor joins
+/// its session through the same snapshot, and keeping its data, with its
+/// number, keeps the ground's meshes and collider, and the editor's note
+/// of what's saved, as they were. The string table isn't in the snapshot
+/// yet, so the old one is kept while the snapshot's is empty.
+pub(crate) fn keep_same_landscapes(old: &World, arrived: &mut World) {
+    let terrains: Vec<InstanceId> = arrived
+        .descendants_iter(arrived.root())
+        .filter(|&id| arrived.terrain(id).is_some())
+        .collect();
+    for id in terrains {
+        if let (Some(had), Some(got)) = (old.terrain(id), arrived.terrain(id))
+            && same_landscape(had, got)
+        {
+            let had = had.clone();
+            arrived.set_terrain(id, had);
+        }
+    }
+    if arrived.strings().is_empty() && !old.strings().is_empty() {
+        arrived.set_strings(old.strings().clone());
+    }
+}
+
+/// Whether two Terrains' saved landscapes are the same.
+fn same_landscape(a: &axcenity_core::TerrainData, b: &axcenity_core::TerrainData) -> bool {
+    a.size() == b.size()
+        && a.heights() == b.heights()
+        && a.paint() == b.paint()
+        && a.foliage() == b.foliage()
+        && a.holes() == b.holes()
+        && a.water() == b.water()
+        && a.generation == b.generation
 }

@@ -27,7 +27,9 @@ struct RayShadows {
     // stud away from the camera, w: how far the volumetric fog's grid
     // reaches while its air is traced (`cs_air`), 0 while not.
     settings: vec4<f32>,
-    // xy: the scene's width and height in pixels.
+    // xy: the scene's width and height in pixels, z: 1 while traced at half
+    // resolution (one pixel of each 2 × 2, then `cs_fill`), w: which pixel
+    // of each 2 × 2 that is this frame (0 to 3; `traced_in_block`).
     size: vec4<u32>,
     // Lamps' ray traced shadows: x: 1 to trace them, y: the size of a light
     // tile in pixels, z: how many tiles across.
@@ -49,7 +51,8 @@ struct RayShadows {
 // Cut-outs' holes (renderer/ray_cut_outs.rs). Must match `CutOutRaw`.
 struct CutOut {
     // x: its mesh's first triangle in `cut_out_uvs`, y: its alpha's layer
-    // plus 1 (0: no holes), z: the alpha cutoff's bits.
+    // plus 1 (0: no holes), z: the alpha cutoff's bits, w: the bits of the
+    // share of its shadow it leaves out (`casts_on_this_ray`).
     mesh: vec4<u32>,
     // The columns of the material's texture coordinate matrix.
     uv_matrix: vec4<f32>,
@@ -110,6 +113,9 @@ const CUT_OUT_NEAR: f32 = 0.35;
 const PREPASS_CUT_OUT: f32 = 0.875;
 // The pixel being traced's `cut_out_near`, set by `cs_trace` and `cs_air`.
 var<private> cut_out_near_here: f32 = CUT_OUT_NEAR;
+// The ray being traced's place in the pattern a thinning shadow is left
+// out by (`casts_on_this_ray`), set by `cs_trace`: 1 casts every shadow.
+var<private> shadow_share_here: f32 = 1.0;
 // The widest a soft edge is smoothed, in pixels each way.
 const MAX_BLUR: i32 = 12;
 // The narrowest, so the few rays a pixel traces always even out with
@@ -126,6 +132,16 @@ fn pixel_noise(pixel: vec2<f32>) -> f32 {
 
 fn index_of(pixel: vec2<i32>) -> u32 {
     return u32(pixel.y) * rays.size.x + u32(pixel.x);
+}
+
+// At half resolution, the pixel of 2 × 2 block `block` traced this frame:
+// each of the four in turn under TAA (one diagonal, then the other), kept
+// on the scene.
+fn traced_in_block(block: vec2<i32>) -> vec2<i32> {
+    let turn = rays.size.w % 4u;
+    let offset = array<vec2<i32>, 4>(vec2<i32>(0, 0), vec2<i32>(1, 1), vec2<i32>(1, 0),
+        vec2<i32>(0, 1))[turn];
+    return min(block * 2 + offset, vec2<i32>(rays.size.xy) - 1);
 }
 
 // The world point the prepass drew at `pixel`, or w = 0 for the sky.
@@ -173,6 +189,17 @@ fn cut_out_covers(hit: RayIntersection) -> bool {
     return alpha >= bitcast<f32>(cut.mesh.z);
 }
 
+// Whether the cut-out a ray's candidate hit is on casts its shadow on this
+// ray. Near the end of its shadow's reach (renderer/lod.rs) a plant casts
+// a share of its shadow: its slot says how much is left out, and the rays
+// of that share of the pixels pass through it, by a pattern that moves on
+// each frame under TAA, so the smoothing and TAA make a lighter shadow of
+// it where the shadow maps' filter does.
+fn casts_on_this_ray(hit: RayIntersection) -> bool {
+    let left_out = bitcast<f32>(cut_outs[hit.instance_custom_data + hit.geometry_index].mesh.w);
+    return shadow_share_here >= left_out;
+}
+
 // One ray from `origin` along `direction` (normalized), up to `far`:
 // whether a solid item blocks it, or a cut-out further off than
 // `cut_out_near_here` where its texture isn't cut out. x: how far along
@@ -195,7 +222,7 @@ fn first_blocker(origin: vec3<f32>, direction: vec3<f32>, far: f32) -> vec2<f32>
     while rayQueryProceed(&query) {
         let candidate = rayQueryGetCandidateIntersection(&query);
         if candidate.kind == RAY_QUERY_INTERSECTION_TRIANGLE && candidate.t > cut_out_near_here
-            && cut_out_covers(candidate) {
+            && casts_on_this_ray(candidate) && cut_out_covers(candidate) {
             rayQueryConfirmIntersection(&query);
             cut_out = 1.0;
         }
@@ -339,12 +366,17 @@ fn traced_lamps(pixel: vec2<i32>, point: vec3<f32>, normal: vec3<f32>, distance:
 
 @compute @workgroup_size(8, 8)
 fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
-    if any(id.xy >= rays.size.xy) {
+    let half = rays.size.z != 0u;
+    // At half resolution a thread is a 2 × 2 block, traced from one pixel.
+    let blocks = (rays.size.xy + 1u) / 2u;
+    if any(id.xy >= select(rays.size.xy, blocks, half)) {
         return;
     }
-    let pixel = vec2<i32>(id.xy);
+    let pixel = select(vec2<i32>(id.xy), traced_in_block(vec2<i32>(id.xy)), half);
     let index = index_of(pixel);
-    let soft = rays.sun.w > 0.0;
+    // Soft shadows, or a half-resolution trace: what `cs_fill` reads is
+    // written as the soft passes' rays are, for hard shadows too.
+    let soft = rays.sun.w > 0.0 || half;
     let point = world_at(pixel);
     let distance = length(point.xyz - rays.camera.xyz);
     if point.w == 0.0 || distance > rays.camera.w {
@@ -354,6 +386,9 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     let view_normal = textureLoad(normal_texture, pixel, 0);
     let normal = normalize((rays.view_to_world * vec4<f32>(view_normal.xyz, 0.0)).xyz);
     cut_out_near_here = cut_out_near(point.xyz, abs(view_normal.w - PREPASS_CUT_OUT) < 0.05);
+    // Above 0, so a slot that leaves nothing out casts on every ray.
+    shadow_share_here = max(fract(pixel_noise(vec2<f32>(pixel)) + rays.settings.y * 0.569840291
+        + 0.5), 1e-4);
     if rays.lamps.x != 0u && index < arrayLength(&lamp_mask) {
         lamp_mask[index] = traced_lamps(pixel, point.xyz, normal, distance);
     }
@@ -365,9 +400,9 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     // Off the surface, by more the further away it is as depth gets coarser.
     let origin = point.xyz + normal * (0.02 + distance * 0.002);
-    if !soft {
+    if rays.sun.w <= 0.0 {
         let lit = select(0.0, 1.0, !is_blocked(origin, sun, rays.camera.w * 2.0));
-        destination[index] = pack_mask(distance, lit);
+        destination[index] = select(pack_mask(distance, lit), pack_soft(lit, 0.0), soft);
         return;
     }
 
@@ -389,6 +424,8 @@ fn cs_trace(@builtin(global_invocation_id) id: vec3<u32>) {
         let offset = sqrt(k) * radius * vec2<f32>(cos(angle), sin(angle));
         let direction = normalize(sun + right * offset.x + forward * offset.y);
         let t = blocker_distance(origin, direction);
+        // The next ray's place in the thinning shadows' pattern.
+        shadow_share_here = max(fract(shadow_share_here + 0.618034), 1e-4);
         if t == 0.0 {
             lit += 1.0;
         } else {
@@ -452,6 +489,106 @@ fn smoothed_along(pixel: vec2<i32>, step: vec2<i32>) -> vec2<f32> {
         weights += weight;
     }
     return vec2<f32>(select(here.x, total / weights, weights > 0.0), blocker);
+}
+
+// How far apart, in pixels, the traced pixels `cs_fill` reads from may be
+// (a Gaussian's width): about the 2 × 2 blocks next to a pixel's own.
+const FILL_SPREAD: f32 = 1.5;
+
+// At half resolution (`rays.size.z`), each pixel the trace left: what the
+// traced pixels of the 3 × 3 blocks around it saw, weighted by how near
+// they are and kept to the same surface (its plane and facing, as the
+// smoothing is), so a shadow's edge stays on the edge of what casts it. A
+// pixel with no traced neighbour on its surface (a thin blade, a corner)
+// takes the one nearest its plane. The lamps' bits are the most weighted
+// neighbour's. Writes the soft passes' rays for soft shadows, or the mask
+// for hard ones.
+@compute @workgroup_size(8, 8)
+fn cs_fill(@builtin(global_invocation_id) id: vec3<u32>) {
+    if any(id.xy >= rays.size.xy) {
+        return;
+    }
+    let pixel = vec2<i32>(id.xy);
+    let index = index_of(pixel);
+    let soft = rays.sun.w > 0.0;
+    let block = pixel / 2;
+    let lamps = rays.lamps.x != 0u && index < arrayLength(&lamp_mask);
+    let point = world_at(pixel);
+    let distance = length(point.xyz - rays.camera.xyz);
+    if point.w == 0.0 || distance > rays.camera.w {
+        destination[index] = select(0u, pack_soft(NOTHING, 0.0), soft);
+        return;
+    }
+    if all(pixel == traced_in_block(block)) {
+        let traced = unpack2x16float(source[index]);
+        destination[index] = select(pack_mask(distance, traced.x), source[index], soft);
+        return;
+    }
+    let view_normal = textureLoad(normal_texture, pixel, 0).xyz;
+    let normal = normalize((rays.view_to_world * vec4<f32>(view_normal, 0.0)).xyz);
+    let tolerance = 0.01 * distance + 0.05;
+    let blocks = vec2<i32>((rays.size.xy + 1u) / 2u);
+    var total = 0.0;
+    var weights = 0.0;
+    var blocker = 0.0;
+    var best = -1;
+    var best_weight = 0.0;
+    var nearest = -1;
+    var nearest_apart = 1e30;
+    for (var dy = -1; dy <= 1; dy++) {
+        for (var dx = -1; dx <= 1; dx++) {
+            let other_block = block + vec2<i32>(dx, dy);
+            if any(other_block < vec2<i32>(0)) || any(other_block >= blocks) {
+                continue;
+            }
+            let at = traced_in_block(other_block);
+            let other_index = index_of(at);
+            let traced = unpack2x16float(source[other_index]);
+            if traced.x < 0.0 {
+                continue;
+            }
+            let there = world_at(at);
+            if there.w == 0.0 {
+                continue;
+            }
+            let apart = abs(dot(there.xyz - point.xyz, normal));
+            if apart < nearest_apart {
+                nearest_apart = apart;
+                nearest = i32(other_index);
+            }
+            let facing = dot(textureLoad(normal_texture, at, 0).xyz, view_normal);
+            let d = vec2<f32>(at - pixel) / FILL_SPREAD;
+            let weight = exp(-0.5 * dot(d, d))
+                * max(1.0 - apart / tolerance, 0.0)
+                * smoothstep(0.7, 0.95, facing);
+            if weight <= 0.0 {
+                continue;
+            }
+            total += traced.x * weight;
+            weights += weight;
+            blocker = max(blocker, traced.y);
+            if weight > best_weight {
+                best_weight = weight;
+                best = i32(other_index);
+            }
+        }
+    }
+    if weights <= 0.0 {
+        if nearest < 0 {
+            destination[index] = select(0u, pack_soft(NOTHING, 0.0), soft);
+            return;
+        }
+        let traced = unpack2x16float(source[u32(nearest)]);
+        total = traced.x;
+        weights = 1.0;
+        blocker = traced.y;
+        best = nearest;
+    }
+    let visible = total / weights;
+    destination[index] = select(pack_mask(distance, visible), pack_soft(visible, blocker), soft);
+    if lamps {
+        lamp_mask[index] = lamp_mask[u32(best)];
+    }
 }
 
 @compute @workgroup_size(8, 8)

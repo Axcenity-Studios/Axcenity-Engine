@@ -62,6 +62,8 @@ const RIGHT: u8 = 8;
 const JUMP: u8 = 16;
 const CROUCH: u8 = 32;
 const RUN: u8 = 64;
+/// The camera was at the eyes (`Drive::eyes`).
+const EYES: u8 = 128;
 
 /// One step a device took of its own character.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -84,6 +86,7 @@ impl Move {
             (input.jump, JUMP),
             (input.crouch, CROUCH),
             (input.run, RUN),
+            (drive.eyes, EYES),
         ]
         .into_iter()
         .filter(|&(held, _)| held)
@@ -112,6 +115,7 @@ impl Move {
                 ..MoveInput::default()
             },
             yaw: self.yaw,
+            eyes: held(EYES),
             seconds: if self.seconds.is_finite() {
                 self.seconds.clamp(0.0, LONGEST)
             } else {

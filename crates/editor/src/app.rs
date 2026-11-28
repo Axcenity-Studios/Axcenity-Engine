@@ -120,6 +120,7 @@ mod updates;
 mod version_history;
 pub(crate) use version_history::local_when;
 mod viewport_bar;
+mod wake_log;
 mod welcome;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -168,7 +169,6 @@ use crate::start::{self, Brand, ProjectLink, StartAction, StartScreen};
 use crate::style_panel::{self, StyleEdit};
 use crate::terrain_studio::TerrainStudio;
 use crate::theme::{self, Appearance, filled_icons, icons};
-use crate::thumbnail;
 use crate::toast::{self, Toasts};
 use crate::toolbox_panel::ToolboxPanel;
 use crate::tree::{self, Insertable};
@@ -326,6 +326,8 @@ pub struct EditorApp {
     /// Whether a frame waits for the display to show the last one before
     /// it starts (see [`EditorApp::pace_display`]).
     display_pace: DisplayPace,
+    /// `AXCENITY_WAKE_LOG`: timed wakes from the idle pace, each frame logged.
+    wake_log: Option<wake_log::WakeLog>,
     /// The parts the viewport drag under way has moved, for Join Surfaces.
     dragged_parts: Vec<InstanceId>,
     /// The game, while Play is on. `world` stays as it was before Play.
@@ -414,6 +416,10 @@ pub struct EditorApp {
     play_from_start: bool,
     /// Bake Probes was clicked: the bake starts on the next frame.
     bake_probes_asked: bool,
+    /// `AXCENITY_BAKE_PROBES=1`: once the project is open, its textures
+    /// in and a few frames drawn, Bake Probes; once that's done, save and
+    /// close (`probe_bake::BakeAndClose`).
+    bake_and_close: probe_bake::BakeAndClose,
     /// The probe bake in progress, a little each frame
     /// (`app/probe_bake.rs`).
     probe_bake: Option<Box<probe_bake::ProbeBake>>,
@@ -459,8 +465,8 @@ pub struct EditorApp {
     recent_tabs: welcome::RecentTabs,
     /// The start screen's thumbnails, search and dialogs.
     start: StartScreen,
-    /// The thumbnail being captured, if one was asked for.
-    thumbnail: Option<ThumbnailShot>,
+    /// The project's picture being drawn on its thread, if one was asked for.
+    thumbnail: Option<crate::thumbnail::PictureJob>,
     /// Set when a thumbnail should be taken at the end of this frame. True
     /// inside means the project closes once it's saved.
     thumbnail_wanted: Option<bool>,
@@ -514,6 +520,8 @@ pub struct EditorApp {
     /// The Character Studio workspace, open in place of the start screen
     /// (`docs/research/character-studio.md` CS2), and where it keeps files.
     character_workspace: Option<Box<crate::character_workspace::CharacterWorkspace>>,
+    /// Character Studio opening on its thread, with a loading screen.
+    character_opening: Option<character_workspace::CharacterOpening>,
     characters_folder: Option<PathBuf>,
     /// Described characters shown in edit mode (OPEN-21).
     edit_characters: Box<edit_characters::EditCharacters>,
@@ -952,22 +960,6 @@ enum Discard {
     Update(axcenity_updater::apply::Action),
 }
 
-/// A screenshot asked for, to make the open project's thumbnail from.
-struct ThumbnailShot {
-    folder: PathBuf,
-    /// Where the viewport was, in points.
-    area: egui::Rect,
-    /// Close the project once it's saved.
-    then_close: bool,
-    /// When it was asked for (`egui::InputState::time`): a screenshot that
-    /// never comes (a driver that can't read the frame back) gives up after
-    /// [`THUMBNAIL_WAIT`], so Close Project still closes (QA-021).
-    asked_at: f64,
-}
-
-/// How long, in seconds, a project thumbnail's screenshot is waited for.
-const THUMBNAIL_WAIT: f64 = 3.0;
-
 /// The answers to "Save changes?".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Answer {
@@ -1105,6 +1097,7 @@ impl EditorApp {
             frame_pace: None,
             next_present: None,
             display_pace: DisplayPace::default(),
+            wake_log: wake_log::WakeLog::from_env(),
             dragged_parts: Vec::new(),
             play: None,
             play_settings: PlaySettings::default(),
@@ -1144,6 +1137,7 @@ impl EditorApp {
             play_from_start: false,
             stale_light_probes: None,
             bake_probes_asked: false,
+            bake_and_close: probe_bake::BakeAndClose::Off,
             probe_bake: None,
             constraint_tool: None,
             importing: None,
@@ -1188,6 +1182,7 @@ impl EditorApp {
             effect_editor: Default::default(),
             character_studio: Default::default(),
             character_workspace: None,
+            character_opening: None,
             characters_folder: None,
             edit_characters: Default::default(),
             block_tab_pointer: None,
@@ -1418,6 +1413,9 @@ impl eframe::App for EditorApp {
     /// Takes the keys that move the game UI's focus during Play before
     /// egui sees them, so Tab and the arrows don't move egui's own focus.
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        if let Some(log) = &mut self.wake_log {
+            log.before_frame(ctx, raw_input);
+        }
         // First, so keys chosen from the macOS menu bar reach Play's too.
         self.take_native_menu_input(raw_input);
         self.take_nav_keys(ctx, raw_input);
@@ -1436,7 +1434,7 @@ impl eframe::App for EditorApp {
         let cpu = frame_started.elapsed();
         self.viewport_bar_state.note_editor_frame(cpu);
         self.pace_display(&ctx, frame, frame_started, cpu);
-        self.pace_frame(ctx.requested_repaint_last_pass());
+        self.pace_frame();
         // Restart now, on the viewport's ray tracing badge.
         if self.viewport.take_restart_request() {
             self.restart_editor();
@@ -1768,20 +1766,12 @@ impl EditorApp {
     /// fixed grid before it's presented, which the display sees as one
     /// rate. A frame that misses its point takes the next one, so the grid
     /// holds. Runs after the frame is built, just before eframe presents
-    /// it. `asked` is whether the last frame asked for this one at once.
-    fn pace_frame(&mut self, asked: bool) {
+    /// it.
+    fn pace_frame(&mut self) {
         let steady = self.frame_pace.is_some_and(|(_, steady)| steady);
         let Some(interval) = held_apart(steady, self.appearance.steady_hz) else {
             self.next_present = None;
-            // A frame the last one asked for at once came as soon as it was
-            // ready (working, Play, Hold the refresh rate steady): the real
-            // rate, focused or not. Only one that came on a timer or after a
-            // rest is the editor resting.
-            self.viewport_bar_state.note_pace(if steady || asked {
-                viewport_bar::Pace::Free
-            } else {
-                viewport_bar::Pace::OnDemand
-            });
+            self.viewport_bar_state.note_pace(viewport_bar::Pace::Free);
             return;
         };
         let now = Instant::now();
@@ -1873,6 +1863,7 @@ impl EditorApp {
             .min(MAX_FRAME_SECONDS);
         self.plugins_frame(seconds);
         self.plugin_shortcuts(ctx);
+        self.bake_and_close_frame(ctx);
         if self.bake_probes_asked {
             self.bake_probes_asked = false;
             self.start_probe_bake();
@@ -2130,7 +2121,7 @@ impl EditorApp {
             self.poll_toolbox_background(ctx);
         } else if self.character_workspace.is_some() {
             self.character_workspace_ui(ui, render_state);
-        } else {
+        } else if !self.character_opening_ui(ui, render_state) {
             self.start_screen(ui, render_state);
         }
         if let Some(clicked) = output.clicked {
@@ -2292,7 +2283,7 @@ impl EditorApp {
         self.import_dropped(ctx);
         self.import_prompt(ctx, render_state);
         self.ribbon_tab_editor(ctx);
-        self.start_thumbnail(ctx);
+        self.start_thumbnail(render_state);
         if self.learn_open && self.project.is_some() {
             let folder = self.project.as_ref().map(|project| project.folder.clone());
             let playing = self.playing();

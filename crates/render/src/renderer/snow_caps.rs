@@ -19,9 +19,11 @@
 //! passes that lift corners draw them, and only while snow lies: shadows,
 //! ray tracing and the triangle counts never see them.
 
-use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, Sender};
 
 use glam::Vec3;
+use rustc_hash::FxHashMap;
 
 use crate::mesh::Vertex;
 
@@ -40,84 +42,175 @@ fn place(vertex: &Vertex) -> [u32; 3] {
     vertex.position.map(|value| (value + 0.0).to_bits())
 }
 
+/// A mesh's skirt made on a worker: its indices with the skirt's after
+/// them, for the mesh at `key` as it was at `version`.
+pub(super) struct MadeSkirt {
+    pub(super) key: u64,
+    pub(super) version: u64,
+    pub(super) indices: Vec<u32>,
+}
+
+/// Skirts made away from the frame (a renderer whose frames are shown):
+/// a mesh goes up at once without its skirt, which follows a few frames
+/// later. Snow is all it's for, so nothing else waits on it; made in the
+/// frame, a mesh of 190,000 triangles held its frame up 30 ms.
+pub(super) struct Skirts {
+    send: Sender<MadeSkirt>,
+    made: Receiver<MadeSkirt>,
+}
+
+impl Default for Skirts {
+    fn default() -> Self {
+        let (send, made) = mpsc::channel();
+        Self { send, made }
+    }
+}
+
+impl Skirts {
+    /// Makes `source`'s skirt on rayon's pool. A mesh that needs none
+    /// sends nothing.
+    pub(super) fn request(&self, source: Arc<dyn crate::MeshSource>) {
+        let send = self.send.clone();
+        rayon::spawn(move || {
+            let Some(vertices) = super::gpu::custom_vertices(source.as_ref()) else {
+                return;
+            };
+            let indices = source.indices();
+            let skirt = skirt(&vertices, indices);
+            if skirt.is_empty() {
+                return;
+            }
+            let mut all = Vec::with_capacity(indices.len() + skirt.len());
+            all.extend_from_slice(indices);
+            all.extend_from_slice(&skirt);
+            let _ = send.send(MadeSkirt {
+                key: source.key(),
+                version: source.version(),
+                indices: all,
+            });
+        });
+    }
+
+    /// The skirts made since last asked.
+    pub(super) fn made(&self) -> Vec<MadeSkirt> {
+        self.made.try_iter().collect()
+    }
+}
+
+/// One edge's corner pairs, each kept once in the order first met. Most
+/// edges have one or two, held without an allocation.
+#[derive(Default)]
+struct Pairs {
+    inline: [(u32, u32); 2],
+    len: u8,
+    more: Vec<(u32, u32)>,
+}
+
+impl Pairs {
+    fn add(&mut self, pair: (u32, u32)) {
+        if self.iter().any(|&seen| seen == pair) {
+            return;
+        }
+        if usize::from(self.len) < self.inline.len() {
+            self.inline[usize::from(self.len)] = pair;
+            self.len += 1;
+        } else {
+            self.more.push(pair);
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &(u32, u32)> {
+        self.inline[..usize::from(self.len)]
+            .iter()
+            .chain(self.more.iter())
+    }
+}
+
 /// The skirt of the mesh with these corners and `indices` (three a
 /// triangle): three indices a triangle again, to draw after its own.
+///
+/// Each corner's place is numbered once and each edge found by its two
+/// places' numbers in one `u64`, so a mesh of 190,000 triangles takes a few
+/// milliseconds: keyed by the places themselves in a SipHash map with a
+/// list allocated per edge, it took 380 ms, in the frame that first drew
+/// the mesh (2026-11-27, a hitch each time a near level of detail came in).
 pub(super) fn skirt(vertices: &[Vertex], indices: &[u32]) -> Vec<u32> {
-    // Each edge's corner pairs, by where its two ends are. The pair is
-    // kept in the key's order, so two faces' pairs line up end to end.
-    type Edge = ([u32; 3], [u32; 3]);
-    let mut edges: HashMap<Edge, Vec<(u32, u32)>> = HashMap::with_capacity(indices.len());
+    if indices
+        .iter()
+        .any(|&index| index as usize >= vertices.len())
+    {
+        return Vec::new();
+    }
+    let places: Vec<[u32; 3]> = vertices.iter().map(place).collect();
+    let mut numbers: FxHashMap<[u32; 3], u32> =
+        FxHashMap::with_capacity_and_hasher(vertices.len(), Default::default());
+    let number: Vec<u32> = places
+        .iter()
+        .map(|place| {
+            let next = numbers.len() as u32;
+            *numbers.entry(*place).or_insert(next)
+        })
+        .collect();
+    // Each edge's corner pairs, by its two ends' places, in the order the
+    // edges are first met. The pair is kept in the places' order, so two
+    // faces' pairs line up end to end.
+    let mut edge_of: FxHashMap<u64, u32> =
+        FxHashMap::with_capacity_and_hasher(indices.len(), Default::default());
+    let mut edges: Vec<Pairs> = Vec::with_capacity(indices.len() / 2);
     for triangle in indices.chunks_exact(3) {
         for corner in 0..3 {
             let (a, b) = (triangle[corner], triangle[(corner + 1) % 3]);
-            let (Some(at_a), Some(at_b)) = (vertices.get(a as usize), vertices.get(b as usize))
-            else {
-                return Vec::new();
-            };
-            let (place_a, place_b) = (place(at_a), place(at_b));
-            if place_a == place_b {
+            let (number_a, number_b) = (number[a as usize], number[b as usize]);
+            if number_a == number_b {
                 continue;
             }
-            let (key, pair) = if place_a < place_b {
-                ((place_a, place_b), (a, b))
+            let (low, high, pair) = if places[a as usize] < places[b as usize] {
+                (number_a, number_b, (a, b))
             } else {
-                ((place_b, place_a), (b, a))
+                (number_b, number_a, (b, a))
             };
-            let pairs = edges.entry(key).or_default();
-            if !pairs.contains(&pair) {
-                pairs.push(pair);
+            let key = (u64::from(low) << 32) | u64::from(high);
+            let next = edges.len() as u32;
+            let edge = *edge_of.entry(key).or_insert(next);
+            if edge == next {
+                edges.push(Pairs::default());
             }
+            edges[edge as usize].add(pair);
         }
     }
     let normal = |index: u32| Vec3::from(vertices[index as usize].normal).normalize_or_zero();
     let position = |index: u32| Vec3::from(vertices[index as usize].position);
     let most = indices.len() * MOST;
     let mut skirt = Vec::new();
-    // In the order of the mesh's own indices, so the same mesh always
-    // gets the same skirt (a map's order changes from run to run).
-    let mut seen = std::collections::HashSet::new();
-    for triangle in indices.chunks_exact(3) {
-        for corner in 0..3 {
-            let (a, b) = (triangle[corner], triangle[(corner + 1) % 3]);
-            let (place_a, place_b) = (place(&vertices[a as usize]), place(&vertices[b as usize]));
-            let key = if place_a < place_b {
-                (place_a, place_b)
-            } else {
-                (place_b, place_a)
-            };
-            if place_a == place_b || !seen.insert(key) {
+    // In the order the mesh's own indices first meet each edge, so the same
+    // mesh always gets the same skirt.
+    for pairs in &edges {
+        for (first, second) in pairs.iter().zip(pairs.iter().skip(1)) {
+            let ((a1, b1), (a2, b2)) = (*first, *second);
+            let (n1, n2) = (normal(a1) + normal(b1), normal(a2) + normal(b2));
+            let together =
+                normal(a1).dot(normal(a2)) > SAME_WAY && normal(b1).dot(normal(b2)) > SAME_WAY;
+            if together {
                 continue;
             }
-            let pairs = &edges[&key];
-            for (first, second) in pairs.iter().zip(pairs.iter().skip(1)) {
-                let ((a1, b1), (a2, b2)) = (*first, *second);
-                let (n1, n2) = (normal(a1) + normal(b1), normal(a2) + normal(b2));
-                let together =
-                    normal(a1).dot(normal(a2)) > SAME_WAY && normal(b1).dot(normal(b2)) > SAME_WAY;
-                if together {
-                    continue;
+            // Wound to face out from the face that stays, whichever of the
+            // two rises (the same winding serves both).
+            let along = position(b1) - position(a1);
+            let quad = if n1.cross(along).dot(n2) >= 0.0 {
+                [a1, b1, b2, a1, b2, a2]
+            } else {
+                [a1, b2, b1, a1, a2, b2]
+            };
+            for corners in quad.chunks_exact(3) {
+                // Where the two faces do share a corner, half the quad is
+                // a triangle of no area whatever rises.
+                if corners[0] != corners[1] && corners[1] != corners[2] && corners[0] != corners[2]
+                {
+                    skirt.extend_from_slice(corners);
                 }
-                // Wound to face out from the face that stays, whichever
-                // of the two rises (the same winding serves both).
-                let along = position(b1) - position(a1);
-                let quad = if n1.cross(along).dot(n2) >= 0.0 {
-                    [a1, b1, b2, a1, b2, a2]
-                } else {
-                    [a1, b2, b1, a1, a2, b2]
-                };
-                for corners in quad.chunks_exact(3) {
-                    // Where the two faces do share a corner, half the
-                    // quad is a triangle of no area whatever rises.
-                    if corners[0] != corners[1]
-                        && corners[1] != corners[2]
-                        && corners[0] != corners[2]
-                    {
-                        skirt.extend_from_slice(corners);
-                    }
-                }
-                if skirt.len() > most {
-                    return Vec::new();
-                }
+            }
+            if skirt.len() > most {
+                return Vec::new();
             }
         }
     }
@@ -126,6 +219,135 @@ pub(super) fn skirt(vertices: &[Vertex], indices: &[u32]) -> Vec<u32> {
 
 #[cfg(test)]
 mod tests {
+
+    /// The skirt as it was first written (2026-11), kept to check the faster
+    /// one gives exactly the same.
+    /// The skirt of the mesh with these corners and `indices` (three a
+    /// triangle): three indices a triangle again, to draw after its own.
+    fn reference_skirt(vertices: &[Vertex], indices: &[u32]) -> Vec<u32> {
+        // Each edge's corner pairs, by where its two ends are. The pair is
+        // kept in the key's order, so two faces' pairs line up end to end.
+        type Edge = ([u32; 3], [u32; 3]);
+        let mut edges: std::collections::HashMap<Edge, Vec<(u32, u32)>> =
+            std::collections::HashMap::with_capacity(indices.len());
+        for triangle in indices.chunks_exact(3) {
+            for corner in 0..3 {
+                let (a, b) = (triangle[corner], triangle[(corner + 1) % 3]);
+                let (Some(at_a), Some(at_b)) = (vertices.get(a as usize), vertices.get(b as usize))
+                else {
+                    return Vec::new();
+                };
+                let (place_a, place_b) = (place(at_a), place(at_b));
+                if place_a == place_b {
+                    continue;
+                }
+                let (key, pair) = if place_a < place_b {
+                    ((place_a, place_b), (a, b))
+                } else {
+                    ((place_b, place_a), (b, a))
+                };
+                let pairs = edges.entry(key).or_default();
+                if !pairs.contains(&pair) {
+                    pairs.push(pair);
+                }
+            }
+        }
+        let normal = |index: u32| Vec3::from(vertices[index as usize].normal).normalize_or_zero();
+        let position = |index: u32| Vec3::from(vertices[index as usize].position);
+        let most = indices.len() * MOST;
+        let mut skirt = Vec::new();
+        // In the order of the mesh's own indices, so the same mesh always
+        // gets the same skirt (a map's order changes from run to run).
+        let mut seen = std::collections::HashSet::new();
+        for triangle in indices.chunks_exact(3) {
+            for corner in 0..3 {
+                let (a, b) = (triangle[corner], triangle[(corner + 1) % 3]);
+                let (place_a, place_b) =
+                    (place(&vertices[a as usize]), place(&vertices[b as usize]));
+                let key = if place_a < place_b {
+                    (place_a, place_b)
+                } else {
+                    (place_b, place_a)
+                };
+                if place_a == place_b || !seen.insert(key) {
+                    continue;
+                }
+                let pairs = &edges[&key];
+                for (first, second) in pairs.iter().zip(pairs.iter().skip(1)) {
+                    let ((a1, b1), (a2, b2)) = (*first, *second);
+                    let (n1, n2) = (normal(a1) + normal(b1), normal(a2) + normal(b2));
+                    let together = normal(a1).dot(normal(a2)) > SAME_WAY
+                        && normal(b1).dot(normal(b2)) > SAME_WAY;
+                    if together {
+                        continue;
+                    }
+                    // Wound to face out from the face that stays, whichever
+                    // of the two rises (the same winding serves both).
+                    let along = position(b1) - position(a1);
+                    let quad = if n1.cross(along).dot(n2) >= 0.0 {
+                        [a1, b1, b2, a1, b2, a2]
+                    } else {
+                        [a1, b2, b1, a1, a2, b2]
+                    };
+                    for corners in quad.chunks_exact(3) {
+                        // Where the two faces do share a corner, half the
+                        // quad is a triangle of no area whatever rises.
+                        if corners[0] != corners[1]
+                            && corners[1] != corners[2]
+                            && corners[0] != corners[2]
+                        {
+                            skirt.extend_from_slice(corners);
+                        }
+                    }
+                    if skirt.len() > most {
+                        return Vec::new();
+                    }
+                }
+            }
+        }
+        skirt
+    }
+
+    #[test]
+    fn the_skirt_is_exactly_what_it_was() {
+        // A cube, a mesh of random faceted triangles sharing places, and a
+        // grid with some corners split and some normals bent.
+        let mut cases = vec![cube()];
+        let mut state = 0x9e37_79b9_u32;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let grid = 12;
+        let mut vertices = Vec::new();
+        for z in 0..grid {
+            for x in 0..grid {
+                let tilt = (next() % 5) as f32 * 0.2;
+                vertices.push(vertex(
+                    [x as f32, (next() % 3) as f32 * 0.1, z as f32],
+                    [tilt, 1.0, 0.0],
+                ));
+                if next() % 3 == 0 {
+                    vertices.push(vertex([x as f32, 0.0, z as f32], [0.0, 0.0, 1.0]));
+                }
+            }
+        }
+        let mut indices = Vec::new();
+        for _ in 0..600 {
+            let pick = |n: u32| n % vertices.len() as u32;
+            let (a, b, c) = (pick(next()), pick(next()), pick(next()));
+            indices.extend_from_slice(&[a, b, c]);
+        }
+        cases.push((vertices, indices));
+        for (vertices, indices) in &cases {
+            let reference = reference_skirt(vertices, indices);
+            assert!(!reference.is_empty(), "each case has a skirt to compare");
+            assert_eq!(skirt(vertices, indices), reference);
+        }
+    }
+
     use super::*;
     use crate::mesh::NO_TANGENT;
 

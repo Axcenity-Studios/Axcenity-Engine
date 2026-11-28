@@ -499,8 +499,10 @@ struct GeneratedGroups {
 /// What a terrain's foliage is built from.
 #[derive(PartialEq)]
 struct FoliageKey {
-    /// Addresses, only ever compared.
-    data: usize,
+    /// The data's uid (`TerrainData::uid`): its copies made for generated
+    /// foliage keep it, so the painted foliage isn't built again when only
+    /// what scatter rules place changed.
+    data: u64,
     revision: u64,
     placement: [u32; 6],
     models: Vec<Option<usize>>,
@@ -515,8 +517,8 @@ impl FoliageKey {
     ) -> Self {
         let (at, size) = (placement.position, placement.size);
         Self {
-            data: Arc::as_ptr(data) as usize,
-            revision: data.revision(),
+            data: data.uid(),
+            revision: data.revision_apart_from_water(),
             placement: [at.x, at.y, at.z, size.x, size.y, size.z].map(f32::to_bits),
             models: paths
                 .iter()
@@ -713,7 +715,14 @@ fn built_groups<'a>(
                     turn,
                     ground + turn * Vec3::new(0.0, size.y.abs() * 0.5, 0.0),
                 );
-                push_model(pieces, model_transform, id, cull_distance, items);
+                push_model(
+                    pieces,
+                    model_transform,
+                    id,
+                    cull_distance,
+                    instance.shadow,
+                    items,
+                );
             }
             (source, _) => {
                 let transform =
@@ -723,6 +732,7 @@ fn built_groups<'a>(
                     items.push(DrawItem {
                         cull_distance,
                         sway,
+                        casts_shadow: instance.shadow,
                         ..piece_item(piece, transform)
                     });
                 }
@@ -790,6 +800,7 @@ mod tests {
             yaw: 0.0,
             scale: 1.0,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         });
@@ -800,6 +811,7 @@ mod tests {
             yaw: 0.0,
             scale: 1.0,
             collide: true,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         });
@@ -841,6 +853,7 @@ mod tests {
             yaw: 0.0,
             scale,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         };
@@ -900,6 +913,7 @@ mod tests {
             yaw: 0.0,
             scale: 1.0,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         };
@@ -983,6 +997,7 @@ mod tests {
             yaw: 0.0,
             scale: 1.0,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         };
@@ -1008,6 +1023,7 @@ mod tests {
             yaw: 0.0,
             scale: 1.0,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         };
@@ -1049,6 +1065,53 @@ mod tests {
     }
 
     #[test]
+    fn foliage_that_casts_no_shadow_draws_items_that_cast_none() {
+        let folder =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh");
+        let assets = Assets::new(&folder);
+        let path = "assets/models/pyramid.gltf";
+        assert_eq!(
+            assets.request_model(path).wait(),
+            axcenity_assets::LoadStatus::Ready
+        );
+        let mut world = axcenity_core::World::new();
+        let terrain = world.create(ClassName::Terrain).unwrap();
+        world.set_parent(terrain, Some(world.workspace())).unwrap();
+        let mut data = TerrainData::flat(9, 9, 0.25).unwrap();
+        let at = |source, x, shadow| FoliageInstance {
+            source,
+            x,
+            z: 4.0,
+            yaw: 0.0,
+            scale: 1.0,
+            collide: false,
+            shadow,
+            lean: 0.0,
+            sink: 0.0,
+        };
+        data.foliage_mut().extend([
+            at(FoliageSource::Plant(FoliagePlant::Grass), 1.0, false),
+            at(FoliageSource::Model(path.to_owned()), 4.0, false),
+            at(FoliageSource::Prop(FoliageProp::Crate), 7.0, true),
+        ]);
+        world.set_terrain(terrain, std::sync::Arc::new(data));
+        let placement = Placement::of(world.get(terrain).unwrap()).unwrap();
+        let data = world.terrain(terrain).unwrap();
+        let items = built(terrain, &placement, data, &assets);
+        let model = assets.model_ready(path).unwrap();
+        let crates = items
+            .iter()
+            .filter(|item| matches!(item.shape, Shape::Block))
+            .count();
+        assert!(crates >= 1);
+        assert!(items.len() > crates + model.primitives.len());
+        for item in &items {
+            let is_crate = matches!(item.shape, Shape::Block);
+            assert_eq!(item.casts_shadow, is_crate, "{:?}", item.shape);
+        }
+    }
+
+    #[test]
     fn a_painted_model_appears_when_it_has_loaded() {
         let folder =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples/projects/mesh");
@@ -1074,6 +1137,7 @@ mod tests {
             yaw: 0.0,
             scale: 1.0,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         });
@@ -1126,6 +1190,7 @@ mod tests {
             yaw: 0.0,
             scale: 2.0,
             collide: false,
+            shadow: true,
             lean: 0.0,
             sink: 0.0,
         });

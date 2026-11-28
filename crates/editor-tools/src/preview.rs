@@ -41,6 +41,24 @@ impl Canvas {
         )
     }
 
+    /// Uses `renderer`, made on another thread (its pipelines take a while
+    /// to build), from now on: the first [`paint`](Self::paint) then has
+    /// nothing to wait for. It's resized to the rectangle when it paints.
+    pub fn adopt(&mut self, renderer: TextureRenderer, render_state: &RenderState) {
+        let texture_id = render_state.renderer.write().register_native_texture(
+            &render_state.device,
+            renderer.view(),
+            wgpu::FilterMode::Linear,
+        );
+        if let Some(old) = self.target.take() {
+            render_state.renderer.write().free_texture(&old.texture_id);
+        }
+        self.target = Some(Target {
+            renderer,
+            texture_id,
+        });
+    }
+
     /// Renders `list` and shows it in `rect`.
     pub fn paint(
         &mut self,

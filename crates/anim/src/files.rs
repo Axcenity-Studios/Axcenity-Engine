@@ -46,6 +46,10 @@ fn yes() -> bool {
     true
 }
 
+fn is_one(value: &f64) -> bool {
+    *value == 1.0
+}
+
 fn is_false(value: &bool) -> bool {
     !value
 }
@@ -964,6 +968,23 @@ pub struct BlendTree {
 pub struct BlendChild {
     pub clip: String,
     pub threshold: f64,
+    /// Plays its clip this many times as fast (1, left out of the file):
+    /// a walk and a run whose strides keep up with their thresholds' speeds.
+    /// Mixed, the tree's length is between its clips', by their shares, so
+    /// the cadence goes from one clip's to the other's as the parameter does.
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub speed: f64,
+}
+
+impl BlendChild {
+    /// `clip` at `threshold`, at its own speed.
+    pub fn new(clip: impl Into<String>, threshold: f64) -> Self {
+        Self {
+            clip: clip.into(),
+            threshold,
+            speed: 1.0,
+        }
+    }
 }
 
 /// Each child's weight in a 1D blend at `value`, by their `thresholds` (in
@@ -1388,15 +1409,19 @@ mod tests {
                 BlendChild {
                     clip: "assets/animations/hero/Idle.anim.json".into(),
                     threshold: 0.0,
+                    speed: 1.0,
                 },
                 BlendChild {
                     clip: "assets/animations/hero/Run.anim.json".into(),
                     threshold: 6.0,
+                    speed: 1.36,
                 },
             ],
         });
         let text = controller.to_json();
         assert!(text.contains("\"blend_tree\""), "{text}");
+        // A speed of 1 is left out of the file; another is kept.
+        assert_eq!(text.matches("\"speed\": 1.36").count(), 1, "{text}");
         assert_eq!(StateMachineFile::from_json(&text).unwrap(), controller);
         assert_eq!(controller.states[0].motion.clips().len(), 2);
     }

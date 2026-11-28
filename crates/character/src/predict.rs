@@ -12,13 +12,17 @@ use axcenity_core::{InstanceId, Value, Vector3, World};
 use crate::{Body, Controllers, Eye, Fall, MoveInput, set_crouch};
 
 /// One step of a character as its device took it: the keys, the camera's
-/// turn (radians) the keys walk by, and how long the step was. Mouse look
-/// and zoom are the camera's, not the character's, and stay out.
+/// turn (radians) the keys walk by, how long the step was, and whether the
+/// camera was at the eyes (a third-person one zoomed all the way in), when
+/// the character faces the camera's turn at once instead of turning toward
+/// the way it walks. Mouse look and zoom are the camera's, not the
+/// character's, and stay out.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Drive {
     pub input: MoveInput,
     pub yaw: f32,
     pub seconds: f32,
+    pub eyes: bool,
 }
 
 /// Where a character is and how it moves, as prediction compares and puts
@@ -71,6 +75,7 @@ impl Controllers {
         let Some(eye) = Eye::of(world, id) else {
             return;
         };
+        let eye = if drive.eyes { Eye::Eyes } else { eye };
         let dt = if drive.seconds.is_finite() && drive.seconds > 0.0 {
             drive.seconds
         } else {

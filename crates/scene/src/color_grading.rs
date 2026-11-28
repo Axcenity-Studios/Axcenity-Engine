@@ -6,9 +6,11 @@ use axcenity_core::{ClassName, Instance, Value, World};
 use axcenity_render::{ColorGrading, ColorLookup, MAX_PALETTE_COLORS};
 
 /// The grading Lighting's enabled `ColorCorrectionEffect`s make, if it has
-/// any. Several add their brightness, contrast and saturation and multiply
-/// their tints; the first (in Explorer order) with a lookup table, a
-/// posterize level or a palette gives that.
+/// any. Several add their brightness, contrast, saturation, balance and
+/// curve and multiply their tints (`TintColor`, `ShadowTint`,
+/// `HighlightTint`); the first (in Explorer order) with a curve gives its
+/// pivot, and the first with a lookup table, a posterize level or a palette
+/// gives that.
 pub(crate) fn grading_of(world: &World, assets: &Assets) -> Option<ColorGrading> {
     grading_in(world, world.get(world.lighting())?, assets)
 }
@@ -41,9 +43,23 @@ pub(crate) fn grading_in(
         grading.brightness += number("Brightness");
         grading.contrast += number("Contrast");
         grading.saturation += number("Saturation");
-        if let Some(tint) = effect.property("TintColor").and_then(Value::as_color3) {
-            for (channel, by) in grading.tint.iter_mut().zip([tint.r, tint.g, tint.b]) {
-                *channel *= by;
+        grading.balance += number("Balance");
+        if grading.curve == 0.0 && number("Curve") != 0.0 {
+            grading.curve_pivot = match effect.property("CurvePivot") {
+                Some(Value::Number(value)) if value.is_finite() => *value as f32,
+                _ => 0.5,
+            };
+        }
+        grading.curve += number("Curve");
+        for (name, tint) in [
+            ("TintColor", &mut grading.tint),
+            ("ShadowTint", &mut grading.shadow_tint),
+            ("HighlightTint", &mut grading.highlight_tint),
+        ] {
+            if let Some(by) = effect.property(name).and_then(Value::as_color3) {
+                for (channel, by) in tint.iter_mut().zip([by.r, by.g, by.b]) {
+                    *channel *= by;
+                }
             }
         }
         let path = |name| effect.property(name).and_then(Value::as_str);
@@ -130,6 +146,41 @@ mod tests {
         set(&mut world, first, "Enabled", Value::Bool(true));
         world.set_parent(first, Some(world.workspace())).unwrap();
         assert_eq!(grading_of(&world, &assets), None);
+    }
+
+    #[test]
+    fn split_toning_and_the_curve_combine_across_effects() {
+        let assets = Assets::default();
+        let mut world = World::new();
+        let first = effect(&mut world);
+        let second = effect(&mut world);
+        let plain = grading_of(&world, &assets).unwrap();
+        assert_eq!(
+            (plain.shadow_tint, plain.highlight_tint, plain.balance),
+            ([1.0; 3], [1.0; 3], 0.0),
+            "white tints and no balance by default"
+        );
+        assert_eq!((plain.curve, plain.curve_pivot), (0.0, 0.5));
+
+        let color = |r, g, b| Value::Color3(Color3::new(r, g, b));
+        set(&mut world, first, "ShadowTint", color(0.5, 1.0, 1.0));
+        set(&mut world, second, "ShadowTint", color(1.0, 0.5, 1.0));
+        set(&mut world, first, "HighlightTint", color(1.0, 1.0, 0.5));
+        set(&mut world, first, "Balance", Value::Number(0.25));
+        set(&mut world, second, "Balance", Value::Number(0.25));
+        // The second's curve comes first with a strength, so its pivot.
+        set(&mut world, first, "CurvePivot", Value::Number(0.2));
+        set(&mut world, second, "Curve", Value::Number(0.3));
+        set(&mut world, second, "CurvePivot", Value::Number(0.4));
+        let graded = grading_of(&world, &assets).unwrap();
+        assert_eq!(graded.shadow_tint, [0.5, 0.5, 1.0], "tints multiply");
+        assert_eq!(graded.highlight_tint, [1.0, 1.0, 0.5]);
+        assert_eq!(graded.balance, 0.5, "balances add");
+        assert_eq!((graded.curve, graded.curve_pivot), (0.3, 0.4));
+        set(&mut world, first, "Curve", Value::Number(0.2));
+        let both = grading_of(&world, &assets).unwrap();
+        assert!((both.curve - 0.5).abs() < 1e-6, "curves add");
+        assert_eq!(both.curve_pivot, 0.2, "the first with a curve");
     }
 
     #[test]

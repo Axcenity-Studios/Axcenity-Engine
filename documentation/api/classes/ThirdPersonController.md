@@ -134,6 +134,14 @@ ThirdPersonController.AutoRotate: boolean
 
 If true, the character turns about the middle of its body to face the way it walks (a first-person one, the way the camera looks). It's taken to face -Z when Play starts.
 
+#### TurnSpeed
+
+```luau
+ThirdPersonController.TurnSpeed: number
+```
+
+The fastest the character turns to face the way it walks, in degrees a second (720). Each step turns it part of the way that's left, so it eases into a turn and settles at the end, and a turn started goes on to the end after the keys are let go. 0 turns it at once. A camera at the eyes (a first-person one, or a third-person one zoomed all the way in) turns the character with the camera at once.
+
 #### CameraDistance
 
 ```luau
@@ -148,7 +156,7 @@ How far behind the character the camera sits during Play, in studs. The mouse wh
 ThirdPersonController.CameraMinZoomDistance: number
 ```
 
-The closest the mouse wheel zooms the camera, in studs (at least 0.5). Set it to CameraMaxZoomDistance to lock the distance.
+The closest the mouse wheel zooms the camera, in studs (at least 0.5). At 0.5, zooming all the way in puts the camera at the character's eyes (first person: the eye bones of a skinned body, and the mouse looks round without a button); set it higher to keep the camera behind the character. Set it to CameraMaxZoomDistance to lock the distance.
 
 #### CameraMaxZoomDistance
 

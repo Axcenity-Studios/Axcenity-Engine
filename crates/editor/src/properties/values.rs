@@ -25,6 +25,13 @@ pub(super) fn number_limits(name: &str) -> Option<(f64, std::ops::RangeInclusive
         "RollOffMinDistance" | "RollOffMaxDistance" => (1.0, 0.0..=100_000.0),
         "NormalStrength" | "EmissiveStrength" | "TextSize" => (0.01, 0.0..=f64::INFINITY),
         "DesignWidth" | "DesignHeight" => (1.0, 1.0..=10_000.0),
+        // A ColorCorrectionEffect's split toning balance and curve.
+        "Balance" | "Curve" => (0.01, -1.0..=1.0),
+        "CurvePivot" => (0.01, 0.0..=1.0),
+        // An Atmosphere's height fog.
+        "FogDensity" => (0.01, 0.0..=100.0),
+        "FogFalloff" => (0.5, 0.1..=10_000.0),
+        "FogStart" => (1.0, 0.0..=f64::INFINITY),
         _ => return None,
     })
 }

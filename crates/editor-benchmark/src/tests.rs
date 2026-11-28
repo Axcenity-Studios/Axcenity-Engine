@@ -109,6 +109,7 @@ fn changes_has_a_row_for_every_setting() {
         ambient_occlusion: _,
         reflection_quality: _,
         contact_shadows: _,
+        screen_space_reflections: _,
         realtime_gi: _,
         volumetric_fog: _,
         cloud_quality: _,
@@ -121,12 +122,13 @@ fn changes_has_a_row_for_every_setting() {
         motion_blur: _,
         ray_tracing_distance: _,
         ray_traced_shadows: _,
+        ray_traced_shadow_resolution: _,
         ray_traced_ambient_occlusion: _,
         ray_traced_global_illumination: _,
         ray_traced_reflections: _,
         ray_tracing: _,
     } = &high;
-    let edits: [fn(&mut GraphicsSettings); 28] = [
+    let edits: [fn(&mut GraphicsSettings); 30] = [
         |s| s.quality = Quality::Low,
         |s| s.automatic = !s.automatic,
         |s| s.shadow_quality = other(s.shadow_quality(), ShadowQuality::Low, ShadowQuality::Ultra),
@@ -157,6 +159,7 @@ fn changes_has_a_row_for_every_setting() {
             )
         },
         |s| s.contact_shadows = Some(!s.contact_shadows()),
+        |s| s.screen_space_reflections = Some(!s.screen_space_reflections()),
         |s| s.realtime_gi = Some(!s.realtime_gi()),
         |s| s.volumetric_fog = Some(!s.volumetric_fog()),
         |s| s.cloud_quality = other(s.cloud_quality(), CloudQuality::Low, CloudQuality::Ultra),
@@ -185,6 +188,13 @@ fn changes_has_a_row_for_every_setting() {
                 s.ray_traced_shadows(),
                 RayTracedShadows::Off,
                 RayTracedShadows::High,
+            )
+        },
+        |s| {
+            s.ray_traced_shadow_resolution = other(
+                s.ray_traced_shadow_resolution(),
+                axcenity_render::RayShadowResolution::Half,
+                axcenity_render::RayShadowResolution::Full,
             )
         },
         |s| {

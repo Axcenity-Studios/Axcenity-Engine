@@ -217,10 +217,11 @@ fn item_vertex(vertex: VertexIn, instance: InstanceIn) -> VertexOut {
     // that face up rise by its depth. Not on what's see-through or cut out
     // (leaves take snow by their crown, `lit_leaf`), on what sways or is
     // posed, or on a decal.
-    out.hangs = select(0.0, 1.0, instance.sway.y < 0.0 && instance.sway.z > 0.0);
+    let moves = instance.sway.z > 0.0 || fract(instance.sway.w) > 0.0;
+    out.hangs = select(0.0, 1.0, instance.sway.y < 0.0 && moves);
     out.rise = 0.0;
     if frame.weather.y > 0.0 && frame.weather.z > 0.0 && instance.base_color.a >= 1.0
-        && instance.surface.z <= 0.0 && instance.sway.z <= 0.0 && instance.skin.y == 0u
+        && instance.surface.z <= 0.0 && !moves && instance.skin.y == 0u
         && floor(instance.sway.w) != ROLE_DECAL {
         let facing = world_normal / max(length(world_normal), 1e-6);
         out.rise = snow_cap(world_position.xyz, facing.y);
@@ -317,13 +318,13 @@ fn vs_shadow(
 struct ShadowCutOut {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
-    // The item's own opacity and its cutoff.
-    @location(1) @interpolate(flat) cut: vec2<f32>,
+    // The item's own opacity, its cutoff, and how much of its shadow it
+    // casts (1 all of it; less near the end of its shadow's reach).
+    @location(1) @interpolate(flat) cut: vec3<f32>,
 }
 
-// Draws a cut-out caster (a hair card: `plan_part` sends no other here,
-// since through their holes foliage's shadows cost twice as much) into a
-// shadow map, as `vs_shadow` does, with what its fragment needs to leave
+// Draws a cut-out caster (a leaf card, a blade of grass, a hair card) into
+// a shadow map, as `vs_shadow` does, with what its fragment needs to leave
 // out its holes. Its texture coordinates aren't tiled by its size: a
 // cut-out drawn that way (`DrawItem::uv_tile`) casts its whole mesh.
 @vertex
@@ -336,6 +337,7 @@ fn vs_shadow_cut_out(
     @location(4) model_2: vec4<f32>,
     @location(5) model_3: vec4<f32>,
     @location(9) base_color: vec4<f32>,
+    @location(10) emissive_fade: vec4<f32>,
     @location(11) surface: vec4<f32>,
     @location(14) skin: vec2<u32>,
     @location(15) sway: vec4<f32>,
@@ -346,12 +348,12 @@ fn vs_shadow_cut_out(
     var out: ShadowCutOut;
     out.clip_position = shadow_cascade * vec4<f32>(world, 1.0);
     out.uv = mat2x2<f32>(maps.uv_matrix.xy, maps.uv_matrix.zw) * uv + maps.uv_offset.xy;
-    out.cut = vec2<f32>(base_color.a, surface.z);
+    out.cut = vec3<f32>(base_color.a, surface.z, emissive_fade.w);
     return out;
 }
 
 // A cut-out caster's pixel of a shadow map: left out where its texture is
-// cut out, so strands cast their own shapes, not their cards'.
+// cut out, so leaves and strands cast their own shapes, not their cards'.
 // A hair card's opacity is hashed against a fixed per-texel pattern over
 // the band round its cutoff (`HAIR_HASH_BAND`, as the scene pass hashes
 // it under TAA), so the shadow map's filter averages a strand's soft
@@ -367,7 +369,10 @@ fn fs_shadow_cut_out(in: ShadowCutOut) {
         threshold = clamp(in.cut.y + HAIR_HASH_BAND * (pixel_noise(in.clip_position.xy) - 0.5),
             0.002, 0.998);
     }
-    if opacity < threshold {
+    // A caster near the end of its shadow's reach (renderer/lod.rs) casts
+    // a share of it: the rest of its texels are left out by the same fixed
+    // pattern, and the shadow filter averages them into a lighter shadow.
+    if opacity < threshold || dithered_out(in.cut.z, in.clip_position.xy) {
         discard;
     }
 }
@@ -563,19 +568,26 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
     let footprint = skin_footprint(in, shaded.normal, facing);
 
     // Cut-out materials (leaves, fences) leave holes where the texture is
-    // clear (a hair card's, hashed under TAA: `hair_cut_threshold`).
-    let cut = hair_cut_threshold(in, in.surface.z, data_texel.g);
+    // clear (a hair card's, hashed under TAA: `hair_cut_threshold`; far
+    // off, any cut-out's: `cut_threshold`).
+    let blur = cut_out_blur(in.uv);
+    let cut = cut_threshold(in, in.surface.z, data_texel.g, blur);
     if shaded.opacity < cut || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }
     return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, data_texel, footprint);
 }
 
-// A cut-out surface, in the scene pass. Its depth was drawn just before
-// (`fs_depth_only`), so the depth test (equal) already passes only its
-// nearest layer, and only where it isn't cut out. With no `discard` here
-// the GPU tests depth before running this, so the leaves hidden behind
-// the nearest one are never lit.
+// A surface every pixel of which is drawn, in the scene pass
+// (`PrefillPipelines` in renderer/types.rs). With no `discard` here the
+// GPU tests depth before running this, so what's hidden is never lit;
+// `fs_main`, which can discard, is run first and tested after.
+//
+// A cut-out surface's depth was drawn just before (`fs_depth_only`), so
+// its depth test (equal) passes only its nearest layer, and only where it
+// isn't cut out: the leaves hidden behind the nearest one are never lit.
+// A solid item with no cutoff that isn't fading (`dithered_out`) has
+// nothing `fs_main` would discard, so it's lit here with the plain test.
 @fragment
 fn fs_prefilled(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     let facing = select(-1.0, 1.0, front);
@@ -585,6 +597,88 @@ fn fs_prefilled(in: VertexOut, @builtin(front_facing) front: bool) -> @location(
     let data_texel = textureSample(metalness_texture, material_sampler, in.uv);
     let footprint = skin_footprint(in, shaded.normal, facing);
     return lit_pixel(in, facing, shaded, occlusion_texel, specular_texel, data_texel, footprint);
+}
+
+// Measuring only (`AXCENITY_PLANT_PROBE`, docs/rendering/performance.md):
+// scattered items' pixels in the scene pass with part of `fs_main`'s work
+// left out, to tell what their time is spent on. The picture is wrong
+// while one is on.
+//
+// `flat`: nothing read, so the vertex shader carries nothing to a corner
+// but its position, and a pixel costs nothing.
+@fragment
+fn fs_probe_flat() -> @location(0) vec4<f32> {
+    return vec4<f32>(0.18, 0.18, 0.18, 1.0);
+}
+
+// `carried`: everything the vertex shader carries is read, and nothing is
+// done with it. Against `flat`, the cost of carrying it.
+@fragment
+fn fs_probe_carried(in: VertexOut) -> @location(0) vec4<f32> {
+    let sum = in.world_position + in.normal + in.base_color.rgb + in.emissive + in.surface
+        + in.tangent.xyz + in.item_middle + in.item_half_size
+        + vec3<f32>(in.uv, in.fade) + vec3<f32>(in.role, in.rise, in.hangs);
+    return vec4<f32>(fract(sum * 0.01), in.base_color.a + in.tangent.w);
+}
+
+// `surface`: the material's textures are read as `fs_prefilled` reads
+// them, and the surface is not lit. Against `carried`, the textures'
+// cost; against the pass as it is, the lighting's.
+@fragment
+fn fs_probe_surface(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
+    let facing = select(-1.0, 1.0, front);
+    let shaded = pixel_surface(in, facing);
+    let occlusion_texel = textureSample(occlusion_texture, material_sampler, in.uv);
+    let specular_texel = textureSample(specular_texture, material_sampler, in.uv);
+    let data_texel = textureSample(metalness_texture, material_sampler, in.uv);
+    let rest = occlusion_texel.rgb + specular_texel.rgb + data_texel.rgb + shaded.normal
+        + shaded.emissive + vec3<f32>(shaded.metalness, shaded.roughness, shaded.opacity);
+    return vec4<f32>(shaded.base_color + rest * 0.001, 1.0);
+}
+
+// How far mipmaps have averaged a cut-out's alpha where this pixel reads
+// it: 0 while its texture is read within 2.5 levels of full size, rising to
+// 1 four levels down. Nearer, the mips keep most of an atlas's shapes and
+// the cutoff loses little. A leaf atlas's alpha is whole or clear, and its mips
+// average that into a grey: under the cutoff a far bush thinned to
+// nothing, over it it filled in solid. That grey is the share of texels
+// covered, so under TAA it is kept as coverage instead (`cut_threshold`). The level is the hardware's, from the shorter of
+// the pixel's two steps across the texture (anisotropic filtering reads
+// along the longer one at about that level). Called before any branch:
+// it takes derivatives.
+fn cut_out_blur(uv: vec2<f32>) -> f32 {
+    let size = vec2<f32>(select(textureDimensions(base_color_texture),
+        textureDimensions(opacity_texture), maps.settings.w > 0.5));
+    let across = dpdx(uv) * size;
+    let down = dpdy(uv) * size;
+    let level = 0.5 * log2(max(min(dot(across, across), dot(down, down)), 1e-8));
+    return clamp((level - 2.5) / 1.5, 0.0, 1.0);
+}
+
+// The opacity under which a cut-out's pixel at `pixel` is cut: a hair
+// card's (`hair_cut_threshold`), or a Standard cut-out's cutoff. While TAA
+// is on (`frame.noise.y`), a Standard cut-out's drifts with `blur`
+// (`cut_out_blur`) toward a threshold that changes from pixel to pixel and
+// frame to frame (hashed alpha), so the share of pixels kept is the
+// averaged alpha, the share of the texture covered, and TAA averages them
+// smooth. Without TAA it stays the cutoff: nothing averages a still pattern,
+// and MSAA's alpha to coverage or a fixed hash showed as a dither over every
+// far canopy (a fixed 2×2 pattern on RADV) where the cutoff's solid crowns
+// had looked right.
+fn cut_threshold(in: VertexOut, cutoff: f32, strand: f32, blur: f32) -> f32 {
+    if maps.shading.x == SHADING_HAIR {
+        return hair_cut_threshold(in, cutoff, strand);
+    }
+    return far_cut_threshold(cutoff, blur, in.clip_position.xy);
+}
+
+// `cut_threshold` for a Standard cut-out.
+fn far_cut_threshold(cutoff: f32, blur: f32, pixel: vec2<f32>) -> f32 {
+    if cutoff <= 0.0 || blur <= 0.0 || frame.noise.y == 0.0 {
+        return cutoff;
+    }
+    let noise = fract(pixel_noise(pixel) + 0.618034 * frame.noise.x);
+    return mix(cutoff, clamp(noise, 0.002, 0.998), blur);
 }
 
 // A cut-out surface's opacity at this pixel, as `standard_surface` and
@@ -601,7 +695,8 @@ fn cut_out_opacity(in: VertexOut) -> f32 {
 @fragment
 fn fs_depth_only(in: VertexOut) -> @location(0) vec4<f32> {
     let strand = textureSample(metalness_texture, material_sampler, in.uv).g;
-    let cut = hair_cut_threshold(in, in.surface.z, strand);
+    let blur = cut_out_blur(in.uv);
+    let cut = cut_threshold(in, in.surface.z, strand, blur);
     if cut_out_opacity(in) < cut || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }
@@ -648,9 +743,10 @@ fn lit_pixel(
     let roughness = clamp(shaded.roughness, 0.04, 1.0);
     // The map's, and for solid items the screen-space ambient occlusion's.
     let solid = in.base_color.a >= 1.0;
-    let occlusion = mix(
-        1.0, map_value(occlusion_texel, maps.occlusion, maps.invert.z), maps.settings.z)
-        * select(1.0, screen_occlusion(in.clip_position.xy), solid);
+    let mapped = mix(
+        1.0, map_value(occlusion_texel, maps.occlusion, maps.invert.z), maps.settings.z);
+    let screen = select(1.0, screen_occlusion(in.clip_position.xy), solid);
+    let occlusion = mapped * screen;
     // Non-metals reflect about 4% of light, or as their specular map says.
     let dielectric = mix(vec3<f32>(0.04), 0.08 * specular_texel.rgb, maps.specular.x);
 
@@ -669,18 +765,31 @@ fn lit_pixel(
     } else if maps.shading.x == SHADING_CLOTH {
         color = cloth_surface(in, facing, geometric, shaded, metalness, roughness, occlusion,
             dielectric, solid);
-    } else if maps.shading.y > 0.0 && in.hangs > 0.5 {
+    } else if maps.shading.y > 0.0 && in.hangs > 0.5 && maps.shading.z < 0.5 {
         color = lit_thin_cloth(in, shaded, geometric, metalness, roughness, occlusion, dielectric,
             solid, maps.shading.y);
     } else if maps.shading.y > 0.0 {
-        color = lit_leaf(in, shaded, geometric, metalness, roughness, occlusion, dielectric,
-            solid, maps.shading.y);
+        // A crown of leaf cards isn't a solid ball: light comes through its
+        // leaves and its holes, and `lit_leaf` shades its inside and its foot
+        // itself, so screen-space occlusion counts for a share of its strength.
+        color = lit_leaf(in, shaded, geometric, metalness, roughness,
+            mapped * pow(screen, LEAF_SCREEN_OCCLUSION), dielectric, solid, maps.shading.y,
+            maps.shading.z > 0.5);
     } else {
         // Bump shadowing only with a normal map (`maps.settings.x`, its
         // scale, is 0 without one).
-        color = light_surface(in.world_position, geometric, shaded.normal, in.clip_position.xy,
+        // Where its ambient occlusion map is dark, it lies low: water
+        // gathers there first when it's wet.
+        var cavity = -1.0;
+        if maps.settings.z > 0.0 {
+            let open = map_value(occlusion_texel, maps.occlusion, maps.invert.z);
+            cavity = saturate((1.0 - open) * WET_CAVITY_FROM_OCCLUSION * maps.settings.z);
+            // Its own relief shades slanting sunlight in its cracks.
+            micro_open = mapped;
+        }
+        color = light_surface_low(in.world_position, geometric, shaded.normal, in.clip_position.xy,
             shaded.base_color, metalness, roughness, occlusion, dielectric, solid,
-            maps.settings.x != 0.0);
+            maps.settings.x != 0.0, cavity, true);
     }
 
     // Solid items stay solid whatever the texture's alpha, so the window's
@@ -690,8 +799,24 @@ fn lit_pixel(
     return vec4<f32>(seen, alpha);
 }
 
+// How dark an ambient occlusion map must be (times this) for water to
+// gather there as in the deepest crack (`light_surface_low`).
+const WET_CAVITY_FROM_OCCLUSION: f32 = 1.6;
+// The smoothest a film of water leaves a leaf (`lit_leaf`).
+const WET_LEAF_ROUGHNESS: f32 = 0.4;
+
 // How much of what a translucent surface passes on it no longer reflects.
 const LEAF_REFLECTION_LOSS: f32 = 0.6;
+
+// How much of screen-space ambient occlusion's darkening a leaf takes (an
+// exponent on it). The prepass sees a crown as a heap of solid cards, so
+// each leaf in it was darkened as if it were deep in a solid ball, on top of
+// the crown's own shade (`CANOPY_DEPTH_SHADE`, `LEAF_FOOT_SHADE`): at the
+// Overgrown Street showcase's strength (1.6) every crown went near black.
+// Leaves pass light and the cards have holes, so they take half of it
+// (its square root): enough to keep the clusters of leaves apart (0.35
+// flattened a forest seen from above).
+const LEAF_SCREEN_OCCLUSION: f32 = 0.5;
 
 // How much of each color a leaf lets through, compared with what it
 // reflects: green and red pass, blue is taken, so lit from behind it glows
@@ -727,9 +852,19 @@ const LEAF_GROUND_LIFT: f32 = 0.8;
 const LEAF_GROUND_HEIGHTS: vec2<f32> = vec2<f32>(3.0, 9.0);
 // How much of the surrounding light reaches the foot of a plant, and how far
 // up it (of its height) the shade lasts: its own leaves and stems stand in
-// the way, so it's darker toward the ground and sits on it.
+// the way, so it's darker toward the ground and sits on it. Ground cover
+// (`LEAF_GROUND_HEIGHTS`) is shaded more: a tuft of grass or a fern is
+// densest at its foot, and its foot is what meets the ground. Screen-space
+// occlusion, which had darkened it there, counts for less on leaves now
+// (`LEAF_SCREEN_OCCLUSION`).
 const LEAF_FOOT_SHADE: f32 = 0.55;
+const LEAF_FOOT_SHADE_LOW: f32 = 0.3;
 const LEAF_FOOT_REACH: f32 = 0.5;
+// How far the sky that comes through a leaf is taken from above rather than
+// from straight behind it (added to the far side's direction before it's
+// made unit length): light comes down through a crown or a tuft from leaf
+// to leaf, so even a leaf whose far side faces the ground glows a little.
+const LEAF_SKY_WRAP: f32 = 0.35;
 // How much individual leaves differ in brightness and in hue.
 const LEAF_TONE_VARIATION: f32 = 0.2;
 const LEAF_HUE_VARIATION: f32 = 0.18;
@@ -779,26 +914,40 @@ fn lit_leaf(
     dielectric: vec3<f32>,
     solid: bool,
     amount: f32,
+    // A leaf with a sheen of its own (ivy; `Material::glossy_leaf`): at its
+    // own roughness, not raised to a leaf's least.
+    glossy_leaf: bool,
 ) -> vec3<f32> {
     let canopy = leaf_canopy(in.world_position, in.item_middle, in.item_half_size, shaded.normal);
     let low = 1.0 - smoothstep(LEAF_GROUND_HEIGHTS.x, LEAF_GROUND_HEIGHTS.y,
         2.0 * in.item_half_size.y);
-    let bent = normalize(mix(shaded.normal, canopy.normal, CANOPY_BEND)
-        + vec3<f32>(0.0, LEAF_GROUND_LIFT * low, 0.0));
+    let crown = mix(shaded.normal, canopy.normal, CANOPY_BEND);
+    let bent = normalize(crown + vec3<f32>(0.0, LEAF_GROUND_LIFT * low, 0.0));
+    // The sky comes through from the leaf's far side in its crown, not lifted
+    // as a low plant's light is (lifted, a tuft's far side faced the ground,
+    // so grass let through only the ground's dark and was darker than if it
+    // let nothing through), and partly from above (`LEAF_SKY_WRAP`).
+    let away = -crown / max(length(crown), 1e-4);
+    let far = normalize(away + vec3<f32>(0.0, LEAF_SKY_WRAP, 0.0));
     let base_color = leaf_tone(normalize(in.normal), in.world_position, shaded.base_color);
     // Darker toward its foot, where the plant shades itself.
     let foot = in.item_middle.y - in.item_half_size.y;
     let up_it = (in.world_position.y - foot) / max(2.0 * in.item_half_size.y, 0.001);
     let open = mix(CANOPY_DEPTH_SHADE, 1.0, canopy.openness)
-        * mix(LEAF_FOOT_SHADE, 1.0, smoothstep(0.0, LEAF_FOOT_REACH, up_it));
-    let rough = max(roughness,
-        mix(LEAF_ROUGHNESS_INSIDE, LEAF_ROUGHNESS_OUTSIDE, canopy.openness));
+        * mix(mix(LEAF_FOOT_SHADE, LEAF_FOOT_SHADE_LOW, low), 1.0,
+            smoothstep(0.0, LEAF_FOOT_REACH, up_it));
+    let rough = select(max(roughness,
+        mix(LEAF_ROUGHNESS_INSIDE, LEAF_ROUGHNESS_OUTSIDE, canopy.openness)), roughness,
+        glossy_leaf);
     // Rain and snow lie on the plant, not on each card of it: on the top of
     // its crown, the way the crown faces there, and more on the cards that
     // face up themselves. No water stands on leaves.
     let lie = normalize(mix(shaded.normal, canopy.normal, LEAF_SNOW_CROWN)
         + vec3<f32>(0.0, LEAF_SNOW_LIFT * canopy.openness, 0.0));
-    let weather = weathered_lying(in.world_position, lie, false, false, bent, base_color, metalness, rough);
+    var weather = weathered_lying(in.world_position, lie, false, false, -1.0, bent, base_color,
+        metalness, rough);
+    // A wet leaf has a sheen, never a mirror's shine.
+    weather.roughness = max(weather.roughness, min(rough, WET_LEAF_ROUGHNESS));
     // `bent` leans by the crown, not by bumps: no bump shadowing.
     let reflected_light = shade_surface(in.world_position, geometric, weather.normal,
         in.clip_position.xy, weather.base_color, weather.metalness, weather.roughness,
@@ -806,7 +955,7 @@ fn lit_leaf(
     // What passes through isn't also reflected, and nothing passes snow.
     let through = amount * (1.0 - weather.snow);
     return reflected_light * (1.0 - LEAF_REFLECTION_LOSS * through)
-        + through_thin(in.world_position, geometric, shaded.normal, bent, in.clip_position.xy,
+        + through_thin(in.world_position, geometric, shaded.normal, far, in.clip_position.xy,
             weather.base_color, THROUGH_LEAF_TINT, occlusion, open, through);
 }
 
@@ -833,20 +982,23 @@ fn lit_thin_cloth(
         occlusion, dielectric, solid, false);
     let through = amount * (1.0 - weather.snow);
     return reflected_light * (1.0 - LEAF_REFLECTION_LOSS * through)
-        + through_thin(in.world_position, geometric, shaded.normal, shaded.normal,
+        + through_thin(in.world_position, geometric, shaded.normal, -shaded.normal,
             in.clip_position.xy, weather.base_color, vec3<f32>(1.0), occlusion, 1.0, through);
 }
 
 // The light that comes through a thin surface from its far side, from the
 // sun and from the sky behind it, scattered evenly toward the viewer. The
 // sun lights each leaf by its own card (`n`), a sharp thing; the sky by the
-// crown around it (`bent`, `open`), a soft one. Occlusion counts by half:
-// what's close in front of a leaf doesn't block what reaches it from behind.
+// crown around it (`far`, the way its far side faces, and `open`), a soft
+// one. Occlusion counts by half: what's close in front of a leaf doesn't
+// block what reaches it from behind. What passes is at most what the
+// surface doesn't reflect (`LEAF_REFLECTION_LOSS`), so a pale leaf with a
+// strong tint can't give back more than reaches it.
 fn through_thin(
     world_position: vec3<f32>,
     geometric: vec3<f32>,
     n: vec3<f32>,
-    bent: vec3<f32>,
+    far: vec3<f32>,
     pixel: vec2<f32>,
     base_color: vec3<f32>,
     tint: vec3<f32>,
@@ -858,8 +1010,10 @@ fn through_thin(
         * cloud_shadow(frame.clouds, world_position, frame.sun_direction.xyz);
     let from_sun = frame.sun_radiance.rgb * sun_visible
         * max(dot(-n, frame.sun_direction.xyz), 0.0) / PI;
-    let from_sky = surrounding_diffuse(world_position, -bent, frame.sky_top.w) * open;
-    return amount * base_color * tint * mix(1.0, occlusion, 0.5) * (from_sun + from_sky);
+    let from_sky = surrounding_diffuse(world_position, far, frame.sky_top.w) * open;
+    let reflects = base_color * (1.0 - LEAF_REFLECTION_LOSS * amount);
+    let passes = min(amount * base_color * tint, max(vec3<f32>(1.0) - reflects, vec3<f32>(0.0)));
+    return passes * mix(1.0, occlusion, 0.5) * (from_sun + from_sky);
 }
 
 // `Maps::shading`'s models. Must match `SHADING_*` in renderer/types.rs.
@@ -974,7 +1128,8 @@ fn fs_prepass(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0)
     let facing = select(-1.0, 1.0, front);
     let shaded = pixel_surface(in, facing);
     let strand = textureSample(metalness_texture, material_sampler, in.uv).g;
-    let cut = hair_cut_threshold(in, in.surface.z, strand);
+    let blur = cut_out_blur(in.uv);
+    let cut = cut_threshold(in, in.surface.z, strand, blur);
     if shaded.opacity < cut || dithered_out(in.fade, in.clip_position.xy) {
         discard;
     }

@@ -37,7 +37,56 @@ const CULL_FADE: f32 = 0.1;
 /// a grass tuft's shadow is lost among the others well before the plant is,
 /// and there are thousands of them in every shadow view: ambient occlusion
 /// keeps them seated on the ground past this.
-const SHADOW_REACH: f32 = 0.35;
+const SHADOW_REACH: f32 = 0.45;
+
+/// The share of an item's cull distance its shadow thins out over, up to
+/// [`SHADOW_REACH`]: a shadow that went all at once showed as a pop on the
+/// ground each time the camera moved a plant across the line.
+const SHADOW_FADE: f32 = 0.1;
+
+/// How far an item with a cull distance casts its shadow, in shares of that
+/// distance ([`SHADOW_REACH`], [`SHADOW_FADE`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct ShadowReach {
+    /// Where its shadow ends.
+    pub(super) reach: f32,
+    /// How long before that it starts to thin out.
+    pub(super) fade: f32,
+}
+
+impl Default for ShadowReach {
+    /// The renderer's own, or `AXCENITY_SHADOW_REACH=reach,fade` to measure
+    /// others (`docs/rendering/shadows.md`).
+    fn default() -> Self {
+        let asked = std::env::var("AXCENITY_SHADOW_REACH").ok();
+        let mut asked = asked
+            .iter()
+            .flat_map(|text| text.split(','))
+            .map(|part| part.trim().parse::<f32>().ok().filter(|n| n.is_finite()));
+        let reach = asked.next().flatten().unwrap_or(SHADOW_REACH).max(0.0);
+        let fade = asked.next().flatten().unwrap_or(SHADOW_FADE);
+        Self {
+            reach,
+            fade: fade.clamp(0.0, reach),
+        }
+    }
+}
+
+impl ShadowReach {
+    /// How much of its shadow an item `distance` from the camera casts: all
+    /// of it (1) until the fade begins, none (0) from the reach on.
+    pub(super) fn share(self, distance: f32, cull_distance: f32) -> f32 {
+        let end = cull_distance * self.reach;
+        let band = cull_distance * self.fade;
+        if band > 0.0 {
+            ((end - distance) / band).clamp(0.0, 1.0)
+        } else if distance <= end {
+            1.0
+        } else {
+            0.0
+        }
+    }
+}
 
 /// An item not drawn for this many frames has its level forgotten.
 const FORGET_FRAMES: u64 = 600;
@@ -63,6 +112,10 @@ pub(super) struct Draw<'a> {
     /// False for the copy fading out of a switch: only the level coming in
     /// casts a shadow.
     pub(super) casts_shadow: bool,
+    /// How much of its shadow it casts: 1 all of it, less near the end of
+    /// its shadow's reach ([`ShadowReach::share`]), where the shadow passes
+    /// leave that share of it out, dithered.
+    pub(super) shadow: f32,
     /// Which of the frame's groups the item is in ([`Resolved::clusters`]),
     /// or [`NO_CLUSTER`] for one of the list's own items.
     pub(super) cluster: u32,
@@ -81,6 +134,7 @@ impl<'a> Draw<'a> {
             level: None,
             fade: OPAQUE,
             casts_shadow: item.casts_shadow,
+            shadow: 1.0,
             cluster: NO_CLUSTER,
             at: 0,
         }
@@ -158,6 +212,8 @@ pub(super) struct LodStates {
     /// The editor's LOD preview: the item with this [`DrawItem::id`] is
     /// drawn at this level whatever its size, with no fade.
     pub(super) forced: Option<(u64, usize)>,
+    /// How far items with a cull distance cast their shadows.
+    pub(super) shadows: ShadowReach,
 }
 
 /// What [`LodStates::resolve`] gives a frame.
@@ -207,7 +263,7 @@ impl LodStates {
     ) -> Resolved<'a> {
         let camera = &list.camera;
         let states = &self.states;
-        let forced = self.forced;
+        let forced = (self.forced, self.shadows);
         let mut parts = map_parts(&list.items, |items| {
             let mut part = Part {
                 draws: Vec::with_capacity(items.len()),
@@ -296,7 +352,7 @@ fn resolve_item<'a>(
     item: &'a DrawItem,
     camera: &Camera,
     frame: u64,
-    forced: Option<(u64, usize)>,
+    (forced, shadows): (Option<(u64, usize)>, ShadowReach),
     part: &mut Part<'a>,
 ) {
     let mut draw = Draw::of(item);
@@ -309,7 +365,8 @@ fn resolve_item<'a>(
         }
         let fade = (item.cull_distance - distance) / (item.cull_distance * CULL_FADE);
         draw.fade = fade.min(OPAQUE);
-        draw.casts_shadow &= distance <= item.cull_distance * SHADOW_REACH;
+        draw.shadow = shadows.share(distance, item.cull_distance);
+        draw.casts_shadow &= draw.shadow > 0.0;
     }
     let Shape::Mesh(source) = &item.shape else {
         part.draws.push(draw);
@@ -433,13 +490,61 @@ mod tests {
                 decal_role: Default::default(),
             };
             let mut part = Part::default();
-            resolve_item(&FxHashMap::default(), &item, &camera, 0, None, &mut part);
+            let shadows = ShadowReach {
+                reach: 0.35,
+                fade: 0.0,
+            };
+            let rules = (None, shadows);
+            resolve_item(&FxHashMap::default(), &item, &camera, 0, rules, &mut part);
             part.draws.first().map(|draw| draw.casts_shadow)
         };
         assert_eq!(casts(20.0, 100.0), Some(true), "near");
         assert_eq!(casts(50.0, 100.0), Some(false), "drawn with no shadow");
         assert_eq!(casts(150.0, 100.0), None, "past its cull distance");
         assert_eq!(casts(5000.0, 0.0), Some(true), "no cull distance: always");
+    }
+
+    #[test]
+    fn a_plants_shadow_thins_out_over_the_band_before_its_reach() {
+        let shadows = ShadowReach {
+            reach: 0.6,
+            fade: 0.2,
+        };
+        assert_eq!(shadows.share(30.0, 100.0), 1.0, "before the band");
+        assert_eq!(shadows.share(40.0, 100.0), 1.0, "where the band starts");
+        assert!((shadows.share(50.0, 100.0) - 0.5).abs() < 1e-5, "half way");
+        assert!(shadows.share(60.0, 100.0) < 1e-5, "at its reach");
+        assert_eq!(shadows.share(90.0, 100.0), 0.0, "past it");
+        // No band: all of it, then none.
+        let sudden = ShadowReach {
+            reach: 0.6,
+            fade: 0.0,
+        };
+        assert_eq!(sudden.share(59.0, 100.0), 1.0);
+        assert_eq!(sudden.share(61.0, 100.0), 0.0);
+        // A draw in the band still casts, and says how much.
+        let camera = Camera {
+            position: glam::Vec3::ZERO,
+            look_at: glam::Vec3::NEG_Z,
+            fov_y_degrees: 70.0,
+        };
+        let item = DrawItem {
+            shape: Shape::Block,
+            transform: glam::Mat4::from_translation(glam::Vec3::new(0.0, 0.0, -50.0)),
+            material: Default::default(),
+            uv_tile: 0.0,
+            casts_shadow: true,
+            id: 0,
+            cull_distance: 100.0,
+            skin: None,
+            sway: None,
+            decal_role: Default::default(),
+        };
+        let mut part = Part::default();
+        let rules = (None, shadows);
+        resolve_item(&FxHashMap::default(), &item, &camera, 0, rules, &mut part);
+        assert!(part.draws[0].casts_shadow);
+        assert!((part.draws[0].shadow - 0.5).abs() < 1e-5);
     }
 
     #[test]

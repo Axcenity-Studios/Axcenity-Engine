@@ -291,12 +291,7 @@ mod tests {
                 meshes: 3,
                 triangles: 1_234_567,
                 meshes_waiting: 2,
-                rebuilt: false,
-                path_traced_paths: 0,
-                bent: 0,
-                posed: 0,
-                posed_left_out: 0,
-                shadow_reach: 0,
+                ..Default::default()
             },
             ..RenderStats::default()
         };

@@ -44,6 +44,8 @@ pub struct ScatterItem {
     pub max_scale: f32,
     /// Whether parts rest on it (solid) or fall through it (visual only).
     pub collide: bool,
+    /// Whether it casts a shadow: [`FoliageInstance::shadow`].
+    pub shadow: bool,
     /// How far it's turned at random about the up axis, in degrees: 0
     /// faces every copy the same way, 360 any way.
     pub rotation: f32,
@@ -68,6 +70,7 @@ impl ScatterItem {
             min_scale: 0.85,
             max_scale: 1.15,
             collide: false,
+            shadow: true,
             rotation: 360.0,
             align_to_slope: 0.0,
             sink: 0.0,
@@ -329,6 +332,7 @@ pub(super) fn apply_scatter(
                     yaw: turn * rotation.to_radians(),
                     scale: low + size * (high - low),
                     collide: item.collide,
+                    shadow: item.shadow,
                     lean: if item.align_to_slope.is_finite() {
                         item.align_to_slope.clamp(0.0, 1.0)
                     } else {

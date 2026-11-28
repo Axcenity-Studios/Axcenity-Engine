@@ -22,7 +22,16 @@
 //!   first; one past the budget is left out (its mesh's rest pose would be
 //!   wrong).
 //! - Swaying plants in a wind get a bent copy of their mesh each frame, a
-//!   BLAS of their own (`ray_sway.rs`), within a budget, nearest first.
+//!   BLAS of their own (`ray_sway.rs`), within a budget, nearest first,
+//!   and only within [`SWAY_DISTANCE`]: past it every plant is traced at
+//!   rest, and its item isn't read for its sway at all.
+//! - Small still items share a BLAS by the square of ground they stand on
+//!   (`ray_groups.rs`), one TLAS instance a group.
+//! - A small plant's ray traced shadow ends at [`SMALL_PLANT_SHADOW_REACH`]
+//!   (thinning out over [`SMALL_PLANT_SHADOW_FADE`] before it), and rays
+//!   pass through a cut-out's holes only within [`HOLES_REACH`]: further
+//!   off, every hit on its cards counts (its slot has no holes), which
+//!   ends a shadow ray at the first leaf it meets.
 
 use glam::{Mat4, Vec3};
 use rustc_hash::FxHashMap;
@@ -30,6 +39,10 @@ use rustc_hash::FxHashMap;
 use super::clusters::{Cluster, RayKind};
 use super::posing::Posing;
 use super::ray_cut_outs::{CutOutRaw, CutOuts};
+use super::ray_groups::{
+    GROUP_TRIANGLES_PER_FRAME, GROUPED_TRIANGLES, GroupKey, MIN_GROUP, Member, StillGroups,
+    fold_print, item_print,
+};
 use super::ray_sway::{
     BENT_TRIANGLES, BentMeshes, BundleKey, POSED_TRIANGLES, PosedKey, SEEN_SWAY_PIXELS, Sight,
     Swaying, bending, bundle_cell,
@@ -57,6 +70,78 @@ pub(super) const BLAS_TRIANGLES_PER_FRAME: u64 = 2_000_000;
 /// A mesh's BLAS unused for this many frames is freed, as meshes are.
 const FORGET_AFTER: u64 = 600;
 
+/// Swaying items further than this from the camera (studs, to the nearest
+/// point of their bounds) are traced at rest. In Overgrown Street's dense
+/// views the bending budget ran out at about 26 studs anyway, and deciding
+/// each further plant's sway read 48,000 items a frame.
+pub(super) const SWAY_DISTANCE: f32 = 32.0;
+
+/// A cut-out no bigger than this (the radius of its bounds, studs) is a
+/// small plant: ground cover, a fern, a bush.
+pub(super) const SMALL_PLANT_RADIUS: f32 = 4.0;
+
+/// How far from the camera (studs) a small plant casts a ray traced
+/// shadow, thinning out over the last [`SMALL_PLANT_SHADOW_FADE`].
+pub(super) const SMALL_PLANT_SHADOW_REACH: f32 = 55.0;
+pub(super) const SMALL_PLANT_SHADOW_FADE: f32 = 5.0;
+
+/// How far from the camera (studs) rays pass through a cut-out's holes.
+pub(super) const HOLES_REACH: f32 = 60.0;
+
+/// How much of its ray traced shadow a small plant `distance` studs away
+/// casts: all of it, then thinning to none at [`SMALL_PLANT_SHADOW_REACH`].
+pub(super) fn small_plant_shadow(distance: f32) -> f32 {
+    if !reach_on("AXCENITY_NO_SMALL_PLANT_REACH", &SMALL_PLANT_OFF) {
+        return 1.0;
+    }
+    let start = SMALL_PLANT_SHADOW_REACH - SMALL_PLANT_SHADOW_FADE;
+    (1.0 - (distance - start) / SMALL_PLANT_SHADOW_FADE).clamp(0.0, 1.0)
+}
+
+/// Measuring switches, to time the ray traced scene as it was before
+/// 2026-11-27 on one build: `AXCENITY_NO_RAY_GROUPS` traces every item as
+/// an instance of its own, `AXCENITY_NO_RAY_REACHES` bends swaying plants,
+/// casts small plants' shadows and passes rays through holes at any
+/// distance (`docs/rendering/ray-tracing.md`); `AXCENITY_NO_SWAY_DISTANCE`,
+/// `AXCENITY_NO_SMALL_PLANT_REACH` and `AXCENITY_NO_HOLES_REACH` lift one
+/// of the three.
+fn switch_off(name: &str, cell: &'static std::sync::OnceLock<bool>) -> bool {
+    *cell.get_or_init(|| std::env::var_os(name).is_some())
+}
+
+fn groups_on() -> bool {
+    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    !switch_off("AXCENITY_NO_RAY_GROUPS", &OFF)
+}
+
+static SMALL_PLANT_OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+static SWAY_OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+static HOLES_OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// Whether the reach `name` lifts is kept: neither it nor
+/// `AXCENITY_NO_RAY_REACHES` is set.
+fn reach_on(name: &str, cell: &'static std::sync::OnceLock<bool>) -> bool {
+    static ALL_OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    !switch_off("AXCENITY_NO_RAY_REACHES", &ALL_OFF) && !switch_off(name, cell)
+}
+
+/// [`SWAY_DISTANCE`] and [`HOLES_REACH`], or no limit when lifted.
+fn sway_distance() -> f32 {
+    if reach_on("AXCENITY_NO_SWAY_DISTANCE", &SWAY_OFF) {
+        SWAY_DISTANCE
+    } else {
+        f32::MAX
+    }
+}
+
+fn holes_reach() -> f32 {
+    if reach_on("AXCENITY_NO_HOLES_REACH", &HOLES_OFF) {
+        HOLES_REACH
+    } else {
+        f32::MAX
+    }
+}
+
 /// How many items ray tracing saw in a frame, for [`crate::RenderStats`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RayTracingStats {
@@ -68,6 +153,8 @@ pub struct RayTracingStats {
     pub triangles: u64,
     /// Meshes wanted but not built yet (waiting for the per-frame budget).
     pub meshes_waiting: u32,
+    /// Meshes whose BLAS was built this frame (new, or a new version).
+    pub meshes_built: u32,
     /// Whether the TLAS was rebuilt this frame.
     pub rebuilt: bool,
     /// Paths a pixel the editor's Path Traced view has averaged so far (0
@@ -80,10 +167,18 @@ pub struct RayTracingStats {
     pub posed: u32,
     /// Posed characters in reach left out for the per-frame budget.
     pub posed_left_out: u32,
+    /// Swaying items whose sway shows that were traced at rest this frame,
+    /// for the per-frame budget: their shadows stand still while they move.
+    pub bent_left_out: u32,
     /// How far ray traced sun shadows reach this frame, in studs (0 while
     /// they're off): the ray tracing distance or the world's
     /// `ShadowDistance`, whichever is nearer.
     pub shadow_reach: u32,
+    /// Groups of small still items traced this frame (one TLAS instance
+    /// each), the items in them, and the groups built this frame.
+    pub groups: u32,
+    pub grouped: u32,
+    pub groups_built: u32,
 }
 
 struct MeshBlas {
@@ -120,6 +215,21 @@ type BlasKey = (MeshKey, bool);
 /// instance mask.
 type Wanted<'a> = (BlasKey, &'a GpuMesh, Mat4, u8);
 
+/// A draw within ray tracing's reach, as one thread works it out (see
+/// [`RayScene::prepare`]).
+struct WantedOne<'a> {
+    wanted: Wanted<'a>,
+    draw: &'a Draw<'a>,
+    /// How far it is from the camera, to the nearest point of its bounds.
+    distance: f32,
+    /// How much of its shadow it casts when traced.
+    shadow: f32,
+    /// Whether rays pass through its holes.
+    holes: bool,
+    /// Whether a skin may pose it.
+    posable: bool,
+}
+
 /// One slot: an item of the ray traced scene, and a row of the tables rays
 /// look their hits up in (`Surfaces`, `CutOuts`, the path tracer's). A hit's
 /// slot is its TLAS instance's first one plus the geometry hit.
@@ -150,6 +260,9 @@ enum InstanceBlas {
     /// geometry of it and a slot of its own, already where it stands in
     /// the world.
     Bundle(BundleKey),
+    /// A group's: small still items, each a geometry of it placed by its
+    /// transform (`ray_groups.rs`).
+    Group(GroupKey),
 }
 
 /// One TLAS instance, compared frame to frame.
@@ -172,24 +285,46 @@ struct Laid {
     instances: Vec<Instance>,
     /// Each bundle with its items' slots' range in `order`.
     bundles: Vec<(BundleKey, std::ops::Range<usize>)>,
+    /// Each group with its items' slots' range in `order`.
+    groups: Vec<(GroupKey, std::ops::Range<usize>)>,
 }
 
 /// Lays out the frame's slots and TLAS instances from `in_slots` (indices
-/// into `wanted`) and each one's `moved` copy: first the items with an
-/// instance of their own, in order, then each bundle's bent items together
-/// (its geometries, in slot order), the biggest meshes first so a bundle's
-/// BLAS seldom has to be made again for a frame's different items.
+/// into `wanted`), each one's `moved` copy and the group it's `grouped`
+/// in: first the items with an instance of their own, in order, then each
+/// group's items together (its geometries, in the frame's order), then
+/// each bundle's bent items together (its geometries, in slot order), the
+/// biggest meshes first so a bundle's BLAS seldom has to be made again for
+/// a frame's different items. Bundles change every frame and go last, as
+/// wgpu uploads a TLAS's instances from the first that changed.
 /// `distances` is how far each wanted item is from the camera.
 fn lay_out(
     in_slots: &[usize],
     moved: &[Option<Moved>],
+    grouped: &[Option<GroupKey>],
     wanted: &[Wanted<'_>],
     distances: &[f32],
 ) -> Laid {
     let mut order = Vec::with_capacity(in_slots.len());
     let mut instances = Vec::new();
     let mut bundled: Vec<(BundleKey, u32, usize)> = Vec::new();
-    for (&index, moved) in in_slots.iter().zip(moved) {
+    // Each group's items in the frame's order, the groups as first met.
+    let mut group_items: Vec<(GroupKey, Vec<usize>)> = Vec::new();
+    let mut group_of: FxHashMap<GroupKey, usize> = FxHashMap::default();
+    for ((&index, moved), group) in in_slots.iter().zip(moved).zip(grouped) {
+        if let Some(key) = group {
+            // A group's items mostly come together: the last one is asked
+            // first.
+            let at = match group_items.last() {
+                Some((last, _)) if last == key => group_items.len() - 1,
+                _ => *group_of.entry(*key).or_insert_with(|| {
+                    group_items.push((*key, Vec::new()));
+                    group_items.len() - 1
+                }),
+            };
+            group_items[at].1.push(index);
+            continue;
+        }
         let (mesh, gpu, transform, mask) = wanted[index];
         let blas = match moved {
             Some(Moved::Bent(_)) => {
@@ -208,6 +343,18 @@ fn lay_out(
             mask,
         });
         order.push(index);
+    }
+    let mut groups = Vec::with_capacity(group_items.len());
+    for (key, items) in group_items {
+        let first = order.len();
+        instances.push(Instance {
+            blas: InstanceBlas::Group(key),
+            transform: IN_PLACE,
+            first_slot: first as u32,
+            mask: key.1,
+        });
+        order.extend(items);
+        groups.push((key, first..order.len()));
     }
     // A stable sort: items of one size stay in the frame's order.
     bundled.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
@@ -228,6 +375,7 @@ fn lay_out(
         order,
         instances,
         bundles,
+        groups,
     }
 }
 
@@ -246,6 +394,8 @@ pub(super) struct RayScene {
     pub(super) cut_outs: CutOuts,
     /// Swaying items' bent copies, made the first time the wind blows.
     bent: Option<BentMeshes>,
+    /// Small still items' groups.
+    groups: StillGroups,
     pub(super) stats: RayTracingStats,
 }
 
@@ -262,6 +412,7 @@ impl RayScene {
             surfaces: None,
             cut_outs: CutOuts::new(device),
             bent: None,
+            groups: StillGroups::default(),
             stats: RayTracingStats::default(),
         }
     }
@@ -269,6 +420,11 @@ impl RayScene {
     /// The TLAS, built (this frame or before) with the frame's items.
     pub(super) fn tlas(&self) -> &wgpu::Tlas {
         &self.tlas
+    }
+
+    /// Frees the BLASes of meshes no longer `kept` (gone from the GPU).
+    pub(super) fn forget_meshes(&mut self, kept: impl Fn(MeshKey) -> bool) {
+        self.blases.retain(|(mesh, _), _| kept(*mesh));
     }
 
     /// Each slot's mesh and its item's transform (the rows of a 3 by 4
@@ -296,23 +452,19 @@ impl RayScene {
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         encoder: &mut wgpu::CommandEncoder,
         (frame, (camera, sight), reach, surfaces, clock): (u64, (Vec3, Sight), f32, bool, [f32; 4]),
-        (draws, clusters, posing): (&[Draw], &[&Cluster], &Posing),
-        mesh: impl Fn(MeshKey) -> Option<&'a GpuMesh>,
+        (draws, clusters, posing): (&'a [Draw<'a>], &[&Cluster], &Posing),
+        mesh: impl Fn(MeshKey) -> Option<&'a GpuMesh> + Sync,
     ) {
         if !surfaces {
             self.surfaces = None;
         }
-        // The items wanted, and the meshes they need.
-        let mut wanted: Vec<Wanted<'a>> = Vec::new();
-        let mut wanted_items = Vec::new();
-        // Each wanted item's distance, for bending the nearest first.
-        let mut wanted_distances = Vec::new();
-        let mut wanted_surfaces: Vec<SurfaceRaw> = Vec::new();
-        for draw in draws {
+        // Each draw within reach, worked out on its own: shared among the
+        // renderer's threads (a meadow is a hundred thousand), in order.
+        let want = |draw: &'a Draw<'a>| -> Option<WantedOne<'a>> {
             let item = draw.item;
             // The copy fading out of a level-of-detail switch.
             if draw.fade > 1.0 {
-                continue;
+                return None;
             }
             // What never changes of an item in a group comes from its
             // cluster, where it was worked out once: a frame doesn't read
@@ -326,43 +478,81 @@ impl RayScene {
                 (None, Some(cluster)) => cluster.mesh_keys[at],
                 _ => draw.mesh(),
             };
-            let Some(gpu) = mesh(key) else {
-                continue;
-            };
-            let (transform, distance) = match kept {
+            let gpu = mesh(key)?;
+            let (transform, (center, radius)) = match kept {
                 Some(cluster) => {
                     let transform = cluster.transforms[at];
-                    let (center, radius) = gpu.bounds.sphere(transform);
-                    (
-                        transform,
-                        Some(center.distance(camera) - radius).filter(|d| *d <= reach),
-                    )
+                    (transform, gpu.bounds.sphere(transform))
                 }
-                None => (item.transform, within_reach(item, gpu, camera, reach)),
+                None => (item.transform, item_sphere(item, gpu)),
             };
-            let Some(distance) = distance else {
-                continue;
-            };
-            let cluster = clusters.get(draw.cluster as usize);
-            let kind = match cluster {
+            let distance = center.distance(camera) - radius;
+            if distance > reach {
+                return None;
+            }
+            let kind = match clusters.get(draw.cluster as usize) {
                 Some(cluster) => cluster.ray_kinds[at],
                 None => RayKind::of(item),
             };
-            wanted.push((
-                (key, kind.holes),
-                gpu,
-                transform,
-                mask_of(kind, draw.casts_shadow),
-            ));
-            wanted_items.push(item);
-            wanted_distances.push(distance);
+            // A small plant's traced shadow ends sooner than the others'.
+            let shadow = if kind.cut_out && radius <= SMALL_PLANT_RADIUS {
+                draw.shadow * small_plant_shadow(distance)
+            } else {
+                draw.shadow
+            };
+            // Near the end of its shadow's reach a cut-out's shadow thins
+            // out ray by ray (`CutOutRaw::casting`); an item without
+            // holes, whose hits a ray can't pass over, casts until half
+            // of its shadow is gone. One casting none isn't in the shadow
+            // rays' mask at all.
+            let casts = draw.casts_shadow && shadow > 0.0 && (kind.holes || shadow >= 0.5);
+            Some(WantedOne {
+                wanted: ((key, kind.holes), gpu, transform, mask_of(kind, casts)),
+                draw,
+                distance,
+                shadow,
+                holes: kind.holes && distance <= holes_reach(),
+                posable: kept.is_none() && item.skin.is_some(),
+            })
+        };
+        let parts: Vec<Vec<WantedOne<'a>>> = if super::parallel::worth_sharing(draws.len()) {
+            super::parallel::shared(|| {
+                super::parallel::map_parts(draws, |part| part.iter().filter_map(want).collect())
+            })
+        } else {
+            vec![draws.iter().filter_map(want).collect()]
+        };
+        let count: usize = parts.iter().map(Vec::len).sum();
+        // The items wanted, and the meshes they need.
+        let mut wanted: Vec<Wanted<'a>> = Vec::with_capacity(count);
+        let mut wanted_items = Vec::with_capacity(count);
+        // Each wanted item's distance, for bending the nearest first.
+        let mut wanted_distances = Vec::with_capacity(count);
+        // How much of its shadow each casts (`Draw::shadow`, and a small
+        // plant's shorter reach when traced).
+        let mut wanted_shadows = Vec::with_capacity(count);
+        // Whether rays pass through each one's holes (a cut-out within
+        // `HOLES_REACH`).
+        let mut wanted_holes = Vec::with_capacity(count);
+        // Whether each may be posed by a skin: an item of a cluster isn't
+        // (`Cluster::skinned`), so its item needn't be read to find out.
+        let mut wanted_posable = Vec::with_capacity(count);
+        let mut wanted_surfaces: Vec<SurfaceRaw> = Vec::new();
+        for one in parts.into_iter().flatten() {
             if surfaces {
                 let table = self.surfaces.get_or_insert_with(|| Surfaces::new(device));
-                wanted_surfaces.push(match cluster {
+                let draw = one.draw;
+                wanted_surfaces.push(match clusters.get(draw.cluster as usize) {
                     Some(cluster) => cluster.surfaces(&mut table.texture_colors)[draw.at as usize],
-                    None => surface_of(&item.material, &mut table.texture_colors),
+                    None => surface_of(&draw.item.material, &mut table.texture_colors),
                 });
             }
+            wanted.push(one.wanted);
+            wanted_items.push(one.draw.item);
+            wanted_distances.push(one.distance);
+            wanted_shadows.push(one.shadow);
+            wanted_holes.push(one.holes);
+            wanted_posable.push(one.posable);
         }
 
         // New or changed meshes get a BLAS, built within the budget.
@@ -426,14 +616,20 @@ impl RayScene {
 
         // The frame's slots: items whose BLAS is (or is being) built.
         let in_slots: Vec<usize> = (0..wanted.len()).filter(|&index| ready[index]).collect();
-        let (in_slots, moved, posed_left_out) = self.bend(
+        let (in_slots, moved, sways, posed_left_out) = self.bend(
             (device, queue),
             in_slots,
-            (&wanted, &wanted_items, &wanted_distances),
+            (&wanted, &wanted_items, &wanted_distances, &wanted_posable),
             (clock, sight, posing),
             frame,
         );
-        let laid = lay_out(&in_slots, &moved, &wanted, &wanted_distances);
+        let grouped = self.group_still(
+            (device, queue),
+            (&in_slots, &moved, &sways),
+            (&wanted, &wanted_distances),
+            frame,
+        );
+        let laid = lay_out(&in_slots, &moved, &grouped, &wanted, &wanted_distances);
         let moved_of: FxHashMap<usize, Moved> = in_slots
             .iter()
             .zip(&moved)
@@ -471,9 +667,14 @@ impl RayScene {
             .iter()
             .map(|&index| {
                 let ((mesh, cut_out), gpu, _, _) = wanted[index];
-                if cut_out {
+                if wanted_holes[index] {
                     self.cut_outs
                         .slot((device, queue), wanted_items[index], mesh, gpu.version)
+                        .casting(wanted_shadows[index])
+                } else if cut_out {
+                    // Past `HOLES_REACH`: every hit on its cards counts,
+                    // and its shadow still thins out ray by ray.
+                    CutOutRaw::default().casting(wanted_shadows[index])
                 } else {
                     CutOutRaw::default()
                 }
@@ -497,10 +698,13 @@ impl RayScene {
             self.built = false;
         }
         // A posed or bent copy is built afresh each frame, so the TLAS is
-        // too.
+        // too, and so is a group's BLAS made again.
         let any_moved = !moved_of.is_empty();
-        let changed =
-            !self.built || instances != self.instances || !to_build.is_empty() || any_moved;
+        let changed = !self.built
+            || instances != self.instances
+            || !to_build.is_empty()
+            || any_moved
+            || self.groups.any_building();
         if changed {
             for (index, instance) in instances.iter().enumerate() {
                 let blas = match (&instance.blas, &self.bent) {
@@ -516,6 +720,7 @@ impl RayScene {
                     // A copy's instance is set again: its BLAS may be new.
                     (InstanceBlas::Posed(key), Some(bent)) => bent.posed_blas(key),
                     (InstanceBlas::Bundle(key), Some(bent)) => bent.bundle_blas(key),
+                    (InstanceBlas::Group(key), _) => self.groups.blas(key),
                     (InstanceBlas::Posed(_) | InstanceBlas::Bundle(_), None) => None,
                 };
                 self.tlas[index] = blas.map(|blas| {
@@ -552,6 +757,18 @@ impl RayScene {
                 .collect();
             self.bent.as_ref()?.bundle_entry(key, &meshes)
         });
+        // The groups made again this frame: their items' meshes, placed.
+        let group_entries = laid
+            .groups
+            .iter()
+            .filter(|(key, _)| self.groups.building(key))
+            .filter_map(|(key, range)| {
+                let meshes: Vec<&GpuMesh> = laid.order[range.clone()]
+                    .iter()
+                    .map(|&index| wanted[index].1)
+                    .collect();
+                self.groups.entry(key, &meshes)
+            });
         let entries: Vec<wgpu::BlasBuildEntry> = to_build
             .iter()
             .map(|(key, gpu)| {
@@ -574,6 +791,7 @@ impl RayScene {
             })
             .chain(posed_entries)
             .chain(bundle_entries)
+            .chain(group_entries)
             .collect();
         if changed || !entries.is_empty() {
             let tlas = changed.then_some(&self.tlas);
@@ -590,6 +808,13 @@ impl RayScene {
         if let Some(bent) = &mut self.bent {
             bent.forget_unused(frame);
         }
+        self.groups.forget_unused(frame);
+        let (groups, groups_built) = self.groups.counts();
+        let grouped = laid
+            .groups
+            .iter()
+            .map(|(_, range)| range.len() as u32)
+            .sum();
         let built = self.blases.values().filter(|entry| entry.built);
         self.stats = RayTracingStats {
             instances: count,
@@ -598,35 +823,50 @@ impl RayScene {
                 .map(|entry| u64::from(entry.size.index_count.unwrap_or(0) / 3))
                 .sum(),
             meshes_waiting: waiting,
+            meshes_built: to_build.len() as u32,
             rebuilt: changed,
             path_traced_paths: 0,
             bent: self.bent.as_ref().map_or(0, BentMeshes::bent_count),
             posed: self.bent.as_ref().map_or(0, BentMeshes::posed_count),
             posed_left_out,
+            bent_left_out: self.stats.bent_left_out,
             shadow_reach: 0,
+            groups,
+            grouped,
+            groups_built,
         };
     }
 
     /// Builds this frame's posed items from their posed corners (`posing`)
     /// and bends its swaying ones in the wind of `clock`, nearest first
-    /// within [`POSED_TRIANGLES`] and [`BENT_TRIANGLES`]. Returns `in_slots`
-    /// (indices into the wanted items) without the posed items past the
-    /// budget, each one's bent or posed copy (`None` to keep its mesh's rest
-    /// pose), and how many posed items were left out.
+    /// within [`POSED_TRIANGLES`] and [`BENT_TRIANGLES`]; swaying ones only
+    /// within [`SWAY_DISTANCE`]. Returns `in_slots` (indices into the wanted
+    /// items) without the posed items past the budget, each one's bent or
+    /// posed copy (`None` to keep its mesh's rest pose), whether each sways
+    /// where its sway shows (bent, or left out for the budget, so its copy
+    /// may come and go), and how many posed items were left out. `posable`
+    /// says which wanted items may be posed; the others' items aren't read
+    /// for it.
+    #[allow(clippy::type_complexity)]
     fn bend(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         in_slots: Vec<usize>,
-        (wanted, items, distances): (&[Wanted<'_>], &[&DrawItem], &[f32]),
+        (wanted, items, distances, posable): (&[Wanted<'_>], &[&DrawItem], &[f32], &[bool]),
         (clock, sight, posing): ([f32; 4], Sight, &Posing),
         frame: u64,
-    ) -> (Vec<usize>, Vec<Option<Moved>>, u32) {
+    ) -> (Vec<usize>, Vec<Option<Moved>>, Vec<bool>, u32) {
         let mut bent = vec![None; in_slots.len()];
+        let mut sways = vec![false; in_slots.len()];
+        self.stats.bent_left_out = 0;
         // Posed items first (a skinned mesh never also sways here), then
         // swaying ones, each nearest first.
         // Where an item's posed corners start this frame: its joints and its
         // shapes, as every pass draws it.
         let posed_mesh = |index: usize| {
+            if !posable[index] {
+                return None;
+            }
             let ((mesh, _), _, _, _) = wanted[index];
             posing.offset(items[index].skin.as_deref()?, mesh)
         };
@@ -636,6 +876,8 @@ impl RayScene {
         let mut swaying: Vec<(usize, [f32; 4])> = in_slots
             .iter()
             .enumerate()
+            // Past `SWAY_DISTANCE` at rest, and the item isn't read.
+            .filter(|&(_, &index)| distances[index] <= sway_distance())
             .filter(|&(_, &index)| posed_mesh(index).is_none())
             .filter_map(|(slot, &index)| {
                 let (sway, moves) = bending(items[index], clock)?;
@@ -643,11 +885,14 @@ impl RayScene {
                 (sight.pixels(moves, distances[index]) >= SEEN_SWAY_PIXELS).then_some((slot, sway))
             })
             .collect();
+        for &(slot, _) in &swaying {
+            sways[slot] = true;
+        }
         if swaying.is_empty() && posing.is_empty() {
             if let Some(meshes) = &mut self.bent {
                 meshes.begin();
             }
-            return (in_slots, bent, 0);
+            return (in_slots, bent, sways, 0);
         }
         let nearest =
             |a: &usize, b: &usize| distances[in_slots[*a]].total_cmp(&distances[in_slots[*b]]);
@@ -698,6 +943,7 @@ impl RayScene {
             let ((mesh, _), gpu, transform, _) = wanted[in_slots[slot]];
             let triangles = u64::from(gpu.index_count / 3);
             if triangles > budget {
+                self.stats.bent_left_out += 1;
                 continue;
             }
             budget -= triangles;
@@ -710,16 +956,120 @@ impl RayScene {
         }
 
         if posed_left_out == 0 {
-            return (in_slots, bent, 0);
+            return (in_slots, bent, sways, 0);
         }
-        let (kept_slots, kept_bent) = in_slots
+        let mut kept_slots = Vec::with_capacity(in_slots.len());
+        let mut kept_bent = Vec::with_capacity(in_slots.len());
+        let mut kept_sways = Vec::with_capacity(in_slots.len());
+        for (((slot, bent), sways), out) in in_slots.into_iter().zip(bent).zip(sways).zip(left_out)
+        {
+            if !out {
+                kept_slots.push(slot);
+                kept_bent.push(bent);
+                kept_sways.push(sways);
+            }
+        }
+        (kept_slots, kept_bent, kept_sways, posed_left_out)
+    }
+
+    /// Groups this frame's small still items (`ray_groups.rs`): those of
+    /// `in_slots` (indices into `wanted`, as far as `distances`) neither
+    /// `moved` nor swaying where it shows (`sways`), of at most
+    /// [`GROUPED_TRIANGLES`] triangles, and not see-through, by the square
+    /// of ground they stand on. Returns each slot's group, or `None` for one
+    /// traced as an instance of its own (not groupable, too few in its
+    /// square, or its group waiting to be built).
+    fn group_still(
+        &mut self,
+        (device, queue): (&wgpu::Device, &wgpu::Queue),
+        (in_slots, moved, sways): (&[usize], &[Option<Moved>], &[bool]),
+        (wanted, distances): (&[Wanted<'_>], &[f32]),
+        frame: u64,
+    ) -> Vec<Option<GroupKey>> {
+        let mut grouped = vec![None; in_slots.len()];
+        self.groups.begin();
+        if !groups_on() {
+            return grouped;
+        }
+        // Each slot's group and fingerprint, if it's grouped at all: shared
+        // among the renderer's threads.
+        let slots: Vec<usize> = (0..in_slots.len()).collect();
+        let key_of = |slot: &usize| -> Option<(GroupKey, u64)> {
+            let slot = *slot;
+            if moved[slot].is_some() || sways[slot] {
+                return None;
+            }
+            let index = in_slots[slot];
+            let ((mesh, cut_out), gpu, transform, mask) = wanted[index];
+            if gpu.index_count / 3 > GROUPED_TRIANGLES || mask == MASK_SEE_THROUGH {
+                return None;
+            }
+            let wide = gpu.index_format == wgpu::IndexFormat::Uint32;
+            let cell = bundle_cell(transform.w_axis.truncate(), distances[index]);
+            Some((
+                (cut_out, mask, wide, cell),
+                item_print(mesh, gpu, cut_out, &transform),
+            ))
+        };
+        let keys: Vec<Option<(GroupKey, u64)>> = if super::parallel::worth_sharing(slots.len()) {
+            super::parallel::shared(|| {
+                super::parallel::map_parts(&slots, |part| {
+                    part.iter().map(key_of).collect::<Vec<_>>()
+                })
+            })
             .into_iter()
-            .zip(bent)
-            .zip(left_out)
-            .filter(|(_, out)| !out)
-            .map(|(kept, _)| kept)
-            .unzip();
-        (kept_slots, kept_bent, posed_left_out)
+            .flatten()
+            .collect()
+        } else {
+            slots.iter().map(key_of).collect()
+        };
+        // Each group's slots and fingerprint, the groups as first met.
+        // Draws of a square mostly come together, so the last group found
+        // is asked first.
+        let mut groups: Vec<(GroupKey, Vec<usize>, u64)> = Vec::new();
+        let mut group_of: FxHashMap<GroupKey, usize> = FxHashMap::default();
+        let mut last: Option<(GroupKey, usize)> = None;
+        for (slot, found) in keys.into_iter().enumerate() {
+            let Some((key, print)) = found else {
+                continue;
+            };
+            let at = match last {
+                Some((last_key, at)) if last_key == key => at,
+                _ => *group_of.entry(key).or_insert_with(|| {
+                    groups.push((key, Vec::new(), 0));
+                    groups.len() - 1
+                }),
+            };
+            last = Some((key, at));
+            let group = &mut groups[at];
+            group.1.push(slot);
+            group.2 = fold_print(group.2, print);
+        }
+        // The nearest squares first (a square's size grows with its
+        // distance), so a budget that runs out leaves the far ones waiting.
+        groups.sort_unstable_by_key(|(key, _, _)| (key.3[0], *key));
+        let mut budget = GROUP_TRIANGLES_PER_FRAME;
+        let mut members: Vec<Member<'_>> = Vec::new();
+        for (key, slots, print) in groups {
+            if slots.len() < MIN_GROUP {
+                continue;
+            }
+            let traced = self.groups.keep(&key, (slots.len(), print), frame) || {
+                members.clear();
+                members.extend(slots.iter().map(|&slot| {
+                    let ((_, cut_out), gpu, transform, _) = wanted[in_slots[slot]];
+                    (gpu, cut_out, rows_3x4(transform))
+                }));
+                self.groups
+                    .build((device, queue), key, (&members, print), &mut budget, frame)
+            };
+            if traced {
+                for slot in slots {
+                    grouped[slot] = Some(key);
+                }
+            }
+        }
+        grouped
     }
 }
 
@@ -732,6 +1082,25 @@ impl ScenePipeline {
             return false;
         }
         effects || self.ray_traced_view(false)
+    }
+
+    /// Whether some frame may trace rays with these settings: a hardware
+    /// ray traced effect is on, or the editor shows a ray traced view.
+    /// While so, a frame that traces nothing parks the ray traced scene
+    /// rather than freeing it (ADR-0025 keeps it while an effect is on).
+    pub(super) fn may_trace_rays(&self) -> bool {
+        use crate::{
+            RayTracedAmbientOcclusion, RayTracedGlobalIllumination, RayTracedReflections,
+            RayTracedShadows,
+        };
+        let graphics = &self.graphics;
+        graphics.ray_queries
+            && (graphics.ray_traced_shadows != RayTracedShadows::Off
+                || graphics.ray_traced_ambient_occlusion != RayTracedAmbientOcclusion::Off
+                || graphics.ray_traced_reflections != RayTracedReflections::Off
+                || (graphics.ray_traced_global_illumination != RayTracedGlobalIllumination::Off
+                    && !graphics.ray_traced_gi_in_software)
+                || self.ray_traced_view(false))
     }
 
     /// Whether the editor's Path Traced view is shown, which needs each
@@ -757,14 +1126,17 @@ impl ScenePipeline {
     }
 }
 
-/// Makes, updates or frees `scene` (a [`ScenePipeline`]'s) for this frame's
-/// `draws`, seen from `camera`: it's freed when nothing `traces`. With
-/// `surfaces` (ray traced GI), each slot's [`SurfaceRaw`] is kept too. Returns
+/// Makes, updates, parks or frees `scene` (a [`ScenePipeline`]'s) for this
+/// frame's `draws`, seen from `camera`. When nothing `traces`, it's moved
+/// to `parked` while some frame still `may` trace (its meshes' BLASes are
+/// what a first frame spends seconds building), and freed with `parked`
+/// otherwise; the next frame that traces takes it back. With `surfaces`
+/// (ray traced GI), each slot's [`SurfaceRaw`] is kept too. Returns
 /// whether it recorded anything (for the GPU timer's Acceleration
 /// structures pass). Takes the pipeline's fields, not the pipeline, so the
 /// frame's other borrows of it can stay.
 pub(super) fn prepare_scene(
-    scene: &mut Option<Box<RayScene>>,
+    (scene, parked, may): (&mut Option<Box<RayScene>>, &mut Option<Box<RayScene>>, bool),
     pipeline: (
         (&wgpu::Device, &wgpu::Queue),
         &super::Meshes,
@@ -783,8 +1155,18 @@ pub(super) fn prepare_scene(
 ) -> bool {
     let ((device, queue), meshes, custom_meshes) = pipeline;
     if !traces {
-        *scene = None;
+        if may {
+            if let Some(idle) = scene.take() {
+                *parked = Some(idle);
+            }
+        } else {
+            *scene = None;
+            *parked = None;
+        }
         return false;
+    }
+    if scene.is_none() {
+        *scene = parked.take();
     }
     let scene = scene.get_or_insert_with(|| Box::new(RayScene::new(device)));
     scene.prepare(
@@ -903,7 +1285,10 @@ fn rows_3x4(transform: Mat4) -> [f32; 12] {
 /// A BLAS's size for `gpu`: opaque, unless it's for a `cut_out`, whose
 /// triangles rays that don't force opacity see as candidates to test
 /// against the texture's holes.
-fn size_of_mesh(gpu: &GpuMesh, cut_out: bool) -> wgpu::BlasTriangleGeometrySizeDescriptor {
+pub(super) fn size_of_mesh(
+    gpu: &GpuMesh,
+    cut_out: bool,
+) -> wgpu::BlasTriangleGeometrySizeDescriptor {
     wgpu::BlasTriangleGeometrySizeDescriptor {
         // `Vertex::position` comes first in each corner.
         vertex_format: wgpu::VertexFormat::Float32x3,
@@ -955,13 +1340,19 @@ pub(super) fn within_reach(
     camera: Vec3,
     reach: f32,
 ) -> Option<f32> {
+    let (center, radius) = item_sphere(item, gpu);
+    let distance = center.distance(camera) - radius;
+    (distance <= reach).then_some(distance)
+}
+
+/// The sphere around `item` (drawn with `gpu`) in the world: its middle and
+/// radius. A posed item is bounded by where its joints put it.
+fn item_sphere(item: &DrawItem, gpu: &GpuMesh) -> (Vec3, f32) {
     let bounds = match (&item.skin, &gpu.skin) {
         (Some(skin), Some(gpu_skin)) => gpu_skin.bounds(skin),
         _ => gpu.bounds,
     };
-    let (center, radius) = bounds.sphere(item.transform);
-    let distance = center.distance(camera) - radius;
-    (distance <= reach).then_some(distance)
+    bounds.sphere(item.transform)
 }
 
 pub(super) fn blas_input(device: &wgpu::Device) -> wgpu::BufferUsages {

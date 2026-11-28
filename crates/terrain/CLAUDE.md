@@ -1,6 +1,6 @@
 # `terrain`
 
-- Terrain algorithms over `core::TerrainData`: placement, brushes (including the Scatter op, `brush/scatter.rs`: a palette's weighted mix of foliage, each item thinned by its masks, `brush/scatter_mask.rs`; open masks must place exactly what an unmasked stroke does), generation, erosion, material rules and biomes (`biomes.rs`, PW2), chunk meshes, raycasts, file codecs and background jobs; see `docs/terrain.md`.
+- Terrain algorithms over `core::TerrainData`: placement, brushes (including the Scatter op, `brush/scatter.rs`: a palette's weighted mix of foliage, each item thinned by its masks, `brush/scatter_mask.rs`; open masks must place exactly what an unmasked stroke does), generation, tiles (several Terrains side by side, `tiles.rs`), erosion, material rules and biomes (`biomes.rs`, PW2), chunk meshes, raycasts, file codecs and background jobs; see `docs/terrain.md`.
 - Depends only on `core`; no UI, GPU or file-system access (`project` reads and writes the files, `scene` draws, `physics` collides).
 - Keep generators deterministic for a seed and `GENERATOR_VERSION`: saved terrains record both to be made again. Bump the version when output changes.
 - Render triangles must split cells like parry's heightfield (`mesh.rs`), so collision matches what's drawn. Hole cells (PW7, `TerrainData::is_hole`) must be skipped by anything reading the surface: mesh, raycast, `ground_y`, physics, nav and scatter.

@@ -289,10 +289,16 @@ fn cell_scatter(id: vec3<u32>) -> vec4<f32> {
     let point = fract(vec3<f32>(0.5) + shift);
     let uv = (vec2<f32>(id.xy) + point.xy) / vec2<f32>(GRID.xy);
     let dir = view_ray(uv);
-    let along = mix(slice_distance(f32(id.z)), slice_distance(f32(id.z) + 1.0), point.z);
+    let near = slice_distance(f32(id.z));
+    let far = slice_distance(f32(id.z) + 1.0);
+    let along = mix(near, far, point.z);
     let position = frame.camera_position.xyz + dir * along;
     let air = dust_at(fog, position, dir);
-    let fog_density = fog.height.x * fog_thickness(fog, position.y) * air.keep;
+    // Height fog only past its start: the share of the slice beyond it, so
+    // the slice the start falls in is partly fogged, as the surfaces'
+    // `fog_transmittance` has it.
+    let started = clamp((far - fog.sun_direction.w) / max(far - near, 1e-4), 0.0, 1.0);
+    let fog_density = fog.height.x * fog_thickness(fog, position.y) * air.keep * started;
     let dust = air.density;
     let density = fog_density + dust;
     if density <= 0.0 {

@@ -54,6 +54,46 @@ ColorCorrectionEffect.TintColor: Color3
 
 Multiplies every color. White (the default) changes nothing.
 
+#### ShadowTint
+
+```luau
+ColorCorrectionEffect.ShadowTint: Color3
+```
+
+Split toning: tints the dark colors, keeping their brightness (a pale blue cools the shadows). White (the default) changes nothing.
+
+#### HighlightTint
+
+```luau
+ColorCorrectionEffect.HighlightTint: Color3
+```
+
+Split toning: tints the light colors, keeping their brightness. White (the default) changes nothing.
+
+#### Balance
+
+```luau
+ColorCorrectionEffect.Balance: number
+```
+
+Where ShadowTint gives way to HighlightTint, from -1 (more of the picture takes the shadow tint) to 1 (more takes the highlight tint). 0 by default.
+
+#### Curve
+
+```luau
+ColorCorrectionEffect.Curve: number
+```
+
+An S-curve on each color channel, from -1 to 1: above 0 it deepens what's darker than CurvePivot and lifts what's lighter, easing into black and white without clipping; below 0 it flattens colors toward the pivot. 0 (the default) changes nothing.
+
+#### CurvePivot
+
+```luau
+ColorCorrectionEffect.CurvePivot: number
+```
+
+The shade, from 0 (black) to 1 (white), that Curve turns about and keeps. 0.5 by default.
+
 #### LookupTable
 
 ```luau

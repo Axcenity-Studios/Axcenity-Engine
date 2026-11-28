@@ -363,6 +363,7 @@ fn sow(data: &mut TerrainData) {
                 yaw: 0.0,
                 scale: 1.0,
                 collide: false,
+                shadow: true,
                 lean: 0.0,
                 sink: 0.0,
             });

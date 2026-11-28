@@ -403,8 +403,10 @@ impl ApplicationHandler for App {
                     if self.mouse.0 == MouseBehavior::Default
                         && let Some(window) = &self.window
                     {
-                        capture_mouse(window, self.looking);
-                        window.set_cursor_visible(!self.looking && self.mouse.1);
+                        // Zoomed in to the eyes it stays held either way.
+                        let held = self.looking || self.eyes_look;
+                        capture_mouse(window, held);
+                        window.set_cursor_visible(!held && self.mouse.1);
                     }
                 }
                 if let Some(button) = input::mouse_button(button) {
@@ -463,7 +465,8 @@ impl ApplicationHandler for App {
 
     /// Raw mouse movement, reported even when the cursor is held still.
     /// Scripts hear it (`GetMouseDelta`) while the window has focus; it
-    /// turns the camera while the right button is held.
+    /// turns the camera while the right button is held, and always while
+    /// a third-person camera is zoomed in to the eyes.
     fn device_event(&mut self, _event_loop: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
         let DeviceEvent::MouseMotion { delta: (dx, dy) } = event else {
             return;
@@ -473,7 +476,8 @@ impl ApplicationHandler for App {
         }
         let (dx, dy) = (dx as f32, dy as f32);
         self.input.add_motion(dx, dy);
-        if self.looking && !self.sim.scripts.camera_scripted() {
+        let eyes = self.sim.characters.zoomed_to_eyes(&self.sim.world);
+        if (self.looking || eyes) && !self.sim.scripts.camera_scripted() {
             if self.sim.characters.view(&self.sim.world).is_some() {
                 self.look_dx += dx;
                 self.look_dy += dy;

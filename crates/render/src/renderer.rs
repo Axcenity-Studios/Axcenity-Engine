@@ -62,6 +62,7 @@ mod culling;
 #[cfg(feature = "debug-views")]
 mod debug_views;
 mod decals;
+mod depth_start;
 mod encoders;
 mod environment;
 mod fog;
@@ -70,28 +71,33 @@ mod gpu_particles;
 mod gpu_timer;
 mod grading;
 mod grid;
+mod lamp_shadows;
 mod latency;
 mod lens;
 mod light_probes;
 mod lighting;
 mod lod;
 mod occlusion;
+mod occlusion_probe;
 mod parallel;
 #[cfg(feature = "debug-views")]
 mod path_tracer;
 mod posing;
 mod post;
+mod probe;
 mod probe_bake;
 mod probes;
 mod ray_ao;
 mod ray_cut_outs;
 mod ray_gi;
+mod ray_groups;
 mod ray_reflections;
 mod ray_shadows;
 mod ray_soft;
 mod ray_sway;
 mod ray_tracing;
 mod realtime_gi;
+mod screen_reflections;
 mod skinning;
 mod snow_caps;
 mod sprites;
@@ -115,14 +121,14 @@ use glam::Vec3;
 use gpu::mip_levels;
 use gpu::{
     DepthUse, create_frame_bind_group, create_instance_buffer, create_material, create_pipeline,
-    create_pipeline_for, create_shadow_pipeline, create_shadow_views, create_target_texture,
-    create_texture, drawable_size, shader_module, target_bytes, update_custom_mesh,
-    upload_custom_mesh, upload_mesh, upload_texture,
+    create_pipeline_for, create_shadow_layers, create_shadow_pipeline, create_shadow_views,
+    create_target_texture, create_texture, drawable_size, index_buffer, shader_module,
+    target_bytes, update_custom_mesh, upload_custom_mesh_with, upload_mesh, upload_texture,
 };
 use lighting::{
     DrawPlan, FrameUses, camera_view_projection, casters_in_views, frame_uniform, linear_color,
     maps_uniform_of, material_textures, plan_draws, plan_lights, post_drawn, post_uniform,
-    shadows_drawn,
+    shadows_drawn, sun_reach,
 };
 #[cfg(test)]
 use lighting::{cascade_ends, light_raw, material_key, uv_matrix, view_projection};
@@ -220,6 +226,14 @@ pub struct RenderStats {
     /// Casters and triangles drawn into each cascade this frame.
     pub cascade_casters: [u32; SHADOW_CASCADE_COUNT],
     pub cascade_triangles: [u64; SHADOW_CASCADE_COUNT],
+    /// Draw calls into each cascade this frame.
+    pub cascade_draws: [u32; SHADOW_CASCADE_COUNT],
+    /// Draw calls into the shadow views of spot and point lights this
+    /// frame, and how many of those views (a spot light's, or one face of
+    /// a point light's) were kept from an earlier frame because nothing
+    /// they're drawn from changed.
+    pub lamp_shadow_draws: u32,
+    pub lamp_views_kept: u32,
     /// The GPU's time for each pass of the frame `gpu_time` measured, in
     /// [`FramePass::ALL`]'s order: `None` for a pass that frame didn't draw
     /// (see [`RenderStats::pass_time`]).
@@ -237,6 +251,20 @@ pub struct RenderStats {
     pub items_drawn: u32,
     /// Instanced draws in the scene pass, one per mesh and material.
     pub batches: u32,
+    /// Of the frame's draw calls: the prepass's, the motion vectors' pass's
+    /// and those drawing the cut-out surfaces' depth before the scene is
+    /// lit. The scene pass's are `batches`; the rest are the shadow views'.
+    pub prepass_draws: u32,
+    pub motion_draws: u32,
+    pub depth_fill_draws: u32,
+    /// Whether the scene pass's depth started from the prepass's, not
+    /// from the far plane (renderer/depth_start.rs).
+    pub depth_from_prepass: bool,
+    /// Of the solid batches in view, those of scattered items (a
+    /// terrain's painted plants, stones and litter), and the items in
+    /// them: a draw each in the prepass and in the scene pass.
+    pub scattered_batches: u32,
+    pub scattered_items: u32,
     /// Items outside the camera's view, so not drawn by the scene pass.
     pub items_culled: u32,
     /// Casters drawn into the shadow views (each cascade and shadowing spot
@@ -544,6 +572,16 @@ impl Renderer {
         self.scene.cloud_trace.enabled = on;
     }
 
+    /// Whether the scene pass's depth starts a step behind the prepass's
+    /// in place of the far plane, so that what is hidden is never lit
+    /// (renderer/depth_start.rs): one sample per pixel only (not under
+    /// MSAA), and only while the prepass is drawn. The picture is the
+    /// same either way. For comparing the two
+    /// (`docs/rendering/performance.md`).
+    pub fn set_depth_from_prepass(&mut self, on: bool) {
+        self.scene.depth_start.enabled = on;
+    }
+
     /// How many background uploads are still on their way.
     pub fn pending_uploads(&self) -> usize {
         self.scene.pending_uploads()
@@ -769,6 +807,11 @@ impl TextureRenderer {
     /// See [`Renderer::set_trace_clouds`].
     pub fn set_trace_clouds(&mut self, on: bool) {
         self.scene.cloud_trace.enabled = on;
+    }
+
+    /// See [`Renderer::set_depth_from_prepass`].
+    pub fn set_depth_from_prepass(&mut self, on: bool) {
+        self.scene.depth_start.enabled = on;
     }
 
     /// See [`Renderer::pending_uploads`].

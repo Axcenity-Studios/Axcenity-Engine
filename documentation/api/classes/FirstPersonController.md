@@ -134,6 +134,14 @@ FirstPersonController.AutoRotate: boolean
 
 If true, the character turns about the middle of its body to face the way it walks (a first-person one, the way the camera looks). It's taken to face -Z when Play starts.
 
+#### TurnSpeed
+
+```luau
+FirstPersonController.TurnSpeed: number
+```
+
+The fastest the character turns to face the way it walks, in degrees a second (720). Each step turns it part of the way that's left, so it eases into a turn and settles at the end, and a turn started goes on to the end after the keys are let go. 0 turns it at once. A camera at the eyes (a first-person one, or a third-person one zoomed all the way in) turns the character with the camera at once.
+
 #### EyeHeight
 
 ```luau

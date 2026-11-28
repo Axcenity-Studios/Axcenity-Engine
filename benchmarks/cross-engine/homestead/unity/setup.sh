@@ -2,7 +2,10 @@
 # Copies the port's scripts into the Unity project, then imports the dump
 # or builds the player with the editor, headless.
 #
-#   unity/setup.sh import|build|both [project folder]
+#   unity/setup.sh import|build|both|windows [project folder]
+#
+# `windows` builds the Windows DirectX 12 player with HDRP's ray tracing
+# allowed (Build-Windows/), which run.py runs through Proton.
 #
 # The project (default ~/Projects/Unity Projects/Desert Homestead HDRP) is
 # an HDRP project made from Unity's own template, with Vulkan named as its
@@ -29,5 +32,6 @@ case "$STEP" in
     import) run HomesteadImport.Import import ;;
     build) run HomesteadImport.Build build ;;
     both) run HomesteadImport.Import import; run HomesteadImport.Build build ;;
-    *) echo "import, build or both" >&2; exit 1 ;;
+    windows) run HomesteadImport.BuildWindows build-windows ;;
+    *) echo "import, build, both or windows" >&2; exit 1 ;;
 esac

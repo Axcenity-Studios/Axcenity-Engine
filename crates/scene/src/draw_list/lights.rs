@@ -198,14 +198,24 @@ pub(super) fn light_of(world: &World, instance: &Instance) -> Option<Light> {
     let mount = mount_of(world, instance)?;
     let placed = place_light(instance, mount);
     let position = placed.position;
-    // How far along `direction` its own part reaches: shadows start there.
-    // A free-standing light has no part to keep out of its shadows.
-    let near = |direction: Vec3| match mount {
-        Mount::Part { transform, .. } => shadow_near(transform, position, direction),
-        Mount::Free { .. } => 0.0,
-    };
     let color = instance.property("Color").and_then(Value::as_color3)?;
     let number = |name| instance.property(name).and_then(Value::as_number);
+    // Studs from the light before anything casts its shadows, every way
+    // (`ShadowStart`): a fixture it sits inside, as a lamp in a lantern
+    // that's part of a larger model, doesn't shadow its light.
+    let start = number("ShadowStart")
+        .filter(|start| start.is_finite())
+        .map_or(0.0, |start| start.max(0.0) as f32);
+    // How far along `direction` its own part reaches: shadows start there,
+    // or at `start` if that's farther. A free-standing light has no part
+    // to keep out of its shadows.
+    let near = |direction: Vec3| {
+        let part = match mount {
+            Mount::Part { transform, .. } => shadow_near(transform, position, direction),
+            Mount::Free { .. } => 0.0,
+        };
+        part.max(start)
+    };
     let shadows = instance.property("Shadows").and_then(Value::as_bool) == Some(true);
     let cone = match instance.class() {
         ClassName::SpotLight => Some(Cone {

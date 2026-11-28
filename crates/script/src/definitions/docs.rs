@@ -1520,6 +1520,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "If true, parts around the light cast shadows on every side of it. Only the few point lights nearest the camera do, as the graphics settings allow.",
     ),
     (
+        ClassName::PointLight,
+        "ShadowStart",
+        "Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.",
+    ),
+    (
         ClassName::SpotLight,
         "Enabled",
         "If false, the light is off.",
@@ -1549,6 +1554,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::SpotLight,
         "Shadows",
         "If true, parts in the beam cast shadows. Only the few spot lights nearest the camera do, as the graphics settings allow.",
+    ),
+    (
+        ClassName::SpotLight,
+        "ShadowStart",
+        "Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.",
     ),
     (
         ClassName::PointLight,
@@ -1627,6 +1637,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         "If true, parts in front of it cast shadows. Only the few lights nearest the camera do, as the graphics settings allow.",
     ),
     (
+        ClassName::RectLight,
+        "ShadowStart",
+        "Studs from the light before anything casts its shadows, every way, in both shadow maps and ray traced shadows. Set it to the size of a fixture the light sits inside, such as a lantern's frame, so the fixture doesn't throw its own shadow across the room. 0 (the default) keeps nothing out but the light's own part, if it's in one.",
+    ),
+    (
         ClassName::ReflectionProbe,
         "Bake",
         "The bake the editor saved for it (Lighting > Bake Probes), such as \"assets/probes/Hall.probe.hdr\". Empty, or a file that's missing, reflects the sky instead.",
@@ -1680,6 +1695,26 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::Atmosphere,
         "Haze",
         "Adds dust and haze to the air, from 0 to 10: a paler horizon, a wider glow around the sun, a dimmer, redder sun, and thicker fog (1 + Haze times as thick).",
+    ),
+    (
+        ClassName::Atmosphere,
+        "FogDensity",
+        "How many times thicker the height fog is than Density and Haze make it, from 0 (no fog, the sky kept) to 100, leaving the sky and the sun's color as they are. 1 by default.",
+    ),
+    (
+        ClassName::Atmosphere,
+        "FogHeight",
+        "The height in studs (world Y) at and below which the fog is thickest; above it, it thins by FogFalloff. Offset lowers it further, by up to 250 studs. 0 by default.",
+    ),
+    (
+        ClassName::Atmosphere,
+        "FogFalloff",
+        "How many studs above FogHeight the fog thins by about two thirds (e): small values keep it low to the ground as a mist, large ones spread it up the sky. 50 by default, at least 0.1.",
+    ),
+    (
+        ClassName::Atmosphere,
+        "FogStart",
+        "How many studs from the camera the fog starts: nearer is clear of it, so the foreground keeps its contrast. 0 by default.",
     ),
     (
         ClassName::Clouds,
@@ -1745,6 +1780,31 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::ColorCorrectionEffect,
         "TintColor",
         "Multiplies every color. White (the default) changes nothing.",
+    ),
+    (
+        ClassName::ColorCorrectionEffect,
+        "ShadowTint",
+        "Split toning: tints the dark colors, keeping their brightness (a pale blue cools the shadows). White (the default) changes nothing.",
+    ),
+    (
+        ClassName::ColorCorrectionEffect,
+        "HighlightTint",
+        "Split toning: tints the light colors, keeping their brightness. White (the default) changes nothing.",
+    ),
+    (
+        ClassName::ColorCorrectionEffect,
+        "Balance",
+        "Where ShadowTint gives way to HighlightTint, from -1 (more of the picture takes the shadow tint) to 1 (more takes the highlight tint). 0 by default.",
+    ),
+    (
+        ClassName::ColorCorrectionEffect,
+        "Curve",
+        "An S-curve on each color channel, from -1 to 1: above 0 it deepens what's darker than CurvePivot and lifts what's lighter, easing into black and white without clipping; below 0 it flattens colors toward the pivot. 0 (the default) changes nothing.",
+    ),
+    (
+        ClassName::ColorCorrectionEffect,
+        "CurvePivot",
+        "The shade, from 0 (black) to 1 (white), that Curve turns about and keeps. 0.5 by default.",
     ),
     (
         ClassName::ColorCorrectionEffect,
@@ -2620,7 +2680,7 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     (
         ClassName::Terrain,
         "WaveHeight",
-        "How high the biggest wave rises above the water's surface at rest, in studs.",
+        "How high the biggest wave rises above the water's surface at rest, in studs. With more WaveVariation the waves share it more evenly, and they calm where the water is shallow.",
     ),
     (
         ClassName::Terrain,
@@ -2891,6 +2951,11 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::ScatterRule,
         "CanCollide",
         "If true, parts and characters bump into what it places, as into painted foliage marked solid. False by default.",
+    ),
+    (
+        ClassName::ScatterRule,
+        "CastShadow",
+        "If false, what it places casts no shadow, in the shadow maps or ray traced: for ground cover too small for its shadow to show (fine grass, weeds, leaf litter), which contact shadows still ground. Changing it makes its plants again. True by default.",
     ),
     (
         ClassName::ScatterRule,
@@ -3210,7 +3275,7 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
     (
         ClassName::ThirdPersonController,
         "CameraMinZoomDistance",
-        "The closest the mouse wheel zooms the camera, in studs (at least 0.5). Set it to CameraMaxZoomDistance to lock the distance.",
+        "The closest the mouse wheel zooms the camera, in studs (at least 0.5). At 0.5, zooming all the way in puts the camera at the character's eyes (first person: the eye bones of a skinned body, and the mouse looks round without a button); set it higher to keep the camera behind the character. Set it to CameraMaxZoomDistance to lock the distance.",
     ),
     (
         ClassName::ThirdPersonController,
@@ -3311,6 +3376,16 @@ pub(super) const PROPERTY_DOCS: &[(ClassName, &str, &str)] = &[
         ClassName::FirstPersonController,
         "PlatformStand",
         "If true, the controller neither moves nor jumps the character; it stays where it is until this is false again.",
+    ),
+    (
+        ClassName::ThirdPersonController,
+        "TurnSpeed",
+        "The fastest the character turns to face the way it walks, in degrees a second (720). Each step turns it part of the way that's left, so it eases into a turn and settles at the end, and a turn started goes on to the end after the keys are let go. 0 turns it at once. A camera at the eyes (a first-person one, or a third-person one zoomed all the way in) turns the character with the camera at once.",
+    ),
+    (
+        ClassName::FirstPersonController,
+        "TurnSpeed",
+        "The fastest the character turns to face the way it walks, in degrees a second (720). Each step turns it part of the way that's left, so it eases into a turn and settles at the end, and a turn started goes on to the end after the keys are let go. 0 turns it at once. A camera at the eyes (a first-person one, or a third-person one zoomed all the way in) turns the character with the camera at once.",
     ),
     (
         ClassName::FirstPersonController,

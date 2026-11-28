@@ -386,7 +386,9 @@ pub const LEAF_TRANSLUCENCY: f32 = 0.42;
 /// file without them stays still; a material that flutters is a leaf, and
 /// lets [`LEAF_TRANSLUCENCY`] through unless it says otherwise.
 /// `axcenity_hang` is `true` or a number above 0 for what hangs (drapes,
-/// washing on a line): it sways from its top down.
+/// washing on a line): it sways from its top down. `axcenity_glossy_leaf`,
+/// likewise, marks a leaf with a sheen of its own (ivy, laurel): lit as a
+/// leaf even when it hangs, at its own roughness.
 fn wind_of(extras: &gltf::json::Extras) -> ModelMaterial {
     // Each on its own, so one of the wrong kind doesn't lose the others.
     #[derive(serde::Deserialize)]
@@ -395,6 +397,7 @@ fn wind_of(extras: &gltf::json::Extras) -> ModelMaterial {
         axcenity_flutter: Option<serde_json::Value>,
         axcenity_translucency: Option<serde_json::Value>,
         axcenity_hang: Option<serde_json::Value>,
+        axcenity_glossy_leaf: Option<serde_json::Value>,
     }
     let wind = extras
         .as_ref()
@@ -405,17 +408,20 @@ fn wind_of(extras: &gltf::json::Extras) -> ModelMaterial {
             .and_then(serde_json::Value::as_f64)
             .map(|v| v as f32)
     };
-    let (sway, flutter, translucency, hangs) = wind.map_or((None, None, None, false), |wind| {
-        (
-            number(&wind.axcenity_sway),
-            number(&wind.axcenity_flutter),
-            number(&wind.axcenity_translucency),
-            match &wind.axcenity_hang {
-                Some(serde_json::Value::Bool(hangs)) => *hangs,
-                other => number(other).is_some_and(|v| v > 0.0),
-            },
-        )
-    });
+    let yes = |value: &Option<serde_json::Value>| match value {
+        Some(serde_json::Value::Bool(yes)) => *yes,
+        other => number(other).is_some_and(|v| v > 0.0),
+    };
+    let (sway, flutter, translucency, hangs, glossy_leaf) =
+        wind.map_or((None, None, None, false, false), |wind| {
+            (
+                number(&wind.axcenity_sway),
+                number(&wind.axcenity_flutter),
+                number(&wind.axcenity_translucency),
+                yes(&wind.axcenity_hang),
+                yes(&wind.axcenity_glossy_leaf),
+            )
+        });
     let usable = |value: Option<f32>| value.filter(|v| v.is_finite() && *v > 0.0).unwrap_or(0.0);
     let flutter = usable(flutter).min(MAX_FLUTTER);
     let leaf = if flutter > 0.0 {
@@ -427,6 +433,7 @@ fn wind_of(extras: &gltf::json::Extras) -> ModelMaterial {
         sway: usable(sway).min(2.0),
         flutter,
         hangs,
+        glossy_leaf,
         translucency: translucency
             .filter(|v| v.is_finite() && *v >= 0.0)
             .unwrap_or(leaf)
@@ -676,6 +683,11 @@ pub struct ModelMaterial {
     /// then sways from the top of its model down, its top staying put.
     /// From glTF `extras`: `axcenity_hang`.
     pub hangs: bool,
+    /// A leaf with a sheen of its own (ivy, laurel): lit as a leaf even when
+    /// it hangs, and at its own roughness, not raised to a leaf's least
+    /// (which keeps a matte leaf seen edge-on from mirroring a white sky).
+    /// From glTF `extras`: `axcenity_glossy_leaf`.
+    pub glossy_leaf: bool,
     /// How much light passes through it from behind, 0 for none: leaves.
     /// From glTF `extras`: `axcenity_translucency`, or a leaf's default.
     pub translucency: f32,
@@ -779,6 +791,7 @@ impl Default for ModelMaterial {
             sway: 0.0,
             flutter: 0.0,
             hangs: false,
+            glossy_leaf: false,
             translucency: 0.0,
             shading: ModelShading::Standard,
             defined_normal_texture: None,

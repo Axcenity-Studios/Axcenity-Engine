@@ -85,7 +85,7 @@ impl EditorApp {
         }
         if self.graphics.reflection_quality() == axcenity_render::ReflectionQuality::Low {
             message.push_str(
-                " Your Reflection quality is Low, so the editor keeps showing the sky colors: \
+                " Your Sky and probe reflections setting is Low, so the editor keeps showing the sky colors: \
                  raise it in Settings > Graphics to see the image.",
             );
         }

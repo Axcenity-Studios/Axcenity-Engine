@@ -9,15 +9,15 @@ use super::*;
 
 use crate::shortcuts;
 use crate::theme::{
-    Accent, Appearance, Density, MenuIcons, Palette, RibbonAlign, ThemeChoice, space, type_scale,
+    Accent, Appearance, Density, Palette, RibbonAlign, ThemeChoice, space, type_scale,
 };
 use crate::widgets;
 use axcenity_render::{
     AmbientOcclusion, AntiAliasing, Capabilities, CloudQuality, DepthOfFieldQuality,
     EffectiveGraphics, GraphicsSettings, MotionBlurQuality, Quality, RAY_TRACING_DISTANCE_RANGE,
-    RENDER_SCALE_RANGE, RayTracedAmbientOcclusion, RayTracedGlobalIllumination,
-    RayTracedReflections, RayTracedShadows, ReflectionQuality, ShadowQuality, TEXTURE_BUDGET_RANGE,
-    TextureQuality,
+    RENDER_SCALE_RANGE, RayShadowResolution, RayTracedAmbientOcclusion,
+    RayTracedGlobalIllumination, RayTracedReflections, RayTracedShadows, ReflectionQuality,
+    ShadowQuality, TEXTURE_BUDGET_RANGE, TextureQuality,
 };
 
 /// The file beside eframe's saved settings that says whether the GPU is

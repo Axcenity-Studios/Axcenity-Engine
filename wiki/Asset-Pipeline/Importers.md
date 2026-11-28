@@ -28,7 +28,7 @@ tags: [asset-pipeline, import]
 |---|---|---|
 | Geometry | Default scene's node tree (or every mesh), node transforms, triangle lists only | Every visible node with a mesh, world transforms incl. pivots; polygons triangulated by ufbx |
 | Normals / tangents | Missing normals made smooth; tangents computed after fitting (file tangents ignored) | Same; ufbx makes missing normals |
-| Materials | Metallic-roughness, normal, occlusion, emissive, alpha modes, `doubleSided`, `KHR_texture_transform`, `extras` (`axcenity_flutter`, `axcenity_translucency`, `axcenity_shading`, `axcenity_defined_normal`: skin shading, `docs/rendering/skin.md`) | ufbx's PBR mapping of Lambert/Phong/Principled, plus the material's own slots; bump maps that look like normal maps |
+| Materials | Metallic-roughness, normal, occlusion, emissive, alpha modes, `doubleSided`, `KHR_texture_transform`, `extras` (`axcenity_flutter`, `axcenity_translucency`, `axcenity_shading`, `axcenity_defined_normal`: skin shading, `docs/rendering/skin.md`; `axcenity_glossy_leaf`: a leaf lit at its own roughness, since 2026-11-27, `docs/rendering/models.md`) | ufbx's PBR mapping of Lambert/Phong/Principled, plus the material's own slots; bump maps that look like normal maps |
 | Texture roles by name | Used for packed layouts | Decides roles; Lambert/Phong names win over misused slots |
 | LODs | `_LOD1`/`_LOD2` objects, else meshopt to 1/2 and 1/4 of triangles (≥ 256 triangles; a copy that saves < 20% is dropped) | Same; hidden LOD objects read too |
 | Collision pieces (R15.2) | `_COL`/`_COL1`… objects: one convex piece each, not drawn, `Model::collision` | Same; hidden pieces read too |

@@ -17,7 +17,9 @@ pub struct Water {
     /// How many studs of water light crosses before only about a third of
     /// what's under it still shows (e⁻¹). Bigger is clearer.
     pub clarity: f32,
-    /// How high the biggest wave rises above the surface at rest, in studs.
+    /// How high the biggest wave rises above the surface at rest, in studs,
+    /// at no variation; with variation the waves share it more evenly
+    /// (`water.wgsl`, `water_waves`).
     pub wave_height: f32,
     /// How long the biggest wave is from crest to crest, in studs. Smaller
     /// waves of shorter lengths ride on it.

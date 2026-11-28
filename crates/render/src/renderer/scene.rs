@@ -1,3 +1,4 @@
+use super::lamp_shadows::LampDraw;
 use super::*;
 use rustc_hash::FxHashMap;
 
@@ -224,6 +225,12 @@ impl ScenePipeline {
             [&frame_layout, &material_layout, &skinning.layout],
             samples,
         );
+        let plant_probe = probe::PlantProbe::from_environment(
+            &device,
+            [&frame_layout, &material_layout, &skinning.layout],
+            samples,
+        );
+        let depth_start = depth_start::DepthStart::new(&device);
         let mut terrain =
             terrain::TerrainPass::new(&device, &frame_layout, texture_bytes.clone(), samples);
         terrain.set_skipped_levels(graphics.texture_quality.skipped_levels());
@@ -295,6 +302,12 @@ impl ScenePipeline {
             sky_pipeline,
             item_pipelines,
             prefill_pipelines,
+            plant_probe,
+            depth_start,
+            // `AXCENITY_NO_WHOLE_SOLIDS` lights them with `fs_main` as
+            // before, for comparing the two.
+            whole_solids: std::env::var_os("AXCENITY_NO_WHOLE_SOLIDS").is_none(),
+            cut_out_cascades: lighting::cut_out_cascades(),
             cascades_drawn: [None; SHADOW_CASCADES],
             casters_planned: 0,
             outline_pipeline,
@@ -382,6 +395,7 @@ impl ScenePipeline {
             white_texture,
             plain_material,
             uploader: None,
+            skirts: Default::default(),
             frame_clock: std::collections::VecDeque::new(),
             custom_meshes: FxHashMap::default(),
             textures: FxHashMap::default(),
@@ -403,11 +417,13 @@ impl ScenePipeline {
             lods: LodStates::default(),
             clusters: clusters::Clusters::default(),
             ray_scene: None,
+            parked_ray_scene: None,
             posing_generation: posing.generation,
             posing,
             ray_shadows: None,
             no_ray_shadows,
             ray_reflections: None,
+            screen_reflections: None,
             no_ray_reflections,
             weather_field,
             weather_field_capacity,
@@ -539,6 +555,15 @@ impl ScenePipeline {
             );
             self.edge_pipeline =
                 create_edge_pipeline(&self.device, &self.occlusion.layout, samples);
+            self.plant_probe = probe::PlantProbe::from_environment(
+                &self.device,
+                [
+                    &self.frame_layout,
+                    &self.material_layout,
+                    &self.skinning.layout,
+                ],
+                samples,
+            );
             self.terrain
                 .set_samples(&self.device, &self.frame_layout, samples);
             self.water.set_samples(
@@ -621,6 +646,10 @@ impl ScenePipeline {
                 &self.targets_alive,
             );
             self.history.valid = false;
+            // Last frame's picture went with them.
+            if let Some(pass) = &mut self.screen_reflections {
+                pass.previous = None;
+            }
             // The frame bindings held the old occlusion texture, and so did
             // the traced clouds'.
             self.cloud_trace.forget_target();
@@ -852,7 +881,7 @@ impl ScenePipeline {
         };
         frame_uniform.fog = fog::FogRaw::new(
             &list.fog,
-            sky.colors[1],
+            sky.fog_horizon,
             sky_average,
             glam::Vec3::from_slice(&frame_uniform.sun_direction[..3]),
             glam::Vec3::from_slice(&frame_uniform.sun_radiance[..3]),
@@ -1039,6 +1068,45 @@ impl ScenePipeline {
                 }
                 None
             };
+        // Screen-space reflections, while drawn and ray traced ones aren't
+        // (renderer/screen_reflections.rs): what they find on the screen is
+        // bound in the frame's place 18, as ray traced reflections are. Not
+        // on the first frame drawn into these targets: there is no last
+        // frame's picture to read.
+        let screen_reflection_uniform = if screen_reflections::marched(&self.graphics)
+            && self.frame_targets.occlusion.is_some()
+        {
+            let size = self.frame_targets.size;
+            if !self
+                .screen_reflections
+                .as_ref()
+                .is_some_and(|pass| pass.fits(size))
+            {
+                self.screen_reflections = Some(Box::new(
+                    screen_reflections::ScreenReflections::new(&self.device, size),
+                ));
+                self.bind_frame();
+            }
+            let matrices = lighting::camera_matrices(&list.camera, aspect);
+            self.screen_reflections.as_ref().and_then(|pass| {
+                // On from the first frame, for the sky's shading: with no
+                // last frame to read, the pass's buffer is cleared instead.
+                frame_uniform.ray_reflections = pass.frame_values();
+                // Its steps start at a different offset each frame only while
+                // TAA averages them (as the shading's noise).
+                let step = frame_uniform.noise[0] as u64;
+                pass.uniform(drawn_view_proj, matrices, step)
+            })
+        } else {
+            if self.screen_reflections.take().is_some() {
+                self.bind_frame();
+            }
+            None
+        };
+        // This frame's picture is next frame's to read.
+        if let Some(pass) = &mut self.screen_reflections {
+            pass.previous = Some(view_proj);
+        }
         if let Some(field) = list
             .weather_field
             .as_ref()
@@ -1086,7 +1154,7 @@ impl ScenePipeline {
                 None => self.weather_prints_uploaded = None,
             }
         }
-        let cascade_drawn = self.schedule_cascades(list, &mut frame_uniform);
+        let cascade_drawn = self.schedule_cascades(list, &mut frame_uniform, aspect);
         self.queue
             .write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame_uniform));
         // The sun's cascades, then the spot lights' views, then the point
@@ -1169,11 +1237,22 @@ impl ScenePipeline {
                 .push(Frustum::of(camera_view_projection(&list.camera, aspect)));
             let cascades = shadows_drawn(list.shadows, &self.graphics)
                 .map_or(0, |(_, size)| size.cascades as usize);
-            reach.views.extend(
-                frame_uniform.cascades[..cascades]
-                    .iter()
-                    .map(|matrix| Frustum::of(glam::Mat4::from_cols_array_2d(matrix))),
-            );
+            // Not the cascades ray traced shadows leave out.
+            let under_rays = super::lighting::cascades_under_rays(list, &self.graphics, aspect);
+            reach.views.extend(super::lighting::cascade_views(
+                &frame_uniform.cascades[..cascades],
+                under_rays,
+            ));
+            // Ray traced shadows' rays toward the sun, where the shadow
+            // maps reach less far than they do (or aren't drawn).
+            if let Some(rays) = ray_shadows::RayShadowPlan::of(list, &self.graphics)
+                && shadows_drawn(list.shadows, &self.graphics)
+                    .is_none_or(|(maps, _)| maps.distance < rays.reach)
+            {
+                reach
+                    .views
+                    .push(Frustum::of(sun_reach(list, rays.reach, aspect)));
+            }
             for spot in &planned_lights.spot_shadows {
                 reach.lamps.push((spot.bounds, Frustum::of(spot.view_proj)));
             }
@@ -1220,6 +1299,7 @@ impl ScenePipeline {
             skins,
             posed,
             lod_items,
+            in_view,
         } = {
             let (meshes, custom_meshes) = (&self.meshes, &self.custom_meshes);
             plan_draws(
@@ -1261,7 +1341,10 @@ impl ScenePipeline {
             }
         }
         self.casters_planned = casters.iter().map(Vec::len).sum();
-        let mut view_casters = casters_in_views(&casters, &shadow_view_list);
+        // Swaying casters move with the clock while the wind blows.
+        let windy = glam::Vec2::new(list.wind.x, list.wind.z).length() >= 1e-3;
+        let mut view_casters =
+            casters_in_views(&casters, &shadow_view_list, self.cut_out_cascades, windy);
         cpu.lap(CpuSection::Casters);
         // Water reflecting the screen traces rays too, with the GPU (LE5).
         let water_rays = water_mode.traces_rays(&self.graphics);
@@ -1296,9 +1379,12 @@ impl ScenePipeline {
         // What moved since last frame, for the motion vectors.
         let moved = self.frame_targets.temporal.as_ref().map(|_| {
             let posing = &self.posing;
-            let moved = self
-                .history
-                .moved(&draws, |skin, mesh| posing.offset(skin, mesh), clock);
+            let moved = self.history.moved(
+                &draws,
+                Some(&in_view),
+                |skin, mesh| posing.offset(skin, mesh),
+                clock,
+            );
             let blur = list
                 .lens
                 .motion_blur
@@ -1334,7 +1420,7 @@ impl ScenePipeline {
                     )
                 })
                 .collect();
-            casters_by_view.push((groups, view.left_out));
+            casters_by_view.push((groups, view.left_out, view.still_groups));
             pieces.extend(view.instances.iter().map(Vec::as_slice));
             instance_count += view.instances.iter().map(Vec::len).sum::<usize>() as u32;
         }
@@ -1464,12 +1550,19 @@ impl ScenePipeline {
                 debug_assert!(
                     size.size <= SHADOW_MAP_SIZE && size.cascades as usize <= SHADOW_CASCADES
                 );
-                let (array, layers) =
-                    create_shadow_views(&self.device, "shadow map", size.size, size.cascades);
+                let (texture, array, layers) = create_shadow_layers(
+                    &self.device,
+                    "shadow map",
+                    (size.size, size.cascades),
+                    false,
+                );
                 ShadowMap {
                     size,
                     _alive: self.shadow_maps_alive.clone(),
                     bytes: target_bytes((size.size, size.size, size.cascades), DEPTH_FORMAT, 1),
+                    drawn_from: vec![None; layers.len()],
+                    kept: None,
+                    texture,
                     array,
                     layers,
                 }
@@ -1479,12 +1572,19 @@ impl ScenePipeline {
         if self.spot_shadow_map.as_ref().map(|map| map.size) != spot_map {
             self.spot_shadow_map = spot_map.map(|size| {
                 debug_assert!(size.lights as usize <= MAX_SPOT_SHADOWS);
-                let (array, layers) =
-                    create_shadow_views(&self.device, "spot shadow map", size.size, size.lights);
+                let (texture, array, layers) = create_shadow_layers(
+                    &self.device,
+                    "spot shadow map",
+                    (size.size, size.lights),
+                    true,
+                );
                 ShadowMap {
                     size,
                     _alive: self.spot_shadow_maps_alive.clone(),
                     bytes: target_bytes((size.size, size.size, size.lights), DEPTH_FORMAT, 1),
+                    drawn_from: vec![None; layers.len()],
+                    kept: None,
+                    texture,
                     array,
                     layers,
                 }
@@ -1495,12 +1595,19 @@ impl ScenePipeline {
             self.point_shadow_map = point_map.map(|size| {
                 debug_assert!(size.lights as usize <= MAX_POINT_SHADOWS);
                 let count = size.lights * POINT_SHADOW_FACES;
-                let (array, layers) =
-                    create_shadow_views(&self.device, "point shadow map", size.size, count);
+                let (texture, array, layers) = create_shadow_layers(
+                    &self.device,
+                    "point shadow map",
+                    (size.size, count),
+                    true,
+                );
                 ShadowMap {
                     size,
                     _alive: self.point_shadow_maps_alive.clone(),
                     bytes: target_bytes((size.size, size.size, count), DEPTH_FORMAT, 1),
+                    drawn_from: vec![None; layers.len()],
+                    kept: None,
+                    texture,
                     array,
                     layers,
                 }
@@ -1542,8 +1649,9 @@ impl ScenePipeline {
         mark(&mut encoder, FramePass::AccelerationStructures);
         let path_traced = self.path_traced();
         cpu.lap(CpuSection::Interface);
+        let may_trace = self.may_trace_rays();
         let tracing = ray_tracing::prepare_scene(
-            &mut self.ray_scene,
+            (&mut self.ray_scene, &mut self.parked_ray_scene, may_trace),
             (
                 (&self.device, &self.queue),
                 &self.meshes,
@@ -1614,7 +1722,7 @@ impl ScenePipeline {
         let mut counts = FrameCounts {
             items_submitted,
             items_culled: culled + past_cull_distance,
-            shadow_casters_culled: casters_by_view.iter().map(|(_, culled)| culled).sum(),
+            shadow_casters_culled: casters_by_view.iter().map(|(_, culled, _)| culled).sum(),
             sprites_culled,
             decals_drawn: list.decals.len() as u32 - decals_left_out,
             decals_left_out,
@@ -1641,24 +1749,95 @@ impl ScenePipeline {
         let (cascade_casters, lamp_casters) = casters_by_view.split_at(cascades);
         let (spot_casters, point_casters) =
             lamp_casters.split_at(planned_lights.spot_shadows.len());
-        let cascades = self
-            .shadow_map
+        // Each lamp view keeps its layer, draws it, or draws its moving
+        // casters over its kept still ones (renderer/lamp_shadows.rs).
+        let lamp_views = &view_casters[cascades..];
+        let lamp_matrices = (planned_lights.spot_shadows.iter())
+            .map(|spot| spot.view_proj)
+            .chain(
+                planned_lights
+                    .point_shadows
+                    .iter()
+                    .flat_map(|point| point.faces),
+            );
+        let prints: Vec<Option<u64>> = lamp_views
             .iter()
-            .flat_map(|map| map.layers.iter().zip(cascade_casters).enumerate());
-        let spots = self
-            .spot_shadow_map
+            .zip(lamp_matrices)
+            .map(|(view, matrix)| {
+                (!lamp_shadows::redrawn_every_frame()).then(|| {
+                    lamp_shadows::fingerprint(
+                        matrix,
+                        view,
+                        |mesh| self.gpu_mesh(mesh).map(|mesh| mesh.version),
+                        |material| self.cut_out_material(&uses, material).serial,
+                    )
+                })
+            })
+            .collect();
+        let moving: Vec<bool> = lamp_views
             .iter()
-            .flat_map(|map| map.layers.iter().zip(spot_casters).enumerate())
-            .map(|(index, view)| (SHADOW_CASCADES + index, view));
-        let points = self
-            .point_shadow_map
-            .iter()
-            .flat_map(|map| map.layers.iter().zip(point_casters).enumerate())
-            .map(|(index, view)| (SHADOW_CASCADES + MAX_SPOT_SHADOWS + index, view));
+            .map(|view| view.still_groups < view.groups.len())
+            .collect();
+        let spot_count = planned_lights.spot_shadows.len();
+        let spot_plans = lamp_shadows::plan_layers(
+            &self.device,
+            self.spot_shadow_map.as_mut(),
+            &prints[..spot_count],
+            &moving[..spot_count],
+        );
+        let point_plans = lamp_shadows::plan_layers(
+            &self.device,
+            self.point_shadow_map.as_mut(),
+            &prints[spot_count..],
+            &moving[spot_count..],
+        );
+        // Views whose still casters weren't drawn again.
+        let lamp_views_kept = (spot_plans.iter().chain(&point_plans))
+            .filter(|plan| matches!(plan, LampDraw::Kept | LampDraw::Over { still: false }))
+            .count();
+        let mut lamp_shadow_draws = 0;
+        // Each view: its index in `cascade_buffer`, what it does, its map's
+        // texture, kept still casters and layer, and its casters.
+        let cascades = self.shadow_map.iter().flat_map(|map| {
+            let layers = map.layers.iter().zip(cascade_casters).enumerate();
+            layers.map(move |(index, view)| {
+                (
+                    index,
+                    LampDraw::All,
+                    (&map.texture, map.kept.as_ref(), index),
+                    view,
+                )
+            })
+        });
+        let spots = self.spot_shadow_map.iter().flat_map(|map| {
+            let layers = map.layers.iter().zip(spot_casters).enumerate();
+            layers.map(|(index, view)| {
+                (
+                    SHADOW_CASCADES + index,
+                    spot_plans[index],
+                    (&map.texture, map.kept.as_ref(), index),
+                    view,
+                )
+            })
+        });
+        let points = self.point_shadow_map.iter().flat_map(|map| {
+            let layers = map.layers.iter().zip(point_casters).enumerate();
+            layers.map(|(index, view)| {
+                let at = SHADOW_CASCADES + MAX_SPOT_SHADOWS + index;
+                (
+                    at,
+                    point_plans[index],
+                    (&map.texture, map.kept.as_ref(), index),
+                    view,
+                )
+            })
+        });
         let mut cascades_timed = [false; SHADOW_CASCADES];
-        let mut cascade_counts = [(0u32, 0u64); SHADOW_CASCADES];
+        let mut cascade_counts = [(0u32, 0u64, 0u32); SHADOW_CASCADES];
         let mut after_cascades = false;
-        for (index, (layer, (casters, _))) in cascades.chain(spots).chain(points) {
+        for (index, plan, (texture, kept, at), (layer, (casters, _, still))) in
+            cascades.chain(spots).chain(points)
+        {
             // A cascade waiting its turn keeps what it drew: not even cleared.
             if index < SHADOW_CASCADES && !cascade_drawn[index] {
                 continue;
@@ -1672,69 +1851,120 @@ impl ScenePipeline {
                     after_cascades = true;
                 }
             }
-            let (mut view_casters, mut view_triangles) = (0u32, 0u64);
+            let (still_casters, moving_casters) = casters.split_at(*still);
+            // What's drawn into which layer, cleared first or not, with a
+            // copy of the kept still casters into the layer between.
+            let steps: Vec<ShadowStep> = match (plan, kept) {
+                // A lamp's view with nothing changed keeps its layer too.
+                (LampDraw::Kept, _) => continue,
+                (LampDraw::Still, _) => vec![ShadowStep::Draw(layer, true, still_casters)],
+                (LampDraw::Over { still }, Some(kept)) => {
+                    let mut steps = Vec::with_capacity(3);
+                    if still {
+                        steps.push(ShadowStep::Draw(&kept.layers[at], true, still_casters));
+                    }
+                    steps.push(ShadowStep::Copy);
+                    steps.push(ShadowStep::Draw(layer, false, moving_casters));
+                    steps
+                }
+                _ => vec![ShadowStep::Draw(layer, true, casters)],
+            };
+            let (mut view_casters, mut view_triangles, mut view_draws) = (0u32, 0u64, 0u32);
             // Each view with enough casters is a part of its own.
             if casters.len() >= encoders::WORTH_A_PART {
                 encoder.part("shadow view");
             }
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("shadow view"),
-                color_attachments: &[],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: layer,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                ..Default::default()
-            });
-            pass.set_pipeline(&self.shadow_pipeline);
-            let offset = (index as u64 * CASCADE_UNIFORM_STRIDE) as u32;
-            pass.set_bind_group(0, &self.shadow_bind_group, &[offset]);
-            pass.set_bind_group(1, &self.skinning.empty, &[]);
-            pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-            // Which caster group's pipeline and material are bound: a
-            // cut-out's are its own, every other caster's the plain ones.
-            let mut bound: Option<u32> = None;
-            // See-through items, and parts with `CastShadow` off, cast no shadow.
-            for ((mesh, cut_out), instances) in casters {
-                let Some(mesh) = self.gpu_mesh(*mesh) else {
-                    continue;
-                };
-                if *cut_out != bound {
-                    match cut_out {
-                        Some(material) => {
-                            let gpu = uses
-                                .materials
-                                .get(*material as usize)
-                                .and_then(|key| self.materials.get(key))
-                                .and_then(|cached| cached.gpu.as_ref())
-                                .unwrap_or(&self.plain_material);
-                            pass.set_pipeline(&self.shadow_cut_out_pipeline);
-                            pass.set_bind_group(1, &gpu.bind_group, &[]);
-                        }
-                        None => {
-                            pass.set_pipeline(&self.shadow_pipeline);
-                            pass.set_bind_group(1, &self.skinning.empty, &[]);
-                        }
+            for step in steps {
+                let (target, clear, groups) = match step {
+                    ShadowStep::Draw(target, clear, groups) => (target, clear, groups),
+                    ShadowStep::Copy => {
+                        let Some(kept) = kept else { continue };
+                        let layer_of = |texture| wgpu::TexelCopyTextureInfo {
+                            texture,
+                            mip_level: 0,
+                            origin: wgpu::Origin3d {
+                                x: 0,
+                                y: 0,
+                                z: at as u32,
+                            },
+                            aspect: wgpu::TextureAspect::All,
+                        };
+                        let size = texture.size();
+                        encoder.copy_texture_to_texture(
+                            layer_of(&kept.texture),
+                            layer_of(texture),
+                            wgpu::Extent3d {
+                                depth_or_array_layers: 1,
+                                ..size
+                            },
+                        );
+                        continue;
                     }
-                    bound = *cut_out;
+                };
+                let load = if clear {
+                    wgpu::LoadOp::Clear(1.0)
+                } else {
+                    wgpu::LoadOp::Load
+                };
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("shadow view"),
+                    color_attachments: &[],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: target,
+                        depth_ops: Some(wgpu::Operations {
+                            load,
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    }),
+                    ..Default::default()
+                });
+                pass.set_pipeline(&self.shadow_pipeline);
+                let offset = (index as u64 * CASCADE_UNIFORM_STRIDE) as u32;
+                pass.set_bind_group(0, &self.shadow_bind_group, &[offset]);
+                pass.set_bind_group(1, &self.skinning.empty, &[]);
+                pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+                // Which caster group's pipeline and material are bound: a
+                // cut-out's are its own, every other caster's the plain ones.
+                let mut bound: Option<u32> = None;
+                // See-through items, and parts with `CastShadow` off, cast
+                // no shadow. The groups come whole casters first, then
+                // cut-outs by material (`casters_in_views`), so the pipeline
+                // changes once.
+                for ((mesh, cut_out), instances) in groups {
+                    let Some(mesh) = self.gpu_mesh(*mesh) else {
+                        continue;
+                    };
+                    if *cut_out != bound {
+                        match cut_out {
+                            Some(material) => {
+                                let gpu = self.cut_out_material(&uses, *material);
+                                pass.set_pipeline(&self.shadow_cut_out_pipeline);
+                                pass.set_bind_group(1, &gpu.bind_group, &[]);
+                            }
+                            None => {
+                                pass.set_pipeline(&self.shadow_pipeline);
+                                pass.set_bind_group(1, &self.skinning.empty, &[]);
+                            }
+                        }
+                        bound = *cut_out;
+                    }
+                    pass.set_bind_group(2, self.skin_group(mesh), &[]);
+                    pass.set_vertex_buffer(0, mesh.vertices.slice(..));
+                    pass.set_index_buffer(mesh.indices.slice(..), mesh.index_format);
+                    count(mesh, instances);
+                    shadow_casters_drawn += instances.end - instances.start;
+                    view_casters += instances.end - instances.start;
+                    view_triangles += u64::from(mesh.index_count / 3)
+                        * u64::from(instances.end - instances.start);
+                    view_draws += 1;
+                    pass.draw_indexed(0..mesh.index_count, 0, instances.clone());
                 }
-                pass.set_bind_group(2, self.skin_group(mesh), &[]);
-                pass.set_vertex_buffer(0, mesh.vertices.slice(..));
-                pass.set_index_buffer(mesh.indices.slice(..), mesh.index_format);
-                count(mesh, instances);
-                shadow_casters_drawn += instances.end - instances.start;
-                view_casters += instances.end - instances.start;
-                view_triangles +=
-                    u64::from(mesh.index_count / 3) * u64::from(instances.end - instances.start);
-                pass.draw_indexed(0..mesh.index_count, 0, instances.clone());
             }
-            drop(pass);
             if index < SHADOW_CASCADES {
-                cascade_counts[index] = (view_casters, view_triangles);
+                cascade_counts[index] = (view_casters, view_triangles, view_draws);
+            } else {
+                lamp_shadow_draws += view_draws;
             }
         }
         if let Some(timer) = timer
@@ -1746,6 +1976,7 @@ impl ScenePipeline {
         encoder.part("prepass");
         mark(&mut encoder, FramePass::Prepass);
         let mut motion_draws = 0;
+        let mut prepass_draws = 0;
 
         // While ambient occlusion or contact shadows are on: solid items'
         // depth and normals, then (for ambient occlusion) how hidden each
@@ -1785,6 +2016,7 @@ impl ScenePipeline {
                         continue;
                     };
                     count(mesh, &batch.instances);
+                    prepass_draws += 1;
                     pass.draw_indexed(0..mesh.drawn_indices(snow_caps), 0, batch.instances.clone());
                 }
                 stamp_part(&mut pass, PartPass::Prepass, None);
@@ -1901,6 +2133,28 @@ impl ScenePipeline {
                 bytemuck::bytes_of(&[0.0f32; 4]),
             );
         }
+        mark(&mut encoder, FramePass::ScreenReflections);
+        let screen_reflections_drawn = match (
+            &self.screen_reflections,
+            &screen_reflection_uniform,
+            &self.frame_targets.occlusion,
+        ) {
+            (Some(pass), Some(uniform), Some(prepass)) => {
+                pass.march(
+                    (&self.device, &self.queue),
+                    &mut encoder,
+                    (prepass, &self.frame_targets.hdr_view),
+                    uniform,
+                );
+                true
+            }
+            // No last frame to read: nothing is found on the screen.
+            (Some(pass), None, _) => {
+                encoder.clear_buffer(&pass.buffer, 0, None);
+                false
+            }
+            _ => false,
+        };
         mark(&mut encoder, FramePass::VolumetricFog);
         if let Some(fog) = &self.volumetric_fog {
             fog.scatter(&mut encoder);
@@ -1919,6 +2173,20 @@ impl ScenePipeline {
             .as_ref()
             .map_or_else(Vec::new, |particles| particles.draws());
 
+        // Where the prepass drew the same solid items with as many samples
+        // a pixel, the scene's depth starts a step behind the prepass's in
+        // place of the far plane (renderer/depth_start.rs): what's hidden
+        // then fails the depth test before it is lit, and what shows is
+        // drawn exactly as it would be.
+        let depth_started = match &self.frame_targets.occlusion {
+            Some(prepass) if self.frame_targets.samples == 1 => self.depth_start.draw(
+                &self.device,
+                &mut encoder,
+                &prepass.depth_view,
+                &self.frame_targets.depth_view,
+            ),
+            _ => false,
+        };
         // The scene is drawn into the HDR texture; post-processing then brings
         // it to `view`. With MSAA it's drawn into the multisampled texture,
         // whose samples are averaged into the HDR one as the pass ends.
@@ -1999,7 +2267,12 @@ impl ScenePipeline {
         // Each pass is a block so it ends (is dropped) before the next
         // begins and before `encoder.finish()`, which need the encoder back.
         {
-            let mut pass = begin_scene_pass(&mut encoder, &self.frame_targets, false, copied);
+            let mut pass = begin_scene_pass(
+                &mut encoder,
+                &self.frame_targets,
+                (false, depth_started),
+                copied,
+            );
             pass.set_bind_group(0, frame_bind_group, &[]);
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             // The cut-out surfaces' depth first, so they're lit only once
@@ -2057,7 +2330,7 @@ impl ScenePipeline {
                     camera_position: frame_uniform.camera_position,
                 },
             );
-            let mut pass = begin_scene_pass(&mut encoder, targets, true, false);
+            let mut pass = begin_scene_pass(&mut encoder, targets, (true, true), false);
             pass.set_bind_group(0, frame_bind_group, &[]);
             pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             stamp_part(&mut pass, PartPass::Scene, Some(DrawnPart::SeeThrough));
@@ -2068,8 +2341,17 @@ impl ScenePipeline {
         }
         (counts.items_drawn, counts.batches) = drawn;
         counts.draw_calls += motion_draws + depth_fill.0 + decal_draws.len() as u32;
-        counts.triangles += depth_fill.1;
-        counts.vertices += depth_fill.2;
+        counts.prepass_draws = prepass_draws;
+        counts.motion_draws = motion_draws;
+        counts.depth_fill_draws = depth_fill.0;
+        counts.depth_from_prepass = depth_started;
+        for batch in solid
+            .iter()
+            .filter(|batch| batch.part == DrawnPart::Scattered)
+        {
+            counts.scattered_batches += 1;
+            counts.scattered_items += batch.instances.end - batch.instances.start;
+        }
         // The light the volumetric fog scattered in front of what was drawn.
         if let (Some(fog), Some(occlusion)) = (&self.volumetric_fog, &self.frame_targets.occlusion)
         {
@@ -2255,6 +2537,16 @@ impl ScenePipeline {
         cpu.lap(CpuSection::Submit);
         self.wait_for_frame_before(submitted);
         cpu.skip();
+        if super::occlusion_probe::reads_on(self.frame)
+            && let Some(targets) = &self.frame_targets.occlusion
+        {
+            super::occlusion_probe::read(
+                &self.device,
+                &self.queue,
+                &targets.depth_texture,
+                view_proj,
+            );
+        }
         if timed && let Some(timer) = &mut self.gpu_timer {
             let shadows = self.shadow_map.is_some()
                 || self.spot_shadow_map.is_some()
@@ -2270,6 +2562,7 @@ impl ScenePipeline {
                     ray_shadows_drawn,
                     ray_gi_drawn,
                     ray_reflections_drawn,
+                    screen_reflections_drawn,
                     self.volumetric_fog.is_some(),
                     self.gpu_particles.is_some(),
                     self.cloud_trace.traced(),
@@ -2281,8 +2574,11 @@ impl ScenePipeline {
             );
         }
         counts.shadow_casters_drawn = shadow_casters_drawn;
-        counts.cascade_casters = cascade_counts.map(|(casters, _)| casters);
-        counts.cascade_triangles = cascade_counts.map(|(_, triangles)| triangles);
+        counts.cascade_casters = cascade_counts.map(|(casters, _, _)| casters);
+        counts.cascade_triangles = cascade_counts.map(|(_, triangles, _)| triangles);
+        counts.cascade_draws = cascade_counts.map(|(_, _, draws)| draws);
+        counts.lamp_shadow_draws = lamp_shadow_draws;
+        counts.lamp_views_kept = lamp_views_kept as u32;
         self.counts = counts;
         match &self.frame_targets.temporal {
             Some(temporal) => {
@@ -2319,6 +2615,7 @@ impl ScenePipeline {
         &mut self,
         list: &DrawList,
         uniform: &mut FrameUniform,
+        aspect: f32,
     ) -> [bool; SHADOW_CASCADES] {
         let mut drawn = [true; SHADOW_CASCADES];
         let Some((_, size)) = shadows_drawn(list.shadows, &self.graphics) else {
@@ -2327,7 +2624,15 @@ impl ScenePipeline {
         let cascades = size.cascades as usize;
         let map_fits = self.shadow_map.as_ref().map(|map| map.size) == Some(size);
         let heavy = self.casters_planned > HEAVY_SHADOW_CASTERS;
+        // The nearest cascades that ray traced shadows make unneeded cover
+        // nothing (`shadow_setup`) and aren't drawn.
+        let under_rays = super::lighting::cascades_under_rays(list, &self.graphics, aspect);
         for (index, drawn) in drawn.iter_mut().enumerate().take(cascades) {
+            if index < under_rays {
+                *drawn = false;
+                self.cascades_drawn[index] = None;
+                continue;
+            }
             let takes_turns = heavy && map_fits && cascades >= 3 && index >= cascades - 2;
             let its_turn = (self.frame as usize + index).is_multiple_of(2);
             // A cascade reaches half the map's width from the camera: it
@@ -2385,11 +2690,20 @@ impl ScenePipeline {
                 None => &water.blended,
             };
             let side = usize::from(batch.double_sided);
+            let probe = self
+                .plant_probe
+                .as_ref()
+                .filter(|_| kind == BatchPass::Scene)
+                .and_then(|probe| probe.pipeline(batch));
             let pipeline = match (prepass, batch.double_sided, surface) {
                 _ if kind == BatchPass::DepthFill => &self.prefill_pipelines.depth[side],
                 // Water is never in the prepass.
                 _ if batch.water => water,
+                _ if probe.is_some() => probe?,
                 (false, _, None) if batch.prefilled => &self.prefill_pipelines.lit[side],
+                (false, _, None) if !batch.transparent && !batch.fading && self.whole_solids => {
+                    &self.prefill_pipelines.whole[side]
+                }
                 (false, _, Some(surface)) => surface.items.of(batch),
                 (false, _, None) => self.item_pipelines.of(batch),
                 (true, double_sided, Some(surface)) => surface.prepass(double_sided),
@@ -2519,10 +2833,12 @@ impl ScenePipeline {
             .ray_shadows
             .as_ref()
             .map_or(&self.no_ray_shadows, |shadows| &shadows.mask);
-        let ray_reflections = self
-            .ray_reflections
-            .as_ref()
-            .map_or(&self.no_ray_reflections, |reflections| &reflections.buffer);
+        // Ray traced reflections, or screen-space ones in their place.
+        let ray_reflections = match (&self.ray_reflections, &self.screen_reflections) {
+            (Some(traced), _) => &traced.buffer,
+            (None, Some(screen)) => &screen.buffer,
+            (None, None) => &self.no_ray_reflections,
+        };
         let bind = |layout, prepass_depth, occlusion| {
             create_frame_bind_group(
                 &self.device,
@@ -2761,9 +3077,12 @@ impl ScenePipeline {
 
     pub(super) fn stats(&self) -> RenderStats {
         let counts = self.counts;
+        // A lamp's map with its kept still casters.
+        let kept =
+            |kept: &Option<lamp_shadows::KeptLayers>| kept.as_ref().map_or(0, |kept| kept.bytes);
         let shadow_bytes = self.shadow_map.as_ref().map_or(0, |map| map.bytes)
-            + self.spot_shadow_map.as_ref().map_or(0, |map| map.bytes)
-            + self.point_shadow_map.as_ref().map_or(0, |map| map.bytes);
+            + (self.spot_shadow_map.as_ref()).map_or(0, |map| map.bytes + kept(&map.kept))
+            + (self.point_shadow_map.as_ref()).map_or(0, |map| map.bytes + kept(&map.kept));
         let sheet_bytes = self.turned_text.sheet.as_ref().map_or(0, |(sheet, _, _)| {
             target_bytes((sheet.width(), sheet.height(), 1), sheet.format(), 1)
         });
@@ -2802,6 +3121,9 @@ impl ScenePipeline {
                 .map_or([None; SHADOW_CASCADES], gpu_timer::GpuTimer::last_cascades),
             cascade_casters: counts.cascade_casters,
             cascade_triangles: counts.cascade_triangles,
+            cascade_draws: counts.cascade_draws,
+            lamp_shadow_draws: counts.lamp_shadow_draws,
+            lamp_views_kept: counts.lamp_views_kept,
             pass_times: self
                 .gpu_timer
                 .as_ref()
@@ -2815,6 +3137,12 @@ impl ScenePipeline {
             items_submitted: counts.items_submitted,
             items_drawn: counts.items_drawn,
             batches: counts.batches,
+            prepass_draws: counts.prepass_draws,
+            motion_draws: counts.motion_draws,
+            depth_fill_draws: counts.depth_fill_draws,
+            scattered_batches: counts.scattered_batches,
+            scattered_items: counts.scattered_items,
+            depth_from_prepass: counts.depth_from_prepass,
             items_culled: counts.items_culled,
             shadow_casters_drawn: counts.shadow_casters_drawn,
             shadow_casters_culled: counts.shadow_casters_culled,
@@ -2851,6 +3179,10 @@ impl ScenePipeline {
                 + self.realtime_gi.as_ref().map_or(0, |gi| gi.bytes())
                 + self.ray_gi.as_ref().map_or(0, |gi| gi.bytes())
                 + self.ray_reflections.as_ref().map_or(0, |pass| pass.bytes())
+                + self
+                    .screen_reflections
+                    .as_ref()
+                    .map_or(0, |pass| pass.bytes())
                 + self.soft_scene.as_ref().map_or(0, |soft| soft.bytes())
                 + self.volumetric_fog.as_ref().map_or(0, |fog| fog.bytes())
                 + self.water.copy.as_ref().map_or(0, |copy| copy.bytes),
@@ -2894,6 +3226,18 @@ impl ScenePipeline {
 
     pub(super) fn gpu_mesh(&self, key: MeshKey) -> Option<&GpuMesh> {
         gpu_mesh_in(&self.meshes, &self.custom_meshes, key)
+    }
+
+    /// The binding a shadow view draws a cut-out caster through: its
+    /// material (`material`, its index in `uses`), or the plain one for a
+    /// caster without holes ([`lighting::CutOutCaster::NO_HOLES`]) or a
+    /// material not bound yet.
+    pub(super) fn cut_out_material(&self, uses: &FrameUses, material: u32) -> &GpuMaterial {
+        uses.materials
+            .get(material as usize)
+            .and_then(|key| self.materials.get(key))
+            .and_then(|cached| cached.gpu.as_ref())
+            .unwrap_or(&self.plain_material)
     }
 
     /// Shapes and uploads the UI text in `ui`, with its rich text runs,
@@ -3067,6 +3411,22 @@ impl ScenePipeline {
     pub(super) fn upload_new(&mut self, list: &DrawList, draws: &[Draw], uses: &FrameUses) {
         let frame = self.frame;
         let arrived = self.finish_background_uploads();
+        // Skirts made on a worker join their meshes: the indices again, the
+        // skirt's after them (the mesh's own are the same, so nothing built
+        // from the old buffer is out of date).
+        for made in self.skirts.made() {
+            if let Some(Cached { gpu: Some(gpu), .. }) = self.custom_meshes.get_mut(&made.key)
+                && gpu.version == made.version
+                && made.indices.len() > gpu.index_count as usize
+            {
+                gpu.indices =
+                    index_buffer(&self.device, "mesh", bytemuck::cast_slice(&made.indices));
+                gpu.cap_index_count = made.indices.len() as u32;
+                gpu._bytes = self
+                    .mesh_bytes
+                    .count(gpu.vertices.size() + gpu.indices.size());
+            }
+        }
         // Terrain chunks and painted terrain water meshes are small and rebuilt
         // live as the camera moves or the user paints: each goes up right away,
         // like terrain weights. Left to the background upload thread, a chunk
@@ -3112,15 +3472,23 @@ impl ScenePipeline {
                         uploader.mesh(source);
                         continue;
                     }
+                    // A renderer whose frames are shown makes the skirt
+                    // away from the frame; an offline one (tests, stills)
+                    // draws the frame asked for with it.
+                    let later = self.one_frame_ahead;
                     slot.insert(Cached {
-                        gpu: upload_custom_mesh(
+                        gpu: upload_custom_mesh_with(
                             &self.device,
                             &self.mesh_bytes,
                             &self.skinning,
                             source.as_ref(),
+                            !later,
                         ),
                         last_drawn: frame,
                     });
+                    if later {
+                        self.skirts.request(Arc::clone(source));
+                    }
                 }
             }
         }
@@ -3499,19 +3867,24 @@ fn item_bounds(
     }
 }
 
+/// Begins a pass drawing into the scene's targets. `load` says whether
+/// the color, then the depth, already there is kept (else it's cleared),
+/// and `keep` whether a later pass carries on from what this one leaves.
 fn begin_scene_pass<'a>(
     encoder: &'a mut wgpu::CommandEncoder,
     targets: &'a FrameTargets,
-    load: bool,
+    (load_color, load_depth): (bool, bool),
     keep: bool,
 ) -> wgpu::RenderPass<'a> {
-    let (color_load, depth_load) = if load {
-        (wgpu::LoadOp::Load, wgpu::LoadOp::Load)
+    let color_load = if load_color {
+        wgpu::LoadOp::Load
     } else {
-        (
-            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-            wgpu::LoadOp::Clear(1.0),
-        )
+        wgpu::LoadOp::Clear(wgpu::Color::BLACK)
+    };
+    let depth_load = if load_depth {
+        wgpu::LoadOp::Load
+    } else {
+        wgpu::LoadOp::Clear(1.0)
     };
     let kept = if keep {
         wgpu::StoreOp::Store
@@ -3612,6 +3985,8 @@ fn scene_pipelines(
         depth_double,
         lit,
         lit_double,
+        whole,
+        whole_double,
     ] = gpu::in_parallel([
         &|| create_sky_pipeline(device, frame_layout, clouds_layout, samples),
         &|| pipeline(false, false),
@@ -3632,6 +4007,8 @@ fn scene_pipelines(
         &|| prefill(depth_fill, true, DepthUse::Fill),
         &|| prefill("fs_prefilled", false, DepthUse::Filled),
         &|| prefill("fs_prefilled", true, DepthUse::Filled),
+        &|| prefill("fs_prefilled", false, DepthUse::Plain),
+        &|| prefill("fs_prefilled", true, DepthUse::Plain),
     ]);
     (
         sky,
@@ -3645,6 +4022,7 @@ fn scene_pipelines(
         PrefillPipelines {
             depth: [depth, depth_double],
             lit: [lit, lit_double],
+            whole: [whole, whole_double],
         },
     )
 }
@@ -3717,7 +4095,9 @@ fn frame_layout_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         },
         wgpu::BindGroupLayoutEntry {
             binding: 7,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            // Water's corners read the scene's copy here too (how deep it
+            // is under them), so its waves calm at the shore.
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Texture {
                 sample_type: wgpu::TextureSampleType::Float { filterable: true },
                 view_dimension: wgpu::TextureViewDimension::D2,
@@ -3727,7 +4107,7 @@ fn frame_layout_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         },
         wgpu::BindGroupLayoutEntry {
             binding: 8,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
             count: None,
         },
@@ -3813,6 +4193,7 @@ fn targets_used(
         graphics.ambient_occlusion != crate::AmbientOcclusion::Off
             || ray_ao::traced(graphics)
             || ray_reflections::traced(graphics)
+            || screen_reflections::marched(graphics)
             || graphics.contact_shadows
             || graphics.volumetric_fog
             || graphics.ray_traced_shadows != crate::RayTracedShadows::Off
@@ -3913,4 +4294,16 @@ fn create_shadow_bind_group(
             },
         ],
     })
+}
+
+/// One step of drawing a shadow view: casters drawn into a layer (cleared
+/// first, or over what it holds), or a lamp's kept still casters copied
+/// into its layer (renderer/lamp_shadows.rs).
+enum ShadowStep<'a> {
+    Draw(
+        &'a wgpu::TextureView,
+        bool,
+        &'a [(lighting::CasterGroup, Range<u32>)],
+    ),
+    Copy,
 }
