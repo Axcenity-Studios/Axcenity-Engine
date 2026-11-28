@@ -125,11 +125,11 @@ fn a_far_model_draws_fewer_triangles_and_switches_back_up_as_the_camera_nears() 
     let far = square_at(distance_for(LOD_SCREEN_SIZES[1] * 0.5), 1);
     let middle = square_at(distance_for(LOD_SCREEN_SIZES[0] * 0.7), 1);
     assert_eq!(settled(&mut renderer, &near), Detailed::triangles(0));
-    assert_eq!(renderer.stats().lod_items, [1, 0, 0]);
+    assert_eq!(renderer.stats().lod_items, [1, 0, 0, 0]);
     assert_eq!(settled(&mut renderer, &far), Detailed::triangles(2));
-    assert_eq!(renderer.stats().lod_items, [0, 0, 1]);
+    assert_eq!(renderer.stats().lod_items, [0, 0, 1, 0]);
     assert_eq!(settled(&mut renderer, &middle), Detailed::triangles(1));
-    assert_eq!(renderer.stats().lod_items, [0, 1, 0]);
+    assert_eq!(renderer.stats().lod_items, [0, 1, 0, 0]);
     assert_eq!(settled(&mut renderer, &near), Detailed::triangles(0));
 
     // While it switches, both levels draw for a few frames, then only the
@@ -139,7 +139,7 @@ fn a_far_model_draws_fewer_triangles_and_switches_back_up_as_the_camera_nears() 
         renderer.stats().triangles,
         Detailed::triangles(0) + Detailed::triangles(2)
     );
-    assert_eq!(renderer.stats().lod_items, [0, 0, 1]);
+    assert_eq!(renderer.stats().lod_items, [0, 0, 1, 0]);
     for _ in 1..FADE_FRAMES {
         renderer.render(&far).unwrap();
         assert_eq!(renderer.stats().items_drawn, 2);

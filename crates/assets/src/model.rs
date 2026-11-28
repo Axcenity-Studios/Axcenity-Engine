@@ -7,6 +7,7 @@
 //! file (1 glTF unit, or 1 meter in an FBX file, is 1 stud), which is the
 //! `Size` an imported MeshPart starts with.
 
+mod cards;
 mod collision;
 pub(crate) mod cooked_model;
 mod fbx;

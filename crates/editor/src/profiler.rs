@@ -866,7 +866,7 @@ impl Profiler {
 }
 
 /// The Graphics tab's names for [`RenderStats::lod_items`]' levels.
-const LOD_NAMES: [&str; LOD_LEVELS] = ["Full detail", "Level 1", "Level 2"];
+const LOD_NAMES: [&str; LOD_LEVELS] = ["Full detail", "Level 1", "Level 2", "Level 3"];
 
 /// The readings the panel shows.
 struct Summary {
@@ -1486,7 +1486,7 @@ mod tests {
             shadow_casters_culled: 13,
             sprites_culled: 5,
             gpu_particles: 100_000,
-            lod_items: [3, 4, 6],
+            lod_items: [3, 4, 6, 0],
             surface_shaders: 2,
             broken_shaders: 1,
             texture_bytes: 3 << 20,
@@ -1512,7 +1512,7 @@ mod tests {
         let busier = RenderStats {
             draw_calls: 90,
             triangles: 9_000,
-            lod_items: [0, 0, 12],
+            lod_items: [0, 0, 12, 0],
             ..stats
         };
         profiler.record_game(frame(1), GameLoad::default());

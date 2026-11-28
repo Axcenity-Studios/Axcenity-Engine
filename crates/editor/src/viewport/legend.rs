@@ -246,17 +246,21 @@ mod tests {
     #[test]
     fn the_lod_legend_names_each_level_its_count_and_the_thresholds() {
         let stats = RenderStats {
-            lod_items: [10, 4, 2],
+            lod_items: [10, 4, 2, 0],
             ..RenderStats::default()
         };
         let lines = lod_lines(&stats);
         assert_eq!(lines[0].1, "LOD0, its own mesh: 10 in view");
         assert_eq!(lines[2].1, "LOD2, a simpler copy: 2 in view");
-        assert_eq!(lines[3].1, "No simpler copies");
+        // A plant's far copy (`assets::model::lod`).
+        assert_eq!(lines[3].1, "LOD3, a simpler copy: 0 in view");
+        assert_eq!(lines[4].1, "No simpler copies");
         assert!(
-            lines[4].1.contains("LOD1 below 30%, LOD2 below 12%"),
+            lines[5]
+                .1
+                .contains("LOD1 below 30%, LOD2 below 12%, LOD3 below 5%"),
             "{}",
-            lines[4].1
+            lines[5].1
         );
         // The swatches are the shader's colors as the screen shows them.
         assert_eq!(lines[0].0, Some(shown([0.2, 0.8, 0.25])));
@@ -304,7 +308,7 @@ mod tests {
     #[test]
     fn the_legend_draws_in_the_viewports_corner_for_its_views_only() {
         let stats = RenderStats {
-            lod_items: [12, 5, 3],
+            lod_items: [12, 5, 3, 0],
             ..RenderStats::default()
         };
         let draw = |mode: ViewMode| {
