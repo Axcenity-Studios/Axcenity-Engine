@@ -1252,7 +1252,7 @@ impl FarCascadeLods<'_> {
         // The simplest copy at or under that level that the GPU has.
         (usize::from(caster.level) + 1..=level)
             .rev()
-            .filter_map(|level| caster.lods[level - 1])
+            .filter_map(|level| caster.lods.get(level - 1).copied().flatten())
             .find(|&mesh| (self.uploaded)(mesh))
             .unwrap_or(caster.mesh)
     }
