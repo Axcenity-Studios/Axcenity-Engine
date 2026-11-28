@@ -112,6 +112,25 @@ fn a_cut_out_surface_shows_itself_where_solid_and_what_is_behind_through_its_hol
     }
 }
 
+/// With four cascades the farthest takes one frame in four, never one its
+/// neighbour is drawn on, so a frame draws at most one of the two.
+#[test]
+fn with_four_cascades_the_farthest_is_drawn_one_frame_in_four_alone() {
+    use super::super::scene::cascade_turn;
+    for frame in 0..64 {
+        let third = cascade_turn(frame, 2, 4);
+        let fourth = cascade_turn(frame, 3, 4);
+        assert!(!(third && fourth), "frame {frame}");
+        assert_eq!(third, frame.is_multiple_of(2), "frame {frame}");
+    }
+    let fourth = (0..64).filter(|&frame| cascade_turn(frame, 3, 4)).count();
+    assert_eq!(fourth, 16);
+    // Three cascades: the far two still alternate.
+    for frame in 0..8 {
+        assert_ne!(cascade_turn(frame, 1, 3), cascade_turn(frame, 2, 3));
+    }
+}
+
 #[test]
 fn the_far_cascades_of_a_heavy_scene_take_turns_and_a_small_scene_draws_them_all() {
     let Some((device, queue)) = test_device() else {
