@@ -109,6 +109,7 @@ fn changes_has_a_row_for_every_setting() {
         ambient_occlusion: _,
         reflection_quality: _,
         contact_shadows: _,
+        shadow_lod: _,
         screen_space_reflections: _,
         realtime_gi: _,
         volumetric_fog: _,
@@ -128,7 +129,7 @@ fn changes_has_a_row_for_every_setting() {
         ray_traced_reflections: _,
         ray_tracing: _,
     } = &high;
-    let edits: [fn(&mut GraphicsSettings); 30] = [
+    let edits: [fn(&mut GraphicsSettings); 31] = [
         |s| s.quality = Quality::Low,
         |s| s.automatic = !s.automatic,
         |s| s.shadow_quality = other(s.shadow_quality(), ShadowQuality::Low, ShadowQuality::Ultra),
@@ -159,6 +160,7 @@ fn changes_has_a_row_for_every_setting() {
             )
         },
         |s| s.contact_shadows = Some(!s.contact_shadows()),
+        |s| s.shadow_lod = Some(!s.shadow_lod()),
         |s| s.screen_space_reflections = Some(!s.screen_space_reflections()),
         |s| s.realtime_gi = Some(!s.realtime_gi()),
         |s| s.volumetric_fog = Some(!s.volumetric_fog()),

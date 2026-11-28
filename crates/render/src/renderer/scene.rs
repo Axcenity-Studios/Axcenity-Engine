@@ -1281,7 +1281,12 @@ impl ScenePipeline {
         cpu.lap(CpuSection::Lods);
         // Each draw's material binding, worked out once for the uploads
         // and the plan: it reads every map setting of the item.
-        let uses = FrameUses::of(&draws, &groups);
+        let mut uses = FrameUses::of(&draws, &groups);
+        if self.graphics.shadow_lod {
+            // The farthest cascade may draw a caster at a simpler level
+            // than the camera does: those copies go up too.
+            uses.add_lods(&draws, &groups, self.frame);
+        }
         cpu.lap(CpuSection::Materials);
         self.upload_new(list, &draws, &uses);
         cpu.lap(CpuSection::Uploads);
@@ -1343,8 +1348,24 @@ impl ScenePipeline {
         self.casters_planned = casters.iter().map(Vec::len).sum();
         // Swaying casters move with the clock while the wind blows.
         let windy = glam::Vec2::new(list.wind.x, list.wind.z).length() >= 1e-3;
-        let mut view_casters =
-            casters_in_views(&casters, &shadow_view_list, self.cut_out_cascades, windy);
+        // The farthest cascade draws casters at the level of detail their
+        // size in its map calls for (`GraphicsSettings::shadow_lod`).
+        let (meshes, custom_meshes) = (&self.meshes, &self.custom_meshes);
+        let uploaded = |mesh: MeshKey| gpu_mesh_in(meshes, custom_meshes, mesh).is_some();
+        let by_map_size = map_size
+            .filter(|size| self.graphics.shadow_lod && size.cascades > 1)
+            .map(|size| FarCascadeLods {
+                view: cascades - 1,
+                extent: frame_uniform.cascade_texels[cascades - 1] * size.size as f32,
+                uploaded: &uploaded,
+            });
+        let mut view_casters = casters_in_views(
+            &casters,
+            &shadow_view_list,
+            self.cut_out_cascades,
+            windy,
+            by_map_size,
+        );
         cpu.lap(CpuSection::Casters);
         // Water reflecting the screen traces rays too, with the GPU (LE5).
         let water_rays = water_mode.traces_rays(&self.graphics);

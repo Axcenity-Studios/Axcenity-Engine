@@ -611,6 +611,7 @@ pub(super) fn casters_in_views(
     views: &[ShadowView],
     cut_out_cascades: usize,
     windy: bool,
+    by_map_size: Option<FarCascadeLods<'_>>,
 ) -> Vec<ViewCasters> {
     let share = worth_sharing(casters.iter().map(Vec::len).sum());
     let views: Vec<(usize, &ShadowView)> = views.iter().enumerate().collect();
@@ -620,6 +621,14 @@ pub(super) fn casters_in_views(
         }
         let lamp = matches!(view, ShadowView::Lamp(..));
         let near = lamp || index < cut_out_cascades;
+        // The farthest cascade draws each caster at the level of detail its
+        // size in that map calls for, where that's simpler than the
+        // camera's and its mesh is on the GPU.
+        let lods = by_map_size.as_ref().filter(|lods| lods.view == index);
+        let mesh_of = |caster: &Caster| match lods {
+            Some(lods) => lods.mesh(caster),
+            None => caster.mesh,
+        };
         // The material it's drawn through in this view, or `None` whole.
         let drawn = |cut_out: Option<CutOutCaster>| {
             cut_out
@@ -645,7 +654,7 @@ pub(super) fn casters_in_views(
                 if view.touches(caster.sphere) {
                     let moving = lamp && super::lamp_shadows::moves(&caster.raw, windy);
                     let material = drawn(caster.cut_out);
-                    let key = caster_order(moving, material, caster.mesh, first + at as u32);
+                    let key = caster_order(moving, material, mesh_of(caster), first + at as u32);
                     kept.push((key, caster));
                 } else {
                     left_out += 1;
@@ -673,7 +682,7 @@ pub(super) fn casters_in_views(
             match groups.last_mut() {
                 Some((_, range)) if last_kind == Some(kind) => range.end = copy + 1,
                 _ => {
-                    groups.push(((caster.mesh, drawn(caster.cut_out)), copy..copy + 1));
+                    groups.push(((mesh_of(caster), drawn(caster.cut_out)), copy..copy + 1));
                     if key >> 127 == 0 {
                         still_groups = groups.len();
                     }
@@ -1122,6 +1131,42 @@ impl<'a> FrameUses<'a> {
     }
 }
 
+impl<'a> FrameUses<'a> {
+    /// Adds the simpler copies (`MeshSource::lod`) of meshes `draws` draw
+    /// to [`FrameUses::meshes`], so they're on the GPU for a shadow view
+    /// that draws a caster at another level than the camera
+    /// ([`FarCascadeLods`], which draws the camera's mesh until its copy is
+    /// there). A frame takes one [`LOD_TURNS`]th of the list's own items and
+    /// of the clusters (`turn`), so each mesh's copies are listed, and kept
+    /// as drawn, every few frames at little cost; a copy listed twice is
+    /// only looked up twice.
+    pub(super) fn add_lods(&mut self, draws: &'a [Draw<'_>], clusters: &[&'a Cluster], turn: u64) {
+        let mine = |index: usize| index as u64 % LOD_TURNS == turn % LOD_TURNS;
+        let own = draws.partition_point(|draw| draw.cluster == NO_CLUSTER);
+        let own_sources = draws[..own]
+            .iter()
+            .enumerate()
+            .filter(|&(index, _)| mine(index))
+            .filter_map(|(_, draw)| match &draw.item.shape {
+                crate::Shape::Mesh(source) => Some(source),
+                _ => None,
+            });
+        let cluster_sources = clusters
+            .iter()
+            .enumerate()
+            .filter(|&(index, _)| mine(index))
+            .flat_map(|(_, cluster)| cluster.meshes.iter());
+        for source in own_sources.chain(cluster_sources) {
+            self.meshes
+                .extend((1..=source.lod_count()).filter_map(|level| source.lod(level)));
+        }
+    }
+}
+
+/// How many frames [`FrameUses::add_lods`] takes to list every mesh's
+/// simpler copies once.
+const LOD_TURNS: u64 = 8;
+
 impl FrameUses<'_> {
     /// Where `key` (whose digest is `digest`) is among the frame's
     /// materials, added as first used by draw `first` if it's new.
@@ -1185,10 +1230,54 @@ impl MaterialPlaces {
     }
 }
 
+/// What the farthest cascade needs to draw casters at the level of detail
+/// their size in its map calls for (`GraphicsSettings::shadow_lod`).
+pub(super) struct FarCascadeLods<'a> {
+    /// The cascade's index among the shadow views.
+    pub(super) view: usize,
+    /// How wide its map is, in studs.
+    pub(super) extent: f32,
+    /// Whether a mesh is on the GPU to draw with.
+    pub(super) uploaded: &'a (dyn Fn(MeshKey) -> bool + Sync),
+}
+
+impl FarCascadeLods<'_> {
+    /// The mesh `caster` is drawn with in this cascade: the camera's, or a
+    /// simpler copy where its size in the map calls for one.
+    fn mesh(&self, caster: &Caster) -> MeshKey {
+        let level = shadow_level(2.0 * caster.sphere.1 / self.extent);
+        if level <= usize::from(caster.level) {
+            return caster.mesh;
+        }
+        // The simplest copy at or under that level that the GPU has.
+        (usize::from(caster.level) + 1..=level)
+            .rev()
+            .filter_map(|level| caster.lods.get(level - 1).copied().flatten())
+            .find(|&mesh| (self.uploaded)(mesh))
+            .unwrap_or(caster.mesh)
+    }
+}
+
+/// The level of detail an item `size` across, as a fraction of a shadow
+/// map's width, is drawn with there: as the camera picks it by the share
+/// of the screen's height (`lod::LOD_SCREEN_SIZES`).
+pub(super) fn shadow_level(size: f32) -> usize {
+    super::lod::LOD_SCREEN_SIZES
+        .iter()
+        .filter(|&&threshold| size < threshold)
+        .count()
+}
+
 /// A solid item that casts a shadow, whether or not the camera sees it.
 #[derive(Clone, Copy)]
 pub(super) struct Caster {
     pub(super) mesh: MeshKey,
+    /// The level of detail it's drawn with in the camera's view (0 for its
+    /// own mesh), and its mesh's simpler copies (`MeshSource::lod`), for
+    /// the farthest cascade to draw it at the level its size in that
+    /// shadow map calls for ([`shadow_level`]).
+    pub(super) level: u8,
+    pub(super) lods: [Option<MeshKey>; 2],
     /// A cut-out's material: its shadow is drawn through its texture's
     /// holes (`fs_shadow_cut_out`). `None` casts the whole mesh.
     pub(super) cut_out: Option<CutOutCaster>,
@@ -1502,8 +1591,19 @@ fn plan_part<'a>(
         let caster_at = caster.then(|| {
             let mut raw = raw;
             raw.emissive_fade[3] = draw.shadow;
+            let lods = match &item.shape {
+                crate::Shape::Mesh(source) => [1, 2].map(|level| {
+                    (level <= source.lod_count())
+                        .then(|| source.lod(level))
+                        .flatten()
+                        .map(|lod| MeshKey::Custom(lod.key()))
+                }),
+                _ => [None; 2],
+            };
             part.casters.push(Caster {
                 mesh,
+                level: draw.level.unwrap_or(0) as u8,
+                lods,
                 cut_out,
                 sphere,
                 raw,

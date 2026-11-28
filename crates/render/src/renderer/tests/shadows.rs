@@ -332,8 +332,13 @@ fn spot_shadows_skip_casters_outside_the_beams_bounds() {
     let beam = (Vec3::new(0.0, 0.0, -5.0), 4.0);
     // A view that sees everywhere, so only the lamp's reach decides.
     let everywhere = Frustum::of(Mat4::ZERO);
-    let views =
-        lighting::casters_in_views(&casters, &[ShadowView::Lamp(beam, everywhere)], 0, false);
+    let views = lighting::casters_in_views(
+        &casters,
+        &[ShadowView::Lamp(beam, everywhere)],
+        0,
+        false,
+        None,
+    );
     // Only the near solid block: the far one is out of reach, the glass is
     // see-through and the sphere casts no shadow.
     assert_eq!(views[0].groups, [((MeshKey::Block, None), 0..1)]);
@@ -372,7 +377,7 @@ fn a_shadow_view_draws_each_mesh_once_whatever_distance_its_casters_are_at() {
     );
     let everywhere = Frustum::of(Mat4::ZERO);
     let sun = ShadowView::Sun(everywhere);
-    let views = lighting::casters_in_views(&casters, &[sun, sun], 1, false);
+    let views = lighting::casters_in_views(&casters, &[sun, sun], 1, false, None);
     let material = casters
         .iter()
         .flatten()
@@ -411,4 +416,51 @@ fn a_shadow_view_draws_each_mesh_once_whatever_distance_its_casters_are_at() {
         .map(|raw| raw.model[3][2])
         .collect();
     assert_eq!(instances[4..], [-4.0, -45.0]);
+}
+
+#[test]
+fn the_farthest_cascade_draws_casters_at_the_level_their_size_in_its_map_calls_for() {
+    use super::level_of_detail::Detailed;
+    // Two copies of a mesh with two simpler levels, both near the camera,
+    // so the camera draws them at full detail.
+    let near = |x: f32| DrawItem {
+        shape: Shape::Mesh(Arc::new(Detailed { level: 0 })),
+        ..item(Shape::Block, Vec3::new(x, 0.0, -3.0), 1.0)
+    };
+    let list = list_of(vec![near(-1.0), near(1.0)]);
+    let DrawPlan { casters, .. } = plan(&list);
+    let full = MeshKey::Custom(900);
+    assert!(casters.iter().flatten().all(|caster| caster.mesh == full));
+    let radius = casters[0][0].sphere.1;
+    let sun = ShadowView::Sun(Frustum::of(Mat4::ZERO));
+    let meshes_in = |extent: f32, uploaded: &(dyn Fn(MeshKey) -> bool + Sync)| {
+        let lods = lighting::FarCascadeLods {
+            view: 1,
+            extent,
+            uploaded,
+        };
+        let views = lighting::casters_in_views(&casters, &[sun, sun], 0, false, Some(lods));
+        let near: Vec<MeshKey> = views[0].groups.iter().map(|((mesh, _), _)| *mesh).collect();
+        let far: Vec<MeshKey> = views[1].groups.iter().map(|((mesh, _), _)| *mesh).collect();
+        (near, far)
+    };
+    let everything: &(dyn Fn(MeshKey) -> bool + Sync) = &|_| true;
+    // Half the map across: full detail, as the camera draws it.
+    let (near, far) = meshes_in(4.0 * radius, everything);
+    assert_eq!((near, far), (vec![full], vec![full]));
+    // A fifth of it: the first simpler copy, in the farthest cascade only.
+    let (near, far) = meshes_in(10.0 * radius, everything);
+    assert_eq!((near, far), (vec![full], vec![MeshKey::Custom(901)]));
+    // A twentieth: the simplest.
+    let (_, far) = meshes_in(40.0 * radius, everything);
+    assert_eq!(far, vec![MeshKey::Custom(902)]);
+    // A copy not on the GPU yet isn't drawn: the next one that is, or the
+    // camera's.
+    let (_, far) = meshes_in(40.0 * radius, &|mesh| mesh != MeshKey::Custom(902));
+    assert_eq!(far, vec![MeshKey::Custom(901)]);
+    let (_, far) = meshes_in(40.0 * radius, &|mesh| mesh == full);
+    assert_eq!(far, vec![full]);
+    assert_eq!(lighting::shadow_level(0.5), 0);
+    assert_eq!(lighting::shadow_level(0.2), 1);
+    assert_eq!(lighting::shadow_level(0.05), 2);
 }
